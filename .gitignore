@@ -1,1 +1,3 @@
 .stfolder/
+.venv/
+__pycache__/
