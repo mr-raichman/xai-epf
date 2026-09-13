@@ -1,0 +1,43 @@
+[project]
+name = "epf"
+version = "0.1.0"
+description = "Day-ahead electricity price forecasting for the Spanish market, and what the models learn about how the price forms."
+requires-python = "==3.13.*"
+dependencies = [
+    "pandas==3.0.5",
+    "numpy==2.5.3",
+    "requests==2.34.2",
+    "scikit-learn==1.9.1",
+    "lightgbm==4.7.0",
+    "xgboost==3.4.1",
+    "shap==0.52.0",
+    "matplotlib==3.11.2",
+]
+
+[project.scripts]
+epf-download = "epf.data.omie:download"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff==0.16.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["epf"]
+
+[tool.ruff.lint]
+# Pinned rather than left on ruff's defaults, which widen between releases: a
+# repo sanitised under one ruff reports new findings under the next, in code
+# nobody touched. This is the correctness-focused set (pyflakes plus the E rules
+# that are not style), so a failure means something is wrong rather than
+# differently written. Widen it deliberately, in a commit that also fixes what it
+# turns up.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+# Collect only real automated tests. tools/ holds diagnostics that hit the
+# network, so collecting them would turn a test run into a download.
+testpaths = ["tests"]
+addopts = "-q"
