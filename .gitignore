@@ -1,3 +1,4 @@
 .stfolder/
 .venv/
 __pycache__/
+data/
