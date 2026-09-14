@@ -1,8 +1,4 @@
-"""L'alineació dels retards, que és l'error que no faria soroll.
-
-Si una fila s'aparella amb el dia equivocat, el model entrena amb parelles
-desplaçades i cap excepció ho diu. La resta del mòdul falla sorollosament.
-"""
+"""Alineació dels retards per data de lliurament."""
 import datetime
 
 import pandas as pd
@@ -13,7 +9,7 @@ from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build, feature_names
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
-    """Preus sintètics on cada valor diu de quin dia i de quina hora ve."""
+    """Preus sintètics on cada valor és dia * 100 + hora."""
     index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in days], name="day")
     rows = [[d * 100 + hour for hour in range(24)] for d in days]
     return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
@@ -42,7 +38,6 @@ def test_the_first_complete_row_is_the_longest_lag_away():
 
 
 def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
-    """La propietat per la qual el carregador torna un DataFrame i no una matriu."""
     complete = build(frame_of(range(30)))[0]
     with_gap = build(frame_of([d for d in range(30) if d != 15]))[0]
 
@@ -50,8 +45,7 @@ def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
     missing = set(complete.index) - set(with_gap.index)
     assert missing == {gap} | {gap + pd.Timedelta(days=lag) for lag in PRICE_LAGS}
 
-    # I el que queda segueix ben aparellat: cap fila ha absorbit el dia del costat.
-    # El valor sintètic de l'hora 0 del dia n-èsim és n * 100.
+    # Les files restants segueixen aparellades amb el seu dia.
     day = with_gap.index[-1]
     offset = (day - pd.Timedelta(days=1) - pd.Timestamp("2020-01-01")).days
     assert with_gap.loc[day, "lag1_h00"] == offset * 100

@@ -1,4 +1,4 @@
-"""On viuen les dades. Res del repositori no s'escriu aquí (decisió 40)."""
+"""Rutes on viuen les dades."""
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

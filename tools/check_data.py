@@ -1,9 +1,4 @@
-"""Comprovació de coherència de la capa de dades. És una execució de tempteig.
-
-No mesura res i no imprimeix cap xifra que es pugui confondre amb un resultat
-(decisió 30): només pregunta si el que surt del carregador quadra amb el que
-sabem de la font. Falla amb soroll, mai en silenci.
-"""
+"""Comprovació de coherència de la capa de dades amb la font."""
 import collections
 import datetime
 import sys
@@ -54,9 +49,7 @@ versions = collections.Counter(int(path.suffix[1:]) for path in chosen.values())
 check("s'usa alguna versió superior a la primera", sum(versions.values()) > versions[1],
       f"{dict(sorted(versions.items()))}")
 
-# Un dia normal amb Espanya i Portugal desacoblats: a l'hora 14 el fitxer porta
-# -0.58 per a Portugal i -0.60 per a Espanya, així que llegir la columna que no
-# toca es veuria aquí (decisió 43).
+# Dia amb Espanya i Portugal desacoblats: a l'hora 14, -0.60 a Espanya i -0.58 a Portugal.
 DECOUPLED_DAY, DECOUPLED_HOUR, SPANISH_PRICE = datetime.date(2024, 6, 1), 14, -0.60
 check("es llegeix la columna espanyola i no la portuguesa",
       abs(frame.loc[str(DECOUPLED_DAY)].iloc[DECOUPLED_HOUR] - SPANISH_PRICE) < 1e-9,

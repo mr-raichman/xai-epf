@@ -1,14 +1,12 @@
-"""La reparació del canvi d'hora, amb els dos dies reals que la van motivar."""
+"""Correcció dels dies de canvi d'hora."""
 import pytest
 
 from epf.data.calendar import repair_dst
 
-# 2025-03-30, l'últim diumenge de març: el fitxer porta 23 períodes perquè l'hora
-# local 02 no es va subhastar. Els cinc primers preus espanyols del fitxer.
+# 2025-03-30: 23 períodes, sense l'hora local 02. Primers cinc preus espanyols.
 SPRING = [3.6, 3.2, 0.65, 0.1, 0.09]
 
-# 2024-10-27, l'últim diumenge d'octubre: 25 períodes, i els períodes 3 i 4 són
-# les dues subhastes de l'hora 02.
+# 2024-10-27: 25 períodes; el tercer i el quart són l'hora local 02 repetida.
 AUTUMN = [87.71, 83.31, 82.23, 80.68, 81.3]
 
 
@@ -30,7 +28,6 @@ def test_autumn_merges_the_two_auctions_of_the_repeated_hour():
 
 
 def test_the_repair_only_moves_the_third_hour():
-    """La resta del dia ha de quedar igual, només desplaçada."""
     day = [float(h) for h in range(23)]
     repaired = repair_dst(day)
     assert repaired[:2] == day[:2]
