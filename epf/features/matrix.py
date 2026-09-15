@@ -6,7 +6,7 @@ del dia anterior al lliurament.
 import pandas as pd
 
 from epf.config.market import HOURS_PER_DAY
-from epf.data.omie import HOUR_COLUMNS
+from epf.data.calendar import HOUR_COLUMNS
 
 # Retards del model LEAR de Lago et al. (2021): fa 1, 2, 3 i 7 dies.
 PRICE_LAGS = (1, 2, 3, 7)

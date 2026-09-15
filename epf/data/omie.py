@@ -16,7 +16,7 @@ import requests
 
 from epf.config.market import HOURS_PER_DAY, QUARTERS_PER_HOUR
 from epf.config.paths import OMIE_PRICES
-from epf.data.calendar import repair_dst
+from epf.data.calendar import HOUR_COLUMNS, repair_dst
 
 # Índex de MarginalES, el preu espanyol. L'índex 4 és el portuguès.
 SPAIN_FIELD = 5
@@ -28,7 +28,6 @@ LISTING = f"{BASE}/file-access-list?realdir=marginalpdbc"
 FILENAME = re.compile(r"marginalpdbc_(\d{8})\.(\d+)")
 # Anys que OMIE publica en un sol zip anual en lloc de fitxers diaris.
 YEAR_ARCHIVE = re.compile(r"marginalpdbc_(\d{4})\.zip")
-HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
 
 def _day_of(stem):

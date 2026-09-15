@@ -1,7 +1,9 @@
-"""Correcció dels dies de canvi d'hora."""
+"""Hores del dia i correcció dels dies de canvi d'hora."""
 import statistics
 
 from epf.config.market import DST_HOUR, HOURS_PER_DAY
+
+HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
 
 def repair_dst(hours):

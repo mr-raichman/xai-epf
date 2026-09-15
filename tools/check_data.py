@@ -3,8 +3,11 @@ import collections
 import datetime
 import sys
 
+import pandas as pd
+
 from epf.config.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 from epf.config.split import HISTORY_START
+from epf.data import esios
 from epf.data.omie import latest_version_per_day, load, read_periods
 
 failures = []
@@ -54,6 +57,39 @@ DECOUPLED_DAY, DECOUPLED_HOUR, SPANISH_PRICE = datetime.date(2024, 6, 1), 14, -0
 check("es llegeix la columna espanyola i no la portuguesa",
       abs(frame.loc[str(DECOUPLED_DAY)].iloc[DECOUPLED_HOUR] - SPANISH_PRICE) < 1e-9,
       f"{DECOUPLED_DAY} hora {DECOUPLED_HOUR}")
+
+spain = esios.load_price("España")
+overlap = frame.index.intersection(spain.index)
+largest = (frame.loc[overlap] - spain.loc[overlap]).abs().max().max()
+check("el preu espanyol d'ESIOS coincideix amb el d'OMIE", len(overlap) > 0 and largest < 0.01,
+      f"{len(overlap)} dies comuns, diferència màxima {largest:.4f}")
+
+# Hores que ESIOS no publica en una àncora: el PBF de l'apagada del 28 d'abril de 2025.
+KNOWN_GAPS = {esios.PBF_WIND: pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")}
+
+for anchor in sorted({a for a in esios.SERIES.values() if a is not None}):
+    series = esios.load(anchor)
+    # El primer i l'últim dia poden ser parcials: l'inici de la publicació i avui.
+    interior = series.reindex(pd.date_range(series.index[0], series.index[-1], freq="D")[1:-1])
+    days, hours = interior.isna().to_numpy().nonzero()
+    absent = interior.index[days] + pd.to_timedelta(hours, unit="h")
+    unexpected = absent.difference(KNOWN_GAPS.get(anchor, pd.DatetimeIndex([])))
+    check(f"l'àncora {anchor} no té hores buides fora de les conegudes", unexpected.empty,
+          f"{len(absent)} hores buides, {len(unexpected)} inesperades, des de {series.index[0].date()}")
+
+print()
+print("cobertura de les sèries d'ESIOS: primer dia, últim dia, dies, hores absents")
+for indicator in sorted(esios.SERIES):
+    try:
+        series = esios.load(indicator)
+    except (FileNotFoundError, ValueError) as error:
+        check(f"l'indicador {indicator} es llegeix", False, str(error))
+        continue
+    if series.empty:
+        print(f"  {indicator:>6}  sense cap valor")
+        continue
+    print(f"  {indicator:>6}  {series.index[0].date()}  {series.index[-1].date()}  "
+          f"{len(series):>5}  {int(series.isna().to_numpy().sum()):>6}")
 
 print()
 if failures:

@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-epf-download = "epf.data.omie:download"
+epf-download = "epf.data.download:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff==0.16.1"]

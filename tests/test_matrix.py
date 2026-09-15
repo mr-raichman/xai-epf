@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.data.omie import HOUR_COLUMNS
+from epf.data.calendar import HOUR_COLUMNS
 from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build, feature_names
 
 
