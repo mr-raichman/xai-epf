@@ -24,7 +24,11 @@ DAY_HALF_WIDTH = 7
 # eix lineal fins a 1 i logarítmic a partir d'aquí.
 LINEAR_UP_TO = 1
 
+# Puntuacions més altes de cada panell, marcades en vermell.
+HIGHEST = 100
+
 SERIES_COLOR = "#2a78d6"
+HIGHLIGHT_COLOR = "#e34948"
 INK = "#0b0b0b"
 MUTED_INK = "#898781"
 GRID = "#e1e0d9"
@@ -34,6 +38,12 @@ frame = prices.load()
 by_hours = hampel_score(frame.to_numpy().ravel(), HOUR_HALF_WIDTH).reshape(frame.shape)
 by_days = np.column_stack([hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
                            for column in frame.columns])
+
+
+def highest(scores):
+    """Posicions de les `HIGHEST` puntuacions més altes, sense comptar les NaN."""
+    flat = np.nan_to_num(scores.ravel(), nan=-np.inf)
+    return np.argsort(flat)[-HIGHEST:]
 
 
 def style(axis, title, ylabel):
@@ -54,19 +64,27 @@ figure, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 hours = np.arange(HOURS_PER_DAY)
 top.add_collection(LineCollection([np.column_stack([hours, day]) for day in by_hours],
                                   colors=SERIES_COLOR, linewidths=0.3, alpha=0.3))
+top_marks = highest(by_hours)
+top.scatter(top_marks % HOURS_PER_DAY, by_hours.ravel()[top_marks], s=12, color=HIGHLIGHT_COLOR,
+            zorder=3)
 top.set_xlim(0, HOURS_PER_DAY - 1)
 top.set_ylim(0, np.nanmax(by_hours) * 1.5)
 top.set_xticks(hours)
 top.set_xlabel("hora del dia", color=MUTED_INK)
-style(top, f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia",
+style(top, f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
+      f"en vermell les {HIGHEST} més altes",
       "distància a la mediana, en MAD")
 
 instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
     np.tile(hours, len(frame)), unit="h")
 bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES_COLOR, linewidths=0)
+bottom_marks = highest(by_days)
+bottom.scatter(instants[bottom_marks], by_days.ravel()[bottom_marks], s=12,
+               color=HIGHLIGHT_COLOR, zorder=3)
 bottom.set_xlim(instants[0], instants[-1])
 bottom.set_ylim(0, np.nanmax(by_days) * 1.5)
-style(bottom, f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} dies)",
+style(bottom, f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} dies), "
+      f"en vermell les {HIGHEST} més altes",
       "distància a la mediana, en MAD")
 
 figure.suptitle(f"Distància de cada preu horari als seus veïns, {frame.index[0].year} a "
