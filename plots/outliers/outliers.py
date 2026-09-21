@@ -7,7 +7,7 @@ import pandas as pd
 
 from epf.config.market import HOURS_PER_DAY
 from epf.data import prices
-from epf.data.outliers import hampel_score
+from epf.data.outliers import hampel_score, window_median_mad
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -35,7 +35,8 @@ GRID = "#e1e0d9"
 SURFACE = "#fcfcfb"
 
 frame = prices.load()
-by_hours = hampel_score(frame.to_numpy().ravel(), HOUR_HALF_WIDTH).reshape(frame.shape)
+values = frame.to_numpy().ravel()
+by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
 by_days = np.column_stack([hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
                            for column in frame.columns])
 
@@ -58,6 +59,29 @@ def style(axis, title, ylabel):
     for side in ("left", "bottom"):
         axis.spines[side].set_color(GRID)
 
+
+
+
+def describe(name, scores, median, mad):
+    """Resum de les puntuacions més altes: com és la finestra i on cauen."""
+    marks = highest(scores)
+    years = pd.Series(frame.index.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
+    print(f"{name}, les {HIGHEST} puntuacions més altes:")
+    print(f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f} EUR/MWh, "
+          f"màxim {mad[marks].max():.2f}")
+    print(f"  mediana de la finestra, mediana {np.median(median[marks]):.2f} EUR/MWh")
+    print(f"  distància del preu a la mediana, mediana "
+          f"{np.median(np.abs(values - median)[marks]):.2f} EUR/MWh")
+    print("  per any: " + ", ".join(f"{year} {count}" for year, count in years.items()))
+
+
+hour_median, hour_mad = window_median_mad(values, HOUR_HALF_WIDTH)
+day_parts = [window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
+             for column in frame.columns]
+describe(f"hores adjacents (±{HOUR_HALF_WIDTH} h)", by_hours, hour_median, hour_mad)
+describe(f"mateixa hora (±{DAY_HALF_WIDTH} dies)", by_days,
+         np.column_stack([part[0] for part in day_parts]).ravel(),
+         np.column_stack([part[1] for part in day_parts]).ravel())
 
 figure, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
