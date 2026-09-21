@@ -23,7 +23,7 @@ hourly = frame.stack()
 instants = hourly.index.get_level_values(0) + pd.to_timedelta(
     [int(hour[1:]) for hour in hourly.index.get_level_values(1)], unit="h")
 
-figure, axis = plt.subplots(figsize=(16, 5), facecolor=SURFACE)
+figure, axis = plt.subplots(figsize=(20, 6), facecolor=SURFACE)
 axis.set_facecolor(SURFACE)
 axis.plot(instants, hourly.to_numpy(), color=SERIES_COLOR, linewidth=0.3)
 
@@ -46,5 +46,5 @@ for side in ("left", "bottom"):
     axis.spines[side].set_color(GRID)
 
 figure.tight_layout()
-figure.savefig(OUTPUT, dpi=150)
+figure.savefig(OUTPUT, dpi=300)
 print(f"desat a {OUTPUT}")
