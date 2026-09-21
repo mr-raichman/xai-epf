@@ -7,7 +7,7 @@ import pandas as pd
 
 from epf.config.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 from epf.config.split import HISTORY_START
-from epf.data import esios
+from epf.data import esios, prices
 from epf.data.omie import latest_version_per_day, load, read_periods
 
 failures = []
@@ -26,7 +26,7 @@ periods = {day: len(read_periods(path)) for day, path in chosen.items()}
 first, last = min(chosen), max(chosen)
 expected_days = (last - first).days + 1
 
-check("comença on comença l'arxiu d'OMIE", first == HISTORY_START, f"{first}")
+check("OMIE comença on comença el seu arxiu", first == prices.OMIE_FROM, f"{first}")
 check("cap dia buit entre el primer i l'últim", len(chosen) == expected_days,
       f"{len(chosen)} de {expected_days}, de {first} a {last}")
 check("l'índex del DataFrame no repeteix cap dia", frame.index.is_unique)
@@ -58,7 +58,19 @@ check("es llegeix la columna espanyola i no la portuguesa",
       abs(frame.loc[str(DECOUPLED_DAY)].iloc[DECOUPLED_HOUR] - SPANISH_PRICE) < 1e-9,
       f"{DECOUPLED_DAY} hora {DECOUPLED_HOUR}")
 
-spain = esios.load_price("España")
+joined = prices.load()
+joined_days = pd.date_range(HISTORY_START, joined.index[-1], freq="D")
+check("el preu unit comença on comença ESIOS", joined.index[0].date() == HISTORY_START,
+      f"{joined.index[0].date()}")
+check("el preu unit no té cap dia buit", joined.index.equals(joined_days),
+      f"{len(joined)} de {len(joined_days)}, de {HISTORY_START} a {joined.index[-1].date()}")
+check("el preu unit té 24 hores i cap valor absent",
+      joined.shape[1] == HOURS_PER_DAY and not joined.isna().to_numpy().any(), f"{joined.shape}")
+seam = pd.Timestamp(prices.OMIE_FROM)
+check("el preu unit és continu al canvi de font",
+      {seam - pd.Timedelta(days=1), seam} <= set(joined.index))
+
+spain = esios.load_price(prices.SPAIN)
 overlap = frame.index.intersection(spain.index)
 largest = (frame.loc[overlap] - spain.loc[overlap]).abs().max().max()
 check("el preu espanyol d'ESIOS coincideix amb el d'OMIE", len(overlap) > 0 and largest < 0.01,

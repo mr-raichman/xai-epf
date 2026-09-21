@@ -1,8 +1,8 @@
 """Intervals de dades utilitzades."""
 import datetime
 
-# Primer dia de l'arxiu públic de preus d'OMIE.
-HISTORY_START = datetime.date(2018, 1, 1)
+# Primer dia del preu espanyol a ESIOS.
+HISTORY_START = datetime.date(2014, 1, 1)
 
 # Dos anys de prova, avaluats per separat: l'horari i el quart-horari promediat.
 TEST_PERIODS = {
