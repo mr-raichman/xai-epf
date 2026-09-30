@@ -13,6 +13,22 @@ PRICE_LAGS = (1, 2, 3, 7)
 DAY_OF_WEEK = "day_of_week"
 
 
+def calibration(X, y, day, window=None):
+    """Files amb què es calibra un model per predir `day`: les anteriors, les últimes
+    `window`, o totes si és None.
+
+    Exclusiu per construcció, i és l'única implementació del tall: el dia que es
+    prediu no hi entra mai, ni cap de posterior.
+    """
+    past = X.index < day
+    features, target = X[past], y[past]
+    if features.empty:
+        raise ValueError(f"cap dia anterior a {day} amb què calibrar")
+    if window is None:
+        return features, target
+    return features.iloc[-window:], target.iloc[-window:]
+
+
 def build(prices, lags=PRICE_LAGS):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 

@@ -11,6 +11,7 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 
 from epf.config.market import HOURS_PER_DAY
+from epf.features.matrix import calibration
 
 # Finestres de calibratge en dies. Els "anys" de l'article són de 364 dies, que
 # són 52 setmanes exactes i mantenen alineat el dia de la setmana. None vol dir
@@ -71,10 +72,7 @@ def forecast(X, y, day, window=None):
     `X` i `y` són els de `features.matrix.build`. La finestra són els últims
     `window` dies disponibles abans de `day`, o tots si és None.
     """
-    past = X.index < day
-    features, target = X[past], y[past]
-    if window is not None:
-        features, target = features.iloc[-window:], target.iloc[-window:]
+    features, target = calibration(X, y, day, window)
     if len(features) <= X.shape[1] + DAYS_PER_WEEK:
         raise ValueError(f"{len(features)} dies de calibratge per a {day}, "
                          f"insuficients per a {X.shape[1] + DAYS_PER_WEEK} columnes")

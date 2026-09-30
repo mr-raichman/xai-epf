@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build
+from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build, calibration
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -63,3 +63,24 @@ def test_wrong_columns_fail_loudly():
     prices = frame_of(range(10)).rename(columns={"h00": "hora0"})
     with pytest.raises(ValueError):
         build(prices)
+
+
+def test_the_calibration_slice_never_reaches_the_day_itself():
+    X, y = build(frame_of(range(30)))
+    day = X.index[10]
+    features, target = calibration(X, y, day)
+    assert features.index.max() < day
+    assert target.index.equals(features.index)
+
+
+def test_the_window_takes_the_last_days_before_it():
+    X, y = build(frame_of(range(30)))
+    day = X.index[15]
+    features, _ = calibration(X, y, day, window=5)
+    assert list(features.index) == list(X.index[10:15])
+
+
+def test_calibrating_with_no_earlier_day_fails_loudly():
+    X, y = build(frame_of(range(30)))
+    with pytest.raises(ValueError):
+        calibration(X, y, X.index[0])
