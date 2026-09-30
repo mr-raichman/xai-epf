@@ -46,32 +46,39 @@ def rest_of_day(day, known, value=0.0):
 
 
 def test_autumn_keys_on_the_offset_and_merges_the_repeated_hour():
-    day = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN)).iloc[0]
+    day = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN))[0].iloc[0]
     assert list(day[:4]) == [21063.17, 19838.75, pytest.approx((18956.5 + 18397.92) / 2), 18044.67]
 
 
 def test_spring_inserts_the_missing_hour():
-    day = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING)).iloc[0]
+    day = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING))[0].iloc[0]
     assert list(day[:4]) == [22541.08, 21072.33, pytest.approx((21072.33 + 20130.58) / 2), 20130.58]
 
 
 def test_provinces_are_summed_and_an_absent_province_adds_nothing():
-    day = hourly(NUCLEAR, anchor_days={datetime.date(2024, 3, 9)}).iloc[0]
+    day = hourly(NUCLEAR, anchor_days={datetime.date(2024, 3, 9)})[0].iloc[0]
     assert day["h01"] == pytest.approx(1063.9 + 1005.8 + 3032.8 + 1003.4)
     assert day["h02"] == pytest.approx(1005.8 + 3032.8 + 1003.4)
 
 
 def test_an_absent_hour_is_zero_only_on_an_anchor_day():
     day = datetime.date(2024, 3, 9)
-    assert hourly(NUCLEAR, anchor_days={day}).iloc[0]["h05"] == 0.0
-    assert pd.isna(hourly(NUCLEAR, anchor_days=set()).iloc[0]["h05"])
-    assert pd.isna(hourly(NUCLEAR).iloc[0]["h05"])
+    assert hourly(NUCLEAR, anchor_days={day})[0].iloc[0]["h05"] == 0.0
+    assert pd.isna(hourly(NUCLEAR, anchor_days=set())[0].iloc[0]["h05"])
+    assert pd.isna(hourly(NUCLEAR)[0].iloc[0]["h05"])
 
 
 def test_zeros_never_extend_beyond_the_published_days():
     anchors = {datetime.date(2024, 3, 8), datetime.date(2024, 3, 9), datetime.date(2024, 3, 10)}
-    days = hourly(NUCLEAR, anchor_days=anchors).index
+    days = hourly(NUCLEAR, anchor_days=anchors)[0].index
     assert list(days) == [pd.Timestamp("2024-03-09")]
+
+
+def test_the_published_count_is_of_local_hours_and_not_of_repaired_ones():
+    autumn, autumn_hours = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN))
+    spring, spring_hours = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING))
+    assert autumn_hours.iloc[0] == 25 and len(autumn.columns) == 24
+    assert spring_hours.iloc[0] == 23 and len(spring.columns) == 24
 
 
 def test_revised_forecasts_are_refused_by_the_normal_loader():

@@ -1,9 +1,18 @@
 """Hores del dia i correcció dels dies de canvi d'hora."""
 import statistics
 
-from epf.config.market import DST_HOUR, HOURS_PER_DAY
+import pandas as pd
+
+from epf.config.market import DST_HOUR, HOURS_PER_DAY, MARKET_TIMEZONE
 
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
+
+
+def local_hours(days):
+    """Hores que té realment cada dia local: 23 el del canvi de març, 25 el d'octubre."""
+    starts = pd.DatetimeIndex(days).tz_localize(MARKET_TIMEZONE)
+    return pd.Series((starts + pd.DateOffset(days=1) - starts) // pd.Timedelta(hours=1),
+                     index=days)
 
 
 def repair_dst(hours):

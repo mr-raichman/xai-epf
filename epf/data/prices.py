@@ -14,6 +14,6 @@ SPAIN = "España"
 
 def load():
     """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna."""
-    early = esios.load_price(SPAIN)
+    early, _ = esios.load_price(SPAIN)
     early = early[early.index < pd.Timestamp(OMIE_FROM)]
     return pd.concat([early, omie.load()])

@@ -141,14 +141,21 @@ def _published_days(values):
 
 
 def hourly(values, anchor_days=None):
-    """Valors d'ESIOS com a dies per hores, sumant les geografies de cada instant.
+    """Valors d'ESIOS com a dies per hores, sumant les geografies de cada instant, i
+    quantes hores va publicar la resposta cada dia local.
 
     La clau és `datetime`, que porta el desplaçament horari: `datetime_utc` etiqueta
     malament la primera 02:00 del canvi d'hora d'octubre. Amb `anchor_days`, una
     hora absent val zero els dies d'àncora entre el primer i l'últim dia publicat.
+
+    El recompte és d'hores i no de valors: una sèrie per províncies en porta una per
+    província a cada instant. Comparat amb `local_hours`, diu si la resposta té la
+    forma del calendari local o si alguna hora ha caigut fora de la graella.
     """
     if not values:
-        return pd.DataFrame(columns=HOUR_COLUMNS, index=pd.DatetimeIndex([], name="day"))
+        empty = pd.DatetimeIndex([], name="day")
+        return (pd.DataFrame(columns=HOUR_COLUMNS, index=empty),
+                pd.Series(dtype=int, index=empty))
     instants = pd.to_datetime([value["datetime"] for value in values], format="ISO8601", utc=True)
     series = pd.Series([value["value"] for value in values], index=instants).groupby(level=0).sum()
 
@@ -167,7 +174,9 @@ def hourly(values, anchor_days=None):
 
     rows = {day: repair_dst(hours.tolist()) for day, hours in frame.groupby("day")["value"]}
     index = pd.DatetimeIndex(list(rows), name="day")
-    return pd.DataFrame(list(rows.values()), index=index, columns=HOUR_COLUMNS)
+    days = series.index.tz_convert(MARKET_TIMEZONE).normalize().tz_localize(None)
+    return (pd.DataFrame(list(rows.values()), index=index, columns=HOUR_COLUMNS),
+            days.value_counts().reindex(index, fill_value=0))
 
 
 def _single_geography(values, indicator):
@@ -178,7 +187,7 @@ def _single_geography(values, indicator):
 
 
 def load(indicator, directory=ESIOS):
-    """Una sèrie admissible, en dies per hores."""
+    """Una sèrie admissible, en dies per hores, i les hores publicades cada dia."""
     if indicator in REVISED_FORECASTS:
         raise ValueError(f"l'indicador {indicator} és una previsió revisada, no admissible: "
                          "es llegeix amb load_revised_forecast")
@@ -193,14 +202,15 @@ def load(indicator, directory=ESIOS):
 
 
 def load_price(country, directory=ESIOS):
-    """Preu del mercat diari d'un país, en EUR/MWh."""
+    """Preu del mercat diari d'un país en EUR/MWh, i les hores publicades cada dia."""
     if country not in PRICE_COUNTRIES:
         raise KeyError(f"cap preu desat per a {country}; n'hi ha per a {PRICE_COUNTRIES}")
     return hourly([value for value in _values(PRICE, directory) if value["geo_name"] == country])
 
 
 def load_revised_forecast(indicator, directory=ESIOS):
-    """Una previsió revisada, que conté informació posterior al tancament de la subhasta."""
+    """Una previsió revisada, que conté informació posterior al tancament de la subhasta,
+    i les hores publicades cada dia."""
     if indicator not in REVISED_FORECASTS:
         raise KeyError(f"l'indicador {indicator} no és una previsió revisada")
     return hourly(_single_geography(_values(indicator, directory), indicator))

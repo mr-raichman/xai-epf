@@ -8,6 +8,7 @@ import pandas as pd
 from epf.config.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 from epf.config.split import HISTORY_START
 from epf.data import esios, prices
+from epf.data.calendar import local_hours
 from epf.data.omie import latest_version_per_day, load, read_periods
 
 failures = []
@@ -70,17 +71,27 @@ seam = pd.Timestamp(prices.OMIE_FROM)
 check("el preu unit és continu al canvi de font",
       {seam - pd.Timedelta(days=1), seam} <= set(joined.index))
 
-spain = esios.load_price(prices.SPAIN)
+spain, spain_hours = esios.load_price(prices.SPAIN)
 overlap = frame.index.intersection(spain.index)
 largest = (frame.loc[overlap] - spain.loc[overlap]).abs().max().max()
 check("el preu espanyol d'ESIOS coincideix amb el d'OMIE", len(overlap) > 0 and largest < 0.01,
       f"{len(overlap)} dies comuns, diferència màxima {largest:.4f}")
 
+# Cada dia del preu d'ESIOS ha d'arribar amb les hores que té el dia local. Si en
+# portés de més, alguna cauria fora de la graella i es perdria sense dir-ho, i el
+# 2014 a 2017 és l'únic tram del preu sense una segona font que ho destapés.
+calendar_hours = local_hours(spain.index)
+short = spain.index[spain_hours != calendar_hours]
+changes = spain_hours[calendar_hours != HOURS_PER_DAY].value_counts().sort_index()
+check("el preu d'ESIOS publica exactament les hores de cada dia local", short.empty,
+      f"{len(spain)} dies, als canvis d'hora "
+      + " i ".join(f"{count} de {hours} h" for hours, count in changes.items()))
+
 # Hores que ESIOS no publica en una àncora: el PBF de l'apagada del 28 d'abril de 2025.
 KNOWN_GAPS = {esios.PBF_WIND: pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")}
 
 for anchor in sorted({a for a in esios.SERIES.values() if a is not None}):
-    series = esios.load(anchor)
+    series, _ = esios.load(anchor)
     # El primer i l'últim dia poden ser parcials: l'inici de la publicació i avui.
     interior = series.reindex(pd.date_range(series.index[0], series.index[-1], freq="D")[1:-1])
     days, hours = interior.isna().to_numpy().nonzero()
@@ -91,19 +102,24 @@ for anchor in sorted({a for a in esios.SERIES.values() if a is not None}):
 
 print()
 print("cobertura de les sèries d'ESIOS: primer dia, últim dia, dies, hores absents")
+overfull = []
 for indicator in sorted(esios.SERIES):
     try:
-        series = esios.load(indicator)
+        series, published = esios.load(indicator)
     except (FileNotFoundError, ValueError) as error:
         check(f"l'indicador {indicator} es llegeix", False, str(error))
         continue
     if series.empty:
         print(f"  {indicator:>6}  sense cap valor")
         continue
+    if (published > local_hours(series.index)).any():
+        overfull.append(indicator)
     print(f"  {indicator:>6}  {series.index[0].date()}  {series.index[-1].date()}  "
           f"{len(series):>5}  {int(series.isna().to_numpy().sum()):>6}")
 
 print()
+check("cap sèrie publica més hores que les que té el dia local", not overfull,
+      f"{len(overfull)} sèries" + (f": {overfull}" if overfull else ""))
 if failures:
     print(f"{len(failures)} comprovacions fallides: " + "; ".join(failures))
     sys.exit(1)
