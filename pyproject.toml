@@ -3,6 +3,8 @@ name = "epf"
 version = "0.1.0"
 description = "Day-ahead electricity price forecasting for the Spanish market, and what the models learn about how the price forms."
 requires-python = "==3.13.*"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "pandas==3.0.5",
     "numpy==2.5.3",
