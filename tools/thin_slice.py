@@ -7,23 +7,21 @@ import datetime
 import functools
 import time
 
-from epf.config.split import TEST_PERIODS
 from epf.data import prices
 from epf.evaluation import mae, mae_per_hour, walk_forward
 from epf.features import matrix
 from epf.models import lear
-
-HOURLY_TEST = TEST_PERIODS["hourly"]
-
 
 def day(text):
     return datetime.date.fromisoformat(text)
 
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--from", dest="first", type=day, default=HOURLY_TEST[0],
+# Sense valor per defecte a propòsit: un període implícit és com els anys de prova
+# acaben fent-se servir per decidir coses.
+parser.add_argument("--from", dest="first", type=day, required=True,
                     help="primer dia a predir")
-parser.add_argument("--to", dest="last", type=day, default=HOURLY_TEST[1],
+parser.add_argument("--to", dest="last", type=day, required=True,
                     help="últim dia a predir")
 parser.add_argument("--windows", type=int, nargs="+", default=[w or 0 for w in lear.WINDOWS],
                     help="finestres de calibratge en files, 0 per tot l'historial; "

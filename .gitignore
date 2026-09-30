@@ -4,3 +4,4 @@ api-keys
 __pycache__/
 /data/
 /plots/**/*.png
+/runs/
