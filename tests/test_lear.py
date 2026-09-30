@@ -26,6 +26,18 @@ def test_the_scaler_round_trips():
     assert np.allclose(scaler.back(scaler.forward(values)), values)
 
 
+def test_each_column_gets_its_own_median_and_spread():
+    # Una columna al voltant de 0 i una altra al voltant de 1000. Amb una mediana
+    # compartida, la primera columna quedaria tota desplaçada cap avall.
+    values = np.array([[0.0, 1000.0], [1.0, 1002.0], [2.0, 1004.0], [3.0, 1006.0]])
+    scaler = Scaler(values)
+    assert list(scaler.median) == [1.5, 1003.0]
+    transformed = scaler.forward(values)
+    assert abs(transformed[:, 0].mean()) < 1e-9
+    assert abs(transformed[:, 1].mean()) < 1e-9
+    assert np.allclose(scaler.back(transformed), values)
+
+
 def test_a_window_without_spread_fails_loudly():
     with pytest.raises(ValueError):
         Scaler(np.zeros((10, 24)))

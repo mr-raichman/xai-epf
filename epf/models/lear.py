@@ -11,36 +11,41 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 
 from epf.config.market import HOURS_PER_DAY
-from epf.features.matrix import calibration
-
-# Finestres de calibratge en dies. Els "anys" de l'article són de 364 dies, que
-# són 52 setmanes exactes i mantenen alineat el dia de la setmana. None vol dir
-# tot l'historial disponible, que l'article no fa servir.
-WINDOWS = (364 * 3, 364 * 4, None)
+from epf.features.matrix import PRICE_LAGS, calibration
 
 DAYS_PER_WEEK = 7
 
-# El MAD de l'article és la mediana de les desviacions absolutes, sense cap
-# constant. `statsmodels.robust.mad` divideix per 0.6745 per defecte, i com que
-# asinh no és lineal les dues normalitzacions donen models diferents.
-MAD_SCALE = 1.0
+# Dies que es perden al principi de qualsevol tram: cap fila es pot formar fins que
+# hi ha tots els retards.
+WARM_UP = max(PRICE_LAGS)
 
-MAX_ITER = 5000
+# Finestres de calibratge, en files. Els "anys" de l'article són de 364 dies, 52
+# setmanes exactes que mantenen alineat el dia de la setmana; les seves finestres
+# de 1092 i 1456 dies de preus donen aquestes files un cop descomptat el començament.
+# None vol dir tot l'historial disponible, que l'article no fa servir.
+WINDOWS = (364 * 3 - WARM_UP, 364 * 4 - WARM_UP, None)
+
+# La mediana de les desviacions absolutes dividida per aquesta constant estima la
+# desviació típica d'una normal; és el que fa `statsmodels.robust.mad`, i el que
+# la referència utilitza encara que l'article només digui "MAD".
+NORMAL_CONSISTENCY = 0.6744897501960817
+
+MAX_ITER = 2500
 
 
 class Scaler:
-    """Transformació de variància estabilitzada: asinh del preu centrat i escalat.
+    """Transformació de variància estabilitzada: asinh del valor centrat i escalat.
 
-    La mediana i el MAD es prenen de la finestra de calibratge, mai del dia que es
-    prediu.
+    Mediana i MAD de cada columna per separat, preses de la finestra de calibratge i
+    mai del dia que es prediu.
     """
 
     def __init__(self, values):
-        self.median = float(np.median(values))
-        deviation = float(np.median(np.abs(values - self.median)))
-        if deviation == 0:
-            raise ValueError("la finestra de calibratge no té dispersió: MAD zero")
-        self.mad = deviation / MAD_SCALE
+        self.median = np.median(values, axis=0)
+        deviation = np.median(np.abs(values - self.median), axis=0)
+        if not deviation.all():
+            raise ValueError("alguna columna de la finestra de calibratge no té dispersió")
+        self.mad = deviation / NORMAL_CONSISTENCY
 
     def forward(self, values):
         return np.arcsinh((values - self.median) / self.mad)
@@ -55,34 +60,38 @@ def week_dummies(day_of_week):
 
 
 def _design(rows, scaler):
-    """Files de `matrix.build` com la matriu de LEAR: preus transformats i indicadors."""
+    """Files de `matrix.build` com la matriu de LEAR: preus transformats i indicadors.
+
+    Els indicadors no s'escalen: ja són zeros i uns.
+    """
     values = rows.to_numpy()
     return np.hstack([scaler.forward(values[:, :-1]), week_dummies(values[:, -1])])
 
 
 def _fit_hour(features, target):
     """Un LASSO per una hora: lambda per LARS amb AIC, ajust per descens de coordenades."""
-    alpha = LassoLarsIC(criterion="aic").fit(features, target).alpha_
+    alpha = LassoLarsIC(criterion="aic", max_iter=MAX_ITER).fit(features, target).alpha_
     return Lasso(alpha=alpha, max_iter=MAX_ITER).fit(features, target)
 
 
 def forecast(X, y, day, window=None):
     """Els 24 preus de `day`, amb el model ajustat només amb dies anteriors.
 
-    `X` i `y` són els de `features.matrix.build`. La finestra són els últims
-    `window` dies disponibles abans de `day`, o tots si és None.
+    `X` i `y` són els de `features.matrix.build`, i la finestra són files, com a tot
+    el projecte.
     """
     features, target = calibration(X, y, day, window)
     if len(features) <= X.shape[1] + DAYS_PER_WEEK:
         raise ValueError(f"{len(features)} dies de calibratge per a {day}, "
                          f"insuficients per a {X.shape[1] + DAYS_PER_WEEK} columnes")
 
-    scaler = Scaler(target.to_numpy())
-    train = _design(features, scaler)
-    test = _design(X.loc[[day]], scaler)
-    scaled = scaler.forward(target.to_numpy())
+    prices = Scaler(features.to_numpy()[:, :-1])
+    prices_target = Scaler(target.to_numpy())
+    train = _design(features, prices)
+    test = _design(X.loc[[day]], prices)
+    scaled = prices_target.forward(target.to_numpy())
     hours = [_fit_hour(train, scaled[:, hour]).predict(test)[0] for hour in range(HOURS_PER_DAY)]
-    return scaler.back(np.array(hours))
+    return prices_target.back(np.array(hours))
 
 
 def forecast_ensemble(X, y, day, windows=WINDOWS):
