@@ -37,7 +37,7 @@ check("cap valor absent després de reparar", not frame.isna().to_numpy().any())
 quarter = {day for day, n in periods.items() if n > HOURS_PER_DAY + 1}
 check("cap dia quart-horari abans del canvi de mercat",
       all(day >= QUARTER_HOURLY_FROM for day in quarter),
-      f"{len(quarter)} dies, el primer {min(quarter)}")
+      f"{len(quarter)} dies" + (f", el primer {min(quarter)}" if quarter else ""))
 check("tots els dies a partir del canvi són quart-horaris",
       all(n > HOURS_PER_DAY + 1 for day, n in periods.items() if day >= QUARTER_HOURLY_FROM))
 

@@ -5,7 +5,6 @@ del dia anterior al lliurament.
 """
 import pandas as pd
 
-from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 
 # Retards del model LEAR de Lago et al. (2021): fa 1, 2, 3 i 7 dies.
@@ -30,13 +29,3 @@ def build(prices, lags=PRICE_LAGS):
     complete = features.notna().all(axis="columns")
     return features[complete], prices[complete]
 
-
-def feature_names(lags=PRICE_LAGS):
-    """Noms de les columnes de `build`, en el mateix ordre."""
-    names = [f"lag{lag}_{hour}" for lag in lags for hour in HOUR_COLUMNS]
-    return names + [DAY_OF_WEEK]
-
-
-def horizon_names():
-    """Noms de les 24 sortides, una per hora del dia de lliurament."""
-    return list(HOUR_COLUMNS[:HOURS_PER_DAY])

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build, feature_names
+from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -57,10 +57,6 @@ def test_day_of_week_is_the_delivery_day():
     day = X.index[5]
     assert X.loc[day, DAY_OF_WEEK] == day.dayofweek
 
-
-def test_columns_are_in_the_declared_order():
-    X, _ = build(frame_of(range(30)))
-    assert list(X.columns) == feature_names()
 
 
 def test_wrong_columns_fail_loudly():
