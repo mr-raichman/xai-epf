@@ -3,9 +3,12 @@
 Cada divisió redueix l'error de les 24 hores alhora i cada fulla guarda una corba
 diària sencera, que és el que el fa multivariant de debò.
 """
+import numpy as np
+import shap
 from sklearn.ensemble import RandomForestRegressor
 
 from epf.features.matrix import calibration
+from epf.models.attribution import ONE, PRICE_UNITS, Attribution
 
 # Punt de partida, per ajustar sobre el període de validació. Una tercera part de
 # les columnes a cada divisió és la recomanació habitual en regressió; amb totes,
@@ -26,3 +29,16 @@ def fit(X, y, day, window=None, trees=TREES, features_per_split=FEATURES_PER_SPL
 def forecast(X, y, day, window=None, **parameters):
     """Els 24 preus de `day`, del bosc ajustat només amb dies anteriors."""
     return fit(X, y, day, window, **parameters).predict(X.loc[[day]])[0]
+
+
+def explain(X, y, day, window=None, **parameters):
+    """Els 24 preus de `day` i l'atribució del mateix bosc que els ha predit.
+
+    TreeSHAP sobre un bosc de 24 sortides torna (files, columnes, hores), que per a
+    un sol dia ja és la matriu que es desa.
+    """
+    fitted = fit(X, y, day, window, **parameters)
+    rows = X.loc[[day]]
+    values = shap.TreeExplainer(fitted).shap_values(rows)[0]
+    return (fitted.predict(rows)[0],
+            Attribution(ONE, list(X.columns), values[np.newaxis], PRICE_UNITS))

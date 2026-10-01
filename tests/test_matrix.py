@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, build, calibration
+from epf.features.matrix import DAY_OF_WEEK, HOUR, PRICE_LAGS, build, calibration, per_hour
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -84,3 +84,27 @@ def test_calibrating_with_no_earlier_day_fails_loudly():
     X, y = build(frame_of(range(30)))
     with pytest.raises(ValueError):
         calibration(X, y, X.index[0])
+
+
+def test_the_per_hour_row_carries_its_day_and_its_own_hour():
+    prices = frame_of(range(30))
+    X, y = build(prices)
+    rows, target = per_hour(X, y)
+    assert len(rows) == len(X) * 24
+    day = X.index[10]
+    for hour in range(24):
+        row = rows.loc[day].iloc[hour]
+        assert row[HOUR] == hour
+        assert row["lag1_h00"] == X.loc[day, "lag1_h00"]
+        assert target.loc[day].iloc[hour] == y.loc[day, HOUR_COLUMNS[hour]]
+
+
+def test_the_window_counts_days_on_both_tables():
+    X, y = build(frame_of(range(30)))
+    rows, target = per_hour(X, y)
+    day = X.index[15]
+    daily, _ = calibration(X, y, day, window=5)
+    hourly, _ = calibration(rows, target, day, window=5)
+    assert len(daily) == 5
+    assert len(hourly) == 5 * 24
+    assert list(hourly.index.unique()) == list(daily.index)

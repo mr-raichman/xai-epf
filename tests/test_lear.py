@@ -6,8 +6,9 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import build
-from epf.models.lear import Scaler, forecast, week_dummies
+from epf.features.matrix import PRICE_LAGS, build
+from epf.models.lear import (DESIGN_COLUMNS, EIGHT_WEEKS, TWELVE_WEEKS, Scaler,
+                             design_columns, explain, forecast, lags_of, week_dummies)
 
 # Preus sintètics amb un patró setmanal exacte: cada dia de la setmana té sempre la
 # mateixa corba. Qualsevol model alineat l'ha de reproduir.
@@ -72,3 +73,44 @@ def test_too_short_a_window_fails_loudly():
     X, y = build(weekly_prices(200))
     with pytest.raises(ValueError):
         forecast(X, y, X.index[-1], window=50)
+
+
+def noisy_prices(days, start=datetime.date(2014, 1, 1)):
+    """El mateix patró setmanal amb soroll, perquè cap coeficient no sigui zero."""
+    prices = weekly_prices(days, start)
+    noise = np.random.default_rng(0).normal(0.0, 2.0, size=prices.shape)
+    return prices + noise
+
+
+def test_each_short_window_takes_the_lags_that_fit():
+    assert lags_of(EIGHT_WEEKS) == (1,)
+    assert lags_of(TWELVE_WEEKS) == (1, 2)
+    assert lags_of(None) == PRICE_LAGS
+    for window in (EIGHT_WEEKS, TWELVE_WEEKS):
+        # LassoLarsIC demana com a mínim dues files més que columnes.
+        assert window >= len(design_columns(lags_of(window))) + 2
+
+
+def test_a_short_window_leaves_the_lags_it_cannot_carry_at_zero():
+    X, y = build(noisy_prices(200))
+    _, attribution = explain(X, y, X.index[-1], windows=(EIGHT_WEEKS,))
+    carried = set(design_columns(lags_of(EIGHT_WEEKS)))
+    absent = [number for number, name in enumerate(DESIGN_COLUMNS) if name not in carried]
+    assert np.count_nonzero(attribution.values[0][absent]) == 0
+    assert np.count_nonzero(attribution.values[0]) > 0
+
+
+def test_moving_a_column_of_the_predicted_day_moves_only_its_own_contribution():
+    # Les contribucions són el coeficient per la distància de la columna a la mitjana
+    # de la finestra, i la finestra no conté el dia que es prediu.
+    X, y = build(noisy_prices(400))
+    day = X.index[-1]
+    _, before = explain(X, y, day, windows=(200,))
+    shifted = X.copy()
+    shifted.loc[day, "lag1_h05"] += 5.0
+    _, after = explain(shifted, y, day, windows=(200,))
+
+    moved = after.values[0] - before.values[0]
+    row = DESIGN_COLUMNS.index("lag1_h05")
+    assert np.abs(moved[row]).max() > 0
+    assert np.count_nonzero(np.delete(moved, row, axis=0)) == 0

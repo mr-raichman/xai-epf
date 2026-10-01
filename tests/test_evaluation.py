@@ -60,3 +60,12 @@ def test_tables_with_no_day_in_common_fail_loudly():
     out = walk_forward(perfect, X, y, "2024-01-10", "2024-01-12")
     with pytest.raises(ValueError):
         mae(out, frame_of(5, start=datetime.date(2030, 1, 1)))
+
+
+def test_a_day_repeated_in_the_index_is_predicted_once():
+    # La taula per hora té cada dia 24 vegades i només s'ha de predir una.
+    y = frame_of(30)
+    X = y.loc[y.index.repeat(24)]
+    out = walk_forward(lambda features, target, day: target.loc[day].to_numpy(),
+                       X, y, "2024-01-10", "2024-01-12")
+    assert list(out.index) == list(pd.date_range("2024-01-10", "2024-01-12", freq="D"))

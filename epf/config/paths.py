@@ -6,3 +6,7 @@ KEYS = ROOT / "api-keys"
 DATA = ROOT / "data"
 OMIE_PRICES = DATA / "omie" / "marginalpdbc"
 ESIOS = DATA / "esios"
+
+# Sortides de les execucions, fora del paquet perquè la roda es construeix de
+# `epf/`, i fora de git.
+RUNS = ROOT / "runs"

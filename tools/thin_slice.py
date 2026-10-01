@@ -24,7 +24,7 @@ parser.add_argument("--from", dest="first", type=day, required=True,
 parser.add_argument("--to", dest="last", type=day, required=True,
                     help="últim dia a predir")
 parser.add_argument("--windows", type=int, nargs="+", default=[w or 0 for w in lear.WINDOWS],
-                    help="finestres de calibratge en files, 0 per tot l'historial; "
+                    help="finestres de calibratge en dies, 0 per tot l'historial; "
                          "amb més d'una es fa servir la mitjana de les seves prediccions")
 parser.add_argument("--every", type=int, default=1,
                     help="pren un dia de cada N, per a una passada de fum")
@@ -37,7 +37,7 @@ else:
     predict = functools.partial(lear.forecast_ensemble, windows=windows)
 
 X, y = matrix.build(prices.load())
-names = ", ".join("tot l'historial" if w is None else f"{w} files" for w in windows)
+names = ", ".join("tot l'historial" if w is None else f"{w} dies" for w in windows)
 print(f"LEAR de {args.first} a {args.last}, un dia de cada {args.every}")
 print(f"finestres: {names}")
 

@@ -17,9 +17,12 @@ def walk_forward(predict, X, y, first, last, every=1, on_day=None):
     que serveix per a una passada de fum i no canvia res del que veu el model.
     `on_day` es crida amb cada dia ja predit, perquè una passada de vuitanta minuts
     sense cap senyal no es distingeix d'un penjat.
+
+    Els dies surten de l'índex sense repeticions: a la taula per hora cada dia hi és
+    24 vegades i només s'ha de predir una.
     """
     period = (X.index >= pd.Timestamp(first)) & (X.index <= pd.Timestamp(last))
-    days = X.index[period][::every]
+    days = X.index[period].unique()[::every]
     if days.empty:
         raise ValueError(f"cap dia de la matriu entre {first} i {last}")
     rows = []
