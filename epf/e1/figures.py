@@ -14,7 +14,8 @@ import pandas as pd
 from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
 from epf.e1 import features
-from epf.evaluation import (curve_correlations, error_dispersion, mae_per_hour,
+from epf.evaluation import (curve_correlations, error_dispersion,
+                            extrema_price_deviations, mae_per_hour,
                             mae_per_hour_over_price, rmae_per_hour)
 from epf.models import naive as naive_family
 from epf.models import attribution
@@ -147,6 +148,33 @@ def curve_correlation_over_time(folder, forecasts, actual):
     _style(axes[0], "Forma del dia encertada, dia a dia, amb la mitjana entre parèntesis")
     _style(axes[1], "repartiment")
     _save(figure, folder, "curve_correlation")
+
+
+def daily_spread(folder, forecasts, actual):
+    """La forquilla de cada dia i la que cada pronòstic hauria capturat.
+
+    MPD de Maciejowska, Lipiecki i Uniejewski (2026) és la distància entre les dues
+    línies: el que es perd per col·locar el mínim i el màxim del dia a les hores
+    equivocades. Un model pot tenir un MAE excel·lent i deixar-se la forquilla sencera.
+    """
+    days = next(iter(forecasts.values())).index.intersection(actual.index)
+    spread = actual.loc[days].max(axis="columns") - actual.loc[days].min(axis="columns")
+
+    figure, axes = plt.subplots(1, 2, figsize=(18, 4), facecolor=SURFACE,
+                                width_ratios=[2.5, 1])
+    axes[0].plot(spread.index, spread.to_numpy(), color=INK, linewidth=0.8,
+                 label="forquilla real")
+    for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
+        lost = extrema_price_deviations(frame, actual)
+        axes[0].plot(lost.index, (spread - lost).to_numpy(), color=colour, linewidth=0.7,
+                     alpha=0.8, label=f"{name} (MPD {lost.mean():.2f})")
+        axes[1].hist(lost.to_numpy(), bins=40, histtype="step", color=colour)
+    axes[0].set_ylabel("EUR/MWh", color=MUTED_INK)
+    axes[0].legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
+    axes[1].set_xlabel("MPD del dia (EUR/MWh)", color=MUTED_INK)
+    _style(axes[0], "Forquilla del dia i la que el pronòstic hauria capturat")
+    _style(axes[1], "repartiment del que es perd")
+    _save(figure, folder, "daily_spread")
 
 
 def error_covariance(folder, name, frame, actual):
@@ -304,6 +332,7 @@ def draw(folder, actual):
     error_over_time(folder, forecasts, actual)
     error_distribution(folder, forecasts, actual)
     curve_correlation_over_time(folder, forecasts, actual)
+    daily_spread(folder, forecasts, actual)
     for name, frame in sorted(forecasts.items()):
         error_covariance(folder, name, frame, actual)
 

@@ -6,7 +6,8 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.evaluation import (curve_correlations, error_dispersion, mae, mae_per_hour,
+from epf.evaluation import (curve_correlations, error_dispersion,
+                            extrema_price_deviations, mae, mae_per_hour,
                             mae_per_hour_over_price, rmae, rmae_per_hour, walk_forward)
 from epf.models.naive import weekly_frame
 
@@ -139,3 +140,32 @@ def test_scaling_every_error_moves_the_dispersion_by_a_known_amount():
     doubled = actual + (noisy - actual) * 2.0
     moved = error_dispersion(doubled, actual) - error_dispersion(noisy, actual)
     assert moved == pytest.approx(48 * np.log(2.0))
+
+
+def test_hitting_both_extreme_hours_loses_no_spread():
+    actual = frame_of(5)
+    assert np.allclose(extrema_price_deviations(actual, actual).to_numpy(), 0.0)
+
+
+def test_predicting_the_day_backwards_loses_twice_the_spread():
+    # El pronòstic col·loca el mínim on hi ha el màxim i a l'inrevés, de manera que es
+    # perd la forquilla dues vegades: una per cada extrem.
+    actual = frame_of(5)
+    backwards = actual.iloc[:, ::-1]
+    backwards.columns = actual.columns
+    spread = actual.max(axis="columns") - actual.min(axis="columns")
+    assert np.allclose(extrema_price_deviations(backwards, actual).to_numpy(),
+                       2 * spread.to_numpy())
+
+
+def test_the_deviation_reads_the_real_price_at_the_predicted_hour():
+    # Un pronòstic pla excepte una punta a una hora qualsevol: el que compta no és el
+    # valor que prediu, sinó el preu real de l'hora que tria.
+    actual = frame_of(1)
+    guess = actual.copy()
+    guess.iloc[0] = 0.0
+    guess.iloc[0, 3] = 1.0
+    guess.iloc[0, 9] = -1.0
+    lost = extrema_price_deviations(guess, actual).iloc[0]
+    row = actual.iloc[0]
+    assert lost == pytest.approx(abs(row.min() - row.iloc[9]) + abs(row.max() - row.iloc[3]))

@@ -145,6 +145,30 @@ def curve_correlation(predicted, actual):
     return float(curve_correlations(predicted, actual).mean())
 
 
+def extrema_price_deviations(predicted, actual):
+    """MPD de cada dia: el tros de forquilla diària que es perd triant malament les hores.
+
+    De Maciejowska, Lipiecki i Uniejewski (2026). Es mira a quina hora el pronòstic diu
+    que hi haurà el mínim i el màxim del dia, i es compara el preu real d'aquelles hores
+    amb el mínim i el màxim reals. Equival a la forquilla real menys la que el pronòstic
+    hauria capturat, de manera que va en EUR/MWh i zero és encertar les dues hores.
+
+    Amb dues hores empatades es pren la primera, que és el que fan `argmin` i `argmax`.
+    """
+    days = _days(predicted, actual)
+    real = actual.loc[days].to_numpy()
+    guess = predicted.loc[days].to_numpy()
+    rows = np.arange(len(days))
+    lost = (np.abs(real.min(axis=1) - real[rows, guess.argmin(axis=1)])
+            + np.abs(real.max(axis=1) - real[rows, guess.argmax(axis=1)]))
+    return pd.Series(lost, index=days)
+
+
+def extrema_price_deviation(predicted, actual):
+    """MPD: la mitjana d'aquelles pèrdues. Com més baix, millor."""
+    return float(extrema_price_deviations(predicted, actual).mean())
+
+
 def metrics(forecasts, actual, naive):
     """Taula llarga de totes les mètriques: pronòstic, mètrica, hora i valor.
 
@@ -158,7 +182,8 @@ def metrics(forecasts, actual, naive):
                    ("rmae", rmae(frame, actual, naive)),
                    ("error_dispersion", error_dispersion(frame, actual)),
                    ("curve_correlation", float(daily.mean())),
-                   ("curve_correlation_days", float(daily.notna().sum())))
+                   ("curve_correlation_days", float(daily.notna().sum())),
+                   ("extrema_price_deviation", extrema_price_deviation(frame, actual)))
         rows += [{"forecast": name, "metric": metric, "hour": "", "value": value}
                  for metric, value in singles]
         for metric, series in (("mae_by_hour", mae_per_hour(frame, actual)),
