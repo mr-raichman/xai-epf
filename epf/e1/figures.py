@@ -14,7 +14,9 @@ import pandas as pd
 from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
 from epf.e1 import features
-from epf.evaluation import mae_per_hour, mae_per_hour_over_price
+from epf.evaluation import (curve_correlations, error_dispersion, mae_per_hour,
+                            mae_per_hour_over_price, rmae_per_hour)
+from epf.models import naive as naive_family
 from epf.models import attribution
 
 matplotlib.use("Agg")
@@ -30,6 +32,10 @@ SURFACE = "#fcfcfb"
 # de grisos impresa.
 MAGNITUDE = LinearSegmentedColormap.from_list(
     "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"])
+
+# Escala de dos tons per a una correlació, que va de -1 a 1 al voltant del zero.
+SIGNED = LinearSegmentedColormap.from_list(
+    "signed", ["#8c3c12", "#d6622a", SURFACE, "#2a78d6", "#143f73"])
 LINES = ("#2a78d6", "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b")
 
 DPI = 300
@@ -91,26 +97,86 @@ def prices_against_forecasts(folder, forecasts, actual):
     _save(figure, folder, "price")
 
 
-def error_by_hour(folder, forecasts, actual):
-    """Error de cada hora de lliurament, en brut i dividit pel preu mitjà de l'hora.
+def error_by_hour(folder, forecasts, actual, naive):
+    """Error de cada hora de lliurament, en brut i de dues maneres sense el nivell.
 
-    El preu mitjà de les hores puntes és el doble que el de les valls, i l'error
-    absolut el segueix; el segon plafó treu aquest efecte de nivell.
+    El preu mitjà de les hores puntes és el doble que el de les valls i l'error absolut
+    el segueix. El segon plafó el divideix pel preu de l'hora, que treu el nivell i
+    també part de la variabilitat que sí que ha produït l'error; el tercer el divideix
+    pel que hi erra la predicció ingènua setmanal, que és com de difícil és l'hora.
     """
-    figure, axes = plt.subplots(1, 2, figsize=(16, 4), facecolor=SURFACE)
-    panels = ((mae_per_hour, "MAE (EUR/MWh)", "Error per hora de lliurament"),
-              (mae_per_hour_over_price, "MAE sobre el preu mitjà de l'hora",
-               "El mateix, sense l'efecte del nivell"))
+    figure, axes = plt.subplots(1, 3, figsize=(21, 4), facecolor=SURFACE)
+    panels = ((lambda frame: mae_per_hour(frame, actual),
+               "MAE (EUR/MWh)", "Error per hora de lliurament"),
+              (lambda frame: mae_per_hour_over_price(frame, actual),
+               "MAE sobre el preu mitjà de l'hora", "Sense l'efecte del nivell"),
+              (lambda frame: rmae_per_hour(frame, actual, naive),
+               "MAE sobre el de la predicció ingènua", "Sense l'efecte de la dificultat"))
     for axis, (measure, label, title) in zip(axes, panels):
         for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
-            errors = measure(frame, actual)
-            axis.plot(range(len(HOUR_COLUMNS)), errors.to_numpy(), color=colour, marker="o",
-                      markersize=3, label=name)
+            axis.plot(range(len(HOUR_COLUMNS)), measure(frame).to_numpy(), color=colour,
+                      marker="o", markersize=3, label=name)
         axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
         axis.set_ylabel(label, color=MUTED_INK)
         _style(axis, title)
+    axes[-1].axhline(1.0, color=MUTED_INK, linewidth=0.8, linestyle="--")
     axes[0].legend(frameon=False, labelcolor=MUTED_INK)
     _save(figure, folder, "error_by_hour")
+
+
+def curve_correlation_over_time(folder, forecasts, actual):
+    """Corr-f dia a dia: com de bé reprodueix cada pronòstic la forma del dia.
+
+    La correlació de Spearman entre les 24 hores predites i les reals de cada dia, de
+    Maciejowska, Lipiecki i Uniejewski (2026). Un model pot errar el nivell del dia
+    sencer i encertar-ne la forma, i això no es veu enlloc en un MAE.
+    """
+    figure, axes = plt.subplots(1, 2, figsize=(18, 4), facecolor=SURFACE,
+                                width_ratios=[2.5, 1])
+    for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
+        daily = curve_correlations(frame, actual)
+        axes[0].plot(daily.index, daily.to_numpy(), color=colour, linewidth=0.7, alpha=0.8,
+                     label=f"{name} ({daily.mean():.3f})")
+        axes[1].hist(daily.dropna().to_numpy(), bins=40, histtype="step", color=colour,
+                     orientation="horizontal")
+    for axis in axes:
+        axis.set_ylim(-1.05, 1.05)
+    axes[0].set_ylabel("correlació de Spearman del dia", color=MUTED_INK)
+    axes[0].legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
+    axes[1].set_xlabel("dies", color=MUTED_INK)
+    _style(axes[0], "Forma del dia encertada, dia a dia, amb la mitjana entre parèntesis")
+    _style(axes[1], "repartiment")
+    _save(figure, folder, "curve_correlation")
+
+
+def error_covariance(folder, name, frame, actual):
+    """Com es reparteixen els errors d'un dia entre les 24 hores.
+
+    A l'esquerra la matriu de segons moments dels errors, de la qual Cov-e és el
+    logaritme del determinant; a la dreta la mateixa matriu en forma de correlació, que
+    és on es llegeix si el model s'equivoca el dia sencer en bloc o hora per hora.
+    Equivocar-se en bloc conserva la forma del dia i baixa Cov-e.
+    """
+    days = frame.index.intersection(actual.index)
+    errors = (frame.loc[days] - actual.loc[days]).to_numpy()
+    moment = errors.T @ errors / len(errors)
+    deviation = np.sqrt(np.diag(moment))
+    correlation = moment / np.outer(deviation, deviation)
+
+    figure, axes = plt.subplots(1, 2, figsize=(14, 6), facecolor=SURFACE)
+    first = axes[0].imshow(moment, cmap=MAGNITUDE, origin="lower")
+    _colorbar(figure, first, axes[0], "(EUR/MWh)²")
+    _style(axes[0], "Segons moments dels errors")
+    second = axes[1].imshow(correlation, cmap=SIGNED, vmin=-1, vmax=1, origin="lower")
+    _colorbar(figure, second, axes[1], "correlació")
+    _style(axes[1], "La mateixa matriu, en correlació")
+    for axis in axes:
+        axis.set_xlabel("hora de lliurament", color=MUTED_INK)
+        axis.set_ylabel("hora de lliurament", color=MUTED_INK)
+    figure.suptitle(f"{name}: errors dins del dia. Cov-e = "
+                    f"{error_dispersion(frame, actual):.2f} sobre {len(days)} dies, "
+                    "com més baix millor", color=INK, x=0.01, ha="left")
+    _save(figure, folder, f"error_covariance_{name}")
 
 
 def error_over_time(folder, forecasts, actual):
@@ -230,12 +296,16 @@ def importance_concentration(folder, label, stem, importance):
 def draw(folder, actual):
     """Totes les figures d'una execució ja desada."""
     forecasts = run_files.load_forecasts(folder)
+    naive = naive_family.weekly_frame(actual)
     actual = actual.loc[next(iter(forecasts.values())).index]
 
     prices_against_forecasts(folder, forecasts, actual)
-    error_by_hour(folder, forecasts, actual)
+    error_by_hour(folder, forecasts, actual, naive)
     error_over_time(folder, forecasts, actual)
     error_distribution(folder, forecasts, actual)
+    curve_correlation_over_time(folder, forecasts, actual)
+    for name, frame in sorted(forecasts.items()):
+        error_covariance(folder, name, frame, actual)
 
     for name in forecasts:
         if not attribution.path(folder, name).exists():

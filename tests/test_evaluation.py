@@ -6,8 +6,9 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.evaluation import (mae, mae_per_hour, mae_per_hour_over_price,
-                            walk_forward)
+from epf.evaluation import (curve_correlations, error_dispersion, mae, mae_per_hour,
+                            mae_per_hour_over_price, rmae, rmae_per_hour, walk_forward)
+from epf.models.naive import weekly_frame
 
 
 def frame_of(days, start=datetime.date(2024, 1, 1), offset=0.0):
@@ -86,3 +87,55 @@ def test_the_normalised_error_divides_by_that_hour_s_mean_price():
 def test_a_mean_price_at_or_below_zero_fails_loudly():
     with pytest.raises(ValueError):
         mae_per_hour_over_price(frame_of(3), frame_of(3) * 0.0)
+
+
+def test_the_weekly_naive_is_the_same_hour_seven_days_earlier():
+    prices = frame_of(30)
+    naive = weekly_frame(prices)
+    # Els set primers dies no tenen el seu dia de fa una setmana i no hi són.
+    assert list(naive.index) == list(prices.index[7:])
+    day = naive.index[5]
+    assert (naive.loc[day] == prices.loc[day - pd.Timedelta(days=7)]).all()
+
+
+def test_the_naive_forecast_scores_exactly_one_against_itself():
+    prices = frame_of(60)
+    naive = weekly_frame(prices)
+    assert rmae(naive, prices, naive) == pytest.approx(1.0)
+    assert np.allclose(rmae_per_hour(naive, prices, naive).to_numpy(), 1.0)
+
+
+def test_the_curve_correlation_is_on_ranks_and_not_on_levels():
+    actual = frame_of(3)
+    # Spearman mira l'ordre de les hores, no els valors: doblar-los no el mou.
+    assert np.allclose(curve_correlations(actual * 2.0, actual).to_numpy(), 1.0)
+    # Invertir l'ordre de les hores del dia el porta a -1.
+    reversed_hours = actual.iloc[:, ::-1]
+    reversed_hours.columns = actual.columns
+    assert np.allclose(curve_correlations(reversed_hours, actual).to_numpy(), -1.0)
+
+
+def test_a_day_with_no_spread_has_no_curve_correlation():
+    actual = frame_of(3)
+    flat = actual.copy()
+    flat.iloc[1] = 50.0
+    correlations = curve_correlations(flat, actual)
+    assert np.isnan(correlations.iloc[1])
+    assert correlations.notna().sum() == 2
+
+
+def test_the_error_dispersion_needs_more_days_than_hours():
+    actual = frame_of(23)
+    with pytest.raises(ValueError):
+        error_dispersion(frame_of(23, offset=1.0), actual)
+
+
+def test_scaling_every_error_moves_the_dispersion_by_a_known_amount():
+    # La matriu té 24 files: multiplicar tots els errors per k multiplica el
+    # determinant per k^48, i el seu logaritme puja 48*log(k).
+    actual = frame_of(60)
+    rng = np.random.default_rng(0)
+    noisy = actual + rng.normal(0.0, 5.0, size=actual.shape)
+    doubled = actual + (noisy - actual) * 2.0
+    moved = error_dispersion(doubled, actual) - error_dispersion(noisy, actual)
+    assert moved == pytest.approx(48 * np.log(2.0))

@@ -31,3 +31,16 @@ def similar_day(X, y, day):
     """El dia anterior de dimarts a divendres, i la setmana anterior la resta."""
     lag = PREVIOUS_DAY if day.dayofweek in WEEKDAYS_FROM_YESTERDAY else PREVIOUS_WEEK
     return _lag(X, day, lag)
+
+
+def weekly_frame(prices):
+    """La predicció ingènua setmanal de cada dia d'una sèrie de preus sencera.
+
+    La mateixa que `previous_week`, però sobre una taula de preus i no sobre una
+    matriu de característiques, perquè és el denominador del rMAE de Lago et al.
+    (2021) i aquest s'ha de poder calcular d'una execució ja desada, sense anar a
+    buscar l'execució de la família ingènua. Els dies que no tenen el seu dia de fa
+    una setmana no hi són.
+    """
+    earlier = prices.shift(PREVIOUS_WEEK, freq="D").reindex(prices.index)
+    return earlier[earlier.notna().all(axis="columns")]

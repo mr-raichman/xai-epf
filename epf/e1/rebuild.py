@@ -10,12 +10,13 @@ import pathlib
 from epf import run as run_files
 from epf.e1 import features, figures
 from epf.evaluation import metrics
+from epf.models import naive
 
 
 def rebuild(folder, actual):
     """Reescriu `metrics.csv` i torna a dibuixar les figures d'una execució."""
     forecasts = run_files.load_forecasts(folder)
-    run_files.save_metrics(folder, metrics(forecasts, actual))
+    run_files.save_metrics(folder, metrics(forecasts, actual, naive.weekly_frame(actual)))
     figures.draw(folder, actual)
 
 

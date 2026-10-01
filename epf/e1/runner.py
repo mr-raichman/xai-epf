@@ -151,7 +151,7 @@ def write(folder, forecasts, attributions, actual, record):
         shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
     run_files.save_forecasts(folder, forecasts)
-    run_files.save_metrics(folder, metrics(forecasts, actual))
+    run_files.save_metrics(folder, metrics(forecasts, actual, naive.weekly_frame(actual)))
     for name, kept in attributions.items():
         attribution.save(folder, name, forecasts[name].index, kept)
     run_files.save_record(folder, record)

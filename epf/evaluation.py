@@ -4,8 +4,10 @@ Cada dia es prediu amb un model reajustat només amb dies anteriors, que és com
 s'hauria fet servir de debò. Res d'aquí tria cap paràmetre: escollir es fa sobre
 el període de validació, no sobre el de prova.
 """
+import numpy as np
 import pandas as pd
 
+from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 
 
@@ -71,7 +73,79 @@ def mae_per_hour_over_price(predicted, actual):
     return mae_per_hour(predicted, actual) / level
 
 
-def metrics(forecasts, actual):
+def rmae(predicted, actual, naive):
+    """MAE del model dividit pel de la predicció ingènua setmanal, sobre els dies que
+    tots tres comparteixen.
+
+    El rMAE de Lago et al. (2021): per sota d'1 el model guanya la predicció ingènua i
+    per sobre la perd. El denominador és un error absolut mitjà d'un període sencer, de
+    manera que mai no és a prop de zero, que és el que enfonsa les mesures que divideixen
+    error per error.
+    """
+    days = _days(predicted, actual).intersection(naive.index)
+    if days.empty:
+        raise ValueError("el model, el preu real i la predicció ingènua no comparteixen cap dia")
+    return mae(predicted.loc[days], actual) / mae(naive.loc[days], actual)
+
+
+def rmae_per_hour(predicted, actual, naive):
+    """El mateix hora per hora, amb un denominador per hora.
+
+    Diverge del rMAE de l'article, que pren un sol denominador de tot el període: amb un
+    per hora, el que es compara és com de difícil és cada hora i no com de cara és.
+    """
+    days = _days(predicted, actual).intersection(naive.index)
+    if days.empty:
+        raise ValueError("el model, el preu real i la predicció ingènua no comparteixen cap dia")
+    floor = mae_per_hour(naive.loc[days], actual)
+    if (floor <= 0).any():
+        raise ValueError("alguna hora té la predicció ingènua perfecta i no s'hi pot dividir")
+    return mae_per_hour(predicted.loc[days], actual) / floor
+
+
+def error_dispersion(predicted, actual):
+    """Cov-e de Maciejowska, Lipiecki i Uniejewski (2026): el logaritme del determinant
+    de la matriu de segons moments dels errors d'un dia.
+
+    Diu com de repartits estan els errors d'un mateix dia entre les 24 hores. Baixa quan
+    els errors minven i quan es correlacionen entre ells, de manera que premia una corba
+    equivocada en bloc per damunt d'una equivocada hora per hora: la primera encara té la
+    forma del dia. Com més baix, millor, i barreja dispersió amb precisió.
+
+    La matriu té rang com a molt el nombre de dies, així que amb menys de 24 és singular i
+    el determinant és zero; aleshores no es calcula en lloc de tornar menys infinit.
+    """
+    days = _days(predicted, actual)
+    errors = (predicted.loc[days] - actual.loc[days]).to_numpy()
+    if len(errors) < HOURS_PER_DAY:
+        raise ValueError(f"{len(errors)} dies per a una matriu de {HOURS_PER_DAY} hores, "
+                         "que surt singular")
+    sign, value = np.linalg.slogdet(errors.T @ errors / len(errors))
+    if sign <= 0:
+        raise ValueError("la matriu de segons moments dels errors no és definida positiva")
+    return float(value)
+
+
+def curve_correlations(predicted, actual):
+    """Correlació de Spearman de cada dia entre la corba predita i la real.
+
+    Spearman és Pearson sobre els rangs. Un dia en què les 24 hores tenen el mateix preu,
+    o la mateixa predicció, no té rangs que variïn i surt absent en lloc de zero.
+    """
+    days = _days(predicted, actual)
+    ranked = [frame.loc[days].rank(axis="columns").to_numpy() for frame in (predicted, actual)]
+    centred = [values - values.mean(axis=1, keepdims=True) for values in ranked]
+    spread = np.sqrt((centred[0] ** 2).sum(axis=1) * (centred[1] ** 2).sum(axis=1))
+    correlation = np.where(spread > 0, (centred[0] * centred[1]).sum(axis=1) / spread, np.nan)
+    return pd.Series(correlation, index=days)
+
+
+def curve_correlation(predicted, actual):
+    """Corr-f: la mitjana d'aquelles correlacions diàries. Com més alt, millor."""
+    return float(curve_correlations(predicted, actual).mean())
+
+
+def metrics(forecasts, actual, naive):
     """Taula llarga de totes les mètriques: pronòstic, mètrica, hora i valor.
 
     Llarga i no ampla perquè afegir-ne una no canviï la forma del fitxer: la ronda de
@@ -79,9 +153,17 @@ def metrics(forecasts, actual):
     """
     rows = []
     for name, frame in sorted(forecasts.items()):
-        rows.append({"forecast": name, "metric": "mae", "hour": "", "value": mae(frame, actual)})
+        daily = curve_correlations(frame, actual)
+        singles = (("mae", mae(frame, actual)),
+                   ("rmae", rmae(frame, actual, naive)),
+                   ("error_dispersion", error_dispersion(frame, actual)),
+                   ("curve_correlation", float(daily.mean())),
+                   ("curve_correlation_days", float(daily.notna().sum())))
+        rows += [{"forecast": name, "metric": metric, "hour": "", "value": value}
+                 for metric, value in singles]
         for metric, series in (("mae_by_hour", mae_per_hour(frame, actual)),
-                               ("mae_over_price", mae_per_hour_over_price(frame, actual))):
+                               ("mae_over_price", mae_per_hour_over_price(frame, actual)),
+                               ("rmae_by_hour", rmae_per_hour(frame, actual, naive))):
             rows += [{"forecast": name, "metric": metric, "hour": hour, "value": value}
                      for hour, value in series.items()]
     return pd.DataFrame(rows)
