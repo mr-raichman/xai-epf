@@ -11,6 +11,7 @@ import datetime
 import functools
 import shutil
 import subprocess
+import sys
 import time
 import traceback
 
@@ -146,12 +147,17 @@ def write(folder, forecasts, attributions, actual, record):
 
     Substitueix el directori sencer, i només ara: si la família hagués fallat, el que
     hi havia abans encara hi seria.
+
+    Les mètriques es calculen abans de tocar el disc, perquè una que peti no deixi un
+    directori amb prediccions i sense `metrics.csv`, que des de fora sembla una
+    execució sencera.
     """
+    table = metrics(forecasts, actual, naive.weekly_frame(actual))
     if folder.exists():
         shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
     run_files.save_forecasts(folder, forecasts)
-    run_files.save_metrics(folder, metrics(forecasts, actual, naive.weekly_frame(actual)))
+    run_files.save_metrics(folder, table)
     for name, kept in attributions.items():
         attribution.save(folder, name, forecasts[name].index, kept)
     run_files.save_record(folder, record)
@@ -230,13 +236,21 @@ def main():
         except Exception:
             traceback.print_exc()
             failed.append(name)
+            # Res a mitges: si ha petat després de començar a escriure, el directori
+            # se'n va sencer.
+            shutil.rmtree(folders[name], ignore_errors=True)
             print(f"{name}: ha fallat, no se'n desa res", flush=True)
         else:
             print(f"{name}: {time.perf_counter() - clock:.0f} s, desat a {folder}", flush=True)
 
     if failed:
         print(f"famílies que han fallat i no han desat res: {', '.join(failed)}")
+        # Les que han anat bé ja estan desades: el codi de sortida només hi és perquè
+        # una execució que ha perdut una família no sembli bona a qui la miri des de
+        # fora, que no veu el missatge de dalt.
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
