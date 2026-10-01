@@ -9,6 +9,7 @@ import argparse
 import collections
 import datetime
 import functools
+import shutil
 import subprocess
 import time
 import traceback
@@ -117,8 +118,37 @@ def described(args, family, forecasts):
     }
 
 
+def occupied(folders):
+    """Els directoris de la llista que ja tenen res a dins, amb quants fitxers tenen."""
+    return [(folder, len(list(folder.iterdir()))) for folder in folders
+            if folder.exists() and any(folder.iterdir())]
+
+
+def confirm(taken):
+    """Pregunta abans de substituir res, anomenant cada directori i què hi ha a dins.
+
+    Es pregunta un sol cop i abans de començar res, de manera que dir que no deixi el
+    disc exactament com estava. Un comptador no n'hi ha prou: reconèixer el que no
+    s'havia de tocar és tota la gràcia d'anomenar-ho.
+    """
+    if len(taken) == 1:
+        print("1 directori d'aquesta configuració ja hi és i se substituirà sencer:")
+    else:
+        print(f"{len(taken)} directoris d'aquesta configuració ja hi són i se "
+              "substituiran sencers:")
+    for folder, files in taken:
+        print(f"  {folder}  ({files} fitxers)")
+    return input("escriu «si» per substituir-los: ").strip().lower() in ("si", "sí")
+
+
 def write(folder, forecasts, attributions, actual, record):
-    """Desa tot el que ha deixat una família, un cop ja ha acabat."""
+    """Desa tot el que ha deixat una família, un cop ja ha acabat.
+
+    Substitueix el directori sencer, i només ara: si la família hagués fallat, el que
+    hi havia abans encara hi seria.
+    """
+    if folder.exists():
+        shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
     run_files.save_forecasts(folder, forecasts)
     run_files.save_metrics(folder, metrics(forecasts, actual))
@@ -145,6 +175,8 @@ def parse():
                         help="nom d'aquesta configuració dins del directori de l'execució")
     parser.add_argument("--family", action="append",
                         help="només aquesta família; es pot repetir")
+    parser.add_argument("--replace", action="store_true",
+                        help="substitueix una configuració que ja existeixi sense preguntar")
     parser.add_argument("--every", type=int, default=1,
                         help="pren un dia de cada N")
     parser.add_argument("--window", type=int, default=0,
@@ -172,6 +204,13 @@ def main():
     table = families(args)
     chosen = args.family or list(table)
 
+    folders = {name: run_files.folder(args.tier, features.STAGE, args.config, name)
+               for name in chosen}
+    taken = occupied(folders.values())
+    if taken and not args.replace and not confirm(taken):
+        print("no es toca res")
+        return
+
     started = {}
 
     def report(name, predicted_day):
@@ -184,7 +223,7 @@ def main():
         clock = time.perf_counter()
         try:
             forecasts, attributions = run(table[name], matrices, args, report)
-            folder = run_files.folder(args.tier, features.STAGE, args.config, name)
+            folder = folders[name]
             write(folder, forecasts, attributions, actual,
                   described(args, name, forecasts))
             figures.draw(folder, actual)
