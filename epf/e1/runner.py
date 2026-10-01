@@ -9,16 +9,14 @@ import argparse
 import collections
 import datetime
 import functools
-import json
 import subprocess
 import time
 import traceback
 
-import pandas as pd
-
+from epf import run as run_files
 from epf.config import paths
 from epf.e1 import features, figures
-from epf.evaluation import mae, mae_per_hour, walk_forward
+from epf.evaluation import metrics, walk_forward
 from epf.models import attribution, boosting, forest, lear, naive
 
 DAILY, HOURLY = "daily", "hourly"
@@ -95,7 +93,7 @@ def _git(*arguments):
                           capture_output=True, text=True).stdout.strip()
 
 
-def record(args, family, forecasts):
+def described(args, family, forecasts):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer."""
     return {
         "commit": _git("rev-parse", "HEAD"),
@@ -119,24 +117,14 @@ def record(args, family, forecasts):
     }
 
 
-def write(folder, forecasts, attributions, actual, run_record):
+def write(folder, forecasts, attributions, actual, record):
     """Desa tot el que ha deixat una família, un cop ja ha acabat."""
     folder.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for name, frame in sorted(forecasts.items()):
-        frame.to_csv(folder / f"forecasts_{name}.csv")
-        row = {"forecast": name, "mae": mae(frame, actual)}
-        row.update(mae_per_hour(frame, actual).to_dict())
-        rows.append(row)
-    pd.DataFrame(rows).to_csv(folder / "metrics.csv", index=False)
+    run_files.save_forecasts(folder, forecasts)
+    run_files.save_metrics(folder, metrics(forecasts, actual))
     for name, kept in attributions.items():
         attribution.save(folder, name, forecasts[name].index, kept)
-    (folder / "run.json").write_text(json.dumps(run_record, indent=2) + "\n")
-
-
-def folder_of(args, family):
-    return (paths.RUNS / args.tier / features.STAGE / family /
-            f"{args.first}_{args.last}" / args.config)
+    run_files.save_record(folder, record)
 
 
 def day(text):
@@ -196,8 +184,9 @@ def main():
         clock = time.perf_counter()
         try:
             forecasts, attributions = run(table[name], matrices, args, report)
-            folder = folder_of(args, name)
-            write(folder, forecasts, attributions, actual, record(args, name, forecasts))
+            folder = run_files.folder(args.tier, features.STAGE, args.config, name)
+            write(folder, forecasts, attributions, actual,
+                  described(args, name, forecasts))
             figures.draw(folder, actual)
         except Exception:
             traceback.print_exc()

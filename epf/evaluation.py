@@ -33,10 +33,15 @@ def walk_forward(predict, X, y, first, last, every=1, on_day=None):
     return pd.DataFrame(rows, index=days, columns=HOUR_COLUMNS)
 
 
-def _shared(predicted, actual):
+def _days(predicted, actual):
     days = predicted.index.intersection(actual.index)
     if days.empty:
         raise ValueError("les prediccions i els preus reals no comparteixen cap dia")
+    return days
+
+
+def _shared(predicted, actual):
+    days = _days(predicted, actual)
     return (predicted.loc[days] - actual.loc[days]).abs()
 
 
@@ -48,3 +53,35 @@ def mae(predicted, actual):
 def mae_per_hour(predicted, actual):
     """Error absolut mitjà de cada hora del dia, en EUR/MWh."""
     return _shared(predicted, actual).mean()
+
+
+def mae_per_hour_over_price(predicted, actual):
+    """MAE de cada hora dividit pel preu mitjà d'aquella hora, als dies compartits.
+
+    El nivell del preu canvia molt al llarg del dia i l'error absolut el segueix, de
+    manera que una hora cara sembla pitjor encara que no ho sigui. Divideix també la
+    part de la variabilitat que sí que ha produït l'error, i per això és una lectura
+    més i no la mètrica.
+    """
+    level = actual.loc[_days(predicted, actual)].mean()
+    if (level <= 0).any():
+        flat = ", ".join(level[level <= 0].index)
+        raise ValueError(f"preu mitjà nul o negatiu a les hores {flat}: "
+                         "dividir-hi l'error no vol dir res")
+    return mae_per_hour(predicted, actual) / level
+
+
+def metrics(forecasts, actual):
+    """Taula llarga de totes les mètriques: pronòstic, mètrica, hora i valor.
+
+    Llarga i no ampla perquè afegir-ne una no canviï la forma del fitxer: la ronda de
+    mètriques encara ha de dir quines es reporten.
+    """
+    rows = []
+    for name, frame in sorted(forecasts.items()):
+        rows.append({"forecast": name, "metric": "mae", "hour": "", "value": mae(frame, actual)})
+        for metric, series in (("mae_by_hour", mae_per_hour(frame, actual)),
+                               ("mae_over_price", mae_per_hour_over_price(frame, actual))):
+            rows += [{"forecast": name, "metric": metric, "hour": hour, "value": value}
+                     for hour, value in series.items()]
+    return pd.DataFrame(rows)

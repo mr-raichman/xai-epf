@@ -6,7 +6,8 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.evaluation import mae, mae_per_hour, walk_forward
+from epf.evaluation import (mae, mae_per_hour, mae_per_hour_over_price,
+                            walk_forward)
 
 
 def frame_of(days, start=datetime.date(2024, 1, 1), offset=0.0):
@@ -69,3 +70,19 @@ def test_a_day_repeated_in_the_index_is_predicted_once():
     out = walk_forward(lambda features, target, day: target.loc[day].to_numpy(),
                        X, y, "2024-01-10", "2024-01-12")
     assert list(out.index) == list(pd.date_range("2024-01-10", "2024-01-12", freq="D"))
+
+
+def test_the_normalised_error_divides_by_that_hour_s_mean_price():
+    actual = frame_of(30)
+    predicted = frame_of(30, offset=3.0).loc["2024-01-10":"2024-01-12"]
+    level = actual.loc[predicted.index].mean()
+    assert np.allclose(mae_per_hour_over_price(predicted, actual).to_numpy(),
+                       3.0 / level.to_numpy())
+    # El preu mitjà surt només dels dies compartits, no de tota la sèrie.
+    assert not np.allclose(mae_per_hour_over_price(predicted, actual).to_numpy(),
+                           3.0 / actual.mean().to_numpy())
+
+
+def test_a_mean_price_at_or_below_zero_fails_loudly():
+    with pytest.raises(ValueError):
+        mae_per_hour_over_price(frame_of(3), frame_of(3) * 0.0)

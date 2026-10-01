@@ -11,8 +11,10 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
+from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
 from epf.e1 import features
+from epf.evaluation import mae_per_hour, mae_per_hour_over_price
 from epf.models import attribution
 
 matplotlib.use("Agg")
@@ -90,16 +92,24 @@ def prices_against_forecasts(folder, forecasts, actual):
 
 
 def error_by_hour(folder, forecasts, actual):
-    """Error absolut mitjà de cada hora de lliurament."""
-    figure, axis = plt.subplots(figsize=(10, 4), facecolor=SURFACE)
-    for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
-        errors = (frame - actual.loc[frame.index]).abs().mean()
-        axis.plot(range(len(HOUR_COLUMNS)), errors.to_numpy(), color=colour, marker="o",
-                  markersize=3, label=name)
-    axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
-    axis.set_ylabel("MAE (EUR/MWh)", color=MUTED_INK)
-    axis.legend(frameon=False, labelcolor=MUTED_INK)
-    _style(axis, "Error per hora de lliurament")
+    """Error de cada hora de lliurament, en brut i dividit pel preu mitjà de l'hora.
+
+    El preu mitjà de les hores puntes és el doble que el de les valls, i l'error
+    absolut el segueix; el segon plafó treu aquest efecte de nivell.
+    """
+    figure, axes = plt.subplots(1, 2, figsize=(16, 4), facecolor=SURFACE)
+    panels = ((mae_per_hour, "MAE (EUR/MWh)", "Error per hora de lliurament"),
+              (mae_per_hour_over_price, "MAE sobre el preu mitjà de l'hora",
+               "El mateix, sense l'efecte del nivell"))
+    for axis, (measure, label, title) in zip(axes, panels):
+        for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
+            errors = measure(frame, actual)
+            axis.plot(range(len(HOUR_COLUMNS)), errors.to_numpy(), color=colour, marker="o",
+                      markersize=3, label=name)
+        axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
+        axis.set_ylabel(label, color=MUTED_INK)
+        _style(axis, title)
+    axes[0].legend(frameon=False, labelcolor=MUTED_INK)
     _save(figure, folder, "error_by_hour")
 
 
@@ -219,9 +229,7 @@ def importance_concentration(folder, label, stem, importance):
 
 def draw(folder, actual):
     """Totes les figures d'una execució ja desada."""
-    forecasts = {path.stem.removeprefix("forecasts_"):
-                 pd.read_csv(path, index_col=0, parse_dates=True)
-                 for path in sorted(folder.glob("forecasts_*.csv"))}
+    forecasts = run_files.load_forecasts(folder)
     actual = actual.loc[next(iter(forecasts.values())).index]
 
     prices_against_forecasts(folder, forecasts, actual)
