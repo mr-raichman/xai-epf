@@ -42,7 +42,11 @@ WHOLE_HISTORY = "all"
 # la referència utilitza encara que l'article només digui "MAD".
 NORMAL_CONSISTENCY = 0.6744897501960817
 
-MAX_ITER = 2500
+# Prou iteracions perquè el descens de coordenades convergeixi també sobre les
+# finestres llargues que travessen la crisi del 2021-22, on amb 2500 la meitat dels
+# ajusts es tallaven a mitges i la predicció es movia fins a 0,566 EUR/MWh. Un ajust
+# que ja convergia no es mou gens si s'apuja el sostre.
+MAX_ITER = 10000
 
 
 class Scaler:
