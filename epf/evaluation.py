@@ -136,7 +136,11 @@ def curve_correlations(predicted, actual):
     ranked = [frame.loc[days].rank(axis="columns").to_numpy() for frame in (predicted, actual)]
     centred = [values - values.mean(axis=1, keepdims=True) for values in ranked]
     spread = np.sqrt((centred[0] ** 2).sum(axis=1) * (centred[1] ** 2).sum(axis=1))
-    correlation = np.where(spread > 0, (centred[0] * centred[1]).sum(axis=1) / spread, np.nan)
+    # La divisió es fa només on hi ha dispersió: `np.where` calcularia les dues branques
+    # i dividiria per zero igualment.
+    usable = spread > 0
+    correlation = np.full(len(days), np.nan)
+    correlation[usable] = (centred[0] * centred[1]).sum(axis=1)[usable] / spread[usable]
     return pd.Series(correlation, index=days)
 
 
