@@ -21,6 +21,10 @@ ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 # Primer any que es demana. ESIOS no té dades anteriors al 2014.
 FIRST_YEAR = 2010
 
+# Primer dia que la font serveix, mesurat: una sol·licitud directa a l'API no torna
+# res abans. És un fet d'ESIOS i no una tria nostra, que viu a `experiments.py`.
+ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
+
 # Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.
 PUBLICATION_MARGIN = datetime.timedelta(days=2)
 

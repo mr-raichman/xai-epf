@@ -33,8 +33,8 @@ def walk_forward(predict, X, y, first, last, every=1, on_day=None):
     """Prediccions dels dies de `first` a `last`, una fila per dia.
 
     `predict` és una funció `(X, y, day)` que torna les 24 hores del dia; cada
-    família s'hi adapta i cap coneix les altres. `every` en pren un dia de cada N,
-    que serveix per a una passada de fum i no canvia res del que veu el model.
+    família s'hi adapta i cap coneix les altres. `every` en pren un dia de cada N i no canvia res del que veu el model: cada dia
+    mostrejat es prediu igual que en una passada sencera.
     `on_day` es crida amb cada dia ja predit, perquè una passada de vuitanta minuts
     sense cap senyal no es distingeix d'un penjat.
 

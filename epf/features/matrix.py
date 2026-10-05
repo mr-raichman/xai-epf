@@ -12,9 +12,6 @@ import pandas as pd
 from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 
-# Retards del model LEAR de Lago et al. (2021): fa 1, 2, 3 i 7 dies.
-PRICE_LAGS = (1, 2, 3, 7)
-
 DAY_OF_WEEK = "day_of_week"
 HOUR = "hour"
 PRICE = "price"
@@ -42,7 +39,7 @@ def calibration(X, y, day, window=None):
     return features[kept], target[kept]
 
 
-def build(prices, lags=PRICE_LAGS):
+def build(prices, lags):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les.

@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 
 from epf.config.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
-from epf.config.split import HISTORY_START
+from epf.data.esios import ESIOS_FIRST_DAY
 from epf.data import esios, prices
 from epf.data.calendar import local_hours
 from epf.data.omie import latest_version_per_day, load, read_periods
@@ -60,11 +60,11 @@ check("es llegeix la columna espanyola i no la portuguesa",
       f"{DECOUPLED_DAY} hora {DECOUPLED_HOUR}")
 
 joined = prices.load()
-joined_days = pd.date_range(HISTORY_START, joined.index[-1], freq="D")
-check("el preu unit comença on comença ESIOS", joined.index[0].date() == HISTORY_START,
+joined_days = pd.date_range(ESIOS_FIRST_DAY, joined.index[-1], freq="D")
+check("el preu unit comença on comença ESIOS", joined.index[0].date() == ESIOS_FIRST_DAY,
       f"{joined.index[0].date()}")
 check("el preu unit no té cap dia buit", joined.index.equals(joined_days),
-      f"{len(joined)} de {len(joined_days)}, de {HISTORY_START} a {joined.index[-1].date()}")
+      f"{len(joined)} de {len(joined_days)}, de {ESIOS_FIRST_DAY} a {joined.index[-1].date()}")
 check("el preu unit té 24 hores i cap valor absent",
       joined.shape[1] == HOURS_PER_DAY and not joined.isna().to_numpy().any(), f"{joined.shape}")
 seam = pd.Timestamp(prices.OMIE_FROM)

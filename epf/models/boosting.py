@@ -12,14 +12,7 @@ from lightgbm import LGBMRegressor
 from epf.features.matrix import calibration
 from epf.models.attribution import ONE, PRICE_UNITS, Attribution
 
-# Punt de partida, que s'ajusta sobre el període de validació.
-TREES = 500
-LEARNING_RATE = 0.05
-LEAVES = 31
-SEED = 0
-
-
-def lightgbm(trees=TREES, rate=LEARNING_RATE, leaves=LEAVES, seed=SEED):
+def lightgbm(trees, rate, leaves, seed):
     """Un regressor de LightGBM sense ajustar."""
     return LGBMRegressor(n_estimators=trees, learning_rate=rate, num_leaves=leaves,
                          random_state=seed, n_jobs=-1, verbose=-1)

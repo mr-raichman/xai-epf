@@ -5,6 +5,7 @@ import functools
 import numpy as np
 import pandas as pd
 
+from epf.config.experiments import LAGS
 from epf.data.calendar import HOUR_COLUMNS
 from epf.features.matrix import build, per_hour
 from epf.models.boosting import explain, forecast, lightgbm
@@ -12,13 +13,13 @@ from epf.models.boosting import explain, forecast, lightgbm
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
 
-SMALL = functools.partial(lightgbm, trees=20)
+SMALL = functools.partial(lightgbm, trees=20, rate=0.05, leaves=31, seed=0)
 
 
 def hourly_prices(days, start=datetime.date(2014, 1, 1)):
     index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in range(days)], name="day")
     rows = [[WEEKLY_SHAPE[day.dayofweek] + hour for hour in range(24)] for day in index]
-    return per_hour(*build(pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)))
+    return per_hour(*build(pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS), LAGS))
 
 
 def test_it_predicts_the_twenty_four_hours_in_order():

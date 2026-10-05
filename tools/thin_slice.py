@@ -7,6 +7,7 @@ import datetime
 import functools
 import time
 
+from epf.config import experiments
 from epf.data import prices
 from epf.evaluation import mae, mae_per_hour, walk_forward
 from epf.features import matrix
@@ -23,20 +24,23 @@ parser.add_argument("--from", dest="first", type=day, required=True,
                     help="primer dia a predir")
 parser.add_argument("--to", dest="last", type=day, required=True,
                     help="últim dia a predir")
-parser.add_argument("--windows", type=int, nargs="+", default=[w or 0 for w in lear.WINDOWS],
+parser.add_argument("--windows", type=int, nargs="+",
+                    default=[w or 0 for w in experiments.LEAR_WINDOWS],
                     help="finestres de calibratge en dies, 0 per tot l'historial; "
                          "amb més d'una es fa servir la mitjana de les seves prediccions")
 parser.add_argument("--every", type=int, default=1,
-                    help="pren un dia de cada N, per a una passada de fum")
+                    help="pren un dia de cada N")
 args = parser.parse_args()
 
 windows = tuple(window or None for window in args.windows)
 if len(windows) == 1:
-    predict = functools.partial(lear.forecast, window=windows[0])
+    predict = functools.partial(lear.forecast, window=windows[0],
+                                max_iter=experiments.BASE["lear_max_iter"])
 else:
-    predict = functools.partial(lear.forecast_ensemble, windows=windows)
+    predict = functools.partial(lear.forecast_ensemble, windows=windows,
+                                max_iter=experiments.BASE["lear_max_iter"])
 
-X, y = matrix.build(prices.load())
+X, y = matrix.build(prices.load(), experiments.LAGS)
 names = ", ".join("tot l'historial" if w is None else f"{w} dies" for w in windows)
 print(f"LEAR de {args.first} a {args.last}, un dia de cada {args.every}")
 print(f"finestres: {names}")

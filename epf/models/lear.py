@@ -11,29 +11,13 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 from threadpoolctl import threadpool_limits
 
+from epf.config.experiments import LAGS, SHORT_LAGS
 from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import DAY_OF_WEEK, PRICE_LAGS, calibration
+from epf.features.matrix import DAY_OF_WEEK, calibration
 from epf.models.attribution import Attribution
 
 DAYS_PER_WEEK = 7
-
-# Dies que es perden al principi de qualsevol tram: cap fila es pot formar fins que
-# hi ha tots els retards.
-WARM_UP = max(PRICE_LAGS)
-
-# Finestres de calibratge, en dies de calibratge. Els "anys" de l'article són de 364
-# dies, 52 setmanes exactes que mantenen alineat el dia de la setmana; les seves
-# finestres de 1092 i 1456 dies de preus donen aquests dies un cop descomptat el
-# començament. None vol dir tot l'historial disponible, que l'article no fa servir.
-EIGHT_WEEKS = 8 * DAYS_PER_WEEK - WARM_UP
-TWELVE_WEEKS = 12 * DAYS_PER_WEEK - WARM_UP
-WINDOWS = (EIGHT_WEEKS, TWELVE_WEEKS, 364 * 3 - WARM_UP, 364 * 4 - WARM_UP, None)
-
-# Retards que porta cada finestra curta. Amb els quatre de l'article la matriu de
-# disseny té 103 columnes i LassoLarsIC demana dues files més que columnes, que cap
-# de les dues finestres curtes no té: cada una porta els retards que hi caben.
-SHORT_LAGS = {EIGHT_WEEKS: (1,), TWELVE_WEEKS: (1, 2)}
 
 # Nom de la finestra que agafa tot l'historial, per a l'atribució desada.
 WHOLE_HISTORY = "all"
@@ -42,13 +26,6 @@ WHOLE_HISTORY = "all"
 # desviació típica d'una normal; és el que fa `statsmodels.robust.mad`, i el que
 # la referència utilitza encara que l'article només digui "MAD".
 NORMAL_CONSISTENCY = 0.6744897501960817
-
-# Prou iteracions perquè el descens de coordenades convergeixi també sobre les
-# finestres llargues que travessen la crisi del 2021-22, on amb 2500 la meitat dels
-# ajusts es tallaven a mitges i la predicció es movia fins a 0,566 EUR/MWh. Un ajust
-# que ja convergia no es mou gens si s'apuja el sostre.
-MAX_ITER = 10000
-
 
 class Scaler:
     """Transformació de variància estabilitzada: asinh del valor centrat i escalat.
@@ -85,15 +62,19 @@ def _design(rows, scaler):
     return np.hstack([scaler.forward(values[:, :-1]), week_dummies(values[:, -1])])
 
 
-def _fit_hour(features, target):
-    """Un LASSO per una hora: lambda per LARS amb AIC, ajust per descens de coordenades."""
-    alpha = LassoLarsIC(criterion="aic", max_iter=MAX_ITER).fit(features, target).alpha_
-    return Lasso(alpha=alpha, max_iter=MAX_ITER).fit(features, target)
+def _fit_hour(features, target, max_iter):
+    """Un LASSO per una hora: lambda per LARS amb AIC, ajust per descens de coordenades.
+
+    El sostre d'iteracions ve de la configuració: un ajust tallat a mitges no es
+    queixa, i a 2500 la meitat dels de les finestres llargues ho estaven.
+    """
+    alpha = LassoLarsIC(criterion="aic", max_iter=max_iter).fit(features, target).alpha_
+    return Lasso(alpha=alpha, max_iter=max_iter).fit(features, target)
 
 
 def lags_of(window):
-    """Retards que porta una finestra: els quatre de l'article, o menys si és curta."""
-    return SHORT_LAGS.get(window, PRICE_LAGS)
+    """Retards que porta una finestra: els de l'etapa, o menys si és curta."""
+    return SHORT_LAGS.get(window, LAGS)
 
 
 def feature_columns(lags):
@@ -107,10 +88,10 @@ def design_columns(lags):
             + [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)])
 
 
-DESIGN_COLUMNS = design_columns(PRICE_LAGS)
+DESIGN_COLUMNS = design_columns(LAGS)
 
 
-def _window_forecast(X, y, day, window):
+def _window_forecast(X, y, day, window, max_iter):
     """(24 preus, contribucions, base) d'una finestra, ajustada només amb dies
     anteriors.
 
@@ -142,7 +123,7 @@ def _window_forecast(X, y, day, window):
     # setze.
     with threadpool_limits(limits=1):
         for hour in range(HOURS_PER_DAY):
-            model = _fit_hour(train, scaled[:, hour])
+            model = _fit_hour(train, scaled[:, hour], max_iter)
             hours.append(model.predict(test)[0])
             contributions.append(model.coef_ * (test[0] - background))
             # El valor del qual parteixen les contribucions: la predicció a la
@@ -153,21 +134,21 @@ def _window_forecast(X, y, day, window):
             np.array(base))
 
 
-def forecast(X, y, day, window=None):
+def forecast(X, y, day, window, max_iter):
     """Els 24 preus de `day`, amb el model ajustat només amb dies anteriors.
 
     `X` i `y` són els de `features.matrix.build`, i la finestra són dies de
     calibratge, com a tot el projecte.
     """
-    return _window_forecast(X, y, day, window)[0]
+    return _window_forecast(X, y, day, window, max_iter)[0]
 
 
-def forecast_ensemble(X, y, day, windows=WINDOWS):
+def forecast_ensemble(X, y, day, windows, max_iter):
     """Mitjana aritmètica de les prediccions de cada finestra de calibratge."""
-    return np.mean([forecast(X, y, day, window) for window in windows], axis=0)
+    return np.mean([forecast(X, y, day, window, max_iter) for window in windows], axis=0)
 
 
-def explain(X, y, day, windows=WINDOWS):
+def explain(X, y, day, windows, max_iter):
     """Predicció del conjunt i contribucions de cada finestra, desades per separat.
 
     Cada finestra escala la seva pròpia finestra amb la seva mediana i la seva MAD,
@@ -177,7 +158,7 @@ def explain(X, y, day, windows=WINDOWS):
     """
     forecasts, values, bases = [], [], []
     for window in windows:
-        prices, contributions, base = _window_forecast(X, y, day, window)
+        prices, contributions, base = _window_forecast(X, y, day, window, max_iter)
         forecasts.append(prices)
         bases.append(base)
         whole = np.zeros((len(DESIGN_COLUMNS), HOURS_PER_DAY))

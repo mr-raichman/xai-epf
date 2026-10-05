@@ -4,7 +4,7 @@ import pathlib
 import matplotlib
 import pandas as pd
 
-from epf.config.split import HISTORY_START
+from epf.config.experiments import HISTORY_START
 from epf.data import prices
 
 matplotlib.use("Agg")
