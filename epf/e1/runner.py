@@ -19,7 +19,7 @@ from epf import run as run_files
 from epf.config import paths
 from epf.e1 import features, figures
 from epf.evaluation import metrics, walk_forward
-from epf.models import attribution, boosting, forest, lear, naive
+from epf.models import attribution, boosting, lear, naive
 
 DAILY, HOURLY = "daily", "hourly"
 
@@ -51,19 +51,12 @@ def families(args):
     """
     light = functools.partial(boosting.lightgbm, trees=args.trees, rate=args.rate,
                               leaves=args.leaves, seed=args.seed)
-    extreme = functools.partial(boosting.xgboost, trees=args.trees, rate=args.rate,
-                                depth=args.depth, seed=args.seed)
     return {
         "naive": Family(DAILY, {name: _unattributed(forecast)
                                 for name, forecast in NAIVE.items()}),
         "lear": Family(DAILY, {"lear": functools.partial(lear.explain, windows=args.windows)}),
-        "forest": Family(DAILY, {"forest": functools.partial(
-            forest.explain, window=args.window, trees=args.trees,
-            features_per_split=args.features_per_split, seed=args.seed)}),
         "lightgbm": Family(HOURLY, {"lightgbm": functools.partial(
             boosting.explain, light, window=args.window)}),
-        "xgboost": Family(HOURLY, {"xgboost": functools.partial(
-            boosting.explain, extreme, window=args.window)}),
     }
 
 
@@ -113,8 +106,6 @@ def described(args, family, forecasts):
         "trees": args.trees,
         "rate": args.rate,
         "leaves": args.leaves,
-        "depth": args.depth,
-        "features_per_split": args.features_per_split,
         "seed": args.seed,
     }
 
@@ -190,12 +181,10 @@ def parse():
     parser.add_argument("--windows", type=int, nargs="+",
                         default=[window or 0 for window in lear.WINDOWS],
                         help="finestres de LEAR en dies, 0 per tot l'historial")
-    parser.add_argument("--trees", type=int, default=forest.TREES)
+    parser.add_argument("--trees", type=int, default=boosting.TREES)
     parser.add_argument("--rate", type=float, default=boosting.LEARNING_RATE)
     parser.add_argument("--leaves", type=int, default=boosting.LEAVES)
-    parser.add_argument("--depth", type=int, default=boosting.MAX_DEPTH)
-    parser.add_argument("--features-per-split", type=float, default=forest.FEATURES_PER_SPLIT)
-    parser.add_argument("--seed", type=int, default=forest.SEED)
+    parser.add_argument("--seed", type=int, default=boosting.SEED)
     args = parser.parse_args()
     args.window = args.window or None
     args.windows = tuple(window or None for window in args.windows)

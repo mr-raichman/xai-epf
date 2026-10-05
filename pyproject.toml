@@ -11,7 +11,6 @@ dependencies = [
     "requests==2.34.2",
     "scikit-learn==1.9.1",
     "lightgbm==4.7.0",
-    "xgboost==3.4.1",
     "shap==0.52.0",
     "matplotlib==3.11.2",
 ]
