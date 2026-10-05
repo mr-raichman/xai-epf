@@ -48,6 +48,10 @@ def explain(make, X, y, day, window=None):
     """
     fitted = fit(make, X, y, day, window)
     rows = X.loc[[day]]
-    values = shap.TreeExplainer(fitted).shap_values(rows)
+    explainer = shap.TreeExplainer(fitted)
+    values = explainer.shap_values(rows)
+    # Un sol model per a les 24 hores, de manera que la base és la mateixa a totes.
+    base = np.full((1, len(rows)), float(np.ravel(explainer.expected_value)[0]))
     return (fitted.predict(rows),
-            Attribution(ONE, list(X.columns), values.T[np.newaxis], PRICE_UNITS))
+            Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None,
+                        PRICE_UNITS))

@@ -11,9 +11,15 @@ import numpy as np
 
 # `members` és un sol element per a les famílies d'un sol model, i les finestres de
 # calibratge per a LEAR, que escala cada finestra amb la seva pròpia mediana i MAD i
-# per tant no les té en unitats comparables entre elles. `values` és
-# (membre, columna, hora) per a un dia.
-Attribution = collections.namedtuple("Attribution", "members columns values units")
+# per tant no les té en unitats comparables entre elles, ni tampoc entre hores.
+# `values` és (membre, columna, hora) per a un dia i `base` és (membre, hora): el
+# valor del qual parteix cada contribució, de manera que la base més la suma de les
+# contribucions torna la predicció i això es pot comprovar. `forecasts` és
+# (membre, hora) només per a un conjunt com LEAR, on cada finestra té la seva pròpia
+# predicció i la que es desa al CSV és la mitjana; per a una família d'un sol model
+# és None, perquè la predicció del membre ja és la del CSV.
+Attribution = collections.namedtuple("Attribution",
+                                     "members columns values base forecasts units")
 
 # Membres d'una família que ajusta un sol model.
 ONE = ("model",)
@@ -28,17 +34,30 @@ def path(folder, forecast):
 def save(folder, forecast, days, attributions):
     """Desa l'atribució de tots els dies d'un pronòstic en un sol fitxer comprimit."""
     first = attributions[0]
-    np.savez_compressed(
-        path(folder, forecast),
-        values=np.stack([one.values for one in attributions]).astype(np.float32),
-        days=np.array([str(day.date()) for day in days]),
-        members=np.array(first.members),
-        columns=np.array(first.columns),
-        units=np.array(first.units))
+    arrays = {
+        "values": np.stack([one.values for one in attributions]).astype(np.float32),
+        "base": np.stack([one.base for one in attributions]).astype(np.float32),
+        "days": np.array([str(day.date()) for day in days]),
+        "members": np.array(first.members),
+        "columns": np.array(first.columns),
+        "units": np.array(first.units)}
+    if first.forecasts is not None:
+        arrays["forecasts"] = np.stack(
+            [one.forecasts for one in attributions]).astype(np.float32)
+    np.savez_compressed(path(folder, forecast), **arrays)
 
 
 def load(folder, forecast):
-    """(dies, membres, columnes, unitats, valors) tal com es van desar."""
+    """Els dies desats i l'atribució de tots ells, com una sola `Attribution`.
+
+    Les execucions anteriors a la base no la porten, i aleshores `base` surt None en
+    lloc de fer fallar la lectura.
+    """
     stored = np.load(path(folder, forecast))
-    return (stored["days"], list(stored["members"]), list(stored["columns"]),
-            str(stored["units"]), stored["values"])
+    return stored["days"], Attribution(
+        members=list(stored["members"]),
+        columns=list(stored["columns"]),
+        values=stored["values"],
+        base=stored["base"] if "base" in stored else None,
+        forecasts=stored["forecasts"] if "forecasts" in stored else None,
+        units=str(stored["units"]))

@@ -11,6 +11,24 @@ from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 
 
+def refuse_missing(frame, what):
+    """Falla si la taula porta cap valor absent, anomenant on és el primer.
+
+    Un NaN es veu a les mètriques d'un sol valor, que tornen NaN, i no es veu a les
+    d'hora per hora, que el salten i informen l'hora com si fos neta. Es comprova
+    als dos llocs on pot arribar: quan el camí endavant torna el que ha predit, que
+    agafa un model que ha començat a fallar, i quan les mètriques reben el que
+    llegeixen, que agafa una execució que ja és al disc.
+    """
+    missing = frame.isna()
+    if not missing.to_numpy().any():
+        return
+    flat = missing.stack()
+    row, column = next(iter(flat[flat].index))
+    raise ValueError(f"{int(missing.to_numpy().sum())} valors absents a {what}, "
+                     f"el primer a {row} hora {column}")
+
+
 def walk_forward(predict, X, y, first, last, every=1, on_day=None):
     """Prediccions dels dies de `first` a `last`, una fila per dia.
 
@@ -32,7 +50,9 @@ def walk_forward(predict, X, y, first, last, every=1, on_day=None):
         rows.append(predict(X, y, day))
         if on_day is not None:
             on_day(day)
-    return pd.DataFrame(rows, index=days, columns=HOUR_COLUMNS)
+    predicted = pd.DataFrame(rows, index=days, columns=HOUR_COLUMNS)
+    refuse_missing(predicted, "les prediccions del camí endavant")
+    return predicted
 
 
 def _days(predicted, actual):
@@ -55,22 +75,6 @@ def mae(predicted, actual):
 def mae_per_hour(predicted, actual):
     """Error absolut mitjà de cada hora del dia, en EUR/MWh."""
     return _shared(predicted, actual).mean()
-
-
-def mae_per_hour_over_price(predicted, actual):
-    """MAE de cada hora dividit pel preu mitjà d'aquella hora, als dies compartits.
-
-    El nivell del preu canvia molt al llarg del dia i l'error absolut el segueix, de
-    manera que una hora cara sembla pitjor encara que no ho sigui. Divideix també la
-    part de la variabilitat que sí que ha produït l'error, i per això és una lectura
-    més i no la mètrica.
-    """
-    level = actual.loc[_days(predicted, actual)].mean()
-    if (level <= 0).any():
-        flat = ", ".join(level[level <= 0].index)
-        raise ValueError(f"preu mitjà nul o negatiu a les hores {flat}: "
-                         "dividir-hi l'error no vol dir res")
-    return mae_per_hour(predicted, actual) / level
 
 
 def rmae(predicted, actual, naive):
@@ -179,6 +183,9 @@ def metrics(forecasts, actual, naive):
     Llarga i no ampla perquè afegir-ne una no canviï la forma del fitxer: la ronda de
     mètriques encara ha de dir quines es reporten.
     """
+    refuse_missing(actual, "el preu real")
+    for name, frame in sorted(forecasts.items()):
+        refuse_missing(frame, f"el pronòstic {name}")
     rows = []
     for name, frame in sorted(forecasts.items()):
         daily = curve_correlations(frame, actual)
@@ -191,7 +198,6 @@ def metrics(forecasts, actual, naive):
         rows += [{"forecast": name, "metric": metric, "hour": "", "value": value}
                  for metric, value in singles]
         for metric, series in (("mae_by_hour", mae_per_hour(frame, actual)),
-                               ("mae_over_price", mae_per_hour_over_price(frame, actual)),
                                ("rmae_by_hour", rmae_per_hour(frame, actual, naive))):
             rows += [{"forecast": name, "metric": metric, "hour": hour, "value": value}
                      for hour, value in series.items()]

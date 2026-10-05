@@ -110,11 +110,14 @@ DESIGN_COLUMNS = design_columns(PRICE_LAGS)
 
 
 def _window_forecast(X, y, day, window):
-    """(24 preus, contribucions) d'una finestra, ajustada només amb dies anteriors.
+    """(24 preus, contribucions, base) d'una finestra, ajustada només amb dies
+    anteriors.
 
     Les contribucions són els valors de SHAP exactes d'un model lineal, el
     coeficient per la distància de la columna a la mitjana de la finestra, i van en
-    l'espai transformat del model, que no és EUR/MWh.
+    l'espai transformat del model, que no és EUR/MWh. La base és la predicció a
+    aquella mitjana, en el mateix espai, i cada hora té la seva perquè l'objectiu
+    s'escala per columna.
     """
     columns = feature_columns(lags_of(window))
     features, target = calibration(X[columns], y, day, window)
@@ -130,12 +133,16 @@ def _window_forecast(X, y, day, window):
     scaled = prices_target.forward(target.to_numpy())
     background = train.mean(axis=0)
 
-    hours, contributions = [], []
+    hours, contributions, base = [], [], []
     for hour in range(HOURS_PER_DAY):
         model = _fit_hour(train, scaled[:, hour])
         hours.append(model.predict(test)[0])
         contributions.append(model.coef_ * (test[0] - background))
-    return prices_target.back(np.array(hours)), np.array(contributions).T
+        # El valor del qual parteixen les contribucions: la predicció a la mitjana de
+        # la finestra. Base més la suma de les contribucions torna la predicció.
+        base.append(model.intercept_ + model.coef_ @ background)
+    return (prices_target.back(np.array(hours)), np.array(contributions).T,
+            np.array(base))
 
 
 def forecast(X, y, day, window=None):
@@ -160,13 +167,15 @@ def explain(X, y, day, windows=WINDOWS):
     mitjanar-les no voldria dir res. Les columnes que una finestra curta no porta hi
     són a zero.
     """
-    forecasts, values = [], []
+    forecasts, values, bases = [], [], []
     for window in windows:
-        prices, contributions = _window_forecast(X, y, day, window)
+        prices, contributions, base = _window_forecast(X, y, day, window)
         forecasts.append(prices)
+        bases.append(base)
         whole = np.zeros((len(DESIGN_COLUMNS), HOURS_PER_DAY))
         whole[[DESIGN_COLUMNS.index(name) for name in design_columns(lags_of(window))]] = contributions
         values.append(whole)
     members = tuple(str(window) if window else WHOLE_HISTORY for window in windows)
     return (np.mean(forecasts, axis=0),
-            Attribution(members, DESIGN_COLUMNS, np.array(values), "espai transformat"))
+            Attribution(members, DESIGN_COLUMNS, np.array(values), np.array(bases),
+                        np.array(forecasts), "espai transformat"))

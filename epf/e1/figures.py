@@ -15,10 +15,10 @@ from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
 from epf.e1 import features
 from epf.evaluation import (curve_correlations, error_dispersion,
-                            extrema_price_deviations, mae_per_hour,
-                            mae_per_hour_over_price, rmae_per_hour)
+                            extrema_price_deviations, mae_per_hour, rmae_per_hour)
 from epf.models import naive as naive_family
 from epf.models import attribution
+from epf.models.attribution import PRICE_UNITS
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -86,6 +86,23 @@ def _blocks(columns):
     return lags, others
 
 
+def per_hour_scale(importance, units):
+    """Divisor de cada hora de lliurament, per posar-les totes en una escala llegible.
+
+    LEAR escala l'objectiu de cada hora amb la seva pròpia mediana i MAD, així que
+    les contribucions de dues hores no són en les mateixes unitats i una sola escala
+    de color les compara malament: mesurat, les MAD d'un mateix dia es diferencien un
+    factor 1,26 a la finestra de 1085 dies i 2,21 a la de 49. Cada hora es divideix
+    per la seva pròpia contribució més gran, de manera que el color és una part de
+    l'hora i no una magnitud. Un arbre atribueix en EUR/MWh a totes les hores i sí
+    que comparteix escala, així que allà el divisor és 1.
+    """
+    if units == PRICE_UNITS:
+        return np.ones(importance.shape[1])
+    largest = importance.max(axis=0)
+    return np.where(largest > 0, largest, 1.0)
+
+
 def prices_against_forecasts(folder, forecasts, actual):
     """El preu real i el que cada pronòstic va dir, hora rere hora."""
     figure, axis = plt.subplots(figsize=(16, 4.5), facecolor=SURFACE)
@@ -99,18 +116,15 @@ def prices_against_forecasts(folder, forecasts, actual):
 
 
 def error_by_hour(folder, forecasts, actual, naive):
-    """Error de cada hora de lliurament, en brut i de dues maneres sense el nivell.
+    """Error de cada hora de lliurament, en brut i relatiu a la predicció ingènua.
 
-    El preu mitjà de les hores puntes és el doble que el de les valls i l'error absolut
-    el segueix. El segon plafó el divideix pel preu de l'hora, que treu el nivell i
-    també part de la variabilitat que sí que ha produït l'error; el tercer el divideix
-    pel que hi erra la predicció ingènua setmanal, que és com de difícil és l'hora.
+    L'error absolut d'una hora es llegeix malament tot sol, perquè barreja com de
+    difícil és l'hora amb com de cara és. El segon plafó el divideix pel que hi erra
+    la predicció ingènua setmanal, que és com de difícil és.
     """
-    figure, axes = plt.subplots(1, 3, figsize=(21, 4), facecolor=SURFACE)
+    figure, axes = plt.subplots(1, 2, figsize=(14, 4), facecolor=SURFACE)
     panels = ((lambda frame: mae_per_hour(frame, actual),
                "MAE (EUR/MWh)", "Error per hora de lliurament"),
-              (lambda frame: mae_per_hour_over_price(frame, actual),
-               "MAE sobre el preu mitjà de l'hora", "Sense l'efecte del nivell"),
               (lambda frame: rmae_per_hour(frame, actual, naive),
                "MAE sobre el de la predicció ingènua", "Sense l'efecte de la dificultat"))
     for axis, (measure, label, title) in zip(axes, panels):
@@ -232,6 +246,10 @@ def error_distribution(folder, forecasts, actual):
     _save(figure, folder, "error_distribution")
 
 
+def _bar_label(units):
+    return units if units == PRICE_UNITS else "part de l'hora"
+
+
 def importance_by_lag(folder, label, stem, columns, importance, units):
     """Un plafó per retard: hora d'origen contra hora de lliurament."""
     lags, others = _blocks(columns)
@@ -254,7 +272,7 @@ def importance_by_lag(folder, label, stem, columns, importance, units):
                         fontsize=6)
         axis.set_xlabel("hora del dia predit", color=MUTED_INK)
         _style(axis, "la resta de columnes")
-    _colorbar(figure, image, axes[0][-1], units)
+    _colorbar(figure, image, axes[0][-1], _bar_label(units))
     figure.suptitle(f"{label}: importància de cada retard", color=INK, x=0.01, ha="left")
     _save(figure, folder, f"{stem}_lags")
 
@@ -266,32 +284,40 @@ def importance_by_column(folder, label, stem, columns, importance, units):
     axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=6)
     axis.set_yticks(range(len(columns)), columns, fontsize=4)
     axis.set_xlabel("hora del dia predit", color=MUTED_INK)
-    _colorbar(figure, image, axis, units)
+    _colorbar(figure, image, axis, _bar_label(units))
     _style(axis, f"{label}: totes les columnes")
     _save(figure, folder, f"{stem}_columns")
 
 
-def importance_totals(folder, label, stem, columns, importance, units):
-    """Un retard per fila, sumant les hores d'origen."""
+def importance_totals(folder, label, stem, columns, importance, scale, units):
+    """Un retard per fila, sumant les hores d'origen.
+
+    La suma es fa sobre l'atribució sense escalar i el divisor s'aplica després,
+    perquè escalar primer i sumar després no donaria la part del bloc dins de l'hora.
+    """
     lags, others = _blocks(columns)
-    rows = [importance[positions].sum(axis=0) for _, positions in sorted(lags.items())]
+    rows = [importance[positions].sum(axis=0) / scale for _, positions in sorted(lags.items())]
     labels = [f"preu de fa {lag} dies" for lag in sorted(lags)]
     for position in others:
-        rows.append(importance[position])
+        rows.append(importance[position] / scale)
         labels.append(columns[position])
     figure, axis = plt.subplots(figsize=(14, 0.4 * len(rows) + 2), facecolor=SURFACE)
     image = axis.imshow(np.vstack(rows), cmap=MAGNITUDE, aspect="auto", origin="upper")
     axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
     axis.set_yticks(range(len(rows)), labels, fontsize=7)
     axis.set_xlabel("hora del dia predit", color=MUTED_INK)
-    _colorbar(figure, image, axis, units)
+    _colorbar(figure, image, axis, _bar_label(units))
     _style(axis, f"{label}: importància per retard")
     _save(figure, folder, f"{stem}_totals")
 
 
-def importance_over_time(folder, label, stem, columns, values, days, units):
-    """Les columnes més importants, mes a mes."""
-    monthly = np.abs(values).mean(axis=2)
+def importance_over_time(folder, label, stem, columns, values, days, scale, units):
+    """Les columnes més importants, mes a mes.
+
+    La mitjana és sobre les hores del dia, que a LEAR no són en les mateixes
+    unitats, de manera que cada hora es divideix pel seu divisor abans de mitjanar.
+    """
+    monthly = (np.abs(values) / scale).mean(axis=2)
     order = monthly.mean(axis=0).argsort()[::-1][:FOLLOWED]
     months = pd.DatetimeIndex(days).to_period("M")
     figure, axis = plt.subplots(figsize=(14, 4.5), facecolor=SURFACE)
@@ -299,7 +325,7 @@ def importance_over_time(folder, label, stem, columns, values, days, units):
         series = pd.Series(monthly[:, position], index=months).groupby(level=0).mean()
         axis.plot(series.index.to_timestamp(), series.to_numpy(), color=colour,
                   label=columns[position])
-    axis.set_ylabel(f"mitjana de |SHAP| ({units})", color=MUTED_INK)
+    axis.set_ylabel(f"mitjana de |SHAP| ({_bar_label(units)})", color=MUTED_INK)
     axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=4, fontsize=8)
     _style(axis, f"{label}: les {FOLLOWED} columnes més importants mes a mes")
     _save(figure, folder, f"{stem}_over_time")
@@ -339,17 +365,20 @@ def draw(folder, actual):
     for name in forecasts:
         if not attribution.path(folder, name).exists():
             continue
-        days, members, columns, units, values = attribution.load(folder, name)
-        for number, member in enumerate(members):
+        days, stored = attribution.load(folder, name)
+        columns, units = stored.columns, stored.units
+        for number, member in enumerate(stored.members):
             # Una família d'un sol model no té cap finestra de què parlar al títol.
-            several = len(members) > 1
+            several = len(stored.members) > 1
             label = f"{name}, finestra {member}" if several else name
             stem = f"shap_{name}_{member}" if several else f"shap_{name}"
-            importance = np.abs(values[:, number]).mean(axis=0)
-            importance_by_lag(folder, label, stem, columns, importance, units)
-            importance_by_column(folder, label, stem, columns, importance, units)
-            importance_totals(folder, label, stem, columns, importance, units)
-            importance_over_time(folder, label, stem, columns, values[:, number], days, units)
+            importance = np.abs(stored.values[:, number]).mean(axis=0)
+            scale = per_hour_scale(importance, units)
+            importance_by_lag(folder, label, stem, columns, importance / scale, units)
+            importance_by_column(folder, label, stem, columns, importance / scale, units)
+            importance_totals(folder, label, stem, columns, importance, scale, units)
+            importance_over_time(folder, label, stem, columns, stored.values[:, number],
+                                 days, scale, units)
             importance_concentration(folder, label, stem, importance)
 
 

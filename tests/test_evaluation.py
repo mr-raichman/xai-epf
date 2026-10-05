@@ -7,8 +7,8 @@ import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
-                            extrema_price_deviations, mae, mae_per_hour,
-                            mae_per_hour_over_price, rmae, rmae_per_hour, walk_forward)
+                            extrema_price_deviations, mae, mae_per_hour, metrics,
+                            refuse_missing, rmae, rmae_per_hour, walk_forward)
 from epf.models.naive import weekly_frame
 
 
@@ -74,20 +74,22 @@ def test_a_day_repeated_in_the_index_is_predicted_once():
     assert list(out.index) == list(pd.date_range("2024-01-10", "2024-01-12", freq="D"))
 
 
-def test_the_normalised_error_divides_by_that_hour_s_mean_price():
+def test_a_missing_value_fails_instead_of_being_skipped():
+    # `mae` tornaria NaN, que es veu, però `mae_per_hour` el saltaria i informaria
+    # l'hora com si fos neta: aquest és el cas que la guarda existeix per agafar.
+    holed = frame_of(30, offset=3.0)
+    holed.iloc[4, 0] = np.nan
+    assert mae_per_hour(holed, frame_of(30))["h00"] == 3.0
+    with pytest.raises(ValueError, match="h00"):
+        refuse_missing(holed, "el pronòstic")
+
+
+def test_the_metrics_refuse_a_forecast_with_a_hole():
     actual = frame_of(30)
-    predicted = frame_of(30, offset=3.0).loc["2024-01-10":"2024-01-12"]
-    level = actual.loc[predicted.index].mean()
-    assert np.allclose(mae_per_hour_over_price(predicted, actual).to_numpy(),
-                       3.0 / level.to_numpy())
-    # El preu mitjà surt només dels dies compartits, no de tota la sèrie.
-    assert not np.allclose(mae_per_hour_over_price(predicted, actual).to_numpy(),
-                           3.0 / actual.mean().to_numpy())
-
-
-def test_a_mean_price_at_or_below_zero_fails_loudly():
+    holed = frame_of(30, offset=3.0)
+    holed.iloc[4, 0] = np.nan
     with pytest.raises(ValueError):
-        mae_per_hour_over_price(frame_of(3), frame_of(3) * 0.0)
+        metrics({"model": holed}, actual, weekly_frame(actual))
 
 
 def test_the_weekly_naive_is_the_same_hour_seven_days_earlier():
