@@ -19,7 +19,7 @@ from epf import run as run_files
 from epf.config import paths
 from epf.e1 import features, figures
 from epf.evaluation import metrics, walk_forward
-from epf.models import attribution, boosting, lear, naive
+from epf.models import attribution, boosting, lear, mlp, naive
 
 DAILY, HOURLY = "daily", "hourly"
 
@@ -37,8 +37,14 @@ NAIVE = {"previous_day": naive.previous_day,
 
 
 def _unattributed(forecast):
-    """Un pronòstic que no ajusta res: la predicció és una columna copiada, i la seva
-    atribució seria aquella mateixa columna."""
+    """Adapta un pronòstic que no desa atribució a la forma que espera el camí
+    endavant.
+
+    Les prediccions ingènues no n'hi desen perquè la predicció és una columna
+    copiada i la seva atribució seria aquella mateixa columna. L'MLP no n'hi desa
+    perquè TreeSHAP no s'hi aplica i cap mètode exacte és assumible dia a dia; si
+    mai és la família que s'interpreta, la importància per permutació, que no mira
+    dins del model, hi arriba sense desar res a cada execució."""
     def day(X, y, when):
         return forecast(X, y, when), None
     return day
@@ -57,6 +63,9 @@ def families(args):
         "lear": Family(DAILY, {"lear": functools.partial(lear.explain, windows=args.windows)}),
         "lightgbm": Family(HOURLY, {"lightgbm": functools.partial(
             boosting.explain, light, window=args.window)}),
+        "mlp": Family(DAILY, {"mlp": _unattributed(functools.partial(
+            mlp.forecast, window=args.mlp_window, hidden=args.mlp_hidden,
+            seed=args.seed))}),
     }
 
 
@@ -106,6 +115,8 @@ def described(args, family, forecasts):
         "trees": args.trees,
         "rate": args.rate,
         "leaves": args.leaves,
+        "mlp_window": args.mlp_window or 0,
+        "mlp_hidden": list(args.mlp_hidden),
         "seed": args.seed,
     }
 
@@ -184,9 +195,15 @@ def parse():
     parser.add_argument("--trees", type=int, default=boosting.TREES)
     parser.add_argument("--rate", type=float, default=boosting.LEARNING_RATE)
     parser.add_argument("--leaves", type=int, default=boosting.LEAVES)
+    parser.add_argument("--mlp-window", type=int, default=0,
+                        help="dies de calibratge de l'MLP, 0 per tot l'historial")
+    parser.add_argument("--mlp-hidden", type=int, nargs="+", default=list(mlp.HIDDEN),
+                        help="neurones de cada capa amagada de l'MLP")
     parser.add_argument("--seed", type=int, default=boosting.SEED)
     args = parser.parse_args()
     args.window = args.window or None
+    args.mlp_window = args.mlp_window or None
+    args.mlp_hidden = tuple(args.mlp_hidden)
     args.windows = tuple(window or None for window in args.windows)
     return args
 
