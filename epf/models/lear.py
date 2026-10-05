@@ -9,6 +9,7 @@ Implementació pròpia a partir de la descripció de l'article, no del seu codi.
 """
 import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
+from threadpoolctl import threadpool_limits
 
 from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
@@ -134,13 +135,20 @@ def _window_forecast(X, y, day, window):
     background = train.mean(axis=0)
 
     hours, contributions, base = [], [], []
-    for hour in range(HOURS_PER_DAY):
-        model = _fit_hour(train, scaled[:, hour])
-        hours.append(model.predict(test)[0])
-        contributions.append(model.coef_ * (test[0] - background))
-        # El valor del qual parteixen les contribucions: la predicció a la mitjana de
-        # la finestra. Base més la suma de les contribucions torna la predicció.
-        base.append(model.intercept_ + model.coef_ @ background)
+    # Un fil. La matriu de disseny és de 1085 per 103 i a OpenBLAS li costa més
+    # repartir-la entre setze fils que fer-la en un: mesurat sobre tres dies, un fil
+    # va 2,05 a 2,18 vegades més ràpid i dóna el mateix resultat bit a bit. El límit
+    # és d'aquesta família i no de l'execució, perquè les altres sí que aprofiten els
+    # setze.
+    with threadpool_limits(limits=1):
+        for hour in range(HOURS_PER_DAY):
+            model = _fit_hour(train, scaled[:, hour])
+            hours.append(model.predict(test)[0])
+            contributions.append(model.coef_ * (test[0] - background))
+            # El valor del qual parteixen les contribucions: la predicció a la
+            # mitjana de la finestra. Base més la suma de les contribucions torna
+            # la predicció.
+            base.append(model.intercept_ + model.coef_ @ background)
     return (prices_target.back(np.array(hours)), np.array(contributions).T,
             np.array(base))
 

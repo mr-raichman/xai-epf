@@ -125,6 +125,7 @@ dependencies = [
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "shap" },
+    { name = "threadpoolctl" },
 ]
 
 [package.dev-dependencies]
@@ -142,6 +143,7 @@ requires-dist = [
     { name = "requests", specifier = "==2.34.2" },
     { name = "scikit-learn", specifier = "==1.9.1" },
     { name = "shap", specifier = "==0.52.0" },
+    { name = "threadpoolctl", specifier = "==3.6.0" },
 ]
 
 [package.metadata.requires-dev]
