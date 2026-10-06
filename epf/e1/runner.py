@@ -21,6 +21,8 @@ import sys
 import time
 import traceback
 
+import pandas as pd
+
 from epf import run as run_files
 from epf.config import experiments, paths
 from epf.e1 import features, figures
@@ -32,7 +34,12 @@ DAILY, HOURLY = "daily", "hourly"
 # Els dos nivells els anomena la configuració, que és qui en fixa els períodes.
 MEASUREMENT, TEST = experiments.MEASUREMENT, experiments.TEST
 
-Family = collections.namedtuple("Family", "matrix forecasts")
+# `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
+# que ja es coneixia, i per això no entren a la combinació.
+Family = collections.namedtuple("Family", "matrix forecasts fits")
+
+# Nom de la mitjana de tots els membres ajustats d'una configuració.
+COMBINATION = "combination"
 
 # Els tres pronòstics ingenus són una sola família de la graella i van junts en un
 # sol directori.
@@ -68,12 +75,12 @@ def families(settings):
                               seed=settings["seed"])
     return {
         "naive": Family(DAILY, {name: _unattributed(forecast)
-                                for name, forecast in NAIVE.items()}),
+                                for name, forecast in NAIVE.items()}, fits=False),
         "lear": Family(DAILY, {"lear": functools.partial(
             lear.explain, windows=settings["lear_windows"],
-            max_iter=settings["lear_max_iter"])}),
+            max_iter=settings["lear_max_iter"])}, fits=True),
         "lightgbm": Family(HOURLY, {"lightgbm": functools.partial(
-            boosting.explain, light, window=settings["window"])}),
+            boosting.explain, light, window=settings["window"])}, fits=True),
         "mlp": Family(DAILY, {"mlp": _unattributed(functools.partial(
             mlp.forecast, window=settings["mlp_window"],
             hidden=settings["mlp_hidden"], members=settings["mlp_members"],
@@ -81,7 +88,7 @@ def families(settings):
             learning_rate=settings["mlp_learning_rate"],
             validation_fraction=settings["mlp_validation_fraction"],
             no_change=settings["mlp_no_change"],
-            max_iter=settings["mlp_max_iter"]))}),
+            max_iter=settings["mlp_max_iter"]))}, fits=True),
     }
 
 
@@ -108,6 +115,74 @@ def run(family, matrices, settings, tier, report):
     return forecasts, attributions
 
 
+def members(folder):
+    """Els pronòstics ajustats que hi ha desats en una família.
+
+    Les finestres d'un conjunt com LEAR compten una cada una, perquè el que
+    l'article compta per decidir la mida d'una combinació són models ajustats i no
+    famílies; les famílies d'un sol model aporten el seu CSV. Surten del `.npz`
+    quan n'hi ha, que és on es desen, i del CSV quan no.
+    """
+    forecasts = run_files.load_forecasts(folder)
+    found = []
+    for name, frame in sorted(forecasts.items()):
+        if not attribution.path(folder, name).exists():
+            found.append(frame)
+            continue
+        days, stored = attribution.load(folder, name)
+        if stored.forecasts is None:
+            found.append(frame)
+            continue
+        index = pd.DatetimeIndex(pd.to_datetime(days), name=frame.index.name)
+        found += [pd.DataFrame(stored.forecasts[:, number], index=index,
+                               columns=frame.columns)
+                  for number in range(len(stored.members))]
+    return found
+
+
+def combined(folders):
+    """La mitjana aritmètica de tots els membres ajustats d'una configuració.
+
+    Mitjana simple, que és el que fa l'article, i sobre els dies que tots
+    comparteixen. Amb menys de dos membres no hi ha res a combinar.
+    """
+    found = [frame for folder in folders for frame in members(folder)]
+    if len(found) < 2:
+        return None, found
+    days = found[0].index
+    for frame in found[1:]:
+        days = days.intersection(frame.index)
+    if days.empty:
+        raise ValueError("els membres de la combinació no comparteixen cap dia")
+    return sum(frame.loc[days] for frame in found) / len(found), found
+
+
+def add_combination(folders, actual):
+    """Escriu les mètriques de la combinació a `metrics.csv` de cada família.
+
+    Segona passada, en acabar la configuració: la combinació necessita totes les
+    famílies i la primera ja tenia el seu fitxer escrit quan la segona començava.
+    El preu que es paga és que el `metrics.csv` d'una família depèn de les seves
+    germanes i ja no s'escriu un sol cop.
+    """
+    records = [run_files.load_record(folder) for folder in folders]
+    if any("fits" not in record for record in records):
+        # Un registre d'abans que existís el camp no diu si la família ajusta res.
+        # Amb una barreja de registres la combinació sortiria d'un subconjunt i no
+        # ho diria enlloc, així que no se'n fa cap.
+        return 0
+    fitted = [folder for folder, record in zip(folders, records) if record["fits"]]
+    frame, found = combined(fitted)
+    if frame is None:
+        return 0
+    rows = metrics({COMBINATION: frame}, actual, naive.weekly_frame(actual))
+    for folder in folders:
+        existing = run_files.load_metrics(folder)
+        run_files.save_metrics(folder, pd.concat(
+            [existing[existing["forecast"] != COMBINATION], rows], ignore_index=True))
+    return len(found)
+
+
 def _git(*arguments):
     return subprocess.run(("git", *arguments), cwd=paths.ROOT, check=True,
                           capture_output=True, text=True).stdout.strip()
@@ -124,7 +199,7 @@ def _plain(value):
     return value
 
 
-def described(commit, tier, name, settings, family, forecasts, walk_seconds):
+def described(commit, tier, name, settings, family, fits, forecasts, walk_seconds):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
     La configuració sencera hi va tal com estava, de manera que el fitxer es pot
@@ -141,6 +216,10 @@ def described(commit, tier, name, settings, family, forecasts, walk_seconds):
         "tier": tier,
         "configuration": name,
         "family": family,
+        # Si la família ajusta un model o si copia una columna ja coneguda: és el
+        # que decideix si entra a la combinació, i va al disc perquè una
+        # reconstrucció la pugui refer sense tenir la configuració a mà.
+        "fits": fits,
         "forecasts": sorted(forecasts),
         "days": len(next(iter(forecasts.values()))),
         "walk_seconds": round(walk_seconds, 1),
@@ -254,7 +333,7 @@ def main():
                 folder = folders[(name, family)]
                 measured = write(folder, forecasts, attributions, actual,
                                  described(commit, args.tier, name, settings, family,
-                                           forecasts, walked))
+                                           table[family].fits, forecasts, walked))
                 figures.draw(folder, actual)
             except Exception:
                 traceback.print_exc()
@@ -275,8 +354,10 @@ def main():
                                                f"{commit[:7]}_{name}")
         done = sorted(path for path in where.iterdir() if path.is_dir()) if where.exists() else []
         if done:
+            counted = add_combination(done, actual)
             figures.compare(where, done, actual)
-            print(f"{name}: comparació de {len(done)} famílies a {where}", flush=True)
+            print(f"{name}: comparació de {len(done)} famílies a {where}, "
+                  f"amb la combinació de {counted} membres ajustats", flush=True)
 
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")

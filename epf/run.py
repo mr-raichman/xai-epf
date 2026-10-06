@@ -80,6 +80,11 @@ def summary(table):
     que qui decideix com es llegeix una execució és `evaluation.metrics`, que és qui
     les calcula.
     """
+    # La combinació és a `metrics.csv` de cada família, així que llegint-ne
+    # diverses arriba repetida. Files idèntiques es queden en una; si dues
+    # execucions donessin valors diferents, totes dues sobreviuen i el pivot peta,
+    # que és el que ha de passar.
+    table = table.drop_duplicates()
     singles = table[table["hour"].isna() | (table["hour"] == "")]
     order = list(singles["metric"].drop_duplicates())
     wide = singles.pivot(index="forecast", columns="metric", values="value")
@@ -88,3 +93,7 @@ def summary(table):
 
 def save_record(folder, record):
     (folder / RECORD).write_text(json.dumps(record, indent=2) + "\n")
+
+
+def load_record(folder):
+    return json.loads((folder / RECORD).read_text())
