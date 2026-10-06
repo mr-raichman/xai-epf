@@ -78,7 +78,7 @@ def _fetch(filename, directory):
         return False
     response = requests.get(DOWNLOAD + filename, timeout=60)
     if response.status_code != 200 or not response.content.startswith(b"MARGINALPDBC"):
-        print(f"no s'ha pogut baixar {filename}: HTTP {response.status_code}")
+        print(f"no s'ha pogut baixar {filename}: HTTP {response.status_code}", flush=True)
         return False
     target.write_bytes(response.content)
     return True
@@ -98,15 +98,15 @@ def download(directory=OMIE_PRICES):
             continue
         response = requests.get(f"{DOWNLOAD}marginalpdbc_{year}.zip", timeout=300)
         if response.status_code != 200:
-            print(f"no s'ha pogut baixar l'any {year}: HTTP {response.status_code}")
+            print(f"no s'ha pogut baixar l'any {year}: HTTP {response.status_code}", flush=True)
             continue
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             archive.extractall(directory)
-        print(f"{year} desempaquetat")
+        print(f"{year} desempaquetat", flush=True)
 
     wanted = sorted({f"marginalpdbc_{m[1]}.{m[2]}" for m in FILENAME.finditer(listing.text)})
     written = sum(_fetch(name, directory) for name in wanted if name not in existing)
-    print(f"{len(wanted)} fitxers diaris al llistat, {written} de nous")
+    print(f"{len(wanted)} fitxers diaris al llistat, {written} de nous", flush=True)
 
     days = latest_version_per_day(directory)
-    print(f"{len(days)} dies a disc, de {min(days)} a {max(days)}")
+    print(f"{len(days)} dies a disc, de {min(days)} a {max(days)}", flush=True)

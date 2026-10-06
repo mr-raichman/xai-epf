@@ -120,14 +120,14 @@ def download(directory=ESIOS, key=None):
                 "time_trunc": "hour", "time_agg": "average"})
             if response.status_code != 200 or "indicator" not in _json_or_empty(response):
                 print(f"no s'ha pogut baixar l'indicador {indicator} de {name}: "
-                      f"HTTP {response.status_code}")
+                      f"HTTP {response.status_code}", flush=True)
                 continue
             path.parent.mkdir(parents=True, exist_ok=True)
             partial = path.with_suffix(".part")
             partial.write_text(response.text)
             partial.replace(path)
             written += 1
-        print(f"indicador {indicator}: {written} fitxers baixats")
+        print(f"indicador {indicator}: {written} fitxers baixats", flush=True)
 
 
 def _values(indicator, directory):

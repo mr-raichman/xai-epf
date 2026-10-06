@@ -3,7 +3,7 @@ from epf.data import esios, omie
 
 
 def main():
-    print("OMIE")
+    print("OMIE", flush=True)
     omie.download()
-    print("ESIOS")
+    print("ESIOS", flush=True)
     esios.download()
