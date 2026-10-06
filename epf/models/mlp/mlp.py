@@ -14,11 +14,17 @@ import numpy as np
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
-from epf.features.matrix import calibration
+from epf.matrix import calibration
+from epf.models.mlp.mlp_hyperparameters import (ALPHA, HIDDEN, LEARNING_RATE,
+                                                MAX_ITER, MEMBERS, NO_CHANGE,
+                                                VALIDATION_FRACTION, WINDOW)
+from epf.parameters import SEED
 
 
-def fit(X, y, day, window, hidden, members, seed, alpha, learning_rate,
-        validation_fraction, no_change, max_iter):
+def fit(X, y, day, window=WINDOW, hidden=HIDDEN, members=MEMBERS, seed=SEED,
+        alpha=ALPHA, learning_rate=LEARNING_RATE,
+        validation_fraction=VALIDATION_FRACTION, no_change=NO_CHANGE,
+        max_iter=MAX_ITER):
     """Les xarxes d'un dia i els escaladors que les alimenten, ajustats només amb
     dies anteriors.
 

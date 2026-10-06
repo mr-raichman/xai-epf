@@ -7,7 +7,7 @@ el període de validació, no sobre el de prova.
 import numpy as np
 import pandas as pd
 
-from epf.config.market import HOURS_PER_DAY
+from epf.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 
 

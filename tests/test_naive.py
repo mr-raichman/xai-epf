@@ -2,9 +2,9 @@
 import numpy as np
 import pandas as pd
 
-from epf.config.experiments import LAGS
-from epf.features.matrix import build
-from epf.models.naive import previous_day, previous_week, similar_day
+from epf.parameters import LAGS
+from epf.matrix import build
+from epf.models.naive.naive import previous_day, previous_week, similar_day
 from tests.test_matrix import frame_of
 
 

@@ -12,21 +12,17 @@ import json
 
 import pandas as pd
 
-from epf.config import paths
+from epf import paths
 
 FORECASTS = "forecasts_{name}.csv"
 METRICS = "metrics.csv"
 RECORD = "run.json"
 
 
-def configuration_folder(tier, stage, config):
-    """On viu una configuració sencera: hi pengen les famílies i les figures que
-    les comparen."""
-    return paths.RUNS / tier / stage / config
-
-
-def folder(tier, stage, config, family):
-    return configuration_folder(tier, stage, config) / family
+def run_folder(tier, stage, commit):
+    """On viu una execució sencera: hi pengen les famílies i les figures que les
+    comparen. El commit la nomena, perquè és el que fixa tots els seus números."""
+    return paths.RUNS / tier / stage / commit
 
 
 def family_folders(paths):

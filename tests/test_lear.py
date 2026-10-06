@@ -5,10 +5,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf.config.experiments import EIGHT_WEEKS, LAGS, TWELVE_WEEKS
+from epf.models.lear.lear_hyperparameters import EIGHT_WEEKS, TWELVE_WEEKS
+from epf.parameters import LAGS
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import build
-from epf.models.lear import (DESIGN_COLUMNS, Scaler, design_columns, explain,
+from epf.matrix import build
+from epf.models.lear.lear import (DESIGN_COLUMNS, Scaler, design_columns, explain,
                              forecast, lags_of, week_dummies)
 
 # Prou iteracions perquè els ajusts d'aquestes proves convergeixin; el valor que

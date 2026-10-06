@@ -1,20 +1,22 @@
-"""Executa l'etapa E1 i desa el que n'ha sortit.
+"""Camina el període endavant amb totes les famílies i desa el que n'ha sortit.
 
-Què s'executa surt de `epf/config/experiments.py`: cada configuració hi porta el
-seu període i tots els seus números. Per defecte hi passen totes les
-configuracions i totes les famílies, i `--config` i `--family` ho restringeixen.
+Què s'executa surt de dos llocs: `epf/parameters.py`, que porta el període i el
+mostreig de cada nivell, i `models/<nom>/<nom>_hyperparameters.py`, que porta els
+números de cada model. Per defecte hi passen totes les famílies i `--family` ho
+restringeix.
 
 Una família que falli es salta i s'informa al final, i el seu directori només
 apareix quan tot el seu camí endavant ha anat bé, de manera que un fitxer de
 prediccions curt no es pugui llegir mai com una execució sencera.
 
-El directori d'una execució de mesura es diu pel commit, així que una mesura no
-arrenca amb l'arbre brut: el nom mentiria.
+El directori es diu pel commit, que és el que fixa tots els números de dins, així
+que una mesura no arrenca amb l'arbre brut: el nom mentiria.
 """
 import argparse
 import collections
 import datetime
 import functools
+import importlib
 import shutil
 import subprocess
 import sys
@@ -23,16 +25,20 @@ import traceback
 
 import pandas as pd
 
-from epf import run as run_files
-from epf.config import experiments, paths
-from epf.e1 import features, figures
+from epf import matrix, parameters, paths
 from epf.evaluation import metrics, walk_forward
-from epf.models import attribution, boosting, lear, mlp, naive
+from epf.models import attribution
+from epf.models.boosting import boosting
+from epf.models.lear import lear
+from epf.models.mlp import mlp
+from epf.models.naive import naive
+from epf.results import figures
+from epf.results import run as run_files
 
 DAILY, HOURLY = "daily", "hourly"
 
-# Els dos nivells els anomena la configuració, que és qui en fixa els períodes.
-MEASUREMENT, TEST = experiments.MEASUREMENT, experiments.TEST
+# Els dos nivells, que `parameters.py` anomena i als quals fixa el període.
+MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
 # `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
 # que ja es coneixia, i per això no entren a la combinació.
@@ -62,37 +68,38 @@ def _unattributed(forecast):
     return day
 
 
-def families(settings):
+def families():
     """Cada família: quina matriu fa servir i, per pronòstic, què fa amb un dia.
 
-    `settings` és una configuració de `experiments.py`, i cada família en pren els
-    seus números aquí, de manera que el camí endavant no en sap res.
+    Cada model porta els seus números al seu propi
+    `models/<nom>/<nom>_hyperparameters.py` i els pren per defecte, de manera que
+    aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
 
     La funció d'un dia torna els 24 preus i l'atribució del model que els ha predit.
     """
-    light = functools.partial(boosting.lightgbm, trees=settings["trees"],
-                              rate=settings["rate"], leaves=settings["leaves"],
-                              seed=settings["seed"])
     return {
         "naive": Family(DAILY, {name: _unattributed(forecast)
                                 for name, forecast in NAIVE.items()}, fits=False),
-        "lear": Family(DAILY, {"lear": functools.partial(
-            lear.explain, windows=settings["lear_windows"],
-            max_iter=settings["lear_max_iter"])}, fits=True),
-        "lightgbm": Family(HOURLY, {"lightgbm": functools.partial(
-            boosting.explain, light, window=settings["window"])}, fits=True),
-        "mlp": Family(DAILY, {"mlp": _unattributed(functools.partial(
-            mlp.forecast, window=settings["mlp_window"],
-            hidden=settings["mlp_hidden"], members=settings["mlp_members"],
-            seed=settings["seed"], alpha=settings["mlp_alpha"],
-            learning_rate=settings["mlp_learning_rate"],
-            validation_fraction=settings["mlp_validation_fraction"],
-            no_change=settings["mlp_no_change"],
-            max_iter=settings["mlp_max_iter"]))}, fits=True),
+        "lear": Family(DAILY, {"lear": lear.explain}, fits=True),
+        "lightgbm": Family(HOURLY, {"lightgbm": boosting.explain}, fits=True),
+        "mlp": Family(DAILY, {"mlp": _unattributed(mlp.forecast)}, fits=True),
     }
 
 
-def run(family, matrices, settings, tier, report):
+def hyperparameters(family):
+    """Els números del model d'una família, llegits del seu propi fitxer.
+
+    Tot el que hi és en majúscules, que és la forma que tenen; així `run.json` els
+    recull sense que ningú n'hagi de mantenir una llista.
+    """
+    try:
+        module = importlib.import_module(f"epf.models.{family}.{family}_hyperparameters")
+    except ModuleNotFoundError:
+        return {}
+    return {name: getattr(module, name) for name in dir(module) if name.isupper()}
+
+
+def run(family, matrices, tier, report):
     """Camí endavant d'una família: els seus pronòstics i la seva atribució."""
     X, y = matrices[family.matrix]
     forecasts, attributions = {}, {}
@@ -107,7 +114,7 @@ def run(family, matrices, settings, tier, report):
                 kept.append(found)
             return prices
 
-        first, last, every = settings["periods"][tier]
+        first, last, every = parameters.PERIODS[tier]
         forecasts[name] = walk_forward(predict, X, y, first, last, every=every,
                                        on_day=functools.partial(report, name))
         if kept:
@@ -217,36 +224,38 @@ def _plain(value):
         return {str(key): _plain(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
         return [_plain(item) for item in value]
-    if isinstance(value, datetime.date):
+    if isinstance(value, (datetime.date, datetime.timedelta)):
         return str(value)
     return value
 
 
-def described(commit, tier, name, settings, family, fits, forecasts, walk_seconds):
+def described(commit, tier, family, fits, forecasts, walk_seconds):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
-    La configuració sencera hi va tal com estava, de manera que el fitxer es pot
-    llegir sense anar a buscar el commit, encara que el commit sigui al nom del
-    directori i basti per recuperar-la.
+    Els paràmetres de l'execució i els números del model hi van tal com estaven, de
+    manera que el fitxer es pot llegir sense anar a buscar el commit, encara que el
+    commit basti per recuperar-los.
 
     `walk_seconds` és el camí endavant i no la família sencera: és la part que
     creix amb el període, i per tant la que diu què costarà una passada més llarga.
     Les figures no hi són.
     """
+    chosen = {name: getattr(parameters, name) for name in dir(parameters)
+              if name.isupper() and not name.startswith("_")}
     return {
         "commit": commit,
-        "stage": features.STAGE,
+        "stage": parameters.PRICE_ONLY,
         "tier": tier,
-        "configuration": name,
         "family": family,
         # Si la família ajusta un model o si copia una columna ja coneguda: és el
         # que decideix si entra a la combinació, i va al disc perquè una
-        # reconstrucció la pugui refer sense tenir la configuració a mà.
+        # reconstrucció la pugui refer sense tenir els paràmetres a mà.
         "fits": fits,
         "forecasts": sorted(forecasts),
         "days": len(next(iter(forecasts.values()))),
         "walk_seconds": round(walk_seconds, 1),
-        **{key: _plain(value) for key, value in sorted(settings.items())},
+        "parameters": _plain(chosen),
+        "hyperparameters": _plain(hyperparameters(family)),
     }
 
 
@@ -303,8 +312,8 @@ def parse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tier", choices=(TEST, MEASUREMENT), required=True,
                         help="de prova, que no dóna cap xifra, o de mesura, que sí")
-    parser.add_argument("--config", action="append",
-                        help="només aquesta configuració; es pot repetir")
+    parser.add_argument("--price-only", action="store_true", required=True,
+                        help="conjunt d'informació de només preu, l'únic que hi ha")
     parser.add_argument("--family", action="append",
                         help="només aquesta família; es pot repetir")
     parser.add_argument("--replace", action="store_true",
@@ -321,18 +330,16 @@ def main():
               f"Fes un commit, o fes servir --tier {TEST}.")
         return 1
 
-    daily, hourly = features.load()
+    daily, hourly = matrix.price_only()
     matrices = {DAILY: daily, HOURLY: hourly}
     actual = daily[1]
-    chosen = {name: experiments.configuration(name)
-              for name in (args.config or list(experiments.CONFIGURATIONS))}
+    table = families()
+    chosen = args.family or list(table)
 
-    # Tots els directoris de totes les configuracions triades, perquè la pregunta
-    # es faci un sol cop i abans de començar res.
-    folders = {(name, family): run_files.folder(args.tier, features.STAGE,
-                                                f"{commit[:7]}_{name}", family)
-               for name in chosen
-               for family in (args.family or list(families(chosen[name])))}
+    # Tots els directoris alhora, perquè la pregunta es faci un sol cop i abans de
+    # començar res.
+    where = run_files.run_folder(args.tier, parameters.PRICE_ONLY, commit[:7])
+    folders = {family: where / family for family in chosen}
     taken = occupied(folders.values())
     if taken and not args.replace and not confirm(taken):
         print("no es toca res")
@@ -344,48 +351,42 @@ def main():
         done = started[name] = started.get(name, 0) + 1
         print(f"  {name} {predicted_day.date()}  {done} dies", flush=True)
 
+    first, last, every = parameters.PERIODS[args.tier]
     failed = []
-    for name, settings in chosen.items():
-        table = families(settings)
-        first, last, every = settings["periods"][args.tier]
-        for family in (args.family or list(table)):
-            print(f"{name}/{family}: de {first} a {last}, un dia de cada {every}",
-                  flush=True)
-            clock = time.perf_counter()
-            started.clear()
-            try:
-                forecasts, attributions = run(table[family], matrices, settings,
-                                              args.tier, report)
-                walked = time.perf_counter() - clock
-                folder = folders[(name, family)]
-                measured = write(folder, forecasts, attributions, actual,
-                                 described(commit, args.tier, name, settings, family,
-                                           table[family].fits, forecasts, walked))
-                figures.draw(folder, actual)
-            except Exception:
-                traceback.print_exc()
-                failed.append(f"{name}/{family}")
-                # Res a mitges: si ha petat després de començar a escriure, el
-                # directori se'n va sencer.
-                shutil.rmtree(folders[(name, family)], ignore_errors=True)
-                print(f"{name}/{family}: ha fallat, no se'n desa res", flush=True)
-            else:
-                print(f"{name}/{family}: {time.perf_counter() - clock:.0f} s en total, "
-                      f"{walked:.0f} s de camí endavant, desat a {folder}", flush=True)
-                print(run_files.summary(measured), flush=True)
+    for family in chosen:
+        print(f"{family}: de {first} a {last}, un dia de cada {every}", flush=True)
+        clock = time.perf_counter()
+        started.clear()
+        try:
+            forecasts, attributions = run(table[family], matrices, args.tier, report)
+            walked = time.perf_counter() - clock
+            folder = folders[family]
+            measured = write(folder, forecasts, attributions, actual,
+                             described(commit, args.tier, family, table[family].fits,
+                                       forecasts, walked))
+            figures.draw(folder, actual)
+        except Exception:
+            traceback.print_exc()
+            failed.append(family)
+            # Res a mitges: si ha petat després de començar a escriure, el
+            # directori se'n va sencer.
+            shutil.rmtree(folders[family], ignore_errors=True)
+            print(f"{family}: ha fallat, no se'n desa res", flush=True)
+        else:
+            print(f"{family}: {time.perf_counter() - clock:.0f} s en total, "
+                  f"{walked:.0f} s de camí endavant, desat a {folder}", flush=True)
+            print(run_files.summary(measured), flush=True)
 
-        # Les figures que comparen famílies es dibuixen amb les que hi ha al disc i
-        # no amb les d'aquesta invocació, de manera que tornar a executar-ne una de
-        # sola refresca la comparació amb les altres que ja hi eren.
-        where = run_files.configuration_folder(args.tier, features.STAGE,
-                                               f"{commit[:7]}_{name}")
-        done = sorted(path for path in where.iterdir() if path.is_dir()) if where.exists() else []
-        if done:
-            counted = add_combination(done, actual)
-            figures.shared(where, comparison(done, actual), actual)
-            print(f"{name}: figures de {drawn(len(done))} a {where}"
-                  + (f", i la combinació de {counted} membres ajustats" if counted
-                     else ", sense combinació"), flush=True)
+    # Les figures que comparen famílies es dibuixen amb les que hi ha al disc i no
+    # amb les d'aquesta invocació, de manera que tornar a executar-ne una de sola
+    # refresca la comparació amb les altres que ja hi eren.
+    done = sorted(path for path in where.iterdir() if path.is_dir()) if where.exists() else []
+    if done:
+        counted = add_combination(done, actual)
+        figures.shared(where, comparison(done, actual), actual)
+        print(f"figures de {drawn(len(done))} a {where}"
+              + (f", i la combinació de {counted} membres ajustats" if counted
+                 else ", sense combinació"), flush=True)
 
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")

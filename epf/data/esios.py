@@ -10,9 +10,9 @@ import pathlib
 import pandas as pd
 import requests
 
-from epf.config.keys import api_key
-from epf.config.market import MARKET_TIMEZONE
-from epf.config.paths import ESIOS
+from epf.keys import api_key
+from epf.market import MARKET_TIMEZONE
+from epf.paths import ESIOS
 from epf.data.calendar import HOUR_COLUMNS, repair_dst
 
 URL = "https://api.esios.ree.es/indicators/"
@@ -25,7 +25,7 @@ FIRST_YEAR = 2010
 
 # Primer dia que la font serveix el preu, mesurat: una sol·licitud directa a l'API
 # no en torna cap abans. És un fet d'ESIOS i no una tria nostra, que viu a
-# `experiments.py`. Alguna altra sèrie comença unes hores abans.
+# `parameters.py`. Alguna altra sèrie comença unes hores abans.
 ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
 
 # Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.

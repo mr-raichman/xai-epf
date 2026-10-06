@@ -4,10 +4,10 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from epf.config.experiments import LAGS
+from epf.parameters import LAGS
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import build
-from epf.models.mlp import fit, forecast
+from epf.matrix import build
+from epf.models.mlp.mlp import fit, forecast
 
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]

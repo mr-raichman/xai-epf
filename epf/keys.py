@@ -1,5 +1,5 @@
 """Claus d'API, llegides del fitxer `api-keys` de l'arrel."""
-from epf.config.paths import KEYS
+from epf.paths import KEYS
 
 
 def api_key(name, path=KEYS):

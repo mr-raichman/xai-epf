@@ -9,16 +9,18 @@ import numpy as np
 import shap
 from lightgbm import LGBMRegressor
 
-from epf.features.matrix import calibration
+from epf.matrix import calibration
+from epf.models.boosting.boosting_hyperparameters import LEAVES, RATE, TREES, WINDOW
+from epf.parameters import SEED
 from epf.models.attribution import ONE, PRICE_UNITS, Attribution
 
-def lightgbm(trees, rate, leaves, seed):
+def lightgbm(trees=TREES, rate=RATE, leaves=LEAVES, seed=SEED):
     """Un regressor de LightGBM sense ajustar."""
     return LGBMRegressor(n_estimators=trees, learning_rate=rate, num_leaves=leaves,
                          random_state=seed, n_jobs=-1, verbose=-1)
 
 
-def fit(make, X, y, day, window=None):
+def fit(X, y, day, make=lightgbm, window=WINDOW):
     """El model ajustat només amb les hores dels dies anteriors a `day`.
 
     `make` torna un regressor nou cada vegada, de manera que cap dia no hereta res
@@ -28,18 +30,18 @@ def fit(make, X, y, day, window=None):
     return make().fit(features, target)
 
 
-def forecast(make, X, y, day, window=None):
+def forecast(X, y, day, make=lightgbm, window=WINDOW):
     """Els 24 preus de `day`, en ordre d'hora."""
-    return fit(make, X, y, day, window).predict(X.loc[[day]])
+    return fit(X, y, day, make, window).predict(X.loc[[day]])
 
 
-def explain(make, X, y, day, window=None):
+def explain(X, y, day, make=lightgbm, window=WINDOW):
     """Els 24 preus de `day` i l'atribució del mateix model que els ha predit.
 
     TreeSHAP torna (hores, columnes) per a les 24 files del dia; es desa transposat,
     com la resta, en (columna, hora).
     """
-    fitted = fit(make, X, y, day, window)
+    fitted = fit(X, y, day, make, window)
     rows = X.loc[[day]]
     explainer = shap.TreeExplainer(fitted)
     values = explainer.shap_values(rows)

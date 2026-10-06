@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from epf.data.calendar import HOUR_COLUMNS
-from epf.config.experiments import LAGS
-from epf.features.matrix import DAY_OF_WEEK, HOUR, build, calibration, per_hour
+from epf.parameters import LAGS
+from epf.matrix import DAY_OF_WEEK, HOUR, build, calibration, per_hour
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):

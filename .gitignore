@@ -3,5 +3,5 @@ api-keys
 .venv/
 __pycache__/
 /data/
-/plots/**/*.png
+/plots/
 /runs/

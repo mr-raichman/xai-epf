@@ -14,8 +14,8 @@ import zipfile
 import pandas as pd
 import requests
 
-from epf.config.market import HOURS_PER_DAY, QUARTERS_PER_HOUR
-from epf.config.paths import OMIE_PRICES
+from epf.market import HOURS_PER_DAY, QUARTERS_PER_HOUR
+from epf.paths import OMIE_PRICES
 from epf.data.calendar import HOUR_COLUMNS, repair_dst
 
 # Índex de MarginalES, el preu espanyol. L'índex 4 és el portuguès.

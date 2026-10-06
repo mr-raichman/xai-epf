@@ -9,7 +9,7 @@ from epf.data.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae, mae_per_hour, metrics,
                             refuse_missing, rmae, rmae_per_hour, walk_forward)
-from epf.models.naive import weekly_frame
+from epf.models.naive.naive import weekly_frame
 
 
 def frame_of(days, start=datetime.date(2024, 1, 1), offset=0.0):

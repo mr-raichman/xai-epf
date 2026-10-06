@@ -5,10 +5,10 @@ import functools
 import numpy as np
 import pandas as pd
 
-from epf.config.experiments import LAGS
+from epf.parameters import LAGS
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import build, per_hour
-from epf.models.boosting import explain, forecast, lightgbm
+from epf.matrix import build, per_hour
+from epf.models.boosting.boosting import explain, forecast, lightgbm
 
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
@@ -24,7 +24,7 @@ def hourly_prices(days, start=datetime.date(2014, 1, 1)):
 
 def test_it_predicts_the_twenty_four_hours_in_order():
     X, y = hourly_prices(200)
-    prices = forecast(SMALL, X, y, X.index[-1], window=100)
+    prices = forecast(X, y, X.index[-1], make=SMALL, window=100)
     assert prices.shape == (24,)
     # El preu sintètic creix amb l'hora; un arbre arrodoneix per fulles, així que
     # el que ha de sortir és una corba que no baixa, no pas 24 valors diferents.
@@ -35,10 +35,10 @@ def test_it_predicts_the_twenty_four_hours_in_order():
 def test_the_attribution_is_columns_by_delivery_hour():
     X, y = hourly_prices(200)
     day = X.index[-1]
-    prices, attribution = explain(SMALL, X, y, day, window=100)
+    prices, attribution = explain(X, y, day, make=SMALL, window=100)
     assert attribution.values.shape == (1, X.shape[1], 24)
     assert list(attribution.columns) == list(X.columns)
-    assert np.array_equal(prices, forecast(SMALL, X, y, day, window=100))
+    assert np.array_equal(prices, forecast(X, y, day, make=SMALL, window=100))
 
 
 def test_the_day_being_predicted_is_never_read():
@@ -46,5 +46,5 @@ def test_the_day_being_predicted_is_never_read():
     day = X.index[-1]
     corrupted = y.copy()
     corrupted.loc[day] = 9999.0
-    before = forecast(SMALL, X, y, day, window=100)
-    assert np.array_equal(before, forecast(SMALL, X, corrupted, day, window=100))
+    before = forecast(X, y, day, make=SMALL, window=100)
+    assert np.array_equal(before, forecast(X, corrupted, day, make=SMALL, window=100))

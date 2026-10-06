@@ -9,8 +9,10 @@ del dia anterior al lliurament.
 import numpy as np
 import pandas as pd
 
-from epf.config.market import HOURS_PER_DAY
+from epf.data import prices
 from epf.data.calendar import HOUR_COLUMNS
+from epf.market import HOURS_PER_DAY
+from epf.parameters import LAGS
 
 DAY_OF_WEEK = "day_of_week"
 HOUR = "hour"
@@ -66,3 +68,17 @@ def per_hour(X, y):
     rows = X.loc[X.index.repeat(HOURS_PER_DAY)]
     rows[HOUR] = np.tile(np.arange(HOURS_PER_DAY), len(X))
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
+
+
+def price_only():
+    """Les dues matrius del conjunt d'informació de només preu: la diària i la per
+    hora, ja alineades.
+
+    Els 96 retards de preu i el dia de la setmana, que és el model de només preu de
+    Lago et al. (2021). Tot és calculable molt abans que tanqui la subhasta del dia
+    anterior al lliurament, perquè els preus del dia d-1 es van publicar el d-2.
+    L'any més antic que es pot entrenar és el primer del preu, perquè no hi entra
+    cap sèrie que comenci més tard.
+    """
+    daily = build(prices.load(), LAGS)
+    return daily, per_hour(*daily)

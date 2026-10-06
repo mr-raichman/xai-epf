@@ -5,7 +5,7 @@ import sys
 
 import pandas as pd
 
-from epf.config.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
+from epf.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 from epf.data.esios import ESIOS_FIRST_DAY
 from epf.data import esios, prices
 from epf.data.calendar import local_hours

@@ -11,10 +11,11 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 from threadpoolctl import threadpool_limits
 
-from epf.config.experiments import DAYS_PER_WEEK, LAGS, SHORT_LAGS
-from epf.config.market import HOURS_PER_DAY
+from epf.models.lear.lear_hyperparameters import MAX_ITER, SHORT_LAGS, WINDOWS
+from epf.parameters import DAYS_PER_WEEK, LAGS
+from epf.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
-from epf.features.matrix import DAY_OF_WEEK, calibration
+from epf.matrix import DAY_OF_WEEK, calibration
 from epf.models.attribution import Attribution
 
 # Nom de la finestra que agafa tot l'historial, per a l'atribució desada.
@@ -141,7 +142,7 @@ def forecast(X, y, day, window, max_iter):
     return _window_forecast(X, y, day, window, max_iter)[0]
 
 
-def explain(X, y, day, windows, max_iter):
+def explain(X, y, day, windows=WINDOWS, max_iter=MAX_ITER):
     """Predicció del conjunt i contribucions de cada finestra, desades per separat.
 
     Cada finestra escala la seva pròpia finestra amb la seva mediana i la seva MAD,

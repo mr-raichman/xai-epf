@@ -7,10 +7,11 @@ nova o canviar una figura no ha de costar cap camí endavant.
 import argparse
 import pathlib
 
-from epf import run as run_files
-from epf.e1 import features, figures, runner
+from epf import matrix, runner
 from epf.evaluation import metrics
-from epf.models import naive
+from epf.models.naive import naive
+from epf.results import figures
+from epf.results import run as run_files
 
 
 def rebuild(folder, actual):
@@ -26,7 +27,7 @@ def main():
                         help="directori d'una execució o d'una de les seves famílies")
     folders = run_files.family_folders(parser.parse_args().folder)
 
-    (_, actual), _ = features.load()
+    (_, actual), _ = matrix.price_only()
     for folder in folders:
         rebuild(folder, actual)
         print(f"refet {folder}")

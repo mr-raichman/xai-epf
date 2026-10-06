@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.config.market import MARKET_TIMEZONE
+from epf.market import MARKET_TIMEZONE
 from epf.data.esios import MONTHLY, PRICE, REVISED_FORECASTS, SERIES, hourly, load, periods
 
 # 2024-10-27, demanda real (1293): la primera 02:00 porta `datetime_utc` 01:00Z,
