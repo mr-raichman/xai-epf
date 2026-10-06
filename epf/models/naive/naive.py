@@ -3,7 +3,7 @@
 No s'ajusta res: cada una copia una hora que ja es coneixia. Totes tres tenen la
 signatura que espera el camí endavant, i per això reben `y` sense mirar-lo.
 """
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 
 PREVIOUS_DAY = 1
 PREVIOUS_WEEK = 7
@@ -33,7 +33,7 @@ def similar_day(X, y, day):
     return _lag(X, day, lag)
 
 
-def weekly_frame(prices):
+def weekly_frame(price):
     """La predicció ingènua setmanal de cada dia d'una sèrie de preus sencera.
 
     La mateixa que `previous_week`, però sobre una taula de preus i no sobre una
@@ -42,5 +42,5 @@ def weekly_frame(prices):
     buscar l'execució de la família ingènua. Els dies que no tenen el seu dia de fa
     una setmana no hi són.
     """
-    earlier = prices.shift(PREVIOUS_WEEK, freq="D").reindex(prices.index)
+    earlier = price.shift(PREVIOUS_WEEK, freq="D").reindex(price.index)
     return earlier[earlier.notna().all(axis="columns")]

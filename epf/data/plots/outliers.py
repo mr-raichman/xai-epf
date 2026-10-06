@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 
 from epf import paths
-from epf.data import prices
-from epf.data.outliers import hampel_score, window_median_mad
+from epf.data.price import load
+from epf.data.handle_data import (DAY_HALF_WIDTH, HIGHEST, HOUR_HALF_WIDTH, highest,
+                                 report)
 from epf.market import HOURS_PER_DAY
 from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 
@@ -15,26 +16,12 @@ from matplotlib.collections import LineCollection  # noqa: E402
 
 OUTPUT = paths.PLOTS / "outliers.png"
 
-# Veïns: les hores adjacents de la sèrie cronològica, i la mateixa hora en els
-# dies del voltant.
-HOUR_HALF_WIDTH = 12
-DAY_HALF_WIDTH = 7
-
 # La majoria de puntuacions són inferiors a 10 i les més altes arriben als milers:
 # eix lineal fins a 1 i logarítmic a partir d'aquí.
 LINEAR_UP_TO = 1
 
-# Puntuacions més altes de cada panell, marcades en vermell.
-HIGHEST = 100
-
 # Vermell de les puntuacions marcades, que és d'aquesta figura i de cap altra.
 HIGHLIGHT_COLOR = "#e34948"
-
-
-def highest(scores):
-    """Posicions de les `HIGHEST` puntuacions més altes, sense comptar les NaN."""
-    flat = np.nan_to_num(scores.ravel(), nan=-np.inf)
-    return np.argsort(flat)[-HIGHEST:]
 
 
 def style(axis, title, ylabel):
@@ -50,34 +37,11 @@ def style(axis, title, ylabel):
         axis.spines[side].set_color(GRID)
 
 
-def describe(days, values, name, scores, median, mad):
-    """Resum de les puntuacions més altes: com és la finestra i on cauen."""
-    marks = highest(scores)
-    years = pd.Series(days.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
-    print(f"{name}, les {HIGHEST} puntuacions més altes:")
-    print(f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f} EUR/MWh, "
-          f"màxim {mad[marks].max():.2f}")
-    print(f"  mediana de la finestra, mediana {np.median(median[marks]):.2f} EUR/MWh")
-    print(f"  distància del preu a la mediana, mediana "
-          f"{np.median(np.abs(values - median)[marks]):.2f} EUR/MWh")
-    print("  per any: " + ", ".join(f"{year} {count}" for year, count in years.items()))
-
-
 def main():
-    frame = prices.load()
-    values = frame.to_numpy().ravel()
-    by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
-    by_days = np.column_stack([hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                               for column in frame.columns])
-
-    hour_median, hour_mad = window_median_mad(values, HOUR_HALF_WIDTH)
-    day_parts = [window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                 for column in frame.columns]
-    describe(frame.index, values, f"hores adjacents (±{HOUR_HALF_WIDTH} h)", by_hours,
-             hour_median, hour_mad)
-    describe(frame.index, values, f"mateixa hora (±{DAY_HALF_WIDTH} dies)", by_days,
-             np.column_stack([part[0] for part in day_parts]).ravel(),
-             np.column_stack([part[1] for part in day_parts]).ravel())
+    price = load()
+    # Les puntuacions surten de l'informe, que és qui les calcula i les descriu: la
+    # taula impresa i la figura han de ser dels mateixos números.
+    by_hours, by_days = report("price", price)
 
     figure, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
@@ -95,8 +59,8 @@ def main():
           f"en vermell les {HIGHEST} més altes",
           "distància a la mediana, en MAD")
 
-    instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
-        np.tile(hours, len(frame)), unit="h")
+    instants = price.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
+        np.tile(hours, len(price)), unit="h")
     bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES, linewidths=0)
     bottom_marks = highest(by_days)
     bottom.scatter(instants[bottom_marks], by_days.ravel()[bottom_marks], s=12,
@@ -107,8 +71,8 @@ def main():
           f"en vermell les {HIGHEST} més altes",
           "distància a la mediana, en MAD")
 
-    figure.suptitle(f"Distància de cada preu horari als seus veïns, {frame.index[0].year} a "
-                    f"{frame.index[-1].year}", color=INK, x=0.01, ha="left")
+    figure.suptitle(f"Distància de cada preu horari als seus veïns, {price.index[0].year} a "
+                    f"{price.index[-1].year}", color=INK, x=0.01, ha="left")
     figure.tight_layout()
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(OUTPUT, dpi=DPI)

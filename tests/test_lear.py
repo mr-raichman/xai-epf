@@ -7,7 +7,7 @@ import pytest
 
 from epf.models.lear.lear_hyperparameters import EIGHT_WEEKS, TWELVE_WEEKS
 from epf.parameters import LAGS
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
 from epf.models.lear.lear import (DESIGN_COLUMNS, Scaler, design_columns, explain,
                              forecast, lags_of, week_dummies)
@@ -83,9 +83,9 @@ def test_too_short_a_window_fails_loudly():
 
 def noisy_prices(days, start=datetime.date(2014, 1, 1)):
     """El mateix patró setmanal amb soroll, perquè cap coeficient no sigui zero."""
-    prices = weekly_prices(days, start)
-    noise = np.random.default_rng(0).normal(0.0, 2.0, size=prices.shape)
-    return prices + noise
+    price = weekly_prices(days, start)
+    noise = np.random.default_rng(0).normal(0.0, 2.0, size=price.shape)
+    return price + noise
 
 
 def test_each_short_window_takes_the_lags_that_fit():

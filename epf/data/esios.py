@@ -1,7 +1,14 @@
 """Descàrrega i lectura de les sèries de Red Eléctrica a l'API d'ESIOS.
 
-Es desa la resposta de l'API tal com arriba, un fitxer per indicador i any, o per
-mes en les sèries de `MONTHLY`, amb les mitjanes horàries que calcula el servidor.
+Es desa la resposta de l'API tal com arriba, un fitxer per període, anual o mensual
+en les sèries de `MONTHLY`, amb les mitjanes horàries que calcula el servidor.
+
+El directori es dona, no es deriva de l'indicador: la sèrie del preu viu plana amb
+la resta del seu conjunt de dades i no en un directori propi. `series_folder` és el
+que hi viu a `ESIOS`, que és la resta d'indicadors.
+
+Aquí hi ha el client i els fets de com ESIOS serveix cada sèrie. Quins indicadors
+formen un conjunt de dades és del conjunt, i es declara al seu mòdul.
 """
 import datetime
 import json
@@ -10,10 +17,10 @@ import pathlib
 import pandas as pd
 import requests
 
-from epf.keys import api_key
+from epf.data.keys import api_key
 from epf.market import MARKET_TIMEZONE
 from epf.paths import ESIOS
-from epf.data.calendar import HOUR_COLUMNS, repair_dst
+from epf.calendar import HOUR_COLUMNS, repair_dst
 
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
@@ -23,18 +30,11 @@ ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 # es torna a demanar mai més.
 FIRST_YEAR = 2010
 
-# Primer dia que la font serveix el preu, mesurat: una sol·licitud directa a l'API
-# no en torna cap abans. És un fet d'ESIOS i no una tria nostra, que viu a
-# `parameters.py`. Alguna altra sèrie comença unes hores abans.
-ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
-
 # Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.
 PUBLICATION_MARGIN = datetime.timedelta(days=2)
 
 DEMAND = 1293
 PBF_WIND = 12
-PRICE = 600
-PRICE_COUNTRIES = ("España", "Portugal", "Francia")
 
 # Indicador i la seva àncora. ESIOS omet les hores que valen zero. Sense àncora,
 # la sèrie no pot valer zero i una hora absent queda absent. Amb àncora, una hora
@@ -103,41 +103,58 @@ def _json_or_empty(response):
         return {}
 
 
-def download(directory=ESIOS, key=None):
-    """Baixa cada període de cada indicador que encara no té un fitxer complet."""
+def session_for(key=None):
+    """Sessió amb la clau i la capçalera que l'API demana."""
     session = requests.Session()
     session.headers.update({"x-api-key": key or api_key("ESIOS_KEY"), "Accept": ACCEPT})
-
-    for indicator in sorted({*SERIES, PRICE, *REVISED_FORECASTS}):
-        written = 0
-        for name, first, last in periods(indicator, datetime.date.today()):
-            path = pathlib.Path(directory) / str(indicator) / f"{name}.json"
-            if _is_complete(path, last):
-                continue
-            # ESIOS interpreta les dates en hora local.
-            response = session.get(URL + str(indicator), timeout=600, params={
-                "start_date": f"{first}T00:00", "end_date": f"{last}T23:59",
-                "time_trunc": "hour", "time_agg": "average"})
-            if response.status_code != 200 or "indicator" not in _json_or_empty(response):
-                print(f"no s'ha pogut baixar l'indicador {indicator} de {name}: "
-                      f"HTTP {response.status_code}", flush=True)
-                continue
-            path.parent.mkdir(parents=True, exist_ok=True)
-            partial = path.with_suffix(".part")
-            partial.write_text(response.text)
-            partial.replace(path)
-            written += 1
-        print(f"indicador {indicator}: {written} fitxers baixats", flush=True)
+    return session
 
 
-def _values(indicator, directory):
-    """Tots els valors desats d'un indicador, de tots els períodes."""
-    folder = pathlib.Path(directory) / str(indicator)
-    # Només els fitxers del format de la sèrie: un fitxer anual oblidat al costat
-    # dels mensuals sumaria dues vegades les mateixes hores.
-    paths = sorted(folder.glob("????-??.json" if indicator in MONTHLY else "????.json"))
+def series_folder(indicator, directory=ESIOS):
+    """On viu un indicador que no pertany a cap conjunt de dades amb nom."""
+    return pathlib.Path(directory) / str(indicator)
+
+
+def download(indicator, folder, session=None):
+    """Baixa cada període d'un indicador que encara no tingui un fitxer complet.
+
+    Un indicador i no tots: qui en vol diversos els recorre, i és el conjunt de
+    dades qui diu quins són seus i on van.
+    """
+    session = session or session_for()
+    folder = pathlib.Path(folder)
+    written = 0
+    for name, first, last in periods(indicator, datetime.date.today()):
+        path = folder / f"{name}.json"
+        if _is_complete(path, last):
+            continue
+        # ESIOS interpreta les dates en hora local.
+        response = session.get(URL + str(indicator), timeout=600, params={
+            "start_date": f"{first}T00:00", "end_date": f"{last}T23:59",
+            "time_trunc": "hour", "time_agg": "average"})
+        if response.status_code != 200 or "indicator" not in _json_or_empty(response):
+            print(f"no s'ha pogut baixar l'indicador {indicator} de {name}: "
+                  f"HTTP {response.status_code}", flush=True)
+            continue
+        folder.mkdir(parents=True, exist_ok=True)
+        partial = path.with_suffix(".part")
+        partial.write_text(response.text)
+        partial.replace(path)
+        written += 1
+    print(f"indicador {indicator}: {written} fitxers baixats", flush=True)
+
+
+def values(folder, monthly=False):
+    """Tots els valors desats d'una sèrie, de tots els seus períodes.
+
+    Només els fitxers del format de la sèrie: un fitxer anual oblidat al costat dels
+    mensuals sumaria dues vegades les mateixes hores. En una carpeta plana compartida
+    amb una altra font, el patró és també el que deixa fora els fitxers de l'altra.
+    """
+    folder = pathlib.Path(folder)
+    paths = sorted(folder.glob("????-??.json" if monthly else "????.json"))
     if not paths:
-        raise FileNotFoundError(f"no hi ha dades de l'indicador {indicator} a {folder}")
+        raise FileNotFoundError(f"no hi ha cap període d'ESIOS desat a {folder}")
     return [value for path in paths for value in json.loads(path.read_text())["indicator"]["values"]]
 
 
@@ -193,6 +210,11 @@ def _single_geography(values, indicator):
     return values
 
 
+def _stored(indicator, directory):
+    """Els valors d'un indicador del seu propi directori, amb el format que li toca."""
+    return values(series_folder(indicator, directory), indicator in MONTHLY)
+
+
 def load(indicator, directory=ESIOS):
     """Una sèrie admissible, en dies per hores, i les hores publicades cada dia."""
     if indicator in REVISED_FORECASTS:
@@ -200,19 +222,12 @@ def load(indicator, directory=ESIOS):
                          "es llegeix amb load_revised_forecast")
     if indicator not in SERIES:
         raise KeyError(f"l'indicador {indicator} no és a la llista de sèries")
-    values = _values(indicator, directory)
+    stored = _stored(indicator, directory)
     if indicator not in PROVINCES:
-        _single_geography(values, indicator)
+        _single_geography(stored, indicator)
     anchor = SERIES[indicator]
-    anchor_days = None if anchor is None else _published_days(_values(anchor, directory))
-    return hourly(values, anchor_days)
-
-
-def load_price(country, directory=ESIOS):
-    """Preu del mercat diari d'un país en EUR/MWh, i les hores publicades cada dia."""
-    if country not in PRICE_COUNTRIES:
-        raise KeyError(f"cap preu desat per a {country}; n'hi ha per a {PRICE_COUNTRIES}")
-    return hourly([value for value in _values(PRICE, directory) if value["geo_name"] == country])
+    anchor_days = None if anchor is None else _published_days(_stored(anchor, directory))
+    return hourly(stored, anchor_days)
 
 
 def load_revised_forecast(indicator, directory=ESIOS):
@@ -220,4 +235,4 @@ def load_revised_forecast(indicator, directory=ESIOS):
     i les hores publicades cada dia."""
     if indicator not in REVISED_FORECASTS:
         raise KeyError(f"l'indicador {indicator} no és una previsió revisada")
-    return hourly(_single_geography(_values(indicator, directory), indicator))
+    return hourly(_single_geography(_stored(indicator, directory), indicator))

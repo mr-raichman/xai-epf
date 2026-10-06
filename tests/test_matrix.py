@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.parameters import LAGS
 from epf.matrix import DAY_OF_WEEK, HOUR, build, calibration, per_hour
 
@@ -17,25 +17,25 @@ def frame_of(days, start=datetime.date(2020, 1, 1)):
 
 
 def test_each_lag_carries_the_right_day():
-    prices = frame_of(range(30))
-    X, y = build(prices, LAGS)
+    price = frame_of(range(30))
+    X, y = build(price, LAGS)
     day = X.index[10]
     for lag in LAGS:
-        source = prices.loc[day - pd.Timedelta(days=lag)]
+        source = price.loc[day - pd.Timedelta(days=lag)]
         for hour in HOUR_COLUMNS:
             assert X.loc[day, f"lag{lag}_{hour}"] == source[hour]
 
 
 def test_the_target_is_the_day_itself():
-    prices = frame_of(range(30))
-    X, y = build(prices, LAGS)
-    assert (y.loc[X.index[10]] == prices.loc[X.index[10]]).all()
+    price = frame_of(range(30))
+    X, y = build(price, LAGS)
+    assert (y.loc[X.index[10]] == price.loc[X.index[10]]).all()
 
 
 def test_the_first_complete_row_is_the_longest_lag_away():
-    prices = frame_of(range(30))
-    X, _ = build(prices, LAGS)
-    assert (X.index[0] - prices.index[0]).days == max(LAGS)
+    price = frame_of(range(30))
+    X, _ = build(price, LAGS)
+    assert (X.index[0] - price.index[0]).days == max(LAGS)
 
 
 def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
@@ -53,17 +53,17 @@ def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
 
 
 def test_day_of_week_is_the_delivery_day():
-    prices = frame_of(range(30))
-    X, _ = build(prices, LAGS)
+    price = frame_of(range(30))
+    X, _ = build(price, LAGS)
     day = X.index[5]
     assert X.loc[day, DAY_OF_WEEK] == day.dayofweek
 
 
 
 def test_wrong_columns_fail_loudly():
-    prices = frame_of(range(10)).rename(columns={"h00": "hora0"})
+    price = frame_of(range(10)).rename(columns={"h00": "hora0"})
     with pytest.raises(ValueError):
-        build(prices, LAGS)
+        build(price, LAGS)
 
 
 def test_the_calibration_slice_never_reaches_the_day_itself():
@@ -88,8 +88,8 @@ def test_calibrating_with_no_earlier_day_fails_loudly():
 
 
 def test_the_per_hour_row_carries_its_day_and_its_own_hour():
-    prices = frame_of(range(30))
-    X, y = build(prices, LAGS)
+    price = frame_of(range(30))
+    X, y = build(price, LAGS)
     rows, target = per_hour(X, y)
     assert len(rows) == len(X) * 24
     day = X.index[10]

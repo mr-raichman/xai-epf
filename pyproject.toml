@@ -19,10 +19,11 @@ dependencies = [
 # Tot el que es tecleja a mà. El caminant no hi és: l'executa `epf-run`, que viu
 # fora del projecte perquè avisa quan acaba.
 [project.scripts]
-epf-download = "epf.data.download:main"
+epf-price = "epf.data.price:main"
+epf-handle-data = "epf.data.handle_data:main"
 epf-show-run = "epf.results.show_run:main"
 epf-show-figures = "epf.results.show_figures:main"
-epf-plot-prices = "epf.data.plots.prices:main"
+epf-plot-price = "epf.data.plots.price:main"
 epf-plot-outliers = "epf.data.plots.outliers:main"
 
 [dependency-groups]

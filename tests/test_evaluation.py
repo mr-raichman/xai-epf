@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae, mae_per_hour, metrics,
                             refuse_missing, rmae, rmae_per_hour, walk_forward)
@@ -93,19 +93,19 @@ def test_the_metrics_refuse_a_forecast_with_a_hole():
 
 
 def test_the_weekly_naive_is_the_same_hour_seven_days_earlier():
-    prices = frame_of(30)
-    naive = weekly_frame(prices)
+    price = frame_of(30)
+    naive = weekly_frame(price)
     # Els set primers dies no tenen el seu dia de fa una setmana i no hi són.
-    assert list(naive.index) == list(prices.index[7:])
+    assert list(naive.index) == list(price.index[7:])
     day = naive.index[5]
-    assert (naive.loc[day] == prices.loc[day - pd.Timedelta(days=7)]).all()
+    assert (naive.loc[day] == price.loc[day - pd.Timedelta(days=7)]).all()
 
 
 def test_the_naive_forecast_scores_exactly_one_against_itself():
-    prices = frame_of(60)
-    naive = weekly_frame(prices)
-    assert rmae(naive, prices, naive) == pytest.approx(1.0)
-    assert np.allclose(rmae_per_hour(naive, prices, naive).to_numpy(), 1.0)
+    price = frame_of(60)
+    naive = weekly_frame(price)
+    assert rmae(naive, price, naive) == pytest.approx(1.0)
+    assert np.allclose(rmae_per_hour(naive, price, naive).to_numpy(), 1.0)
 
 
 def test_the_curve_correlation_is_on_ranks_and_not_on_levels():

@@ -1,7 +1,7 @@
 """Correcció dels dies de canvi d'hora."""
 import pytest
 
-from epf.data.calendar import repair_dst
+from epf.calendar import repair_dst
 
 # 2025-03-30: 23 períodes, sense l'hora local 02. Primers cinc preus espanyols.
 SPRING = [3.6, 3.2, 0.65, 0.1, 0.09]

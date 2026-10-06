@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.models.attribution import (ONE, PRICE_UNITS, Attribution,
                                     refuse_inconsistent, save)
 

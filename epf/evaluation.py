@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from epf.market import HOURS_PER_DAY
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 
 
 def refuse_missing(frame, what):

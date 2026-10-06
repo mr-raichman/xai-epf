@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from epf.market import MARKET_TIMEZONE
-from epf.data.esios import MONTHLY, PRICE, REVISED_FORECASTS, SERIES, hourly, load, periods
+from epf.data.esios import MONTHLY, REVISED_FORECASTS, SERIES, hourly, load, periods
 
 # 2024-10-27, demanda real (1293): la primera 02:00 porta `datetime_utc` 01:00Z,
 # que és la de la segona.
@@ -92,9 +92,8 @@ def test_every_anchor_is_a_series_that_cannot_be_zero():
         assert SERIES[anchor] is None
 
 
-def test_revised_forecasts_and_prices_are_not_admissible_series():
+def test_revised_forecasts_are_not_admissible_series():
     assert not REVISED_FORECASTS & set(SERIES)
-    assert PRICE not in SERIES
 
 
 def test_monthly_periods_cover_every_day_once_to_the_end_of_this_year():

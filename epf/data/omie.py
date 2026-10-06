@@ -15,8 +15,8 @@ import pandas as pd
 import requests
 
 from epf.market import HOURS_PER_DAY, QUARTERS_PER_HOUR
-from epf.paths import OMIE_PRICES
-from epf.data.calendar import HOUR_COLUMNS, repair_dst
+from epf.paths import PRICE
+from epf.calendar import HOUR_COLUMNS, repair_dst
 
 # Índex de MarginalES, el preu espanyol. L'índex 4 és el portuguès.
 SPAIN_FIELD = 5
@@ -34,7 +34,7 @@ def _day_of(stem):
     return datetime.date(int(stem[:4]), int(stem[4:6]), int(stem[6:8]))
 
 
-def latest_version_per_day(directory=OMIE_PRICES):
+def latest_version_per_day(directory=PRICE):
     """Fitxer de cada dia, en la seva versió més alta."""
     chosen = {}
     for path in pathlib.Path(directory).glob("marginalpdbc_*"):
@@ -61,7 +61,7 @@ def to_hourly(periods):
             for i in range(len(periods) // QUARTERS_PER_HOUR)]
 
 
-def load(directory=OMIE_PRICES):
+def load(directory=PRICE):
     """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna."""
     chosen = latest_version_per_day(directory)
     if not chosen:
@@ -84,7 +84,7 @@ def _fetch(filename, directory):
     return True
 
 
-def download(directory=OMIE_PRICES):
+def download(directory=PRICE):
     """Actualitza el directori de preus amb tot el que llista OMIE."""
     directory = pathlib.Path(directory)
     directory.mkdir(parents=True, exist_ok=True)

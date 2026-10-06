@@ -8,6 +8,7 @@ import argparse
 import pathlib
 
 from epf import matrix, runner
+from epf.data import price
 from epf.evaluation import metrics
 from epf.models.naive import naive
 from epf.results import figures
@@ -27,7 +28,7 @@ def main():
                         help="directori d'una execució o d'una de les seves famílies")
     folders = run_files.family_folders(parser.parse_args().folder)
 
-    (_, actual), _ = matrix.price_only()
+    (_, actual), _ = matrix.price_only(price.load())
     for folder in folders:
         rebuild(folder, actual)
         print(f"refet {folder}")

@@ -14,7 +14,7 @@ from threadpoolctl import threadpool_limits
 from epf.models.lear.lear_hyperparameters import MAX_ITER, SHORT_LAGS, WINDOWS
 from epf.parameters import DAYS_PER_WEEK, LAGS
 from epf.market import HOURS_PER_DAY
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK, calibration
 from epf.models.attribution import Attribution
 

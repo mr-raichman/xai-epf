@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from epf.parameters import LAGS
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
 from epf.models.mlp.mlp import fit, forecast
 

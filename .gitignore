@@ -3,5 +3,4 @@ api-keys
 .venv/
 __pycache__/
 /data/
-/plots/
 /runs/

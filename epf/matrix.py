@@ -9,8 +9,7 @@ del dia anterior al lliurament.
 import numpy as np
 import pandas as pd
 
-from epf.data import prices
-from epf.data.calendar import HOUR_COLUMNS
+from epf.calendar import HOUR_COLUMNS
 from epf.market import HOURS_PER_DAY
 from epf.parameters import LAGS
 
@@ -41,21 +40,21 @@ def calibration(X, y, day, window=None):
     return features[kept], target[kept]
 
 
-def build(prices, lags):
+def build(price, lags):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les.
     """
-    if list(prices.columns) != HOUR_COLUMNS:
-        raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(prices.columns)}")
+    if list(price.columns) != HOUR_COLUMNS:
+        raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}")
 
-    blocks = [prices.shift(lag, freq="D").reindex(prices.index).add_prefix(f"lag{lag}_")
+    blocks = [price.shift(lag, freq="D").reindex(price.index).add_prefix(f"lag{lag}_")
               for lag in lags]
-    blocks.append(prices.index.dayofweek.to_series(index=prices.index, name=DAY_OF_WEEK))
+    blocks.append(price.index.dayofweek.to_series(index=price.index, name=DAY_OF_WEEK))
     features = pd.concat(blocks, axis="columns", sort=False)
 
     complete = features.notna().all(axis="columns")
-    return features[complete], prices[complete]
+    return features[complete], price[complete]
 
 
 def per_hour(X, y):
@@ -70,7 +69,7 @@ def per_hour(X, y):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
-def price_only():
+def price_only(frame):
     """Les dues matrius del conjunt d'informació de només preu: la diària i la per
     hora, ja alineades.
 
@@ -79,6 +78,9 @@ def price_only():
     anterior al lliurament, perquè els preus del dia d-1 es van publicar el d-2.
     L'any més antic que es pot entrenar és el primer del preu, perquè no hi entra
     cap sèrie que comenci més tard.
+
+    Pren el conjunt ja carregat i no el carrega: qui l'ha carregat és qui decideix si
+    el comprova abans, i una execució ho fa (`safety.md` 10.5).
     """
-    daily = build(prices.load(), LAGS)
+    daily = build(frame, LAGS)
     return daily, per_hour(*daily)
