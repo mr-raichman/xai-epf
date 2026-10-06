@@ -12,8 +12,7 @@ from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae_per_hour, rmae_per_hour)
-from epf.models import naive as naive_family
-from epf.models import attribution
+from epf.models import attribution, naive
 from epf.models.attribution import PRICE_UNITS
 
 matplotlib.use("Agg")
@@ -68,10 +67,16 @@ def _save(figure, folder, name):
 
 
 def _chained(frame):
-    """Una taula de dia per fila i hora per columna, en una sola sèrie horària."""
+    """Una taula de dia per fila i hora per columna, en una sola sèrie horària.
+
+    Sobre una graella horària completa del primer dia a l'últim, de manera que un
+    dia que no hi és queda absent i la línia s'hi trenca en lloc de travessar el
+    buit: una passada mostrejada no s'ha de poder llegir com una sèrie contínua.
+    """
     hours = pd.DatetimeIndex([day + pd.Timedelta(hours=hour)
                               for day in frame.index for hour in range(len(HOUR_COLUMNS))])
-    return pd.Series(frame.to_numpy().reshape(-1), index=hours)
+    series = pd.Series(frame.to_numpy().reshape(-1), index=hours)
+    return series.reindex(pd.date_range(hours[0], hours[-1], freq="h"))
 
 
 def _blocks(columns):
@@ -115,7 +120,7 @@ def prices_against_forecasts(folder, forecasts, actual):
     _save(figure, folder, "price")
 
 
-def error_by_hour(folder, forecasts, actual, naive):
+def error_by_hour(folder, forecasts, actual, weekly):
     """Error de cada hora de lliurament, en brut i relatiu a la predicció ingènua.
 
     L'error absolut d'una hora es llegeix malament tot sol, perquè barreja com de
@@ -125,7 +130,7 @@ def error_by_hour(folder, forecasts, actual, naive):
     figure, axes = plt.subplots(1, 2, figsize=(14, 4), facecolor=SURFACE)
     panels = ((lambda frame: mae_per_hour(frame, actual),
                "MAE (EUR/MWh)", "Error per hora de lliurament"),
-              (lambda frame: rmae_per_hour(frame, actual, naive),
+              (lambda frame: rmae_per_hour(frame, actual, weekly),
                "MAE sobre el de la predicció ingènua", "Sense l'efecte de la dificultat"))
     for axis, (measure, label, title) in zip(axes, panels):
         for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
@@ -135,7 +140,7 @@ def error_by_hour(folder, forecasts, actual, naive):
         axis.set_ylabel(label, color=MUTED_INK)
         _style(axis, title)
     axes[-1].axhline(1.0, color=MUTED_INK, linewidth=0.8, linestyle="--")
-    axes[0].legend(frameon=False, labelcolor=MUTED_INK)
+    axes[0].legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     _save(figure, folder, "error_by_hour")
 
 
@@ -222,15 +227,24 @@ def error_covariance(folder, name, frame, actual):
 
 
 def error_over_time(folder, forecasts, actual):
-    """Error absolut mitjà setmana a setmana."""
+    """Error absolut mitjà al llarg del temps, per setmanes o, si els dies no són
+    consecutius, per mesos.
+
+    Una passada mostrejada cada vuit dies té setmanes amb un sol dia i setmanes
+    sense cap, de manera que una mitjana setmanal no és una mitjana: el pas surt
+    dels dies que hi ha i no d'un calendari triat per endavant.
+    """
+    days = next(iter(forecasts.values())).index
+    consecutive = len(days) < 2 or days.to_series().diff().dt.days.median() == 1
+    step, period = ("W", "setmana a setmana") if consecutive else ("ME", "mes a mes")
     figure, axis = plt.subplots(figsize=(14, 4), facecolor=SURFACE)
     for colour, (name, frame) in zip(LINES, sorted(forecasts.items())):
         daily = (frame - actual.loc[frame.index]).abs().mean(axis="columns")
-        weekly = daily.resample("W").mean()
-        axis.plot(weekly.index, weekly.to_numpy(), color=colour, label=name)
+        grouped = daily.resample(step).mean()
+        axis.plot(grouped.index, grouped.to_numpy(), color=colour, label=name)
     axis.set_ylabel("MAE (EUR/MWh)", color=MUTED_INK)
-    axis.legend(frameon=False, labelcolor=MUTED_INK)
-    _style(axis, "Error setmana a setmana")
+    axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
+    _style(axis, f"Error {period}")
     _save(figure, folder, "error_over_time")
 
 
@@ -241,7 +255,7 @@ def error_distribution(folder, forecasts, actual):
         signed = (frame - actual.loc[frame.index]).to_numpy().reshape(-1)
         axis.hist(signed, bins=120, histtype="step", color=colour, label=name)
     axis.set_xlabel("predicció menys preu real (EUR/MWh)", color=MUTED_INK)
-    axis.legend(frameon=False, labelcolor=MUTED_INK)
+    axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     _style(axis, "Repartiment de l'error")
     _save(figure, folder, "error_distribution")
 
@@ -254,25 +268,31 @@ def importance_by_lag(folder, label, stem, columns, importance, units):
     """Un plafó per retard: hora d'origen contra hora de lliurament."""
     lags, others = _blocks(columns)
     panels = len(lags) + bool(others)
-    figure, axes = plt.subplots(1, panels, figsize=(5 * len(lags) + 2, 5), facecolor=SURFACE,
+    figure, axes = plt.subplots(1, panels, figsize=(5 * len(lags) + 3, 5), facecolor=SURFACE,
                                 squeeze=False,
                                 width_ratios=[1] * len(lags) + [0.35] * bool(others))
-    top = importance.max()
+    # Els blocs de retard comparteixen escala, que és el que els fa comparables, i
+    # la resta de columnes té la seva: en un arbre la columna de l'hora val el doble
+    # que el retard més gran i, amb una escala sola, aplanava els quatre blocs.
+    top = importance[[position for block in lags.values() for position in block]].max()
     for axis, (lag, positions) in zip(axes[0], sorted(lags.items())):
         image = axis.imshow(importance[positions], cmap=MAGNITUDE, vmin=0, vmax=top,
                             origin="lower")
         axis.set_xlabel("hora del dia predit", color=MUTED_INK)
         axis.set_ylabel(f"hora de fa {lag} dies", color=MUTED_INK)
         _style(axis, f"preu de fa {lag} dies")
+    # La barra dels retards es penja de l'últim dels seus plafons: penjada de tots
+    # alhora, `tight_layout` no la sap col·locar i la dibuixa a sobre d'un.
+    _colorbar(figure, image, axes[0][len(lags) - 1], _bar_label(units))
     if others:
         axis = axes[0][-1]
-        image = axis.imshow(importance[others], cmap=MAGNITUDE, vmin=0, vmax=top,
-                            aspect="auto", origin="lower")
+        rest = axis.imshow(importance[others], cmap=MAGNITUDE, vmin=0,
+                           aspect="auto", origin="lower")
         axis.set_yticks(range(len(others)), [columns[position] for position in others],
                         fontsize=6)
         axis.set_xlabel("hora del dia predit", color=MUTED_INK)
-        _style(axis, "la resta de columnes")
-    _colorbar(figure, image, axes[0][-1], _bar_label(units))
+        _style(axis, "la resta, amb la seva escala")
+        _colorbar(figure, rest, axis, _bar_label(units))
     figure.suptitle(f"{label}: importància de cada retard", color=INK, x=0.01, ha="left")
     _save(figure, folder, f"{stem}_lags")
 
@@ -353,18 +373,37 @@ def importance_concentration(folder, label, stem, importance):
     _save(figure, folder, f"{stem}_concentration")
 
 
-def draw(folder, actual):
-    """Totes les figures d'una execució ja desada."""
-    forecasts = run_files.load_forecasts(folder)
-    naive = naive_family.weekly_frame(actual)
-    actual = actual.loc[next(iter(forecasts.values())).index]
+def shared(folder, forecasts, actual):
+    """Les figures que comparen pronòstics entre ells.
 
+    Es dibuixen allà on viuen els que es comparen: dins d'una família són els seus,
+    i al directori de la configuració són els de totes les famílies alhora, que és
+    el que de fet s'analitza.
+    """
+    weekly = naive.weekly_frame(actual)
+    actual = actual.loc[next(iter(forecasts.values())).index]
     prices_against_forecasts(folder, forecasts, actual)
-    error_by_hour(folder, forecasts, actual, naive)
+    error_by_hour(folder, forecasts, actual, weekly)
     error_over_time(folder, forecasts, actual)
     error_distribution(folder, forecasts, actual)
     curve_correlation_over_time(folder, forecasts, actual)
     daily_spread(folder, forecasts, actual)
+
+
+def compare(into, folders, actual):
+    """Les figures compartides de diverses famílies alhora, al directori que les
+    conté."""
+    forecasts = {}
+    for folder in folders:
+        forecasts.update(run_files.load_forecasts(folder))
+    shared(into, forecasts, actual)
+
+
+def draw(folder, actual):
+    """Totes les figures d'una família ja desada."""
+    forecasts = run_files.load_forecasts(folder)
+    shared(folder, forecasts, actual)
+    actual = actual.loc[next(iter(forecasts.values())).index]
     for name, frame in sorted(forecasts.items()):
         error_covariance(folder, name, frame, actual)
 

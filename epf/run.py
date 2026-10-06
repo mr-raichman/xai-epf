@@ -19,8 +19,35 @@ METRICS = "metrics.csv"
 RECORD = "run.json"
 
 
+def configuration_folder(tier, stage, config):
+    """On viu una configuració sencera: hi pengen les famílies i les figures que
+    les comparen."""
+    return paths.RUNS / tier / stage / config
+
+
 def folder(tier, stage, config, family):
-    return paths.RUNS / tier / stage / config / family
+    return configuration_folder(tier, stage, config) / family
+
+
+def family_folders(paths):
+    """Els directoris de família que hi ha darrere dels camins donats.
+
+    Un camí que ja ho és val tal qual; un que no ho és aporta els seus
+    subdirectoris que sí que ho són, de manera que tant el directori d'una
+    configuració com un glob que l'obre valen igual. El glob també agafa les
+    figures de la configuració, que no són directoris i se salten.
+    """
+    found = []
+    for path in paths:
+        if not path.is_dir():
+            continue
+        if (path / RECORD).exists():
+            found.append(path)
+        else:
+            found += sorted(child for child in path.iterdir() if (child / RECORD).exists())
+    if not found:
+        raise ValueError(f"cap directori de família a {[str(path) for path in paths]}")
+    return found
 
 
 def save_forecasts(folder, forecasts):

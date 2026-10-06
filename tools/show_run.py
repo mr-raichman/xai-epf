@@ -13,7 +13,7 @@ from epf import run as run_files
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("folder", type=pathlib.Path, nargs="+",
-                    help="directori d'una família d'una execució")
-folders = parser.parse_args().folder
+                    help="directori d'una execució o d'una de les seves famílies")
+folders = run_files.family_folders(parser.parse_args().folder)
 
 print(run_files.summary(pd.concat([run_files.load_metrics(folder) for folder in folders])))

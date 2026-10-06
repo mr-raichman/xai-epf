@@ -268,6 +268,16 @@ def main():
                       f"{walked:.0f} s de camí endavant, desat a {folder}", flush=True)
                 print(run_files.summary(measured), flush=True)
 
+        # Les figures que comparen famílies es dibuixen amb les que hi ha al disc i
+        # no amb les d'aquesta invocació, de manera que tornar a executar-ne una de
+        # sola refresca la comparació amb les altres que ja hi eren.
+        where = run_files.configuration_folder(args.tier, features.STAGE,
+                                               f"{commit[:7]}_{name}")
+        done = sorted(path for path in where.iterdir() if path.is_dir()) if where.exists() else []
+        if done:
+            figures.compare(where, done, actual)
+            print(f"{name}: comparació de {len(done)} famílies a {where}", flush=True)
+
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")
         # Les que han anat bé ja estan desades: el codi de sortida només hi és
