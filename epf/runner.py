@@ -231,7 +231,7 @@ def _plain(value):
     return value
 
 
-def described(commit, tier, family, fits, forecasts, walk_seconds):
+def described(commit, tier, family, chosen, fits, forecasts, walk_seconds):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
     Els paràmetres de l'execució i els números del model hi van tal com estaven, de
@@ -242,13 +242,17 @@ def described(commit, tier, family, fits, forecasts, walk_seconds):
     creix amb el període, i per tant la que diu què costarà una passada més llarga.
     Les figures no hi són.
     """
-    chosen = {name: getattr(parameters, name) for name in dir(parameters)
-              if name.isupper() and not name.startswith("_")}
+    swept = {name: getattr(parameters, name) for name in dir(parameters)
+             if name.isupper() and not name.startswith("_")}
     return {
         "commit": commit,
         "stage": parameters.PRICE_ONLY,
         "tier": tier,
         "family": family,
+        # Quines famílies ha triat la invocació, i no només aquesta. L'últim bit d'una
+        # mètrica es mou amb la selecció, de manera que el commit tot sol no diu quina
+        # crida va donar aquests números.
+        "chosen": sorted(chosen),
         # Si la família ajusta un model o si copia una columna ja coneguda: és el
         # que decideix si entra a la combinació, i va al disc perquè una
         # reconstrucció la pugui refer sense tenir els paràmetres a mà.
@@ -256,7 +260,7 @@ def described(commit, tier, family, fits, forecasts, walk_seconds):
         "forecasts": sorted(forecasts),
         "days": len(next(iter(forecasts.values()))),
         "walk_seconds": round(walk_seconds, 1),
-        "parameters": _plain(chosen),
+        "parameters": _plain(swept),
         "hyperparameters": _plain(hyperparameters(family)),
     }
 
@@ -369,8 +373,8 @@ def main():
             walked = time.perf_counter() - clock
             folder = folders[family]
             measured = write(folder, forecasts, attributions, actual,
-                             described(commit, args.tier, family, table[family].fits,
-                                       forecasts, walked))
+                             described(commit, args.tier, family, chosen,
+                                       table[family].fits, forecasts, walked))
             figures.draw(folder, actual)
         except Exception:
             traceback.print_exc()
