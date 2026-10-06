@@ -37,7 +37,7 @@ def main():
     for where in sorted({folder.resolve().parent for folder in folders}):
         family_folders = run_files.family_folders([where])
         counted = runner.add_combination(family_folders, actual)
-        figures.compare(where, family_folders, actual)
+        figures.shared(where, runner.comparison(family_folders, actual), actual)
         print(f"refeta la comparació de {where}, amb la combinació de {counted} membres")
 
 

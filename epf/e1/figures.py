@@ -32,7 +32,7 @@ MAGNITUDE = LinearSegmentedColormap.from_list(
 # Escala de dos tons per a una correlació, que va de -1 a 1 al voltant del zero.
 SIGNED = LinearSegmentedColormap.from_list(
     "signed", ["#8c3c12", "#d6622a", SURFACE, "#2a78d6", "#143f73"])
-LINES = ("#2a78d6", "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b")
+LINES = ("#2a78d6", "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
 
 DPI = 300
 
@@ -377,8 +377,9 @@ def shared(folder, forecasts, actual):
     """Les figures que comparen pronòstics entre ells.
 
     Es dibuixen allà on viuen els que es comparen: dins d'una família són els seus,
-    i al directori de la configuració són els de totes les famílies alhora, que és
-    el que de fet s'analitza.
+    i al directori de la configuració són els de totes les famílies i la combinació
+    alhora, que és el que de fet s'analitza. Qui crida tria què hi entra, perquè la
+    combinació la munta l'etapa i aquest mòdul no en sap res.
     """
     weekly = naive.weekly_frame(actual)
     actual = actual.loc[next(iter(forecasts.values())).index]
@@ -388,15 +389,6 @@ def shared(folder, forecasts, actual):
     error_distribution(folder, forecasts, actual)
     curve_correlation_over_time(folder, forecasts, actual)
     daily_spread(folder, forecasts, actual)
-
-
-def compare(into, folders, actual):
-    """Les figures compartides de diverses famílies alhora, al directori que les
-    conté."""
-    forecasts = {}
-    for folder in folders:
-        forecasts.update(run_files.load_forecasts(folder))
-    shared(into, forecasts, actual)
 
 
 def draw(folder, actual):

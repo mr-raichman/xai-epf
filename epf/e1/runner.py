@@ -157,6 +157,19 @@ def combined(folders):
     return sum(frame.loc[days] for frame in found) / len(found), found
 
 
+def _fitted(folders):
+    """Les famílies que ajusten un model, segons el que digui el seu registre.
+
+    Un registre d'abans que existís `fits` no ho diu, i aleshores no se'n combina
+    cap: amb una barreja de registres la combinació sortiria d'un subconjunt i no
+    ho diria enlloc.
+    """
+    records = [run_files.load_record(folder) for folder in folders]
+    if any("fits" not in record for record in records):
+        return []
+    return [folder for folder, record in zip(folders, records) if record["fits"]]
+
+
 def add_combination(folders, actual):
     """Escriu les mètriques de la combinació a `metrics.csv` de cada família.
 
@@ -165,14 +178,7 @@ def add_combination(folders, actual):
     El preu que es paga és que el `metrics.csv` d'una família depèn de les seves
     germanes i ja no s'escriu un sol cop.
     """
-    records = [run_files.load_record(folder) for folder in folders]
-    if any("fits" not in record for record in records):
-        # Un registre d'abans que existís el camp no diu si la família ajusta res.
-        # Amb una barreja de registres la combinació sortiria d'un subconjunt i no
-        # ho diria enlloc, així que no se'n fa cap.
-        return 0
-    fitted = [folder for folder, record in zip(folders, records) if record["fits"]]
-    frame, found = combined(fitted)
+    frame, found = combined(_fitted(folders))
     if frame is None:
         return 0
     rows = metrics({COMBINATION: frame}, actual, naive.weekly_frame(actual))
@@ -181,6 +187,18 @@ def add_combination(folders, actual):
         run_files.save_metrics(folder, pd.concat(
             [existing[existing["forecast"] != COMBINATION], rows], ignore_index=True))
     return len(found)
+
+
+def comparison(folders, actual):
+    """Els pronòstics que es comparen en una configuració: els de totes les
+    famílies i, si n'hi ha, la combinació."""
+    forecasts = {}
+    for folder in folders:
+        forecasts.update(run_files.load_forecasts(folder))
+    frame, _ = combined(_fitted(folders))
+    if frame is not None:
+        forecasts[COMBINATION] = frame
+    return forecasts
 
 
 def _git(*arguments):
@@ -355,7 +373,7 @@ def main():
         done = sorted(path for path in where.iterdir() if path.is_dir()) if where.exists() else []
         if done:
             counted = add_combination(done, actual)
-            figures.compare(where, done, actual)
+            figures.shared(where, comparison(done, actual), actual)
             print(f"{name}: comparació de {len(done)} famílies a {where}, "
                   f"amb la combinació de {counted} membres ajustats", flush=True)
 

@@ -8,7 +8,7 @@ import argparse
 import pathlib
 
 from epf import run as run_files
-from epf.e1 import features, figures
+from epf.e1 import features, figures, runner
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("folder", type=pathlib.Path, nargs="+",
@@ -22,5 +22,5 @@ if len(parents) != 1:
 
 (_, actual), _ = features.load()
 into = parents.pop()
-figures.compare(into, folders, actual)
+figures.shared(into, runner.comparison(folders, actual), actual)
 print(f"comparació de {len(folders)} famílies desada a {into}")
