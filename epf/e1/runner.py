@@ -124,12 +124,16 @@ def _plain(value):
     return value
 
 
-def described(commit, tier, name, settings, family, forecasts):
+def described(commit, tier, name, settings, family, forecasts, walk_seconds):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
     La configuració sencera hi va tal com estava, de manera que el fitxer es pot
     llegir sense anar a buscar el commit, encara que el commit sigui al nom del
     directori i basti per recuperar-la.
+
+    `walk_seconds` és el camí endavant i no la família sencera: és la part que
+    creix amb el període, i per tant la que diu què costarà una passada més llarga.
+    Les figures no hi són.
     """
     return {
         "commit": commit,
@@ -139,6 +143,7 @@ def described(commit, tier, name, settings, family, forecasts):
         "family": family,
         "forecasts": sorted(forecasts),
         "days": len(next(iter(forecasts.values()))),
+        "walk_seconds": round(walk_seconds, 1),
         **{key: _plain(value) for key, value in sorted(settings.items())},
     }
 
@@ -174,7 +179,7 @@ def write(folder, forecasts, attributions, actual, record):
 
     Les mètriques es calculen abans de tocar el disc, perquè una que peti no deixi un
     directori amb prediccions i sense `metrics.csv`, que des de fora sembla una
-    execució sencera.
+    execució sencera. Torna la taula que ha desat, que és la que s'imprimeix.
     """
     table = metrics(forecasts, actual, naive.weekly_frame(actual))
     if folder.exists():
@@ -185,6 +190,7 @@ def write(folder, forecasts, attributions, actual, record):
     for name, kept in attributions.items():
         attribution.save(folder, name, forecasts[name].index, kept)
     run_files.save_record(folder, record)
+    return table
 
 
 def parse():
@@ -244,9 +250,11 @@ def main():
             try:
                 forecasts, attributions = run(table[family], matrices, settings,
                                               args.tier, report)
+                walked = time.perf_counter() - clock
                 folder = folders[(name, family)]
-                write(folder, forecasts, attributions, actual,
-                      described(commit, args.tier, name, settings, family, forecasts))
+                measured = write(folder, forecasts, attributions, actual,
+                                 described(commit, args.tier, name, settings, family,
+                                           forecasts, walked))
                 figures.draw(folder, actual)
             except Exception:
                 traceback.print_exc()
@@ -256,8 +264,9 @@ def main():
                 shutil.rmtree(folders[(name, family)], ignore_errors=True)
                 print(f"{name}/{family}: ha fallat, no se'n desa res", flush=True)
             else:
-                print(f"{name}/{family}: {time.perf_counter() - clock:.0f} s, "
-                      f"desat a {folder}", flush=True)
+                print(f"{name}/{family}: {time.perf_counter() - clock:.0f} s en total, "
+                      f"{walked:.0f} s de camí endavant, desat a {folder}", flush=True)
+                print(run_files.summary(measured), flush=True)
 
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")

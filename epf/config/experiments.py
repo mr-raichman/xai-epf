@@ -128,6 +128,24 @@ CONFIGURATIONS = {
 }
 
 
+# Noms que una configuració no pot prendre: són els dos nivells, i el directori
+# d'una execució els posa de costat. Una configuració dita «test» donaria
+# `runs/measurement/<etapa>/<commit>_test/`, que és una mesura amb cara d'assaig, i
+# això ja ha passat un cop.
+RESERVED = (MEASUREMENT, TEST)
+
+
+def refuse_reserved(names):
+    """Falla si cap configuració es diu com un nivell d'execució."""
+    taken = sorted(set(names) & set(RESERVED))
+    if taken:
+        raise ValueError(f"cap configuració no es pot dir {taken}: són els nivells "
+                         "d'execució i el directori els posa de costat")
+
+
+refuse_reserved(CONFIGURATIONS)
+
+
 def configuration(name):
     """La configuració amb aquest nom, o un error que diu quines hi ha."""
     if name not in CONFIGURATIONS:

@@ -42,5 +42,22 @@ def save_metrics(folder, table):
     table.to_csv(folder / METRICS, index=False)
 
 
+def load_metrics(folder):
+    return pd.read_csv(folder / METRICS)
+
+
+def summary(table):
+    """Les mètriques d'un sol valor, un pronòstic per fila i una mètrica per columna.
+
+    L'ordre de les columnes és el que porta la taula i no l'alfabètic, de manera
+    que qui decideix com es llegeix una execució és `evaluation.metrics`, que és qui
+    les calcula.
+    """
+    singles = table[table["hour"].isna() | (table["hour"] == "")]
+    order = list(singles["metric"].drop_duplicates())
+    wide = singles.pivot(index="forecast", columns="metric", values="value")
+    return wide[order].to_string(float_format=lambda value: f"{value:9.3f}")
+
+
 def save_record(folder, record):
     (folder / RECORD).write_text(json.dumps(record, indent=2) + "\n")
