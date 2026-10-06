@@ -189,6 +189,11 @@ def add_combination(folders, actual):
     return len(found)
 
 
+def drawn(families):
+    """«1 família» o «n famílies», perquè el que imprimeix un script és català."""
+    return "1 família" if families == 1 else f"{families} famílies"
+
+
 def comparison(folders, actual):
     """Els pronòstics que es comparen en una configuració: els de totes les
     famílies i, si n'hi ha, la combinació."""
@@ -286,6 +291,10 @@ def write(folder, forecasts, attributions, actual, record):
     run_files.save_metrics(folder, table)
     for name, kept in attributions.items():
         attribution.save(folder, name, forecasts[name].index, kept)
+        worst = attribution.refuse_inconsistent(folder, name, forecasts[name])
+        if worst is not None:
+            print(f"  atribució de {name}: additivitat a {worst:.1e} EUR/MWh",
+                  flush=True)
     run_files.save_record(folder, record)
     return table
 
@@ -374,8 +383,9 @@ def main():
         if done:
             counted = add_combination(done, actual)
             figures.shared(where, comparison(done, actual), actual)
-            print(f"{name}: comparació de {len(done)} famílies a {where}, "
-                  f"amb la combinació de {counted} membres ajustats", flush=True)
+            print(f"{name}: figures de {drawn(len(done))} a {where}"
+                  + (f", i la combinació de {counted} membres ajustats" if counted
+                     else ", sense combinació"), flush=True)
 
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")

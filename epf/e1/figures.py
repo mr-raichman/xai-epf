@@ -19,10 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
-INK = "#0b0b0b"
-MUTED_INK = "#898781"
-GRID = "#e1e0d9"
-SURFACE = "#fcfcfb"
+from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 
 # Escala seqüencial d'un sol to: la magnitud es llegeix igual en color i en escala
 # de grisos impresa.
@@ -32,9 +29,7 @@ MAGNITUDE = LinearSegmentedColormap.from_list(
 # Escala de dos tons per a una correlació, que va de -1 a 1 al voltant del zero.
 SIGNED = LinearSegmentedColormap.from_list(
     "signed", ["#8c3c12", "#d6622a", SURFACE, "#2a78d6", "#143f73"])
-LINES = ("#2a78d6", "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
-
-DPI = 300
+LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
 
 # Columnes que es segueixen al llarg del temps: una per color, perquè dues línies
 # del mateix color en una llegenda no es distingeixen.

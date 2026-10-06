@@ -26,6 +26,12 @@ ONE = ("model",)
 
 PRICE_UNITS = "EUR/MWh"
 
+# Marge de la comprovació d'additivitat. Les contribucions es desen en `float32` i
+# el residu mesurat és de l'ordre de 1e-5 EUR/MWh, de manera que això hi deixa dos
+# ordres de magnitud i és molt per sota de qualsevol diferència que vulgui dir res
+# en un preu.
+TOLERANCE = 1e-3
+
 
 def path(folder, forecast):
     return folder / f"attribution_{forecast}.npz"
@@ -45,6 +51,34 @@ def save(folder, forecast, days, attributions):
         arrays["forecasts"] = np.stack(
             [one.forecasts for one in attributions]).astype(np.float32)
     np.savez_compressed(path(folder, forecast), **arrays)
+
+
+def refuse_inconsistent(folder, forecast, predicted):
+    """Falla si el que s'ha desat no reprodueix la predicció que hi ha al costat.
+
+    És la comprovació que justifica desar la base. Per a una família que atribueix
+    en EUR/MWh, la base més la suma de les contribucions ha de tornar la predicció;
+    per a un conjunt que atribueix en un espai transformat, on aquella suma no és
+    en EUR/MWh, qui l'ha de tornar és la mitjana de les prediccions dels membres.
+    Llegeix el que hi ha al disc i no el que hi havia a la memòria, de manera que
+    també agafa un error en desar. Torna el pitjor residu, o None si l'atribució no
+    porta prou per comprovar res.
+    """
+    _, stored = load(folder, forecast)
+    if stored.units == PRICE_UNITS:
+        rebuilt = stored.base[:, 0] + stored.values[:, 0].sum(axis=1)
+        whose = "la base més les contribucions"
+    elif stored.forecasts is not None:
+        rebuilt = stored.forecasts.mean(axis=1)
+        whose = "la mitjana de les prediccions dels membres"
+    else:
+        return None
+    worst = float(np.abs(rebuilt - predicted.to_numpy()).max())
+    if worst > TOLERANCE:
+        raise ValueError(f"l'atribució desada de {forecast} no reprodueix la seva "
+                         f"predicció: {whose} se n'allunya {worst:.3g} EUR/MWh, per "
+                         f"sobre del marge de {TOLERANCE}")
+    return worst
 
 
 def load(folder, forecast):

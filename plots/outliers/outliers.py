@@ -8,6 +8,7 @@ import pandas as pd
 from epf.config.market import HOURS_PER_DAY
 from epf.data import prices
 from epf.data.outliers import hampel_score, window_median_mad
+from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -27,12 +28,8 @@ LINEAR_UP_TO = 1
 # Puntuacions més altes de cada panell, marcades en vermell.
 HIGHEST = 100
 
-SERIES_COLOR = "#2a78d6"
+# Vermell de les puntuacions marcades, que és d'aquesta figura i de cap altra.
 HIGHLIGHT_COLOR = "#e34948"
-INK = "#0b0b0b"
-MUTED_INK = "#898781"
-GRID = "#e1e0d9"
-SURFACE = "#fcfcfb"
 
 frame = prices.load()
 values = frame.to_numpy().ravel()
@@ -87,7 +84,7 @@ figure, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
 hours = np.arange(HOURS_PER_DAY)
 top.add_collection(LineCollection([np.column_stack([hours, day]) for day in by_hours],
-                                  colors=SERIES_COLOR, linewidths=0.3, alpha=0.3))
+                                  colors=SERIES, linewidths=0.3, alpha=0.3))
 top_marks = highest(by_hours)
 top.scatter(top_marks % HOURS_PER_DAY, by_hours.ravel()[top_marks], s=12, color=HIGHLIGHT_COLOR,
             zorder=3)
@@ -101,7 +98,7 @@ style(top, f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per
 
 instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
     np.tile(hours, len(frame)), unit="h")
-bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES_COLOR, linewidths=0)
+bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES, linewidths=0)
 bottom_marks = highest(by_days)
 bottom.scatter(instants[bottom_marks], by_days.ravel()[bottom_marks], s=12,
                color=HIGHLIGHT_COLOR, zorder=3)
@@ -114,5 +111,5 @@ style(bottom, f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_W
 figure.suptitle(f"Distància de cada preu horari als seus veïns, {frame.index[0].year} a "
                 f"{frame.index[-1].year}", color=INK, x=0.01, ha="left")
 figure.tight_layout()
-figure.savefig(OUTPUT, dpi=300)
+figure.savefig(OUTPUT, dpi=DPI)
 print(f"desat a {OUTPUT}")

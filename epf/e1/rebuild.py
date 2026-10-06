@@ -38,7 +38,9 @@ def main():
         family_folders = run_files.family_folders([where])
         counted = runner.add_combination(family_folders, actual)
         figures.shared(where, runner.comparison(family_folders, actual), actual)
-        print(f"refeta la comparació de {where}, amb la combinació de {counted} membres")
+        print(f"refetes les figures de {runner.drawn(len(family_folders))} a {where}"
+              + (f", i la combinació de {counted} membres ajustats" if counted
+                 else ", sense combinació"))
 
 
 if __name__ == "__main__":

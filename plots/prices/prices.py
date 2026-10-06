@@ -5,17 +5,13 @@ import matplotlib
 import pandas as pd
 
 from epf.data import prices
+from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 OUTPUT = pathlib.Path(__file__).with_suffix(".png")
 
-SERIES_COLOR = "#2a78d6"
-INK = "#0b0b0b"
-MUTED_INK = "#898781"
-GRID = "#e1e0d9"
-SURFACE = "#fcfcfb"
 
 frame = prices.load()
 hourly = frame.stack()
@@ -24,7 +20,7 @@ instants = hourly.index.get_level_values(0) + pd.to_timedelta(
 
 figure, axis = plt.subplots(figsize=(20, 6), facecolor=SURFACE)
 axis.set_facecolor(SURFACE)
-axis.plot(instants, hourly.to_numpy(), color=SERIES_COLOR, linewidth=0.3)
+axis.plot(instants, hourly.to_numpy(), color=SERIES, linewidth=0.3)
 
 seam = pd.Timestamp(prices.OMIE_FROM)
 axis.axvline(seam, color=MUTED_INK, linewidth=1, linestyle="--")
@@ -45,5 +41,5 @@ for side in ("left", "bottom"):
     axis.spines[side].set_color(GRID)
 
 figure.tight_layout()
-figure.savefig(OUTPUT, dpi=300)
+figure.savefig(OUTPUT, dpi=DPI)
 print(f"desat a {OUTPUT}")
