@@ -11,6 +11,10 @@ un commit nou, i per això el commit identifica el resultat: el missatge del com
 """
 import datetime
 
+from epf.config.market import QUARTER_HOURLY_FROM
+
+ONE_DAY = datetime.timedelta(days=1)
+
 # ---------------------------------------------------------------- la partició
 
 # Primer dia des del qual s'entrena. No és el primer dia que la font serveix, que
@@ -18,17 +22,20 @@ import datetime
 # moure endavant sense tocar les dades.
 HISTORY_START = datetime.date(2014, 1, 1)
 
-# Últim dia d'entrenament, el dia abans de la validació.
-TRAIN_END = datetime.date(2022, 9, 30)
-
 # Dos anys de validació abans de la prova. S'hi trien els hiperparàmetres i s'hi
 # comparen les famílies; els anys de prova no s'hi toquen mai.
 VALIDATION = (datetime.date(2022, 10, 1), datetime.date(2024, 9, 30))
 
-# Dos anys de prova, avaluats per separat: l'horari i el quart-horari promediat.
+# Últim dia d'entrenament. Derivat i no escrit: és el dia abans de la validació, i
+# escrit a part seria la mateixa frontera dues vegades.
+TRAIN_END = VALIDATION[0] - ONE_DAY
+
+# Dos anys de prova, avaluats per separat. El tall entre ells no es tria: és el dia
+# que el mercat va passar a 96 productes quart-horaris, que és un fet i viu a
+# `market.py`. Les dues vores de fora sí que es trien.
 TEST_PERIODS = {
-    "hourly": (datetime.date(2024, 10, 1), datetime.date(2025, 9, 30)),
-    "quarter_hourly": (datetime.date(2025, 10, 1), datetime.date(2026, 9, 30)),
+    "hourly": (datetime.date(2024, 10, 1), QUARTER_HOURLY_FROM - ONE_DAY),
+    "quarter_hourly": (QUARTER_HOURLY_FROM, datetime.date(2026, 9, 30)),
 }
 
 # Els dos nivells d'execució. Una de prova és petita i ràpida a propòsit i el seu

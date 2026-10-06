@@ -11,13 +11,11 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 from threadpoolctl import threadpool_limits
 
-from epf.config.experiments import LAGS, SHORT_LAGS
+from epf.config.experiments import DAYS_PER_WEEK, LAGS, SHORT_LAGS
 from epf.config.market import HOURS_PER_DAY
 from epf.data.calendar import HOUR_COLUMNS
 from epf.features.matrix import DAY_OF_WEEK, calibration
 from epf.models.attribution import Attribution
-
-DAYS_PER_WEEK = 7
 
 # Nom de la finestra que agafa tot l'historial, per a l'atribució desada.
 WHOLE_HISTORY = "all"
@@ -141,11 +139,6 @@ def forecast(X, y, day, window, max_iter):
     calibratge, com a tot el projecte.
     """
     return _window_forecast(X, y, day, window, max_iter)[0]
-
-
-def forecast_ensemble(X, y, day, windows, max_iter):
-    """Mitjana aritmètica de les prediccions de cada finestra de calibratge."""
-    return np.mean([forecast(X, y, day, window, max_iter) for window in windows], axis=0)
 
 
 def explain(X, y, day, windows, max_iter):

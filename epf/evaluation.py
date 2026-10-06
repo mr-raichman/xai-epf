@@ -148,11 +148,6 @@ def curve_correlations(predicted, actual):
     return pd.Series(correlation, index=days)
 
 
-def curve_correlation(predicted, actual):
-    """Corr-f: la mitjana d'aquelles correlacions diàries. Com més alt, millor."""
-    return float(curve_correlations(predicted, actual).mean())
-
-
 def extrema_price_deviations(predicted, actual):
     """MPD de cada dia: el tros de forquilla diària que es perd triant malament les hores.
 

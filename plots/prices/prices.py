@@ -4,7 +4,6 @@ import pathlib
 import matplotlib
 import pandas as pd
 
-from epf.config.experiments import HISTORY_START
 from epf.data import prices
 
 matplotlib.use("Agg")
@@ -34,7 +33,7 @@ axis.annotate("ESIOS", (seam, 1), xycoords=("data", "axes fraction"), xytext=(-6
 axis.annotate("OMIE", (seam, 1), xycoords=("data", "axes fraction"), xytext=(6, -14),
               textcoords="offset points", ha="left", color=MUTED_INK)
 
-axis.set_title(f"Preu horari del mercat diari espanyol, {HISTORY_START.year} a "
+axis.set_title(f"Preu horari del mercat diari espanyol, {frame.index[0].year} a "
                f"{frame.index[-1].year}", color=INK, loc="left")
 axis.set_ylabel("EUR/MWh", color=MUTED_INK)
 axis.set_xlim(instants[0], instants[-1])

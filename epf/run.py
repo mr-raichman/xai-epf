@@ -44,7 +44,3 @@ def save_metrics(folder, table):
 
 def save_record(folder, record):
     (folder / RECORD).write_text(json.dumps(record, indent=2) + "\n")
-
-
-def load_record(folder):
-    return json.loads((folder / RECORD).read_text())

@@ -4,16 +4,12 @@ Cap figura torna a ajustar res: l'atribució de cada dia surt del model que el v
 predir i ja és al directori. L'etapa serveix per experimentar i no encara per
 interpretar, així que se'n dibuixen moltes i ja es decidirà quines es queden.
 """
-import argparse
-import pathlib
-
 import matplotlib
 import numpy as np
 import pandas as pd
 
 from epf import run as run_files
 from epf.data.calendar import HOUR_COLUMNS
-from epf.e1 import features
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae_per_hour, rmae_per_hour)
 from epf.models import naive as naive_family
@@ -41,9 +37,13 @@ LINES = ("#2a78d6", "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b")
 
 DPI = 300
 
-# Columnes que es segueixen al llarg del temps i de les quals es mira la
-# concentració: més no es llegeixen en una llegenda.
-FOLLOWED = 8
+# Columnes que es segueixen al llarg del temps: una per color, perquè dues línies
+# del mateix color en una llegenda no es distingeixen.
+FOLLOWED = len(LINES)
+
+# Per sota d'aquests mesos la figura del temps agrupa per setmana: amb un sol mes
+# la línia té un punt i no es dibuixa res.
+MONTHS_FOR_MONTHLY = 3
 
 
 def _style(axis, title=None):
@@ -289,45 +289,51 @@ def importance_by_column(folder, label, stem, columns, importance, units):
     _save(figure, folder, f"{stem}_columns")
 
 
-def importance_totals(folder, label, stem, columns, importance, scale, units):
+def importance_totals(folder, label, stem, columns, importance, units):
     """Un retard per fila, sumant les hores d'origen.
 
-    La suma es fa sobre l'atribució sense escalar i el divisor s'aplica després,
-    perquè escalar primer i sumar després no donaria la part del bloc dins de l'hora.
+    Sense el divisor per hora de les altres figures: cada fila és la suma de 24
+    columnes i dividir-la per la contribució més gran d'una sola columna donaria
+    una part de l'hora més gran que u. Es queda en les unitats desades, de manera
+    que a LEAR les hores d'aquesta figura no es comparen entre elles.
     """
     lags, others = _blocks(columns)
-    rows = [importance[positions].sum(axis=0) / scale for _, positions in sorted(lags.items())]
+    rows = [importance[positions].sum(axis=0) for _, positions in sorted(lags.items())]
     labels = [f"preu de fa {lag} dies" for lag in sorted(lags)]
     for position in others:
-        rows.append(importance[position] / scale)
+        rows.append(importance[position])
         labels.append(columns[position])
     figure, axis = plt.subplots(figsize=(14, 0.4 * len(rows) + 2), facecolor=SURFACE)
     image = axis.imshow(np.vstack(rows), cmap=MAGNITUDE, aspect="auto", origin="upper")
     axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
     axis.set_yticks(range(len(rows)), labels, fontsize=7)
     axis.set_xlabel("hora del dia predit", color=MUTED_INK)
-    _colorbar(figure, image, axis, _bar_label(units))
+    _colorbar(figure, image, axis, units)
     _style(axis, f"{label}: importància per retard")
     _save(figure, folder, f"{stem}_totals")
 
 
 def importance_over_time(folder, label, stem, columns, values, days, scale, units):
-    """Les columnes més importants, mes a mes.
+    """Les columnes més importants al llarg del temps, mes a mes o, si el període
+    és curt, setmana a setmana.
 
     La mitjana és sobre les hores del dia, que a LEAR no són en les mateixes
     unitats, de manera que cada hora es divideix pel seu divisor abans de mitjanar.
     """
-    monthly = (np.abs(values) / scale).mean(axis=2)
-    order = monthly.mean(axis=0).argsort()[::-1][:FOLLOWED]
-    months = pd.DatetimeIndex(days).to_period("M")
+    averaged = (np.abs(values) / scale).mean(axis=2)
+    order = averaged.mean(axis=0).argsort()[::-1][:FOLLOWED]
+    when = pd.DatetimeIndex(days)
+    by_month = when.to_period("M").nunique() >= MONTHS_FOR_MONTHLY
+    groups = when.to_period("M" if by_month else "W")
     figure, axis = plt.subplots(figsize=(14, 4.5), facecolor=SURFACE)
-    for position, colour in zip(order, LINES * 2):
-        series = pd.Series(monthly[:, position], index=months).groupby(level=0).mean()
+    for position, colour in zip(order, LINES):
+        series = pd.Series(averaged[:, position], index=groups).groupby(level=0).mean()
         axis.plot(series.index.to_timestamp(), series.to_numpy(), color=colour,
                   label=columns[position])
     axis.set_ylabel(f"mitjana de |SHAP| ({_bar_label(units)})", color=MUTED_INK)
     axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=4, fontsize=8)
-    _style(axis, f"{label}: les {FOLLOWED} columnes més importants mes a mes")
+    step = "mes a mes" if by_month else "setmana a setmana"
+    _style(axis, f"{label}: les {FOLLOWED} columnes més importants {step}")
     _save(figure, folder, f"{stem}_over_time")
 
 
@@ -376,21 +382,7 @@ def draw(folder, actual):
             scale = per_hour_scale(importance, units)
             importance_by_lag(folder, label, stem, columns, importance / scale, units)
             importance_by_column(folder, label, stem, columns, importance / scale, units)
-            importance_totals(folder, label, stem, columns, importance, scale, units)
+            importance_totals(folder, label, stem, columns, importance, units)
             importance_over_time(folder, label, stem, columns, stored.values[:, number],
                                  days, scale, units)
             importance_concentration(folder, label, stem, importance)
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("folder", type=pathlib.Path, help="directori d'una execució ja feta")
-    folder = parser.parse_args().folder
-
-    (_, actual), _ = features.load()
-    draw(folder, actual)
-    print(f"figures desades a {folder}")
-
-
-if __name__ == "__main__":
-    main()

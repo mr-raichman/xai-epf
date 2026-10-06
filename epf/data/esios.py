@@ -18,11 +18,14 @@ from epf.data.calendar import HOUR_COLUMNS, repair_dst
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 
-# Primer any que es demana. ESIOS no té dades anteriors al 2014.
+# Primer any que es demana, més enrere del que la font arriba a servir: la decisió
+# és baixar cada font tan enrere com vagi, i una resposta buida es desa igual i no
+# es torna a demanar mai més.
 FIRST_YEAR = 2010
 
-# Primer dia que la font serveix, mesurat: una sol·licitud directa a l'API no torna
-# res abans. És un fet d'ESIOS i no una tria nostra, que viu a `experiments.py`.
+# Primer dia que la font serveix el preu, mesurat: una sol·licitud directa a l'API
+# no en torna cap abans. És un fet d'ESIOS i no una tria nostra, que viu a
+# `experiments.py`. Alguna altra sèrie comença unes hores abans.
 ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
 
 # Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.
