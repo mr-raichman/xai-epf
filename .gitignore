@@ -2,5 +2,6 @@ api-keys
 .stfolder/
 .venv/
 __pycache__/
-/data/
+/downloads/
+/figures/
 /runs/

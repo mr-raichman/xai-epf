@@ -1,9 +1,10 @@
 """Com es veu una figura d'aquest projecte, en un sol lloc.
 
-Ho comparteixen les figures del paquet i els scripts solts de `plots/`, que
-abans en portaven una còpia cada un. Només hi ha el que fan servir dues coses o
-més: el que és d'una figura concreta, com la seqüència de colors de línia o les
-escales de color, viu amb ella.
+Ho comparteixen les figures d'una execució, a `results/`, i les de les dades
+d'origen, a `data/figures/`, que són dos subpaquets germans: el que dos llocs
+llegeixen viu al paquet de dalt. Només hi ha el que fan servir dues coses o més: el
+que és d'una figura concreta, com la seqüència de colors de línia o les escales de
+color, viu amb ella.
 """
 
 # Tinta del text, tinta apagada de les etiquetes, línies de reixa i fons.

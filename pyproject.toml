@@ -23,8 +23,8 @@ epf-price = "epf.data.price:main"
 epf-handle-data = "epf.data.handle_data:main"
 epf-show-run = "epf.results.show_run:main"
 epf-show-figures = "epf.results.show_figures:main"
-epf-plot-price = "epf.data.plots.price:main"
-epf-plot-outliers = "epf.data.plots.outliers:main"
+epf-figure-price = "epf.data.figures.price.price:main"
+epf-figure-outliers = "epf.data.figures.price.outliers:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff==0.16.1"]

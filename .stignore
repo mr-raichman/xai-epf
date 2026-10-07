@@ -2,4 +2,4 @@
 api-keys
 .venv
 __pycache__
-/data
+/downloads

@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 
-OUTPUT = paths.PLOTS / "outliers.png"
+OUTPUT = paths.PRICE_FIGURES / "outliers.png"
 
 # La majoria de puntuacions són inferiors a 10 i les més altes arriben als milers:
 # eix lineal fins a 1 i logarítmic a partir d'aquí.

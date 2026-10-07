@@ -9,7 +9,7 @@ from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-OUTPUT = paths.PLOTS / "price.png"
+OUTPUT = paths.PRICE_FIGURES / "price.png"
 
 
 def main():
