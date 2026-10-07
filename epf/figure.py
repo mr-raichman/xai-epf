@@ -37,6 +37,21 @@ LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f
 FOLLOWED = len(LINES)
 
 
+def colours(names):
+    """Un color per nom, en l'ordre dels noms.
+
+    Peta si n'hi ha més que colors. `zip(LINES, ...)` els deixaria fora sense dir-ho,
+    i una figura que perd un model en silenci és pitjor que una figura que no es
+    dibuixa (`safety.md` 10.3). Repetir-ne un no val: dues línies del mateix color en
+    una llegenda no es distingeixen.
+    """
+    names = list(names)
+    if len(names) > len(LINES):
+        raise ValueError(f"{len(names)} sèries i només {len(LINES)} colors de línia: "
+                         f"{names}")
+    return list(zip(LINES, names))
+
+
 def style(axis, title=None):
     """El títol, les marques i el marc d'uns eixos, iguals a tot el projecte."""
     if title:

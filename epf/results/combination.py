@@ -8,7 +8,6 @@ i no amb el que l'escriu.
 import pandas as pd
 
 from epf.evaluation import metrics
-from epf.attribution import stored
 from epf.models.naive import naive
 from epf.results import run_files
 
@@ -17,37 +16,34 @@ COMBINATION = "combination"
 
 
 def members(folder):
-    """Els pronòstics ajustats que hi ha desats en una família.
+    """Els models ajustats que hi ha desats en una família, un CSV cada un.
 
-    Les finestres d'un conjunt com LEAR compten una cada una, perquè el que
-    l'article compta per decidir la mida d'una combinació són models ajustats i no
-    famílies; les famílies d'un sol model aporten el seu CSV. Surten del `.npz`
-    quan n'hi ha, que és on es desen, i del CSV quan no.
+    Les finestres d'un conjunt com LEAR compten una cada una, perquè el que l'article
+    compta per decidir la mida d'una combinació són models ajustats i no famílies; la
+    mitjana de les finestres no hi entra, que no és cap model. Qui ho diu és el
+    `run.json`, i `None` vol dir un registre d'abans que ho digués.
     """
+    record = run_files.load_record(folder)
+    if "members" not in record:
+        return None
     forecasts = run_files.load_forecasts(folder)
-    found = []
-    for name, frame in sorted(forecasts.items()):
-        if not stored.path(folder, name).exists():
-            found.append(frame)
-            continue
-        days, attribution = stored.load(folder, name)
-        if attribution.forecasts is None:
-            found.append(frame)
-            continue
-        index = pd.DatetimeIndex(pd.to_datetime(days), name=frame.index.name)
-        found += [pd.DataFrame(attribution.forecasts[:, number], index=index,
-                               columns=frame.columns)
-                  for number in range(len(attribution.members))]
-    return found
+    return [forecasts[name] for name in record["members"]]
 
 
 def combined(folders):
     """La mitjana aritmètica de tots els membres ajustats d'una configuració.
 
     Mitjana simple, que és el que fa l'article, i sobre els dies que tots
-    comparteixen. Amb menys de dos membres no hi ha res a combinar.
+    comparteixen. Amb menys de dos membres no hi ha res a combinar, i amb un registre
+    que no diu qui és membre tampoc: amb una barreja de registres la combinació
+    sortiria d'un subconjunt i no ho diria enlloc.
     """
-    found = [frame for folder in folders for frame in members(folder)]
+    found = []
+    for folder in folders:
+        theirs = members(folder)
+        if theirs is None:
+            return None, []
+        found += theirs
     if len(found) < 2:
         return None, found
     days = found[0].index
@@ -58,19 +54,6 @@ def combined(folders):
     return sum(frame.loc[days] for frame in found) / len(found), found
 
 
-def _fitted(folders):
-    """Les famílies que ajusten un model, segons el que digui el seu registre.
-
-    Un registre d'abans que existís `fits` no ho diu, i aleshores no se'n combina
-    cap: amb una barreja de registres la combinació sortiria d'un subconjunt i no
-    ho diria enlloc.
-    """
-    records = [run_files.load_record(folder) for folder in folders]
-    if any("fits" not in record for record in records):
-        return []
-    return [folder for folder, record in zip(folders, records) if record["fits"]]
-
-
 def add_combination(folders, actual):
     """Escriu les mètriques de la combinació a `metrics.csv` de cada família.
 
@@ -79,7 +62,7 @@ def add_combination(folders, actual):
     El preu que es paga és que el `metrics.csv` d'una família depèn de les seves
     germanes i ja no s'escriu un sol cop.
     """
-    frame, found = combined(_fitted(folders))
+    frame, found = combined(folders)
     if frame is None:
         return 0
     rows = metrics({COMBINATION: frame}, actual, naive.weekly_frame(actual))
@@ -91,12 +74,20 @@ def add_combination(folders, actual):
 
 
 def comparison(folders, actual):
-    """Els pronòstics que es comparen en una configuració: els de totes les
-    famílies i, si n'hi ha, la combinació."""
+    """Els pronòstics que es comparen en una configuració: el de capçalera de cada
+    família i, si n'hi ha, la combinació.
+
+    No tots els que hi ha al disc: les cinc finestres de LEAR tenen el seu CSV i les
+    seves mètriques, però el que es compara amb els altres models és la seva mitjana.
+    Un registre que no diu quins són de capçalera dóna tots els seus, que és el que
+    feia abans que ho digués.
+    """
     forecasts = {}
     for folder in folders:
-        forecasts.update(run_files.load_forecasts(folder))
-    frame, _ = combined(_fitted(folders))
+        theirs = run_files.load_forecasts(folder)
+        forecasts.update({name: theirs[name]
+                          for name in run_files.headlines(folder, theirs)})
+    frame, _ = combined(folders)
     if frame is not None:
         forecasts[COMBINATION] = frame
     return forecasts

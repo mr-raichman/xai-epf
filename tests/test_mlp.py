@@ -7,7 +7,7 @@ import pandas as pd
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
-from epf.models.mlp.mlp import fit, predict
+from epf.models.mlp.mlp import NAME, fit, predict
 
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
@@ -17,8 +17,12 @@ SMALL = dict(hidden=(8,), members=2, seed=0, alpha=1e-4, learning_rate=1e-3,
 
 
 def forecast(X, y, day, **parameters):
-    """El que fa el camí endavant: un ajust i la predicció d'aquell ajust."""
-    return predict(fit(X, y, day, **parameters), X, day)
+    """El que fa el camí endavant: un ajust i la predicció d'aquell ajust.
+
+    `predict` torna un diccionari de nom de pronòstic a preus; aquesta família en té
+    un de sol.
+    """
+    return predict(fit(X, y, day, **parameters), X, day)[NAME]
 
 
 def daily_prices(days, start=datetime.date(2014, 1, 1)):

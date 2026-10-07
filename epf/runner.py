@@ -36,21 +36,24 @@ MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
 
 def run(family, name, tables, tier, store, report):
-    """Camí endavant d'un pronòstic: les seves prediccions, i prou.
+    """Camí endavant d'una família: les prediccions de tots els seus pronòstics.
 
-    L'ajust de cada dia es desa a `store` abans de predir-hi, de manera que el que
-    queda al disc és el model que ha fet la predicció i no un de nou; l'atribució en
-    surt després, a `epf-attribute`. Només es desa si el pronòstic té manera
-    d'atribuir-se: un ajust que ningú no explicarà és disc per res.
+    Un ajust per dia i tots els pronòstics d'aquell ajust, de manera que les cinc
+    finestres de LEAR i els tres pronòstics ingenus no caminen el període una vegada
+    cada un.
+
+    L'ajust es desa a `store` abans de predir-hi, de manera que el que queda al disc és
+    el model que ha fet la predicció i no un de nou; l'atribució en surt després, a
+    `epf-attribute`. Només es desa si la família té manera d'atribuir-se: un ajust que
+    ningú no explicarà és disc per res.
     """
     X, y = tables[family.matrix]
-    of_day = family.forecasts[name]
 
     def predict(X, y, when):
-        model = of_day.fit(X, y, when)
-        if of_day.attribute is not None:
+        model = family.fit(X, y, when)
+        if family.attribute is not None:
             fitted.save(store, when, model)
-        return of_day.predict(model, X, when)
+        return family.predict(model, X, when)
 
     first, last, every = parameters.PERIODS[tier]
     return walk_forward(predict, X, y, first, last, every=every,
@@ -73,7 +76,7 @@ def _plain(value):
     return value
 
 
-def described(commit, tier, family, chosen, fits, forecasts, walk_seconds):
+def described(commit, tier, name, chosen, family, forecasts, walk_seconds):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
     Els paràmetres de l'execució i els números del model hi van tal com estaven, de
@@ -90,20 +93,21 @@ def described(commit, tier, family, chosen, fits, forecasts, walk_seconds):
         "commit": commit,
         "stage": parameters.PRICE_ONLY,
         "tier": tier,
-        "family": family,
+        "family": name,
         # Quines famílies ha triat la invocació, i no només aquesta. L'últim bit d'una
         # mètrica es mou amb la selecció, de manera que el commit tot sol no diu quina
         # crida va donar aquests números.
         "chosen": sorted(chosen),
-        # Si la família ajusta un model o si copia una columna ja coneguda: és el
-        # que decideix si entra a la combinació, i va al disc perquè una
-        # reconstrucció la pugui refer sense tenir els paràmetres a mà.
-        "fits": fits,
+        # Quins dels pronòstics del directori són models ajustats, i per tant què
+        # mitjana la combinació, i quins es comparen a les figures. Van al disc perquè
+        # una reconstrucció els pugui refer sense el registre de famílies a mà.
+        "members": sorted(family.members),
+        "headlines": sorted(family.headlines),
         "forecasts": sorted(forecasts),
         "days": len(next(iter(forecasts.values()))),
         "walk_seconds": round(walk_seconds, 1),
         "parameters": _plain(swept),
-        "hyperparameters": _plain(hyperparameters(family)),
+        "hyperparameters": _plain(hyperparameters(name)),
     }
 
 
@@ -210,14 +214,11 @@ def main():
             # queda és sempre de l'última execució d'aquest nivell i etapa. Només el
             # tenen les famílies que s'atribueixen; les altres no desen cap ajust i no
             # han de deixar un directori buit amb una marca.
-            explains = any(of_day.attribute is not None
-                           for of_day in table[family].forecasts.values())
+            explains = table[family].attribute is not None
             store = fitted.folder(args.tier, parameters.PRICE_ONLY, family)
             if explains:
                 fitted.clear(store)
-            forecasts = {name: run(table[family], name, tables, args.tier, store,
-                                   report)
-                         for name in table[family].forecasts}
+            forecasts = run(table[family], family, tables, args.tier, store, report)
             if explains:
                 fitted.save_stamp(store, fitted.describe(
                     commit, args.tier, parameters.PRICE_ONLY, family,
@@ -226,7 +227,7 @@ def main():
             folder = folders[family]
             measured = write(folder, forecasts, actual,
                              described(commit, args.tier, family, chosen,
-                                       table[family].fits, forecasts, walked))
+                                       table[family], forecasts, walked))
             figures.draw(folder, actual)
         except Exception:
             traceback.print_exc()

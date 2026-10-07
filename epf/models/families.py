@@ -19,17 +19,20 @@ from epf.models.naive import naive
 
 DAILY, HOURLY = "daily", "hourly"
 
-# Les tres funcions d'un pronòstic, cada una amb una feina. `attribute` és `None` on
-# no hi ha cap mètode: les prediccions ingènues perquè la seva atribució seria la
-# columna que copien, i l'MLP perquè TreeSHAP no s'hi aplica i cap mètode exacte és
-# assumible dia a dia; si mai és la família que s'interpreta, la importància per
-# permutació, que no mira dins del model, hi arriba sense desar res a cada execució.
-Forecast = collections.namedtuple("Forecast", "fit predict attribute")
-
-# `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
-# que ja es coneixia, i per això no entren a la combinació. No se'n deriva de `fit`,
-# que hi és a totes, ni d'`attribute`, que l'MLP no té tot i ajustar.
-Family = collections.namedtuple("Family", "matrix forecasts fits")
+# Una família: la matriu que pren, les seves tres funcions, i quins dels pronòstics que
+# `predict` torna són què.
+#
+# `attribute` és `None` on no hi ha cap mètode: les prediccions ingènues perquè la seva
+# atribució seria la columna que copien, i l'MLP perquè TreeSHAP no s'hi aplica i cap
+# mètode exacte no és assumible dia a dia; si mai és la família que s'interpreta, la
+# importància per permutació, que no mira dins del model, hi arriba sense desar res a
+# cada execució.
+#
+# `members` són els models ajustats que entren a la combinació d'una execució, i
+# `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
+# s'ajusta són les cinc finestres i el que es compara amb els altres models és la seva
+# mitjana, que no és cap model. Les ingènues no ajusten res i no són membres de res.
+Family = collections.namedtuple("Family", "matrix fit predict attribute members headlines")
 
 
 def matrices(data):
@@ -45,17 +48,14 @@ def families():
     aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
     """
     return {
-        "naive": Family(DAILY, {
-            "previous_day": Forecast(naive.fit, naive.previous_day, None),
-            "previous_week": Forecast(naive.fit, naive.previous_week, None),
-            "similar_day": Forecast(naive.fit, naive.similar_day, None),
-        }, fits=False),
-        "lear": Family(DAILY, {
-            "lear": Forecast(lear.fit, lear.predict, lear.attribute)}, fits=True),
-        "lightgbm": Family(HOURLY, {
-            "lightgbm": Forecast(boosting.fit, boosting.predict, boosting.attribute)},
-            fits=True),
-        "mlp": Family(DAILY, {"mlp": Forecast(mlp.fit, mlp.predict, None)}, fits=True),
+        "naive": Family(DAILY, naive.fit, naive.predict, None,
+                        members=(), headlines=naive.NAMES),
+        lear.NAME: Family(DAILY, lear.fit, lear.predict, lear.attribute,
+                          members=lear.window_names(), headlines=(lear.NAME,)),
+        boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict, boosting.attribute,
+                              members=(boosting.NAME,), headlines=(boosting.NAME,)),
+        mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None,
+                         members=(mlp.NAME,), headlines=(mlp.NAME,)),
     }
 
 

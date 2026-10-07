@@ -25,46 +25,42 @@ from epf.models.families import families, matrices
 from epf.results import run_files
 
 
-def explained(family):
-    """Els pronòstics d'una família que tenen manera d'atribuir-se."""
-    return {name: of_day for name, of_day in family.forecasts.items()
-            if of_day.attribute is not None}
+def attribute(folder, tables):
+    """Escriu l'atribució d'una família i la dibuixa, de l'ajust que va predir cada dia.
 
+    Torna el nom que ha escrit, o `None` si la família no s'atribueix. Valida tot el que
+    necessita abans de tocar el disc: la marca dels ajustos i que hi hagi un ajust per
+    cada dia predit.
 
-def attribute(folder, matrices):
-    """Escriu l'atribució de cada pronòstic explicable d'una família i la dibuixa.
-
-    Torna els noms que ha escrit. Valida tot el que necessita abans de tocar el disc:
-    la marca dels ajustos i que hi hagi un ajust per cada dia predit.
+    El `.npz` es diu per la família, que és també el nom del pronòstic de capçalera: és
+    contra aquell CSV que es comprova l'additivitat, perquè és la predicció que l'ajust
+    va donar.
     """
     record = run_files.load_record(folder)
-    family = families()[record["family"]]
-    forecasts = run_files.load_forecasts(folder)
-    wanted = {name: of_day for name, of_day in explained(family).items()
-              if name in forecasts}
-    if not wanted:
-        return []
+    name = record["family"]
+    family = families()[name]
+    if family.attribute is None:
+        return None
 
-    store = fitted.folder(record["tier"], record["stage"], record["family"])
+    forecasts = run_files.load_forecasts(folder)
+    store = fitted.folder(record["tier"], record["stage"], name)
     fitted.refuse_mismatch(store, record)
-    days = forecasts[next(iter(wanted))].index
-    absent = [day for day in days if not (store / fitted.MODEL.format(day=day.date())).exists()]
+    days = forecasts[name].index
+    absent = [day for day in days
+              if not (store / fitted.MODEL.format(day=day.date())).exists()]
     if absent:
         raise FileNotFoundError(
             f"{len(absent)} dies predits sense cap ajust desat a {store}, "
             f"el primer {absent[0].date()}")
 
-    X, _ = matrices[family.matrix]
-    written = []
-    for name, of_day in sorted(wanted.items()):
-        attributions = [of_day.attribute(fitted.load(store, day), X, day) for day in days]
-        stored.save(folder, name, days, attributions)
-        worst = stored.refuse_inconsistent(folder, name, forecasts[name])
-        if worst is not None:
-            print(f"  {name}: additivitat a {worst:.1e} EUR/MWh", flush=True)
-        figures.draw(folder, name)
-        written.append(name)
-    return written
+    X, _ = tables[family.matrix]
+    attributions = [family.attribute(fitted.load(store, day), X, day) for day in days]
+    stored.save(folder, name, days, attributions)
+    worst = stored.refuse_inconsistent(folder, name, forecasts[name])
+    if worst is not None:
+        print(f"  {name}: additivitat a {worst:.1e} EUR/MWh", flush=True)
+    figures.draw(folder, name)
+    return name
 
 
 def parse():
@@ -87,8 +83,8 @@ def main():
             print(f"  ha fallat: {error}", flush=True)
             failed.append(folder.name)
         else:
-            print(f"  {', '.join(written)}" if written
-                  else "  cap pronòstic amb manera d'atribuir-se", flush=True)
+            print(f"  {written}" if written
+                  else "  aquesta família no s'atribueix", flush=True)
     if failed:
         print(f"no s'ha explicat: {', '.join(failed)}")
         return 1

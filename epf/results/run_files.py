@@ -97,6 +97,15 @@ def summary(table):
     return wide[order].to_string(float_format=lambda value: f"{value:9.3f}")
 
 
+def headlines(folder, forecasts):
+    """Els noms que una família compara a les figures, del seu `run.json`.
+
+    Un registre d'abans que ho digués dóna tots els pronòstics que hi ha, que és el
+    que es dibuixava aleshores.
+    """
+    return load_record(folder).get("headlines", sorted(forecasts))
+
+
 def drawn(families):
     """«1 família» o «n famílies», perquè el que imprimeix un script és català."""
     return "1 família" if families == 1 else f"{families} famílies"

@@ -24,20 +24,31 @@ def _lag(X, day, lag):
     return X.loc[day, [f"lag{lag}_{hour}" for hour in HOUR_COLUMNS]].to_numpy(dtype=float)
 
 
-def previous_day(model, X, day):
+def previous_day(X, day):
     """La mateixa hora del dia anterior."""
     return _lag(X, day, PREVIOUS_DAY)
 
 
-def previous_week(model, X, day):
+def previous_week(X, day):
     """La mateixa hora de fa una setmana."""
     return _lag(X, day, PREVIOUS_WEEK)
 
 
-def similar_day(model, X, day):
+def similar_day(X, day):
     """El dia anterior de dimarts a divendres, i la setmana anterior la resta."""
     lag = PREVIOUS_DAY if day.dayofweek in WEEKDAYS_FROM_YESTERDAY else PREVIOUS_WEEK
     return _lag(X, day, lag)
+
+
+# Els tres pronòstics ingenus són una sola família i van junts en un sol directori.
+FORECASTS = {"previous_day": previous_day, "previous_week": previous_week,
+             "similar_day": similar_day}
+NAMES = tuple(FORECASTS)
+
+
+def predict(model, X, day):
+    """Els tres pronòstics ingenus del dia, per nom. El model és `None` i no es mira."""
+    return {name: forecast(X, day) for name, forecast in FORECASTS.items()}
 
 
 def weekly_frame(price):

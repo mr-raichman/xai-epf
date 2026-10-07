@@ -8,7 +8,7 @@ import pandas as pd
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build, per_hour
-from epf.models.boosting.boosting import attribute, fit, lightgbm, predict
+from epf.models.boosting.boosting import NAME, attribute, fit, lightgbm, predict
 
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
@@ -17,8 +17,12 @@ SMALL = functools.partial(lightgbm, trees=20, rate=0.05, leaves=31, seed=0)
 
 
 def forecast(X, y, day, **parameters):
-    """El que fa el camí endavant: un ajust i la predicció d'aquell ajust."""
-    return predict(fit(X, y, day, **parameters), X, day)
+    """El que fa el camí endavant: un ajust i la predicció d'aquell ajust.
+
+    `predict` torna un diccionari de nom de pronòstic a preus; aquesta família en té
+    un de sol.
+    """
+    return predict(fit(X, y, day, **parameters), X, day)[NAME]
 
 
 def hourly_prices(days, start=datetime.date(2014, 1, 1)):
@@ -46,7 +50,7 @@ def test_the_attribution_is_columns_by_delivery_hour():
     assert list(attribution.columns) == list(X.columns)
     # L'atribució surt del mateix ajust que la predicció, i un segon ajust del mateix
     # dia dóna el mateix model: `deterministic` a `boosting.lightgbm`.
-    assert np.array_equal(predict(model, X, day),
+    assert np.array_equal(predict(model, X, day)[NAME],
                           forecast(X, y, day, make=SMALL, window=100))
 
 

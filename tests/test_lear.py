@@ -9,8 +9,9 @@ from epf.models.lear.lear_hyperparameters import EIGHT_WEEKS, TWELVE_WEEKS
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
-from epf.models.lear.lear import (DESIGN_COLUMNS, Scaler, attribute, design_columns,
-                                  fit, lags_of, predict, week_dummies)
+from epf.models.lear.lear import (DESIGN_COLUMNS, NAME, Scaler, attribute,
+                                  design_columns, fit, lags_of, predict,
+                                  week_dummies)
 
 # Prou iteracions perquè els ajusts d'aquestes proves convergeixin; el valor que
 # fan servir les execucions és a la configuració.
@@ -26,7 +27,7 @@ def forecast(X, y, day, window, max_iter):
 
     Amb una finestra la mitjana del conjunt és aquella finestra.
     """
-    return predict(fit(X, y, day, windows=(window,), max_iter=max_iter), X, day)
+    return predict(fit(X, y, day, windows=(window,), max_iter=max_iter), X, day)[NAME]
 
 
 def explained(X, y, day, windows, max_iter):

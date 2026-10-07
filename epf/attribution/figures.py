@@ -14,8 +14,8 @@ import pandas as pd
 from epf.attribution import stored
 from epf.attribution.stored import PRICE_UNITS
 from epf.calendar import HOUR_COLUMNS
-from epf.figure import (FOLLOWED, INK, LINES, MAGNITUDE, MUTED_INK, SURFACE,
-                        colorbar, plt, save, style)
+from epf.figure import (FOLLOWED, INK, MAGNITUDE, MUTED_INK, SURFACE, colorbar,
+                        colours, plt, save, style)
 
 # Per sota d'aquests mesos la figura del temps agrupa per setmana: amb un sol mes la
 # línia té un punt i no es dibuixa res.
@@ -136,7 +136,7 @@ def importance_over_time(folder, label, stem, columns, values, days, scale, unit
     by_month = when.to_period("M").nunique() >= MONTHS_FOR_MONTHLY
     groups = when.to_period("M" if by_month else "W")
     figure, axis = plt.subplots(figsize=(14, 4.5), facecolor=SURFACE)
-    for position, colour in zip(order, LINES):
+    for colour, position in colours(order):
         series = pd.Series(averaged[:, position], index=groups).groupby(level=0).mean()
         axis.plot(series.index.to_timestamp(), series.to_numpy(), color=colour,
                   label=columns[position])

@@ -20,6 +20,8 @@ from epf.models.mlp.mlp_hyperparameters import (ALPHA, HIDDEN, LEARNING_RATE,
                                                 VALIDATION_FRACTION, WINDOW)
 from epf.parameters import SEED
 
+NAME = "mlp"
+
 
 def fit(X, y, day, window=WINDOW, hidden=HIDDEN, members=MEMBERS, seed=SEED,
         alpha=ALPHA, learning_rate=LEARNING_RATE,
@@ -46,8 +48,8 @@ def fit(X, y, day, window=WINDOW, hidden=HIDDEN, members=MEMBERS, seed=SEED,
 
 
 def predict(model, X, day):
-    """Els 24 preus de `day`, la mitjana de les xarxes del model."""
+    """Els 24 preus de `day`, la mitjana de les xarxes del model, per nom."""
     networks, inputs, outputs = model
     row = inputs.transform(X.loc[[day]])
-    return np.mean([outputs.inverse_transform(network.predict(row))[0]
-                    for network in networks], axis=0)
+    return {NAME: np.mean([outputs.inverse_transform(network.predict(row))[0]
+                           for network in networks], axis=0)}

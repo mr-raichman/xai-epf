@@ -14,6 +14,11 @@ from epf.models.boosting.boosting_hyperparameters import LEAVES, RATE, TREES, WI
 from epf.parameters import SEED
 from epf.attribution.stored import ONE, PRICE_UNITS, Attribution
 
+# Nom de la família i del seu únic pronòstic. El mòdul es diu `boosting` perquè és la
+# tècnica; la família es diu per la implementació, que és el que es compara.
+NAME = "lightgbm"
+
+
 def lightgbm(trees=TREES, rate=RATE, leaves=LEAVES, seed=SEED):
     """Un regressor de LightGBM sense ajustar, i repetible.
 
@@ -41,8 +46,8 @@ def fit(X, y, day, make=lightgbm, window=WINDOW):
 
 
 def predict(model, X, day):
-    """Els 24 preus de `day`, en ordre d'hora."""
-    return model.predict(X.loc[[day]])
+    """Els 24 preus de `day`, en ordre d'hora, per nom de pronòstic."""
+    return {NAME: model.predict(X.loc[[day]])}
 
 
 def attribute(model, X, day):

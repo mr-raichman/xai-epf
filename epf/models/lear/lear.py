@@ -20,8 +20,27 @@ from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK, calibration
 from epf.attribution.stored import Attribution
 
-# Nom de la finestra que agafa tot l'historial, per a l'atribució desada.
+# Nom de la finestra que agafa tot l'historial.
 WHOLE_HISTORY = "all"
+
+# Nom del conjunt, que és la mitjana de les seves finestres, i nom de cada finestra.
+# Cada finestra és un pronòstic amb el seu CSV i les seves mètriques, perquè el que
+# una combinació compta són models ajustats: la mitjana no és un model, és una mitjana.
+NAME = "lear"
+
+
+def window_name(window):
+    """Nom del pronòstic d'una finestra: `lear_49`, i `lear_all` per tot l'historial.
+
+    Dins de l'atribució de la família els membres es diuen només per la finestra,
+    `49` i `all`, perquè ja són dins d'`attribution_lear.npz` i el prefix hi seria
+    dues vegades.
+    """
+    return f"{NAME}_{window if window else WHOLE_HISTORY}"
+
+
+def window_names(windows=WINDOWS):
+    return tuple(window_name(window) for window in windows)
 
 # El que queda ajustat d'una finestra, i tot el que la predicció i les contribucions
 # necessiten. Els 24 LASSO hi són tal com es van ajustar i no com a matrius de
@@ -169,9 +188,15 @@ def fit(X, y, day, windows=WINDOWS, max_iter=MAX_ITER):
 
 
 def predict(model, X, day):
-    """La predicció del conjunt: la mitjana aritmètica de les seves finestres."""
-    return np.mean([_window_prices(fitted, _rows_of(fitted, X, day))
-                    for fitted in model], axis=0)
+    """Cada finestra i la mitjana aritmètica de totes, per nom.
+
+    La mitjana és el que l'article anomena LEAR i és la que es compara amb els altres
+    models; les finestres hi són perquè cada una és un model ajustat, i és això el que
+    entra a la combinació d'una execució.
+    """
+    prices = {window_name(fitted.window): _window_prices(fitted, _rows_of(fitted, X, day))
+              for fitted in model}
+    return {NAME: np.mean(list(prices.values()), axis=0), **prices}
 
 
 def attribute(model, X, day):
