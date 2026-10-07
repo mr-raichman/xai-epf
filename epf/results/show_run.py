@@ -9,7 +9,7 @@ import pathlib
 
 import pandas as pd
 
-from epf.results import run as run_files
+from epf.results import run_files
 
 
 def main():

@@ -23,8 +23,6 @@ import sys
 import time
 import traceback
 
-import pandas as pd
-
 from epf import matrix, parameters, paths
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
@@ -34,8 +32,8 @@ from epf.models.boosting import boosting
 from epf.models.lear import lear
 from epf.models.mlp import mlp
 from epf.models.naive import naive
-from epf.results import figures
-from epf.results import run as run_files
+from epf.results import figures, run_files
+from epf.results.combination import add_combination, comparison
 
 DAILY, HOURLY = "daily", "hourly"
 
@@ -45,9 +43,6 @@ MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 # `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
 # que ja es coneixia, i per això no entren a la combinació.
 Family = collections.namedtuple("Family", "matrix forecasts fits")
-
-# Nom de la mitjana de tots els membres ajustats d'una configuració.
-COMBINATION = "combination"
 
 # Els tres pronòstics ingenus són una sola família de la graella i van junts en un
 # sol directori.
@@ -122,97 +117,6 @@ def run(family, matrices, tier, report):
         if kept:
             attributions[name] = kept
     return forecasts, attributions
-
-
-def members(folder):
-    """Els pronòstics ajustats que hi ha desats en una família.
-
-    Les finestres d'un conjunt com LEAR compten una cada una, perquè el que
-    l'article compta per decidir la mida d'una combinació són models ajustats i no
-    famílies; les famílies d'un sol model aporten el seu CSV. Surten del `.npz`
-    quan n'hi ha, que és on es desen, i del CSV quan no.
-    """
-    forecasts = run_files.load_forecasts(folder)
-    found = []
-    for name, frame in sorted(forecasts.items()):
-        if not attribution.path(folder, name).exists():
-            found.append(frame)
-            continue
-        days, stored = attribution.load(folder, name)
-        if stored.forecasts is None:
-            found.append(frame)
-            continue
-        index = pd.DatetimeIndex(pd.to_datetime(days), name=frame.index.name)
-        found += [pd.DataFrame(stored.forecasts[:, number], index=index,
-                               columns=frame.columns)
-                  for number in range(len(stored.members))]
-    return found
-
-
-def combined(folders):
-    """La mitjana aritmètica de tots els membres ajustats d'una configuració.
-
-    Mitjana simple, que és el que fa l'article, i sobre els dies que tots
-    comparteixen. Amb menys de dos membres no hi ha res a combinar.
-    """
-    found = [frame for folder in folders for frame in members(folder)]
-    if len(found) < 2:
-        return None, found
-    days = found[0].index
-    for frame in found[1:]:
-        days = days.intersection(frame.index)
-    if days.empty:
-        raise ValueError("els membres de la combinació no comparteixen cap dia")
-    return sum(frame.loc[days] for frame in found) / len(found), found
-
-
-def _fitted(folders):
-    """Les famílies que ajusten un model, segons el que digui el seu registre.
-
-    Un registre d'abans que existís `fits` no ho diu, i aleshores no se'n combina
-    cap: amb una barreja de registres la combinació sortiria d'un subconjunt i no
-    ho diria enlloc.
-    """
-    records = [run_files.load_record(folder) for folder in folders]
-    if any("fits" not in record for record in records):
-        return []
-    return [folder for folder, record in zip(folders, records) if record["fits"]]
-
-
-def add_combination(folders, actual):
-    """Escriu les mètriques de la combinació a `metrics.csv` de cada família.
-
-    Segona passada, en acabar la configuració: la combinació necessita totes les
-    famílies i la primera ja tenia el seu fitxer escrit quan la segona començava.
-    El preu que es paga és que el `metrics.csv` d'una família depèn de les seves
-    germanes i ja no s'escriu un sol cop.
-    """
-    frame, found = combined(_fitted(folders))
-    if frame is None:
-        return 0
-    rows = metrics({COMBINATION: frame}, actual, naive.weekly_frame(actual))
-    for folder in folders:
-        existing = run_files.load_metrics(folder)
-        run_files.save_metrics(folder, pd.concat(
-            [existing[existing["forecast"] != COMBINATION], rows], ignore_index=True))
-    return len(found)
-
-
-def drawn(families):
-    """«1 família» o «n famílies», perquè el que imprimeix un script és català."""
-    return "1 família" if families == 1 else f"{families} famílies"
-
-
-def comparison(folders, actual):
-    """Els pronòstics que es comparen en una configuració: els de totes les
-    famílies i, si n'hi ha, la combinació."""
-    forecasts = {}
-    for folder in folders:
-        forecasts.update(run_files.load_forecasts(folder))
-    frame, _ = combined(_fitted(folders))
-    if frame is not None:
-        forecasts[COMBINATION] = frame
-    return forecasts
 
 
 def _git(*arguments):
@@ -395,7 +299,7 @@ def main():
     if done:
         counted = add_combination(done, actual)
         figures.shared(where, comparison(done, actual), actual)
-        print(f"figures de {drawn(len(done))} a {where}"
+        print(f"figures de {run_files.drawn(len(done))} a {where}"
               + (f", i la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"), flush=True)
 

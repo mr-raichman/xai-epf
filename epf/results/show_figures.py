@@ -7,10 +7,9 @@ ser de la mateixa execució, i les figures van a la que les conté.
 import argparse
 import pathlib
 
-from epf import matrix, runner
+from epf import matrix
 from epf.data import price
-from epf.results import figures
-from epf.results import run as run_files
+from epf.results import combination, figures, run_files
 
 
 def main():
@@ -26,5 +25,5 @@ def main():
 
     actual = matrix.price_only(price.load()).actual
     into = parents.pop()
-    figures.shared(into, runner.comparison(folders, actual), actual)
+    figures.shared(into, combination.comparison(folders, actual), actual)
     print(f"comparació de {len(folders)} famílies desada a {into}")

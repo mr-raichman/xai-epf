@@ -8,7 +8,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from epf.results import run as run_files
+from epf.results import run_files
 from epf.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae_per_hour, rmae_per_hour)

@@ -97,6 +97,11 @@ def summary(table):
     return wide[order].to_string(float_format=lambda value: f"{value:9.3f}")
 
 
+def drawn(families):
+    """«1 família» o «n famílies», perquè el que imprimeix un script és català."""
+    return "1 família" if families == 1 else f"{families} famílies"
+
+
 def save_record(folder, record):
     (folder / RECORD).write_text(json.dumps(record, indent=2) + "\n")
 

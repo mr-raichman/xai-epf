@@ -7,12 +7,11 @@ nova o canviar una figura no ha de costar cap camí endavant.
 import argparse
 import pathlib
 
-from epf import matrix, runner
+from epf import matrix
 from epf.data import price
 from epf.evaluation import metrics
 from epf.models.naive import naive
-from epf.results import figures
-from epf.results import run as run_files
+from epf.results import combination, figures, run_files
 
 
 def rebuild(folder, actual):
@@ -38,9 +37,9 @@ def main():
     # tocada, amb totes les famílies que hi hagi al disc.
     for where in sorted({folder.resolve().parent for folder in folders}):
         family_folders = run_files.family_folders([where])
-        counted = runner.add_combination(family_folders, actual)
-        figures.shared(where, runner.comparison(family_folders, actual), actual)
-        print(f"refetes les figures de {runner.drawn(len(family_folders))} a {where}"
+        counted = combination.add_combination(family_folders, actual)
+        figures.shared(where, combination.comparison(family_folders, actual), actual)
+        print(f"refetes les figures de {run_files.drawn(len(family_folders))} a {where}"
               + (f", i la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"))
 

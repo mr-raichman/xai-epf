@@ -4,9 +4,9 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from epf.results import run as run_files
+from epf.results import run_files
 from epf.calendar import HOUR_COLUMNS
-from epf.runner import combined, members
+from epf.results.combination import combined, members
 from epf.models.attribution import ONE, PRICE_UNITS, Attribution, save
 
 
