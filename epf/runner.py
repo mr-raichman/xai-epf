@@ -25,11 +25,12 @@ from epf import matrix, parameters, paths
 from epf.attribution import fitted
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
-from epf.evaluation import metrics, walk_forward
+from epf.evaluation import metrics
 from epf.models.families import families, hyperparameters, matrices
 from epf.models.naive import naive
 from epf.results import figures, run_files
 from epf.results.combination import add_combination, comparison
+from epf.walk import forward
 
 # Els dos nivells, que `parameters.py` anomena i als quals fixa el període.
 MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
@@ -56,8 +57,8 @@ def run(family, name, tables, tier, store, report):
         return family.predict(model, X, when)
 
     first, last, every = parameters.PERIODS[tier]
-    return walk_forward(predict, X, y, first, last, every=every,
-                        on_day=functools.partial(report, name))
+    return forward(predict, X, y, first, last, every=every,
+                   on_day=functools.partial(report, name))
 
 
 def _git(*arguments):
