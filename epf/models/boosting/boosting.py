@@ -40,23 +40,21 @@ def fit(X, y, day, make=lightgbm, window=WINDOW):
     return make().fit(features, target)
 
 
-def forecast(X, y, day, make=lightgbm, window=WINDOW):
+def predict(model, X, day):
     """Els 24 preus de `day`, en ordre d'hora."""
-    return fit(X, y, day, make, window).predict(X.loc[[day]])
+    return model.predict(X.loc[[day]])
 
 
-def explain(X, y, day, make=lightgbm, window=WINDOW):
-    """Els 24 preus de `day` i l'atribució del mateix model que els ha predit.
+def attribute(model, X, day):
+    """L'atribució de les 24 hores de `day`, del model que les ha predit.
 
     TreeSHAP torna (hores, columnes) per a les 24 files del dia; es desa transposat,
     com la resta, en (columna, hora).
     """
-    fitted = fit(X, y, day, make, window)
     rows = X.loc[[day]]
-    explainer = shap.TreeExplainer(fitted)
+    explainer = shap.TreeExplainer(model)
     values = explainer.shap_values(rows)
     # Un sol model per a les 24 hores, de manera que la base és la mateixa a totes.
     base = np.full((1, len(rows)), float(np.ravel(explainer.expected_value)[0]))
-    return (fitted.predict(rows),
-            Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None,
-                        PRICE_UNITS))
+    return Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None,
+                       PRICE_UNITS)

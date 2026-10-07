@@ -40,46 +40,38 @@ DAILY, HOURLY = "daily", "hourly"
 # Els dos nivells, que `parameters.py` anomena i als quals fixa el període.
 MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
+# Les tres funcions d'un pronòstic, cada una amb una feina. `attribute` és `None` on
+# no hi ha cap mètode: les prediccions ingènues perquè la seva atribució seria la
+# columna que copien, i l'MLP perquè TreeSHAP no s'hi aplica i cap mètode exacte és
+# assumible dia a dia; si mai és la família que s'interpreta, la importància per
+# permutació, que no mira dins del model, hi arriba sense desar res a cada execució.
+Forecast = collections.namedtuple("Forecast", "fit predict attribute")
+
 # `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
-# que ja es coneixia, i per això no entren a la combinació.
+# que ja es coneixia, i per això no entren a la combinació. No se'n deriva de `fit`,
+# que hi és a totes, ni d'`attribute`, que l'MLP no té tot i ajustar.
 Family = collections.namedtuple("Family", "matrix forecasts fits")
-
-# Els tres pronòstics ingenus són una sola família de la graella i van junts en un
-# sol directori.
-NAIVE = {"previous_day": naive.previous_day,
-         "previous_week": naive.previous_week,
-         "similar_day": naive.similar_day}
-
-
-def _unattributed(forecast):
-    """Adapta un pronòstic que no desa atribució a la forma que espera el camí
-    endavant.
-
-    Les prediccions ingènues no n'hi desen perquè la predicció és una columna
-    copiada i la seva atribució seria aquella mateixa columna. L'MLP no n'hi desa
-    perquè TreeSHAP no s'hi aplica i cap mètode exacte és assumible dia a dia; si
-    mai és la família que s'interpreta, la importància per permutació, que no mira
-    dins del model, hi arriba sense desar res a cada execució."""
-    def day(X, y, when):
-        return forecast(X, y, when), None
-    return day
 
 
 def families():
-    """Cada família: quina matriu fa servir i, per pronòstic, què fa amb un dia.
+    """Cada família: quina matriu fa servir i, per pronòstic, les seves tres funcions.
 
     Cada model porta els seus números al seu propi
     `models/<nom>/<nom>_hyperparameters.py` i els pren per defecte, de manera que
     aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
-
-    La funció d'un dia torna els 24 preus i l'atribució del model que els ha predit.
     """
     return {
-        "naive": Family(DAILY, {name: _unattributed(forecast)
-                                for name, forecast in NAIVE.items()}, fits=False),
-        "lear": Family(DAILY, {"lear": lear.explain}, fits=True),
-        "lightgbm": Family(HOURLY, {"lightgbm": boosting.explain}, fits=True),
-        "mlp": Family(DAILY, {"mlp": _unattributed(mlp.forecast)}, fits=True),
+        "naive": Family(DAILY, {
+            "previous_day": Forecast(naive.fit, naive.previous_day, None),
+            "previous_week": Forecast(naive.fit, naive.previous_week, None),
+            "similar_day": Forecast(naive.fit, naive.similar_day, None),
+        }, fits=False),
+        "lear": Family(DAILY, {
+            "lear": Forecast(lear.fit, lear.predict, lear.attribute)}, fits=True),
+        "lightgbm": Family(HOURLY, {
+            "lightgbm": Forecast(boosting.fit, boosting.predict, boosting.attribute)},
+            fits=True),
+        "mlp": Family(DAILY, {"mlp": Forecast(mlp.fit, mlp.predict, None)}, fits=True),
     }
 
 
@@ -103,13 +95,14 @@ def run(family, matrices, tier, report):
     for name, of_day in family.forecasts.items():
         kept = []
 
-        # El camí endavant torna un valor per dia, i l'atribució surt del mateix
-        # ajust que la predicció, així que es recull aquí al costat.
+        # Un ajust per dia, i tant la predicció com l'atribució surten d'aquell ajust
+        # i no d'un de nou. És el que fa que l'explicació sigui de la predicció que
+        # va al CSV al seu costat.
         def predict(X, y, when):
-            prices, found = of_day(X, y, when)
-            if found is not None:
-                kept.append(found)
-            return prices
+            model = of_day.fit(X, y, when)
+            if of_day.attribute is not None:
+                kept.append(of_day.attribute(model, X, when))
+            return of_day.predict(model, X, when)
 
         first, last, every = parameters.PERIODS[tier]
         forecasts[name] = walk_forward(predict, X, y, first, last, every=every,

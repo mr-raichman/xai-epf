@@ -45,10 +45,9 @@ def fit(X, y, day, window=WINDOW, hidden=HIDDEN, members=MEMBERS, seed=SEED,
     return networks, inputs, outputs
 
 
-def forecast(X, y, day, **parameters):
-    """Els 24 preus de `day`, la mitjana de les xarxes ajustades només amb dies
-    anteriors."""
-    networks, inputs, outputs = fit(X, y, day, **parameters)
+def predict(model, X, day):
+    """Els 24 preus de `day`, la mitjana de les xarxes del model."""
+    networks, inputs, outputs = model
     row = inputs.transform(X.loc[[day]])
     return np.mean([outputs.inverse_transform(network.predict(row))[0]
                     for network in networks], axis=0)

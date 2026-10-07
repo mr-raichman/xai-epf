@@ -9,8 +9,8 @@ from epf.models.lear.lear_hyperparameters import EIGHT_WEEKS, TWELVE_WEEKS
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
-from epf.models.lear.lear import (DESIGN_COLUMNS, Scaler, design_columns, explain,
-                             forecast, lags_of, week_dummies)
+from epf.models.lear.lear import (DESIGN_COLUMNS, Scaler, attribute, design_columns,
+                                  fit, lags_of, predict, week_dummies)
 
 # Prou iteracions perquè els ajusts d'aquestes proves convergeixin; el valor que
 # fan servir les execucions és a la configuració.
@@ -19,6 +19,19 @@ MAX_ITER = 10000
 # Preus sintètics amb un patró setmanal exacte: cada dia de la setmana té sempre la
 # mateixa corba. Qualsevol model alineat l'ha de reproduir.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
+
+
+def forecast(X, y, day, window, max_iter):
+    """El que fa el camí endavant amb una sola finestra: un ajust i la seva predicció.
+
+    Amb una finestra la mitjana del conjunt és aquella finestra.
+    """
+    return predict(fit(X, y, day, windows=(window,), max_iter=max_iter), X, day)
+
+
+def explained(X, y, day, windows, max_iter):
+    """L'atribució del mateix ajust que hauria predit el dia."""
+    return attribute(fit(X, y, day, windows=windows, max_iter=max_iter), X, day)
 
 
 def weekly_prices(days, start=datetime.date(2014, 1, 1)):
@@ -99,7 +112,7 @@ def test_each_short_window_takes_the_lags_that_fit():
 
 def test_a_short_window_leaves_the_lags_it_cannot_carry_at_zero():
     X, y = build(noisy_prices(200), LAGS)
-    _, attribution = explain(X, y, X.index[-1], windows=(EIGHT_WEEKS,), max_iter=MAX_ITER)
+    attribution = explained(X, y, X.index[-1], windows=(EIGHT_WEEKS,), max_iter=MAX_ITER)
     carried = set(design_columns(lags_of(EIGHT_WEEKS)))
     absent = [number for number, name in enumerate(DESIGN_COLUMNS) if name not in carried]
     assert np.count_nonzero(attribution.values[0][absent]) == 0
@@ -111,10 +124,10 @@ def test_moving_a_column_of_the_predicted_day_moves_only_its_own_contribution():
     # de la finestra, i la finestra no conté el dia que es prediu.
     X, y = build(noisy_prices(400), LAGS)
     day = X.index[-1]
-    _, before = explain(X, y, day, windows=(200,), max_iter=MAX_ITER)
+    before = explained(X, y, day, windows=(200,), max_iter=MAX_ITER)
     shifted = X.copy()
     shifted.loc[day, "lag1_h05"] += 5.0
-    _, after = explain(shifted, y, day, windows=(200,), max_iter=MAX_ITER)
+    after = explained(shifted, y, day, windows=(200,), max_iter=MAX_ITER)
 
     moved = after.values[0] - before.values[0]
     row = DESIGN_COLUMNS.index("lag1_h05")

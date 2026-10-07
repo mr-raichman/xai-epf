@@ -12,9 +12,9 @@ def test_each_one_copies_its_own_lag():
     price = frame_of(range(30))
     X, y = build(price, LAGS)
     day = X.index[10]
-    assert np.array_equal(previous_day(X, y, day),
+    assert np.array_equal(previous_day(None, X, day),
                           price.loc[day - pd.Timedelta(days=1)].to_numpy())
-    assert np.array_equal(previous_week(X, y, day),
+    assert np.array_equal(previous_week(None, X, day),
                           price.loc[day - pd.Timedelta(days=7)].to_numpy())
 
 
@@ -23,7 +23,7 @@ def test_the_similar_day_takes_yesterday_only_from_tuesday_to_friday():
     X, y = build(price, LAGS)
     for day in X.index[:7]:
         expected = 1 if day.dayofweek in (1, 2, 3, 4) else 7
-        assert np.array_equal(similar_day(X, y, day),
+        assert np.array_equal(similar_day(None, X, day),
                               price.loc[day - pd.Timedelta(days=expected)].to_numpy())
 
 
@@ -32,4 +32,4 @@ def test_the_weekend_and_monday_reach_a_week_back():
     X, y = build(price, LAGS)
     weekend = [day for day in X.index if day.dayofweek in (5, 6, 0)]
     for day in weekend:
-        assert np.array_equal(similar_day(X, y, day), previous_week(X, y, day))
+        assert np.array_equal(similar_day(None, X, day), previous_week(None, X, day))

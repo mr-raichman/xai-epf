@@ -1,7 +1,9 @@
 """Prediccions ingènues de Lago et al. (2021), el terra que hi ha sota la referència.
 
 No s'ajusta res: cada una copia una hora que ja es coneixia. Totes tres tenen la
-signatura que espera el camí endavant, i per això reben `y` sense mirar-lo.
+forma que espera el camí endavant, `fit` i després `predict`, i per això `fit` torna
+`None` i les prediccions reben un model que no miren. Així el camí endavant no porta
+cap branca que digui quines famílies ajusten alguna cosa.
 """
 from epf.calendar import HOUR_COLUMNS
 
@@ -13,21 +15,26 @@ PREVIOUS_WEEK = 7
 WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
 
 
+def fit(X, y, day):
+    """No hi ha res a ajustar: una predicció ingènua copia una columna que ja hi era."""
+    return None
+
+
 def _lag(X, day, lag):
     return X.loc[day, [f"lag{lag}_{hour}" for hour in HOUR_COLUMNS]].to_numpy(dtype=float)
 
 
-def previous_day(X, y, day):
+def previous_day(model, X, day):
     """La mateixa hora del dia anterior."""
     return _lag(X, day, PREVIOUS_DAY)
 
 
-def previous_week(X, y, day):
+def previous_week(model, X, day):
     """La mateixa hora de fa una setmana."""
     return _lag(X, day, PREVIOUS_WEEK)
 
 
-def similar_day(X, y, day):
+def similar_day(model, X, day):
     """El dia anterior de dimarts a divendres, i la setmana anterior la resta."""
     lag = PREVIOUS_DAY if day.dayofweek in WEEKDAYS_FROM_YESTERDAY else PREVIOUS_WEEK
     return _lag(X, day, lag)
