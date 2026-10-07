@@ -8,7 +8,7 @@ i no amb el que l'escriu.
 import pandas as pd
 
 from epf.evaluation import metrics
-from epf.models import attribution
+from epf.attribution import stored
 from epf.models.naive import naive
 from epf.results import run_files
 
@@ -27,17 +27,17 @@ def members(folder):
     forecasts = run_files.load_forecasts(folder)
     found = []
     for name, frame in sorted(forecasts.items()):
-        if not attribution.path(folder, name).exists():
+        if not stored.path(folder, name).exists():
             found.append(frame)
             continue
-        days, stored = attribution.load(folder, name)
-        if stored.forecasts is None:
+        days, attribution = stored.load(folder, name)
+        if attribution.forecasts is None:
             found.append(frame)
             continue
         index = pd.DatetimeIndex(pd.to_datetime(days), name=frame.index.name)
-        found += [pd.DataFrame(stored.forecasts[:, number], index=index,
+        found += [pd.DataFrame(attribution.forecasts[:, number], index=index,
                                columns=frame.columns)
-                  for number in range(len(stored.members))]
+                  for number in range(len(attribution.members))]
     return found
 
 

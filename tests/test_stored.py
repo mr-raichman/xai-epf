@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.models.attribution import (ONE, PRICE_UNITS, Attribution,
+from epf.attribution.stored import (ONE, PRICE_UNITS, Attribution,
                                     refuse_inconsistent, save)
 
 DAYS = 3

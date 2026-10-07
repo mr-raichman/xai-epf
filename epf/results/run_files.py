@@ -6,7 +6,7 @@ sencera: totes les famílies d'una configuració, de cop. El període és dins d
 
 Tot el que hi ha aquí es deriva de les prediccions i del preu, de manera que es pot
 tornar a calcular sense tornar a ajustar res. L'atribució no: aquella surt del model
-que va predir el dia i la desa `models/attribution.py`.
+que va predir el dia i la desa `attribution/stored.py`.
 """
 import json
 

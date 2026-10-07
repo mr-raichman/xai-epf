@@ -13,10 +13,8 @@ El directori es diu pel commit, que és el que fixa tots els números de dins, a
 que una mesura no arrenca amb l'arbre brut: el nom mentiria.
 """
 import argparse
-import collections
 import datetime
 import functools
-import importlib
 import shutil
 import subprocess
 import sys
@@ -24,92 +22,42 @@ import time
 import traceback
 
 from epf import matrix, parameters, paths
+from epf.attribution import fitted, stored
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
 from epf.evaluation import metrics, walk_forward
-from epf.models import attribution
-from epf.models.boosting import boosting
-from epf.models.lear import lear
-from epf.models.mlp import mlp
+from epf.models.families import DAILY, HOURLY, families, hyperparameters
 from epf.models.naive import naive
 from epf.results import figures, run_files
 from epf.results.combination import add_combination, comparison
 
-DAILY, HOURLY = "daily", "hourly"
-
 # Els dos nivells, que `parameters.py` anomena i als quals fixa el període.
 MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
-# Les tres funcions d'un pronòstic, cada una amb una feina. `attribute` és `None` on
-# no hi ha cap mètode: les prediccions ingènues perquè la seva atribució seria la
-# columna que copien, i l'MLP perquè TreeSHAP no s'hi aplica i cap mètode exacte és
-# assumible dia a dia; si mai és la família que s'interpreta, la importància per
-# permutació, que no mira dins del model, hi arriba sense desar res a cada execució.
-Forecast = collections.namedtuple("Forecast", "fit predict attribute")
 
-# `fits` diu si la família ajusta un model. Les ingènues no: copien una columna
-# que ja es coneixia, i per això no entren a la combinació. No se'n deriva de `fit`,
-# que hi és a totes, ni d'`attribute`, que l'MLP no té tot i ajustar.
-Family = collections.namedtuple("Family", "matrix forecasts fits")
+def run(family, name, matrices, tier, store, report):
+    """Camí endavant d'un pronòstic: les seves prediccions i l'atribució del seu ajust.
 
-
-def families():
-    """Cada família: quina matriu fa servir i, per pronòstic, les seves tres funcions.
-
-    Cada model porta els seus números al seu propi
-    `models/<nom>/<nom>_hyperparameters.py` i els pren per defecte, de manera que
-    aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
+    L'ajust de cada dia es desa a `store` abans de predir-hi, de manera que el que
+    queda al disc és el model que ha fet la predicció i no un de nou. Només es desa si
+    el pronòstic té manera d'atribuir-se: un ajust que ningú no explicarà és disc per
+    res.
     """
-    return {
-        "naive": Family(DAILY, {
-            "previous_day": Forecast(naive.fit, naive.previous_day, None),
-            "previous_week": Forecast(naive.fit, naive.previous_week, None),
-            "similar_day": Forecast(naive.fit, naive.similar_day, None),
-        }, fits=False),
-        "lear": Family(DAILY, {
-            "lear": Forecast(lear.fit, lear.predict, lear.attribute)}, fits=True),
-        "lightgbm": Family(HOURLY, {
-            "lightgbm": Forecast(boosting.fit, boosting.predict, boosting.attribute)},
-            fits=True),
-        "mlp": Family(DAILY, {"mlp": Forecast(mlp.fit, mlp.predict, None)}, fits=True),
-    }
-
-
-def hyperparameters(family):
-    """Els números del model d'una família, llegits del seu propi fitxer.
-
-    Tot el que hi és en majúscules, que és la forma que tenen; així `run.json` els
-    recull sense que ningú n'hagi de mantenir una llista.
-    """
-    try:
-        module = importlib.import_module(f"epf.models.{family}.{family}_hyperparameters")
-    except ModuleNotFoundError:
-        return {}
-    return {name: getattr(module, name) for name in dir(module) if name.isupper()}
-
-
-def run(family, matrices, tier, report):
-    """Camí endavant d'una família: els seus pronòstics i la seva atribució."""
     X, y = matrices[family.matrix]
-    forecasts, attributions = {}, {}
-    for name, of_day in family.forecasts.items():
-        kept = []
+    of_day = family.forecasts[name]
+    kept = []
 
-        # Un ajust per dia, i tant la predicció com l'atribució surten d'aquell ajust
-        # i no d'un de nou. És el que fa que l'explicació sigui de la predicció que
-        # va al CSV al seu costat.
-        def predict(X, y, when):
-            model = of_day.fit(X, y, when)
-            if of_day.attribute is not None:
-                kept.append(of_day.attribute(model, X, when))
-            return of_day.predict(model, X, when)
+    def predict(X, y, when):
+        model = of_day.fit(X, y, when)
+        if of_day.attribute is not None:
+            fitted.save(store, when, model)
+            kept.append(of_day.attribute(model, X, when))
+        return of_day.predict(model, X, when)
 
-        first, last, every = parameters.PERIODS[tier]
-        forecasts[name] = walk_forward(predict, X, y, first, last, every=every,
-                                       on_day=functools.partial(report, name))
-        if kept:
-            attributions[name] = kept
-    return forecasts, attributions
+    first, last, every = parameters.PERIODS[tier]
+    predicted = walk_forward(predict, X, y, first, last, every=every,
+                             on_day=functools.partial(report, name))
+    return predicted, kept
 
 
 def _git(*arguments):
@@ -202,8 +150,8 @@ def write(folder, forecasts, attributions, actual, record):
     run_files.save_forecasts(folder, forecasts)
     run_files.save_metrics(folder, table)
     for name, kept in attributions.items():
-        attribution.save(folder, name, forecasts[name].index, kept)
-        worst = attribution.refuse_inconsistent(folder, name, forecasts[name])
+        stored.save(folder, name, forecasts[name].index, kept)
+        worst = stored.refuse_inconsistent(folder, name, forecasts[name])
         if worst is not None:
             print(f"  atribució de {name}: additivitat a {worst:.1e} EUR/MWh",
                   flush=True)
@@ -266,7 +214,26 @@ def main():
         clock = time.perf_counter()
         started.clear()
         try:
-            forecasts, attributions = run(table[family], matrices, args.tier, report)
+            # Un sol directori d'ajustos per família, substituït sencer: el que hi
+            # queda és sempre de l'última execució d'aquest nivell i etapa. Només el
+            # tenen les famílies que s'atribueixen; les altres no desen cap ajust i no
+            # han de deixar un directori buit amb una marca.
+            explains = any(of_day.attribute is not None
+                           for of_day in table[family].forecasts.values())
+            store = fitted.folder(args.tier, parameters.PRICE_ONLY, family)
+            if explains:
+                fitted.clear(store)
+            forecasts, attributions = {}, {}
+            for name in table[family].forecasts:
+                predicted, kept = run(table[family], name, matrices, args.tier,
+                                      store, report)
+                forecasts[name] = predicted
+                if kept:
+                    attributions[name] = kept
+            if explains:
+                fitted.save_stamp(store, fitted.describe(
+                    commit, args.tier, parameters.PRICE_ONLY, family,
+                    next(iter(forecasts.values())).index))
             walked = time.perf_counter() - clock
             folder = folders[family]
             measured = write(folder, forecasts, attributions, actual,
@@ -277,8 +244,11 @@ def main():
             traceback.print_exc()
             failed.append(family)
             # Res a mitges: si ha petat després de començar a escriure, el
-            # directori se'n va sencer.
+            # directori se'n va sencer, i amb ell els ajustos a mig desar. Sense la
+            # marca ja no es podrien llegir, però són desenes de MB de res.
             shutil.rmtree(folders[family], ignore_errors=True)
+            shutil.rmtree(fitted.folder(args.tier, parameters.PRICE_ONLY, family),
+                          ignore_errors=True)
             print(f"{family}: ha fallat, no se'n desa res", flush=True)
         else:
             print(f"{family}: {time.perf_counter() - clock:.0f} s en total, "

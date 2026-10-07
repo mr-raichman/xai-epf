@@ -12,8 +12,8 @@ from epf.results import run_files
 from epf.calendar import HOUR_COLUMNS
 from epf.evaluation import (curve_correlations, error_dispersion,
                             extrema_price_deviations, mae_per_hour, rmae_per_hour)
-from epf.models import attribution
-from epf.models.attribution import PRICE_UNITS
+from epf.attribution import stored
+from epf.attribution.stored import PRICE_UNITS
 from epf.models.naive import naive
 
 matplotlib.use("Agg")
@@ -396,20 +396,21 @@ def draw(folder, actual):
         error_covariance(folder, name, frame, actual)
 
     for name in forecasts:
-        if not attribution.path(folder, name).exists():
+        if not stored.path(folder, name).exists():
             continue
-        days, stored = attribution.load(folder, name)
-        columns, units = stored.columns, stored.units
-        for number, member in enumerate(stored.members):
+        days, attribution = stored.load(folder, name)
+        columns, units = attribution.columns, attribution.units
+        for number, member in enumerate(attribution.members):
             # Una família d'un sol model no té cap finestra de què parlar al títol.
-            several = len(stored.members) > 1
+            several = len(attribution.members) > 1
             label = f"{name}, finestra {member}" if several else name
             stem = f"shap_{name}_{member}" if several else f"shap_{name}"
-            importance = np.abs(stored.values[:, number]).mean(axis=0)
+            importance = np.abs(attribution.values[:, number]).mean(axis=0)
             scale = per_hour_scale(importance, units)
             importance_by_lag(folder, label, stem, columns, importance / scale, units)
             importance_by_column(folder, label, stem, columns, importance / scale, units)
             importance_totals(folder, label, stem, columns, importance, units)
-            importance_over_time(folder, label, stem, columns, stored.values[:, number],
+            importance_over_time(folder, label, stem, columns,
+                                 attribution.values[:, number],
                                  days, scale, units)
             importance_concentration(folder, label, stem, importance)

@@ -7,7 +7,7 @@ import pandas as pd
 from epf.results import run_files
 from epf.calendar import HOUR_COLUMNS
 from epf.results.combination import combined, members
-from epf.models.attribution import ONE, PRICE_UNITS, Attribution, save
+from epf.attribution.stored import ONE, PRICE_UNITS, Attribution, save
 
 
 def frame_of(days, value, start=datetime.date(2024, 1, 1)):

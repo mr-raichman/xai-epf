@@ -14,6 +14,7 @@ dependencies = [
     "lightgbm==4.7.0",
     "shap==0.52.0",
     "matplotlib==3.11.2",
+    "joblib==1.6.0",
 ]
 
 # Tot el que es tecleja a mà. El caminant no hi és: l'executa `epf-run`, que viu

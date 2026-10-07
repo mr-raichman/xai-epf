@@ -12,7 +12,7 @@ from lightgbm import LGBMRegressor
 from epf.matrix import calibration
 from epf.models.boosting.boosting_hyperparameters import LEAVES, RATE, TREES, WINDOW
 from epf.parameters import SEED
-from epf.models.attribution import ONE, PRICE_UNITS, Attribution
+from epf.attribution.stored import ONE, PRICE_UNITS, Attribution
 
 def lightgbm(trees=TREES, rate=RATE, leaves=LEAVES, seed=SEED):
     """Un regressor de LightGBM sense ajustar, i repetible.

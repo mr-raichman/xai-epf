@@ -18,7 +18,7 @@ from epf.parameters import DAYS_PER_WEEK, LAGS
 from epf.market import HOURS_PER_DAY
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK, calibration
-from epf.models.attribution import Attribution
+from epf.attribution.stored import Attribution
 
 # Nom de la finestra que agafa tot l'historial, per a l'atribució desada.
 WHOLE_HISTORY = "all"
