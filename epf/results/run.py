@@ -18,6 +18,14 @@ FORECASTS = "forecasts_{name}.csv"
 METRICS = "metrics.csv"
 RECORD = "run.json"
 
+# Com es tornen a llegir els CSV. El lector per defecte de pandas pot errar l'últim
+# bit d'un float, i amb això una reconstrucció donava mètriques que es movien a la
+# 16a xifra significativa; `add_combination` torna a escriure el `metrics.csv` de cada
+# família, de manera que fins i tot els números del camí endavant hi passaven un cop.
+# Amb això una reconstrucció reprodueix l'execució bit a bit i un diff entre les dues
+# vol dir alguna cosa.
+EXACT = "round_trip"
+
 
 def run_folder(tier, stage, commit):
     """On viu una execució sencera: hi pengen les famílies i les figures que les
@@ -57,7 +65,9 @@ def load_forecasts(folder):
     if not found:
         raise ValueError(f"cap fitxer de prediccions a {folder}")
     prefix = FORECASTS.format(name="")[:-len(".csv")]
-    return {path.stem.removeprefix(prefix): pd.read_csv(path, index_col=0, parse_dates=True)
+    return {path.stem.removeprefix(prefix): pd.read_csv(path, index_col=0,
+                                                       parse_dates=True,
+                                                       float_precision=EXACT)
             for path in found}
 
 
@@ -66,7 +76,7 @@ def save_metrics(folder, table):
 
 
 def load_metrics(folder):
-    return pd.read_csv(folder / METRICS)
+    return pd.read_csv(folder / METRICS, float_precision=EXACT)
 
 
 def summary(table):
