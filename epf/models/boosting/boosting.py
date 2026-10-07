@@ -15,9 +15,19 @@ from epf.parameters import SEED
 from epf.models.attribution import ONE, PRICE_UNITS, Attribution
 
 def lightgbm(trees=TREES, rate=RATE, leaves=LEAVES, seed=SEED):
-    """Un regressor de LightGBM sense ajustar."""
+    """Un regressor de LightGBM sense ajustar, i repetible.
+
+    `deterministic` amb `force_row_wise` perquè dos ajustos de la mateixa finestra
+    donin els mateixos arbres: sense això no els donen, i la predicció no ho
+    destapa perquè segueix un sol camí per arbre mentre SHAP recorre tots els camins
+    pesats per la cobertura. Mesurat el 2026-10-07 sobre la finestra de 1085 dies, tres
+    ajustos: 1,21 s cada un i models diferents sense les dues banderes, 1,88 s i
+    idèntics amb elles. No són números que es toquin per guanyar error, i per això no
+    viuen al fitxer d'hiperparàmetres.
+    """
     return LGBMRegressor(n_estimators=trees, learning_rate=rate, num_leaves=leaves,
-                         random_state=seed, n_jobs=-1, verbose=-1)
+                         random_state=seed, n_jobs=-1, verbose=-1,
+                         deterministic=True, force_row_wise=True)
 
 
 def fit(X, y, day, make=lightgbm, window=WINDOW):
