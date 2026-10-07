@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.data.handle_data import refuse_incoherent
+from epf.data.contract import refuse_incoherent
 
 DAYS = 10
 

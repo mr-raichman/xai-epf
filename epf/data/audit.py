@@ -1,114 +1,26 @@
-"""Tota comprovació de les dades, i l'única que n'hi ha.
+"""El que només es pot preguntar a OMIE i a ESIOS, passat a mà.
 
-Dos nivells, tots dos sencers i cap dels dos saltable, perquè una comprovació que
-es pot saltar no és una comprovació:
+El contracte de qualsevol conjunt viu a `contract.py` i el crida el carregador, de
+manera que un marc que arriba aquí ja l'ha passat. Això és l'altra meitat: les
+versions dels fitxers d'OMIE, el dia desacoblat, les hores que cada àncora publica i
+la cobertura de cada indicador, que són fets de la font i no del conjunt.
 
-`refuse_incoherent` és el contracte que qualsevol conjunt de dades ha de complir,
-i és el que una execució crida abans de començar. No sap de quina font ve res.
-
-`main` és la passada sencera, feta a mà, que hi afegeix el que només es pot
-preguntar a OMIE i a ESIOS: les versions dels fitxers, el dia desacoblat, les hores
-que cada àncora publica i la cobertura de cada indicador.
-
-`report` no comprova res, informa: imprimeix les puntuacions de veïnatge més altes
-amb la finestra de cada una. No hi ha cap llindar, i no n'hi pot haver: la
-puntuació és distància partit per MAD, i els seus extrems en aquesta sèrie són
-moviments ordinaris dins de finestres de preu gairebé pla, no moviments grans.
+Res d'aquí corre en una execució. Informa de tot el que troba en lloc de petar al
+primer error, que és el seu ofici, i acaba amb 1 si alguna comprovació ha fallat.
 """
 import collections
 import datetime
 import sys
 
-import numpy as np
 import pandas as pd
 
 from epf.calendar import local_hours
 from epf.data import esios, omie
-from epf.data.price import (ESIOS_FIRST_DAY, OMIE_FROM, SPAIN,
+from epf.data.outliers import report
+from epf.data.price import (ESIOS_FIRST_DAY, NAME, OMIE_FROM, SPAIN,
                             from_esios, load)
-from epf.data.outliers import hampel_score, window_median_mad
 from epf.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 
-# Veïns d'un preu: les hores adjacents de la sèrie cronològica, i la mateixa hora en
-# els dies del voltant.
-HOUR_HALF_WIDTH = 12
-DAY_HALF_WIDTH = 7
-
-# Quantes de les puntuacions més altes s'informen. És quantes files s'imprimeixen i
-# no un llindar: no decideix res sobre cap valor.
-HIGHEST = 100
-
-
-def refuse_incoherent(name, frame):
-    """El contracte de qualsevol conjunt de dades. Torna el marc perquè es compongui.
-
-    Cinc condicions, i cap d'elles és de cap font en concret: un dia repetit, un dia
-    fora d'ordre, un dia que falta al mig, una graella que no és d'un dia sencer o un
-    valor absent. Totes cinc produeixen un número plausible més endavant en lloc de
-    petar, que és per això que es comproven aquí i no es deixen al model.
-    """
-    def refuse(condition, detail):
-        if condition:
-            raise ValueError(f"el conjunt {name} no és coherent: {detail}")
-
-    refuse(not frame.index.is_unique,
-           f"{len(frame) - frame.index.nunique()} dies repetits a l'índex")
-    refuse(not frame.index.is_monotonic_increasing, "l'índex no està ordenat")
-    expected = pd.date_range(frame.index[0], frame.index[-1], freq="D")
-    missing = expected.difference(frame.index)
-    refuse(len(missing) > 0,
-           f"{len(missing)} dies buits entre {frame.index[0].date()} i "
-           f"{frame.index[-1].date()}, el primer {missing[0].date() if len(missing) else ''}")
-    refuse(frame.shape[1] != HOURS_PER_DAY,
-           f"{frame.shape[1]} columnes i no {HOURS_PER_DAY}")
-    absent = int(frame.isna().to_numpy().sum())
-    refuse(absent > 0, f"{absent} valors absents")
-    return frame
-
-
-def highest(scores):
-    """Posicions de les `HIGHEST` puntuacions més altes, sense comptar les NaN."""
-    flat = np.nan_to_num(scores.ravel(), nan=-np.inf)
-    return np.argsort(flat)[-HIGHEST:]
-
-
-def _describe(days, values, label, scores, median, mad):
-    """Resum de les puntuacions més altes: com és la finestra i on cauen."""
-    marks = highest(scores)
-    years = pd.Series(days.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
-    print(f"{label}, les {HIGHEST} puntuacions més altes:")
-    print(f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f}, "
-          f"màxim {mad[marks].max():.2f}")
-    print(f"  mediana de la finestra, mediana {np.median(median[marks]):.2f}")
-    print(f"  distància del valor a la mediana, mediana "
-          f"{np.median(np.abs(values - median)[marks]):.2f}")
-    print("  per any: " + ", ".join(f"{year} {count}" for year, count in years.items()))
-
-
-def report(name, frame):
-    """Imprimeix les puntuacions de veïnatge més altes i les torna, per si es dibuixen.
-
-    Les dues vistes: contra les hores adjacents de la sèrie cronològica, i contra la
-    mateixa hora dels dies del voltant.
-    """
-    values = frame.to_numpy().ravel()
-    by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
-    by_days = np.column_stack([hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                               for column in frame.columns])
-
-    hour_median, hour_mad = window_median_mad(values, HOUR_HALF_WIDTH)
-    day_parts = [window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                 for column in frame.columns]
-    print(f"veïnatge de {name}:")
-    _describe(frame.index, values, f"hores adjacents (±{HOUR_HALF_WIDTH} h)", by_hours,
-              hour_median, hour_mad)
-    _describe(frame.index, values, f"mateixa hora (±{DAY_HALF_WIDTH} dies)", by_days,
-              np.column_stack([part[0] for part in day_parts]).ravel(),
-              np.column_stack([part[1] for part in day_parts]).ravel())
-    return by_hours, by_days
-
-
-# ---------------------------------------------------- la passada sencera, a mà
 
 failures = []
 
@@ -223,14 +135,18 @@ def check_esios_series():
 
 
 def main():
-    price = check_price()
+    # El carregador refusa un conjunt que no compleixi el contracte, de manera que
+    # arribar aquí ja és haver-lo passat. S'enganxa perquè l'auditoria informa i no
+    # peta: sense això un conjunt trencat mataria la passada abans d'arribar a ESIOS.
     try:
-        refuse_incoherent("price", price)
-        check("el conjunt price compleix el contracte", True, f"{price.shape}")
+        price = check_price()
+        check(f"el conjunt {NAME} compleix el contracte", True, f"{price.shape}")
     except ValueError as error:
-        check("el conjunt price compleix el contracte", False, str(error))
-    print()
-    report("price", price)
+        check(f"el conjunt {NAME} compleix el contracte", False, str(error))
+        price = None
+    if price is not None:
+        print()
+        report(NAME, price)
     print()
     check_esios_series()
     if failures:

@@ -5,8 +5,8 @@ import pandas as pd
 
 from epf import paths
 from epf.data.price import load
-from epf.data.handle_data import (DAY_HALF_WIDTH, HIGHEST, HOUR_HALF_WIDTH, highest,
-                                 report)
+from epf.data.outliers import (DAY_HALF_WIDTH, HIGHEST, HOUR_HALF_WIDTH, highest,
+                               report)
 from epf.market import HOURS_PER_DAY
 from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
 

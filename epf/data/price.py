@@ -6,14 +6,22 @@ l'altre a partir. Les dues fonts viuen planes a `paths.PRICE` perquè són un so
 conjunt de dades, i els seus noms de fitxer no xoquen.
 
 Executar el mòdul fa existir el conjunt: el baixa sencer i diu què queda a disc.
-Comprovar-lo és d'una altra banda, `handle_data.py`, que és l'única que comprova.
+`load` passa el contracte de `contract.py` abans de tornar res, de manera que cap
+camí no se'l pot saltar. El que només es pot preguntar a les dues fonts és a
+`audit.py`.
 """
 import datetime
 
 import pandas as pd
 
 from epf.data import esios, omie
+from epf.data.contract import refuse_incoherent
 from epf.paths import PRICE
+
+# El nom del conjunt, que és el seu i no de ningú més: el porta el contracte quan
+# refusa. `parameters.PRICE_ONLY` s'escriu igual i és una altra cosa, el conjunt
+# d'informació d'una execució, que algun dia en tindrà un altre.
+NAME = "price"
 
 # Indicador del preu a ESIOS. No és a `esios.SERIES` i no es llegeix amb
 # `esios.load`: és l'única sèrie que porta diverses geografies que es trien en lloc
@@ -40,10 +48,13 @@ def from_esios(country, directory=PRICE):
 
 
 def load(directory=PRICE):
-    """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna."""
+    """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna.
+
+    Ha passat el contracte: qui carrega és qui comprova.
+    """
     early, _ = from_esios(SPAIN, directory)
     early = early[early.index < pd.Timestamp(OMIE_FROM)]
-    return pd.concat([early, omie.load(directory)])
+    return refuse_incoherent(NAME, pd.concat([early, omie.load(directory)]))
 
 
 def download(directory=PRICE):

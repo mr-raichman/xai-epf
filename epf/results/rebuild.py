@@ -28,7 +28,7 @@ def main():
                         help="directori d'una execució o d'una de les seves famílies")
     folders = run_files.family_folders(parser.parse_args().folder)
 
-    (_, actual), _ = matrix.price_only(price.load())
+    actual = matrix.price_only(price.load()).actual
     for folder in folders:
         rebuild(folder, actual)
         print(f"refet {folder}")

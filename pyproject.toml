@@ -20,7 +20,7 @@ dependencies = [
 # fora del projecte perquè avisa quan acaba.
 [project.scripts]
 epf-price = "epf.data.price:main"
-epf-handle-data = "epf.data.handle_data:main"
+epf-audit-data = "epf.data.audit:main"
 epf-show-run = "epf.results.show_run:main"
 epf-show-figures = "epf.results.show_figures:main"
 epf-figure-price = "epf.data.figures.price.price:main"

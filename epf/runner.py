@@ -26,8 +26,8 @@ import traceback
 import pandas as pd
 
 from epf import matrix, parameters, paths
-from epf.data import handle_data
-from epf.data.price import load
+from epf.data.outliers import report as neighbour_report
+from epf.data.price import NAME, load
 from epf.evaluation import metrics, walk_forward
 from epf.models import attribution
 from epf.models.boosting import boosting
@@ -336,14 +336,14 @@ def main():
               f"Fes un commit, o fes servir --tier {TEST}.")
         return 1
 
-    # Cap conjunt entra a cap model sense passar pel contracte, i l'execució és qui
-    # el declara. L'informe de veïnatge no refusa res: el llegeix Teo.
-    price = handle_data.refuse_incoherent(parameters.PRICE_ONLY, load())
-    handle_data.report(parameters.PRICE_ONLY, price)
+    # `load` ja ha passat el contracte. L'informe de veïnatge no refusa res i no és
+    # cap comprovació: el llegeix Teo.
+    frame = load()
+    neighbour_report(NAME, frame)
+    data = matrix.price_only(frame)
 
-    daily, hourly = matrix.price_only(price)
-    matrices = {DAILY: daily, HOURLY: hourly}
-    actual = daily[1]
+    matrices = {DAILY: data.daily, HOURLY: data.hourly}
+    actual = data.actual
     table = families()
     chosen = args.family or list(table)
 

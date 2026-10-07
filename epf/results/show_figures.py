@@ -24,7 +24,7 @@ def main():
         raise SystemExit(f"les carpetes són de {len(parents)} execucions diferents: "
                          f"{sorted(str(parent) for parent in parents)}")
 
-    (_, actual), _ = matrix.price_only(price.load())
+    actual = matrix.price_only(price.load()).actual
     into = parents.pop()
     figures.shared(into, runner.comparison(folders, actual), actual)
     print(f"comparació de {len(folders)} famílies desada a {into}")

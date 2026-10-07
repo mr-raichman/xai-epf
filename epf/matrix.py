@@ -6,6 +6,8 @@ hora, amb l'hora com a columna.
 Tota columna d'entrada ha de ser calculable abans del tancament de la subhasta
 del dia anterior al lliurament.
 """
+import collections
+
 import numpy as np
 import pandas as pd
 
@@ -16,6 +18,12 @@ from epf.parameters import LAGS
 DAY_OF_WEEK = "day_of_week"
 HOUR = "hour"
 PRICE = "price"
+
+# Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen.
+# `daily` i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el
+# `y` de la diària, anomenat un sol cop aquí perquè tres entrades el volen i cap no
+# ha de saber que és el segon element del primer parell.
+Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 
 def calibration(X, y, day, window=None):
@@ -79,8 +87,8 @@ def price_only(frame):
     L'any més antic que es pot entrenar és el primer del preu, perquè no hi entra
     cap sèrie que comenci més tard.
 
-    Pren el conjunt ja carregat i no el carrega: qui l'ha carregat és qui decideix si
-    el comprova abans, i una execució ho fa (`safety.md` 10.5).
+    Pren el conjunt ja carregat i no el carrega, que és d'una altra capa; `price.load`
+    ja n'ha comprovat el contracte.
     """
     daily = build(frame, LAGS)
-    return daily, per_hour(*daily)
+    return Matrices(daily, per_hour(*daily), daily[1])
