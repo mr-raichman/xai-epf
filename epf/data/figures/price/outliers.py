@@ -1,5 +1,4 @@
 """Gràfic de la puntuació de cada preu horari respecte dels seus veïns."""
-import matplotlib
 import numpy as np
 import pandas as pd
 
@@ -8,11 +7,9 @@ from epf.data.price import load
 from epf.data.outliers import (DAY_HALF_WIDTH, HIGHEST, HOUR_HALF_WIDTH, highest,
                                report)
 from epf.market import HOURS_PER_DAY
-from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
+from epf.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.collections import LineCollection  # noqa: E402
+from matplotlib.collections import LineCollection
 
 OUTPUT = paths.PRICE_FIGURES / "outliers.png"
 

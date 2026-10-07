@@ -32,6 +32,11 @@ Forecast = collections.namedtuple("Forecast", "fit predict attribute")
 Family = collections.namedtuple("Family", "matrix forecasts fits")
 
 
+def matrices(data):
+    """Les dues matrius per nom, que és com una família demana la seva."""
+    return {DAILY: data.daily, HOURLY: data.hourly}
+
+
 def families():
     """Cada família: quina matriu fa servir i, per pronòstic, les seves tres funcions.
 

@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 epf-price = "epf.data.price:main"
 epf-audit-data = "epf.data.audit:main"
+epf-attribute = "epf.attribution.attribute:main"
 epf-show-run = "epf.results.show_run:main"
 epf-show-figures = "epf.results.show_figures:main"
 epf-figure-price = "epf.data.figures.price.price:main"

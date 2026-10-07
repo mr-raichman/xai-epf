@@ -22,11 +22,11 @@ import time
 import traceback
 
 from epf import matrix, parameters, paths
-from epf.attribution import fitted, stored
+from epf.attribution import fitted
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
 from epf.evaluation import metrics, walk_forward
-from epf.models.families import DAILY, HOURLY, families, hyperparameters
+from epf.models.families import families, hyperparameters, matrices
 from epf.models.naive import naive
 from epf.results import figures, run_files
 from epf.results.combination import add_combination, comparison
@@ -35,29 +35,26 @@ from epf.results.combination import add_combination, comparison
 MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
 
-def run(family, name, matrices, tier, store, report):
-    """Camí endavant d'un pronòstic: les seves prediccions i l'atribució del seu ajust.
+def run(family, name, tables, tier, store, report):
+    """Camí endavant d'un pronòstic: les seves prediccions, i prou.
 
     L'ajust de cada dia es desa a `store` abans de predir-hi, de manera que el que
-    queda al disc és el model que ha fet la predicció i no un de nou. Només es desa si
-    el pronòstic té manera d'atribuir-se: un ajust que ningú no explicarà és disc per
-    res.
+    queda al disc és el model que ha fet la predicció i no un de nou; l'atribució en
+    surt després, a `epf-attribute`. Només es desa si el pronòstic té manera
+    d'atribuir-se: un ajust que ningú no explicarà és disc per res.
     """
-    X, y = matrices[family.matrix]
+    X, y = tables[family.matrix]
     of_day = family.forecasts[name]
-    kept = []
 
     def predict(X, y, when):
         model = of_day.fit(X, y, when)
         if of_day.attribute is not None:
             fitted.save(store, when, model)
-            kept.append(of_day.attribute(model, X, when))
         return of_day.predict(model, X, when)
 
     first, last, every = parameters.PERIODS[tier]
-    predicted = walk_forward(predict, X, y, first, last, every=every,
-                             on_day=functools.partial(report, name))
-    return predicted, kept
+    return walk_forward(predict, X, y, first, last, every=every,
+                        on_day=functools.partial(report, name))
 
 
 def _git(*arguments):
@@ -133,11 +130,12 @@ def confirm(taken):
     return input("escriu «si» per substituir-los: ").strip().lower() in ("si", "sí")
 
 
-def write(folder, forecasts, attributions, actual, record):
+def write(folder, forecasts, actual, record):
     """Desa tot el que ha deixat una família, un cop ja ha acabat.
 
     Substitueix el directori sencer, i només ara: si la família hagués fallat, el que
-    hi havia abans encara hi seria.
+    hi havia abans encara hi seria. L'atribució no hi és: la deixa `epf-attribute`
+    llegint els ajustos desats.
 
     Les mètriques es calculen abans de tocar el disc, perquè una que peti no deixi un
     directori amb prediccions i sense `metrics.csv`, que des de fora sembla una
@@ -149,12 +147,6 @@ def write(folder, forecasts, attributions, actual, record):
     folder.mkdir(parents=True, exist_ok=True)
     run_files.save_forecasts(folder, forecasts)
     run_files.save_metrics(folder, table)
-    for name, kept in attributions.items():
-        stored.save(folder, name, forecasts[name].index, kept)
-        worst = stored.refuse_inconsistent(folder, name, forecasts[name])
-        if worst is not None:
-            print(f"  atribució de {name}: additivitat a {worst:.1e} EUR/MWh",
-                  flush=True)
     run_files.save_record(folder, record)
     return table
 
@@ -187,7 +179,7 @@ def main():
     neighbour_report(NAME, frame)
     data = matrix.price_only(frame)
 
-    matrices = {DAILY: data.daily, HOURLY: data.hourly}
+    tables = matrices(data)
     actual = data.actual
     table = families()
     chosen = args.family or list(table)
@@ -223,20 +215,16 @@ def main():
             store = fitted.folder(args.tier, parameters.PRICE_ONLY, family)
             if explains:
                 fitted.clear(store)
-            forecasts, attributions = {}, {}
-            for name in table[family].forecasts:
-                predicted, kept = run(table[family], name, matrices, args.tier,
-                                      store, report)
-                forecasts[name] = predicted
-                if kept:
-                    attributions[name] = kept
+            forecasts = {name: run(table[family], name, tables, args.tier, store,
+                                   report)
+                         for name in table[family].forecasts}
             if explains:
                 fitted.save_stamp(store, fitted.describe(
                     commit, args.tier, parameters.PRICE_ONLY, family,
                     next(iter(forecasts.values())).index))
             walked = time.perf_counter() - clock
             folder = folders[family]
-            measured = write(folder, forecasts, attributions, actual,
+            measured = write(folder, forecasts, actual,
                              described(commit, args.tier, family, chosen,
                                        table[family].fits, forecasts, walked))
             figures.draw(folder, actual)
@@ -265,6 +253,8 @@ def main():
         print(f"figures de {run_files.drawn(len(done))} a {where}"
               + (f", i la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"), flush=True)
+        # L'atribució és una segona passada i el directori encara no en porta cap.
+        print(f"per explicar-la: .venv/bin/epf-attribute {where}", flush=True)
 
     if failed:
         print(f"ha fallat i no ha desat res: {', '.join(failed)}")

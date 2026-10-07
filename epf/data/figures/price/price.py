@@ -1,13 +1,9 @@
 """Gràfic de tots els preus horaris del mercat diari espanyol."""
-import matplotlib
 import pandas as pd
 
 from epf import paths
 from epf.data.price import OMIE_FROM, load
-from epf.palette import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from epf.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 
 OUTPUT = paths.PRICE_FIGURES / "price.png"
 
