@@ -15,6 +15,11 @@ dependencies = [
     "shap==0.52.0",
     "matplotlib==3.11.2",
     "joblib==1.6.0",
+    # La xarxa de Lago et al. (2021) i la cerca dels seus hiperparàmetres. Sense
+    # `[and-cuda]`: aquells paquets són de Linux i d'NVIDIA, i el projecte s'ha
+    # d'instal·lar en una màquina qualsevol.
+    "tensorflow==2.21.0",
+    "hyperopt==0.3.0",
 ]
 
 # Tot el que es tecleja a mà, en una sola ordre: `epf --help` és la llista.
