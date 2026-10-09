@@ -1,8 +1,12 @@
-"""Figures que comparen les famílies d'una execució, dibuixades al seu directori.
+"""Figures que comparen pronòstics, dibuixades al directori que es dóna.
 
-Les mateixes que el camí endavant deixa dins de cada família, però amb els
-pronòstics de totes alhora, que és el que es compara. Totes les carpetes han de
-ser de la mateixa execució, i les figures van a la que les conté.
+Les mateixes sis que el camí endavant deixa dins de cada família. El directori d'una
+configuració les rep amb els pronòstics de totes les famílies i la combinació alhora,
+que és el que de fet es compara; el d'una família les rep només amb els seus.
+
+Es dibuixa al directori donat i no al seu pare. Mentre es dibuixava al pare, donar una
+família sola hi escrivia la comparació de l'execució sencera amb una sola sèrie, i la
+que hi havia desapareixia fins que alguna cosa la refeia.
 """
 from epf import matrix
 from epf.data import price
@@ -10,14 +14,8 @@ from epf.results import combination, figures, run_files
 
 
 def main(arguments):
-    folders = run_files.family_folders(arguments.folder)
-    parents = {folder.resolve().parent for folder in folders}
-    if len(parents) != 1:
-        raise SystemExit(f"les carpetes són de {len(parents)} execucions diferents: "
-                         f"{sorted(str(parent) for parent in parents)}")
-
     actual = matrix.price_only(price.load()).actual
-    into = parents.pop()
-    forecasts = combination.comparison(folders)
-    figures.shared(into, forecasts, actual)
-    print(f"comparació de {run_files.drawn(len(forecasts))} desada a {into}")
+    for into in arguments.folder:
+        forecasts = combination.comparison(run_files.family_folders([into]))
+        figures.shared(into, forecasts, actual)
+        print(f"comparació de {run_files.drawn(len(forecasts))} desada a {into}")
