@@ -22,7 +22,7 @@ def tree(folder, base, contributions):
     """Una família que atribueix en EUR/MWh: base més contribucions és la predicció."""
     folder.mkdir(parents=True, exist_ok=True)
     kept = [Attribution(ONE, ["a", "b"], np.full((1, 2, 24), contributions),
-                        np.full((1, 24), base), None, PRICE_UNITS)
+                        np.full((1, 24), base), None, None, PRICE_UNITS)
             for _ in range(DAYS)]
     frame = frame_of(base + 2 * contributions)
     save(folder, "tree", frame.index, kept)
@@ -45,17 +45,41 @@ def test_an_attribution_that_does_not_add_up_fails_loudly(tmp_path):
         refuse_inconsistent(tmp_path, "tree", frame_of(99.0))
 
 
+def ensemble(folder, base, contributions, transformed, members=(10.0, 20.0, 30.0)):
+    """Un conjunt que atribueix en un espai transformat, amb tres finestres.
+
+    `members` són les seves prediccions en EUR/MWh, que és el que ha de tornar el CSV,
+    i `transformed` les mateixes al seu espai, que és contra el que es comprova
+    l'additivitat.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    count = len(members)
+    kept = [Attribution(tuple("abc"[:count]), ["x", "y"],
+                        np.full((count, 2, 24), contributions),
+                        np.full((count, 24), base),
+                        np.repeat(np.array(members)[:, None], 24, axis=1),
+                        np.full((count, 24), transformed), "espai transformat")
+            for _ in range(DAYS)]
+    frame = frame_of(np.mean(members))
+    save(folder, "lear", frame.index, kept)
+    return frame
+
+
 def test_an_ensemble_is_checked_against_the_mean_of_its_members(tmp_path):
     # Les contribucions de LEAR són a l'espai transformat i no es poden comparar
     # amb el CSV; qui ha de reproduir-lo és la mitjana de les seves finestres.
     folder = tmp_path / "lear"
-    folder.mkdir(parents=True)
-    members = np.array([10.0, 20.0, 30.0])
-    kept = [Attribution(("a", "b", "c"), ["x"], np.zeros((3, 1, 24)), np.zeros((3, 24)),
-                        np.repeat(members[:, None], 24, axis=1), "espai transformat")
-            for _ in range(DAYS)]
-    frame = frame_of(members.mean())
-    save(folder, "lear", frame.index, kept)
+    frame = ensemble(folder, base=0.4, contributions=0.1, transformed=0.6)
     assert refuse_inconsistent(folder, "lear", frame) < 1e-3
     with pytest.raises(ValueError, match="mitjana de les prediccions"):
         refuse_inconsistent(folder, "lear", frame_of(0.0))
+
+
+def test_an_ensemble_whose_base_does_not_add_up_fails_loudly(tmp_path):
+    # Mentre la predicció al mateix espai no es desava, aquesta era la família amb
+    # l'atribució exacta per construcció i l'única que no comprovava res: la base de
+    # cada finestra podia ser qualsevol i la mitjana en EUR/MWh seguia quadrant.
+    folder = tmp_path / "lear"
+    frame = ensemble(folder, base=0.4, contributions=0.1, transformed=99.0)
+    with pytest.raises(ValueError, match="no és additiva"):
+        refuse_inconsistent(folder, "lear", frame)

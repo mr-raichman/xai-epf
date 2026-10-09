@@ -61,5 +61,5 @@ def attribute(model, X, day):
     values = explainer.shap_values(rows)
     # Un sol model per a les 24 hores, de manera que la base és la mateixa a totes.
     base = np.full((1, len(rows)), float(np.ravel(explainer.expected_value)[0]))
-    return Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None,
+    return Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None, None,
                        PRICE_UNITS)

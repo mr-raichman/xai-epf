@@ -154,11 +154,19 @@ def _rows_of(fitted, X, day):
     return _design(X.loc[[day], columns], fitted.prices)
 
 
+def _window_outputs(fitted, rows):
+    """Els 24 valors que donen els models d'una finestra, al seu espai transformat.
+
+    És amb aquests que es comprova l'additivitat de l'atribució: la base més les
+    contribucions són al mateix espai i `sinh` no deixa convertir-ne la suma.
+    """
+    with threadpool_limits(limits=1):
+        return np.array([model.predict(rows)[0] for model in fitted.models])
+
+
 def _window_prices(fitted, rows):
     """Els 24 preus d'una finestra, en EUR/MWh."""
-    with threadpool_limits(limits=1):
-        hours = [model.predict(rows)[0] for model in fitted.models]
-    return fitted.target.back(np.array(hours))
+    return fitted.target.back(_window_outputs(fitted, rows))
 
 
 def _window_contributions(fitted, rows):
@@ -205,14 +213,22 @@ def attribute(model, X, day):
     Cada finestra escala la seva pròpia finestra amb la seva mediana i la seva MAD,
     de manera que dues finestres no tenen les contribucions en les mateixes unitats i
     mitjanar-les no voldria dir res. Les columnes que una finestra curta no porta hi
-    són a zero. `forecasts` porta la predicció de cada finestra perquè la del CSV és
-    la mitjana i la base de cada membre s'ha de poder comprovar contra la seva.
+    són a zero.
+
+    Es desen dues prediccions de cada finestra i no una. `forecasts` és en EUR/MWh,
+    perquè la del CSV és la mitjana de les cinc i cada finestra ha de tenir la seva;
+    `transformed` és la mateixa abans de desfer la transformació, que és l'única
+    contra la qual es pot comprovar que la base més les contribucions tornen la
+    predicció. Les dues surten de `model.predict` i les contribucions de `coef_` i
+    `intercept_`, de manera que la comprovació lliga dos camins independents.
     """
-    forecasts, values, bases = [], [], []
+    forecasts, transformed, values, bases = [], [], [], []
     for fitted in model:
         rows = _rows_of(fitted, X, day)
         contributions, base = _window_contributions(fitted, rows)
-        forecasts.append(_window_prices(fitted, rows))
+        outputs = _window_outputs(fitted, rows)
+        transformed.append(outputs)
+        forecasts.append(fitted.target.back(outputs))
         bases.append(base)
         whole = np.zeros((len(DESIGN_COLUMNS), HOURS_PER_DAY))
         carried = design_columns(lags_of(fitted.window))
@@ -223,4 +239,4 @@ def attribute(model, X, day):
     members = tuple(str(fitted.window) if fitted.window else WHOLE_HISTORY
                     for fitted in model)
     return Attribution(members, DESIGN_COLUMNS, np.array(values), np.array(bases),
-                       np.array(forecasts), "espai transformat")
+                       np.array(forecasts), np.array(transformed), "espai transformat")

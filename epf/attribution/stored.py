@@ -17,9 +17,12 @@ import numpy as np
 # contribucions torna la predicció i això es pot comprovar. `forecasts` és
 # (membre, hora) només per a un conjunt com LEAR, on cada finestra té la seva pròpia
 # predicció i la que es desa al CSV és la mitjana; per a una família d'un sol model
-# és None, perquè la predicció del membre ja és la del CSV.
-Attribution = collections.namedtuple("Attribution",
-                                     "members columns values base forecasts units")
+# és None, perquè la predicció del membre ja és la del CSV. `transformed` és la
+# predicció de cada membre a les unitats de l'atribució i no en EUR/MWh, i hi és
+# només on aquelles dues no coincideixen: és contra ella que es comprova
+# l'additivitat quan la suma de les contribucions no és un preu.
+Attribution = collections.namedtuple(
+    "Attribution", "members columns values base forecasts transformed units")
 
 # Membres d'una família que ajusta un sol model.
 ONE = ("model",)
@@ -31,6 +34,16 @@ PRICE_UNITS = "EUR/MWh"
 # ordres de magnitud i és molt per sota de qualsevol diferència que vulgui dir res
 # en un preu.
 TOLERANCE = 1e-3
+
+# Marge de l'additivitat quan les contribucions no són en EUR/MWh. Hi va a part
+# perquè és a les unitats de l'atribució i no en un preu. Mesurat amb les cinc
+# finestres de LEAR sobre valors transformats d'ordre 1: la identitat es compleix a
+# 1,3e-15 en memòria, que és precisió doble, i després del pas a `float32` amb què es
+# desa queda a 4,8e-7 sobre vuit dies de juny de 2023 i a 1,9e-6 sobre els 30 dies del
+# període de prova. Això deixa un factor 50 de marge, i en EUR/MWh val tant com el
+# marge de dalt: a prop d'1 la derivada de `sinh` és d'1,5 i la MAD d'una finestra va
+# en desenes d'euros.
+TRANSFORMED_TOLERANCE = 1e-4
 
 
 def path(folder, forecast):
@@ -47,24 +60,53 @@ def save(folder, forecast, days, attributions):
         "members": np.array(first.members),
         "columns": np.array(first.columns),
         "units": np.array(first.units)}
-    if first.forecasts is not None:
-        arrays["forecasts"] = np.stack(
-            [one.forecasts for one in attributions]).astype(np.float32)
+    for name in ("forecasts", "transformed"):
+        if getattr(first, name) is not None:
+            arrays[name] = np.stack(
+                [getattr(one, name) for one in attributions]).astype(np.float32)
     np.savez_compressed(path(folder, forecast), **arrays)
+
+
+def refuse_nonadditive(forecast, stored):
+    """Falla si la base i les contribucions d'un membre no tornen la seva predicció.
+
+    És l'additivitat que justifica desar la base, i la comprovació és exacta per
+    construcció: per a un model lineal la contribució d'una columna és el coeficient
+    per la distància al fons i la base és la predicció al fons, de manera que la suma
+    és `intercept_ + coef_ @ x`, que és la predicció.
+
+    Quan les contribucions no són en EUR/MWh aquesta és l'única manera de
+    comprovar-ho, perquè la suma és a l'espai transformat i `sinh` no deixa
+    convertir-la: es compara amb la predicció del model al mateix espai. Mentre no es
+    desava, la base de cada finestra de LEAR no la comprovava res i la família amb
+    l'atribució exacta per construcció era l'única sense comprovar (`evidence.md` 5.4).
+    """
+    if stored.transformed is None:
+        return
+    worst = float(np.abs(stored.base + stored.values.sum(axis=2)
+                         - stored.transformed).max())
+    if worst > TRANSFORMED_TOLERANCE:
+        raise ValueError(f"l'atribució desada de {forecast} no és additiva: la base "
+                         f"més les contribucions s'allunyen {worst:.3g} de la "
+                         f"predicció del membre, per sobre del marge de "
+                         f"{TRANSFORMED_TOLERANCE}")
 
 
 def refuse_inconsistent(folder, forecast, predicted):
     """Falla si el que s'ha desat no reprodueix la predicció que hi ha al costat.
 
-    És la comprovació que justifica desar la base. Per a una família que atribueix
-    en EUR/MWh, la base més la suma de les contribucions ha de tornar la predicció;
-    per a un conjunt que atribueix en un espai transformat, on aquella suma no és
-    en EUR/MWh, qui l'ha de tornar és la mitjana de les prediccions dels membres.
+    Dues comprovacions i no una. L'additivitat de cada membre és de
+    `refuse_nonadditive`, i aquí es comprova que el que s'ha desat torni el CSV: per a
+    una família que atribueix en EUR/MWh les dues coses són la mateixa, i per a un
+    conjunt com LEAR qui ha de tornar el CSV és la mitjana de les prediccions dels
+    seus membres.
+
     Llegeix el que hi ha al disc i no el que hi havia a la memòria, de manera que
-    també agafa un error en desar. Torna el pitjor residu, o None si l'atribució no
-    porta prou per comprovar res.
+    també agafa un error en desar. Torna el pitjor residu en EUR/MWh, o None si
+    l'atribució no porta prou per comprovar res.
     """
     _, stored = load(folder, forecast)
+    refuse_nonadditive(forecast, stored)
     if stored.units == PRICE_UNITS:
         rebuilt = stored.base[:, 0] + stored.values[:, 0].sum(axis=1)
         whose = "la base més les contribucions"
@@ -94,4 +136,5 @@ def load(folder, forecast):
         values=stored["values"],
         base=stored["base"] if "base" in stored else None,
         forecasts=stored["forecasts"] if "forecasts" in stored else None,
+        transformed=stored["transformed"] if "transformed" in stored else None,
         units=str(stored["units"]))

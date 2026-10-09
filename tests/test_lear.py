@@ -9,6 +9,7 @@ from epf.models.lear.lear_hyperparameters import EIGHT_WEEKS, TWELVE_WEEKS
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
+from epf.attribution.stored import TRANSFORMED_TOLERANCE
 from epf.models.lear.lear import (DESIGN_COLUMNS, NAME, Scaler, attribute,
                                   design_columns, fit, lags_of, predict,
                                   week_dummies)
@@ -118,6 +119,21 @@ def test_a_short_window_leaves_the_lags_it_cannot_carry_at_zero():
     absent = [number for number, name in enumerate(DESIGN_COLUMNS) if name not in carried]
     assert np.count_nonzero(attribution.values[0][absent]) == 0
     assert np.count_nonzero(attribution.values[0]) > 0
+
+
+def test_the_base_and_the_contributions_return_the_members_own_prediction():
+    # L'additivitat que justifica desar la base, i l'única comprovació possible per a
+    # LEAR: la suma és a l'espai transformat i `sinh` no deixa comparar-la amb el CSV.
+    # Mentre la predicció transformada no es desava, la base de cada finestra no la
+    # comprovava res.
+    # Dues finestres i no una, perquè el que es pot trencar en silenci és
+    # l'alineació: la base del membre m contra la predicció del membre m.
+    X, y = build(noisy_prices(200), LAGS)
+    one = explained(X, y, X.index[-1], windows=(EIGHT_WEEKS, TWELVE_WEEKS),
+                    max_iter=MAX_ITER)
+    rebuilt = one.base + one.values.sum(axis=1)
+    assert rebuilt.shape == one.transformed.shape
+    assert np.abs(rebuilt - one.transformed).max() < TRANSFORMED_TOLERANCE
 
 
 def test_moving_a_column_of_the_predicted_day_moves_only_its_own_contribution():
