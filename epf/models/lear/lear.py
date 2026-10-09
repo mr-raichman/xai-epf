@@ -17,7 +17,7 @@ from epf.models.lear.lear_hyperparameters import MAX_ITER, SHORT_LAGS, WINDOWS
 from epf.parameters import DAYS_PER_WEEK, LAGS
 from epf.market import HOURS_PER_DAY
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK, calibration
+from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
 from epf.attribution.stored import Attribution
 
 # Nom de la finestra que agafa tot l'historial.
@@ -78,18 +78,14 @@ class Scaler:
         return np.sinh(values) * self.mad + self.median
 
 
-def week_dummies(day_of_week):
-    """El dia de la setmana, enter, en set indicadors, que és el que LEAR necessita."""
-    return np.eye(DAYS_PER_WEEK)[np.asarray(day_of_week, dtype=int)]
-
-
 def _design(rows, scaler):
     """Files de `matrix.build` com la matriu de LEAR: preus transformats i indicadors.
 
-    Els indicadors no s'escalen: ja són zeros i uns.
+    Els indicadors no s'escalen: ja són zeros i uns, i els escriu la matriu.
     """
     values = rows.to_numpy()
-    return np.hstack([scaler.forward(values[:, :-1]), week_dummies(values[:, -1])])
+    return np.hstack([scaler.forward(values[:, :-DAYS_PER_WEEK]),
+                      values[:, -DAYS_PER_WEEK:]])
 
 
 def _fit_hour(features, target, max_iter):
@@ -108,17 +104,16 @@ def lags_of(window):
 
 
 def feature_columns(lags):
-    """Columnes de `matrix.build` que fa servir una finestra, en el mateix ordre."""
-    return [f"lag{lag}_{hour}" for lag in lags for hour in HOUR_COLUMNS] + [DAY_OF_WEEK]
+    """Columnes de `matrix.build` que fa servir una finestra, en el mateix ordre.
 
-
-def design_columns(lags):
-    """Noms de la matriu de disseny: els retards escalats i els set indicadors."""
+    Són també les de la matriu de disseny: l'escalat no canvia cap nom i els
+    indicadors ja arriben oberts.
+    """
     return ([f"lag{lag}_{hour}" for lag in lags for hour in HOUR_COLUMNS]
-            + [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)])
+            + DAY_OF_WEEK_COLUMNS)
 
 
-DESIGN_COLUMNS = design_columns(LAGS)
+DESIGN_COLUMNS = feature_columns(LAGS)
 
 
 def _fit_window(X, y, day, window, max_iter):
@@ -127,12 +122,12 @@ def _fit_window(X, y, day, window, max_iter):
     lags = lags_of(window)
     columns = feature_columns(lags)
     features, target = calibration(X[columns], y, day, window)
-    width = len(columns) - 1 + DAYS_PER_WEEK
+    width = len(columns)
     if len(features) <= width + 1:
         raise ValueError(f"{len(features)} dies de calibratge per a {day}, "
                          f"insuficients per a {width} columnes")
 
-    prices = Scaler(features.to_numpy()[:, :-1])
+    prices = Scaler(features.to_numpy()[:, :-DAYS_PER_WEEK])
     prices_target = Scaler(target.to_numpy())
     train = _design(features, prices)
     scaled = prices_target.forward(target.to_numpy())
@@ -231,7 +226,7 @@ def attribute(model, X, day):
         forecasts.append(fitted.target.back(outputs))
         bases.append(base)
         whole = np.zeros((len(DESIGN_COLUMNS), HOURS_PER_DAY))
-        carried = design_columns(lags_of(fitted.window))
+        carried = feature_columns(lags_of(fitted.window))
         whole[[DESIGN_COLUMNS.index(name) for name in carried]] = contributions
         values.append(whole)
     # Els noms surten de les finestres que s'han ajustat i no de `WINDOWS`: una crida

@@ -6,7 +6,7 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.parameters import LAGS
-from epf.matrix import DAY_OF_WEEK, HOUR, build, calibration, per_hour
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, calibration, per_hour
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -52,11 +52,16 @@ def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
     assert with_gap.loc[day, "lag1_h00"] == offset * 100
 
 
-def test_day_of_week_is_the_delivery_day():
+def test_the_day_of_week_is_seven_indicators_on_the_delivery_day():
+    # Set indicadors i no un enter: l'enter li diu a una xarxa que diumenge és sis
+    # vegades dimarts, i mentre hi era cada família el veia d'una manera diferent.
     price = frame_of(range(30))
     X, _ = build(price, LAGS)
     day = X.index[5]
-    assert X.loc[day, DAY_OF_WEEK] == day.dayofweek
+    row = X.loc[day, DAY_OF_WEEK_COLUMNS]
+    assert list(row) == [1.0 if number == day.dayofweek else 0.0
+                         for number in range(len(DAY_OF_WEEK_COLUMNS))]
+    assert X[DAY_OF_WEEK_COLUMNS].to_numpy().sum(axis=1).tolist() == [1.0] * len(X)
 
 
 

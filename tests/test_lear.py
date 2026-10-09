@@ -11,8 +11,7 @@ from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
 from epf.attribution.stored import TRANSFORMED_TOLERANCE
 from epf.models.lear.lear import (DESIGN_COLUMNS, NAME, Scaler, attribute,
-                                  design_columns, fit, lags_of, predict,
-                                  week_dummies)
+                                  feature_columns, fit, lags_of, predict)
 
 # Prou iteracions perquè els ajusts d'aquestes proves convergeixin; el valor que
 # fan servir les execucions és a la configuració.
@@ -65,13 +64,6 @@ def test_a_window_without_spread_fails_loudly():
         Scaler(np.zeros((10, 24)))
 
 
-def test_week_dummies_are_one_hot_on_the_right_day():
-    dummies = week_dummies([0, 6, 3])
-    assert dummies.shape == (3, 7)
-    assert list(dummies.sum(axis=1)) == [1, 1, 1]
-    assert dummies[1][6] == 1 and dummies[2][3] == 1
-
-
 def test_a_weekly_pattern_is_reproduced():
     X, y = build(weekly_prices(200), LAGS)
     day = X.index[-1]
@@ -109,13 +101,13 @@ def test_each_short_window_takes_the_lags_that_fit():
     assert lags_of(None) == LAGS
     for window in (EIGHT_WEEKS, TWELVE_WEEKS):
         # LassoLarsIC demana com a mínim dues files més que columnes.
-        assert window >= len(design_columns(lags_of(window))) + 2
+        assert window >= len(feature_columns(lags_of(window))) + 2
 
 
 def test_a_short_window_leaves_the_lags_it_cannot_carry_at_zero():
     X, y = build(noisy_prices(200), LAGS)
     attribution = explained(X, y, X.index[-1], windows=(EIGHT_WEEKS,), max_iter=MAX_ITER)
-    carried = set(design_columns(lags_of(EIGHT_WEEKS)))
+    carried = set(feature_columns(lags_of(EIGHT_WEEKS)))
     absent = [number for number, name in enumerate(DESIGN_COLUMNS) if name not in carried]
     assert np.count_nonzero(attribution.values[0][absent]) == 0
     assert np.count_nonzero(attribution.values[0]) > 0

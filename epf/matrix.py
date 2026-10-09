@@ -13,11 +13,17 @@ import pandas as pd
 
 from epf.calendar import HOUR_COLUMNS
 from epf.market import HOURS_PER_DAY
-from epf.parameters import LAGS
+from epf.parameters import DAYS_PER_WEEK, LAGS
 
-DAY_OF_WEEK = "day_of_week"
 HOUR = "hour"
 PRICE = "price"
+
+# El dia de la setmana, en set indicadors i no en un enter. Els escriu la matriu i no
+# cap família, perquè és l'única manera que totes vegin el mateix: mentre l'enter hi
+# era, LEAR l'obria en set i la resta el prenia tal qual, de manera que una diferència
+# entre famílies no era només d'algorisme. A una xarxa, l'enter li diu que diumenge és
+# sis vegades dimarts.
+DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK)]
 
 # Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen.
 # `daily` i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el
@@ -58,7 +64,8 @@ def build(price, lags):
 
     blocks = [price.shift(lag, freq="D").reindex(price.index).add_prefix(f"lag{lag}_")
               for lag in lags]
-    blocks.append(price.index.dayofweek.to_series(index=price.index, name=DAY_OF_WEEK))
+    blocks.append(pd.DataFrame(np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
+                               index=price.index, columns=DAY_OF_WEEK_COLUMNS))
     features = pd.concat(blocks, axis="columns", sort=False)
 
     complete = features.notna().all(axis="columns")
@@ -81,9 +88,10 @@ def price_only(frame):
     """Les dues matrius del conjunt d'informació de només preu: la diària i la per
     hora, ja alineades.
 
-    Els 96 retards de preu i el dia de la setmana, que és el model de només preu de
-    Lago et al. (2021). Tot és calculable molt abans que tanqui la subhasta del dia
-    anterior al lliurament, perquè els preus del dia d-1 es van publicar el d-2.
+    Els 96 retards de preu i els set indicadors del dia de la setmana, que és el
+    model de només preu de Lago et al. (2021). Tot és calculable molt abans que
+    tanqui la subhasta del dia anterior al lliurament, perquè els preus del dia d-1
+    es van publicar el d-2.
     L'any més antic que es pot entrenar és el primer del preu, perquè no hi entra
     cap sèrie que comenci més tard.
 
