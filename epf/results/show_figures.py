@@ -20,4 +20,4 @@ def main(arguments):
     into = parents.pop()
     forecasts = combination.comparison(folders)
     figures.shared(into, forecasts, actual)
-    print(f"comparació de {len(forecasts)} pronòstics desada a {into}")
+    print(f"comparació de {run_files.drawn(len(forecasts))} desada a {into}")

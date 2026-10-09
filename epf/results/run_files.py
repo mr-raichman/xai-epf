@@ -172,6 +172,11 @@ def headlines(folder, forecasts):
     return load_record(folder).get("headlines", sorted(forecasts))
 
 
+def drawn(forecasts):
+    """«1 pronòstic» o «n pronòstics», perquè el que imprimeix un script és català."""
+    return "1 pronòstic" if forecasts == 1 else f"{forecasts} pronòstics"
+
+
 def save_record(folder, record):
     (folder / RECORD).write_text(json.dumps(record, indent=2) + "\n")
 

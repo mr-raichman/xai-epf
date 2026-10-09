@@ -257,7 +257,7 @@ def main(arguments):
         counted = combination.save(where, done, actual)
         forecasts = combination.comparison(run_files.recorded(where))
         figures.shared(where, forecasts, actual)
-        print(f"figures de {len(forecasts)} pronòstics a {where}"
+        print(f"figures de {run_files.drawn(len(forecasts))} a {where}"
               + (f", amb la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"), flush=True)
         # L'atribució és una segona passada i el directori encara no en porta cap.

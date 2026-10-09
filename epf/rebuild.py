@@ -46,6 +46,6 @@ def main(arguments):
         counted = combination.save(where, run_files.recorded(where), actual)
         forecasts = combination.comparison(run_files.recorded(where))
         figures.shared(where, forecasts, actual)
-        print(f"refetes les figures de {len(forecasts)} pronòstics a {where}"
+        print(f"refetes les figures de {run_files.drawn(len(forecasts))} a {where}"
               + (f", amb la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"))
