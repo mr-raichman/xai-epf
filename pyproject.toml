@@ -19,7 +19,7 @@ dependencies = [
     # `[and-cuda]`: aquells paquets són de Linux i d'NVIDIA, i el projecte s'ha
     # d'instal·lar en una màquina qualsevol.
     "tensorflow==2.21.0",
-    "hyperopt==0.3.0",
+    "optuna==5.0.0",
 ]
 
 # Tot el que es tecleja a mà, en una sola ordre: `epf --help` és la llista.

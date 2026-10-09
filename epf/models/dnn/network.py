@@ -41,19 +41,20 @@ def build(columns, hidden, activation, dropout, batch_normalisation, l1, initial
     després de l'activació i no abans**, que és el que diu la seva implementació i el
     contrari del que se'n diria de memòria.
 
-    `l1` és un coeficient per capa, perquè l'article en té un per capa i no un per
-    xarxa. `head` rep l'última capa amagada i torna la sortida.
+    `hidden`, `activation` i `l1` van per capa i no per xarxa: tots dos articles en
+    cerquen un de cada per capa amagada. `head` rep l'última capa amagada i torna la
+    sortida.
 
-    Les activacions `LeakyReLU` i `PReLU` no hi caben: a l'article són una capa a part
-    darrere d'una `Dense` lineal. Hi entraran amb la cerca, que és qui les pot triar;
-    mentre no hi siguin, passar-les aquí dóna una xarxa que no és la que l'article
-    descriu.
+    Les activacions `LeakyReLU` i `PReLU` no hi caben: a Lago et al. (2021) són una
+    capa a part darrere d'una `Dense` lineal, i `selu` vol `AlphaDropout`. Cap de les
+    sis que cerca `search.ACTIVATIONS` no les demana; passar-hi una d'aquelles tres
+    dóna una xarxa que no és la que l'article descriu.
     """
     inputs = keras.Input(shape=(columns,))
     tensor = inputs
-    for neurons, coefficient in zip(hidden, l1, strict=True):
+    for neurons, chosen, coefficient in zip(hidden, activation, l1, strict=True):
         tensor = keras.layers.Dense(
-            neurons, activation=activation, kernel_initializer=initialiser,
+            neurons, activation=chosen, kernel_initializer=initialiser,
             kernel_regularizer=keras.regularizers.L1(coefficient))(tensor)
         if batch_normalisation:
             tensor = keras.layers.BatchNormalization()(tensor)

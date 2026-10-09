@@ -42,6 +42,14 @@ def run_arguments(parser):
     return parser
 
 
+def search_arguments(parser):
+    """Les proves que fa la cerca d'hiperparàmetres. Quantes es decideix amb el cost
+    d'una mesurat, i el valor per defecte viu amb la xarxa i no aquí."""
+    parser.add_argument("--trials", type=int,
+                        help="proves que es fan; per defecte, les del seu fitxer")
+    return parser
+
+
 def folder_arguments(parser):
     """El directori d'una execució, que és el que prenen les quatre que en llegeixen una."""
     parser.add_argument("folder", type=pathlib.Path, nargs="+",
@@ -58,6 +66,9 @@ COMMANDS = {
         "epf.data.figures.price.price", "tots els preus horaris, del 2014 endavant", None),
     "figure-outliers": Command(
         "epf.data.figures.price.outliers", "la distància de cada preu als seus veïns", None),
+    "search-dnn": Command(
+        "epf.models.dnn.search", "cerca els hiperparàmetres de la xarxa",
+        search_arguments),
     "run": Command(
         "epf.runner", "camina el període endavant amb totes les famílies", run_arguments),
     "rebuild": Command(

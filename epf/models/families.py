@@ -60,13 +60,21 @@ def families():
 
 
 def hyperparameters(family):
-    """Els números del model d'una família, llegits del seu propi fitxer.
+    """Els números del model d'una família, del seu fitxer i del que n'hagi cercat.
 
     Tot el que hi és en majúscules, que és la forma que tenen; així `run.json` els
     recull sense que ningú n'hagi de mantenir una llista.
+
+    Una família que es cerca els seus números els té al disc i no al mòdul, i els
+    demana aquí perquè aquest és l'únic lloc que respon "els números d'aquesta
+    família". Sense això el `run.json` d'aquella família no portaria el que ha fet la
+    predicció, que és justament el que l'ha de portar quan el commit ja no ho fixa.
     """
     try:
         module = importlib.import_module(f"epf.models.{family}.{family}_hyperparameters")
     except ModuleNotFoundError:
         return {}
-    return {name: getattr(module, name) for name in dir(module) if name.isupper()}
+    found = {name: getattr(module, name) for name in dir(module) if name.isupper()}
+    if hasattr(module, "searched"):
+        found |= module.searched()
+    return found
