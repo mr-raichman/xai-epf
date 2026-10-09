@@ -10,8 +10,27 @@ import json
 import pandas as pd
 import pytest
 
-from epf import runner
-from epf.models.families import families
+from epf import paths, runner
+from epf.models.dnn import dnn_hyperparameters
+from epf.models.families import families, hyperparameters
+
+# Un conjunt cercat qualsevol, de la forma que desa la cerca: llistes de text, llistes
+# de números i valors solts.
+SEARCHED = {"blocks": ["lag1", "day_of_week"], "hidden": [32, 64],
+            "activation": ["relu", "tanh"], "l1": [0.0, 1e-3], "dropout": 0.25,
+            "batch_normalisation": True, "initialiser": "glorot_uniform",
+            "learning_rate": 1e-3}
+
+
+@pytest.fixture(autouse=True)
+def searched(tmp_path, monkeypatch):
+    """La família que es cerca els seus números els vol al disc, i no al del projecte.
+
+    `autouse` perquè el registre de qualsevol família passa per `hyperparameters`, i
+    aquella els demana a qui en tingui.
+    """
+    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    dnn_hyperparameters.save({"hyperparameters": SEARCHED})
 
 
 def test_the_record_of_every_family_is_writable():
@@ -44,6 +63,25 @@ def test_the_record_says_who_is_a_member_and_who_is_drawn():
     assert record["headlines"] == ["lear"]
     assert len(record["members"]) == 5
     assert "lear" not in record["members"]
+
+
+def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals():
+    # És el que fa que una execució d'aquesta família es pugui tornar al que la va
+    # fer, ara que el commit no en fixa els números. Si la composició es trenqués, el
+    # `run.json` seguiria essent vàlid i hi faltaria tot el que defineix la xarxa.
+    found = hyperparameters("dnn")
+    assert found["WINDOW"] == dnn_hyperparameters.WINDOW
+    for name, value in SEARCHED.items():
+        assert found[name] == value
+    json.dumps(found)
+
+
+def test_a_family_that_has_not_been_searched_refuses_instead_of_inventing():
+    # Arrencar la xarxa amb números inventats donaria un error que no diu res de la
+    # xarxa de l'article, i una xifra que ningú no podria tornar a res.
+    dnn_hyperparameters.path().unlink()
+    with pytest.raises(FileNotFoundError, match="search-dnn"):
+        hyperparameters("dnn")
 
 
 def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():

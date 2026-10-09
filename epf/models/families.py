@@ -13,6 +13,7 @@ import collections
 import importlib
 
 from epf.models.boosting import boosting
+from epf.models.dnn import dnn
 from epf.models.lear import lear
 from epf.models.mlp import mlp
 from epf.models.naive import naive
@@ -22,11 +23,12 @@ DAILY, HOURLY = "daily", "hourly"
 # Una família: la matriu que pren, les seves tres funcions, i quins dels pronòstics que
 # `predict` torna són què.
 #
-# `attribute` és `None` on no hi ha cap mètode: les prediccions ingènues perquè la seva
-# atribució seria la columna que copien, i l'MLP perquè TreeSHAP no s'hi aplica i cap
-# mètode exacte no és assumible dia a dia; si mai és la família que s'interpreta, la
-# importància per permutació, que no mira dins del model, hi arriba sense desar res a
-# cada execució.
+# `attribute` és `None` on no hi ha cap mètode i on no se'n vol cap. Les prediccions
+# ingènues perquè la seva atribució seria la columna que copien. L'MLP perquè TreeSHAP
+# no s'hi aplica i cap mètode exacte no és assumible dia a dia. I la xarxa de l'article
+# perquè no és un model del qual s'esperi cap explicació: hi és per dir com de lluny
+# són LEAR i l'arbre, que són els que s'interpreten, del que es pot arribar a fer amb
+# aquestes dades.
 #
 # `members` són els models ajustats que entren a la combinació d'una execució, i
 # `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
@@ -56,6 +58,8 @@ def families():
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
         mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None,
                          members=(mlp.NAME,), headlines=(mlp.NAME,)),
+        dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None,
+                         members=(dnn.NAME,), headlines=(dnn.NAME,)),
     }
 
 
