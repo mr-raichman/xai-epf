@@ -16,6 +16,10 @@ cada dia. Dins d'un lot, l'últim dia el prediu un ajust de fa quatre setmanes, 
 fa la puntuació una mica pessimista i la cerca assumible. Cap dia d'un lot no entra a
 l'ajust que el prediu, que és el que `tests/test_search.py` fixa.
 
+Una cerca interrompuda no perd res: l'estudi es desa a cada prova, i tornar-la a
+cridar la reprèn. `--trials 0` no en fa cap de nova i desa el millor que l'estudi ja
+té, que és com es tanca una cerca que va caure abans d'arribar-hi.
+
 Es cerca sobre l'últim any del període de validació, que acaba el dia abans del primer
 de prova. Els anys de prova no es toquen mai; aquell any és el més semblant a ells que
 es pot fer servir, perquè el topall del gas va caure el 2023-12-31 i nou dels seus
@@ -117,7 +121,9 @@ def score(tuned, X, y, actual, batches):
 
 
 def main(arguments):
-    trials = arguments.trials or TRIALS
+    # `--trials 0` no és «cap valor»: és demanar que es desi el que l'estudi ja sap,
+    # que és com es recupera una cerca que va caure abans d'arribar a desar res.
+    trials = TRIALS if arguments.trials is None else arguments.trials
     data = matrix.price_only(price.load())
     X, y = data.daily
     period = (X.index >= str(VALIDATION[0])) & (X.index <= str(VALIDATION[1]))
@@ -139,9 +145,15 @@ def main(arguments):
         sampler=optuna.samplers.TPESampler(seed=SEED))
     study.optimize(objective, n_trials=trials)
 
+    done = [one for one in study.trials
+            if one.state == optuna.trial.TrialState.COMPLETE]
+    if not done:
+        print("cap prova acabada: no es desa res")
+        return 1
+
     dnn_hyperparameters.save({
         "taken": str(datetime.date.today()),
-        "trials": len(study.trials),
+        "trials": len(done),
         "recalibrations": RECALIBRATIONS,
         "batch_days": BATCH_DAYS,
         "first": str(batches[0][0].date()),
@@ -150,5 +162,6 @@ def main(arguments):
         "mae": study.best_value,
         "hyperparameters": space(optuna.trial.FixedTrial(study.best_params)),
     })
-    print(f"millor MAE {study.best_value:.3f} EUR/MWh, desat a "
+    print(f"millor MAE {study.best_value:.3f} EUR/MWh de {len(done)} proves, desat a "
           f"{dnn_hyperparameters.path()}")
+    return 0
