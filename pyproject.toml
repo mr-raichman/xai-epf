@@ -17,16 +17,9 @@ dependencies = [
     "joblib==1.6.0",
 ]
 
-# Tot el que es tecleja a mà. El caminant no hi és: l'executa `epf-run`, que viu
-# fora del projecte perquè avisa quan acaba.
+# Tot el que es tecleja a mà, en una sola ordre: `epf --help` és la llista.
 [project.scripts]
-epf-price = "epf.data.price:main"
-epf-audit-data = "epf.data.audit:main"
-epf-attribute = "epf.attribution.attribute:main"
-epf-show-run = "epf.results.show_run:main"
-epf-show-figures = "epf.results.show_figures:main"
-epf-figure-price = "epf.data.figures.price.price:main"
-epf-figure-outliers = "epf.data.figures.price.outliers:main"
+epf = "epf.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff==0.16.1"]
@@ -44,6 +37,6 @@ packages = ["epf"]
 select = ["E4", "E7", "E9", "F"]
 
 [tool.pytest.ini_options]
-# Només les proves de tests/. Els scripts de tools/ no són proves.
+# Només les proves de tests/.
 testpaths = ["tests"]
 addopts = "-q"

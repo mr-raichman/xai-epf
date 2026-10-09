@@ -28,8 +28,15 @@ def perfect(X, y, day):
 
 
 def walked(*arguments, **keywords):
-    """La taula de l'únic pronòstic, per llegir les proves d'una sola sèrie."""
-    return forward(*arguments, **keywords)[ONE]
+    """La taula de l'únic pronòstic, muntada del que `forward` lliura dia a dia.
+
+    `forward` no desa cap dia: els escriu qui li passa `on_day`, que a l'execució és
+    el corredor i aquí és aquesta llista.
+    """
+    rows = []
+    keywords["on_day"] = lambda day, frames: rows.append(frames[ONE])
+    forward(*arguments, **keywords)
+    return pd.concat(rows)
 
 
 def test_every_day_of_the_period_is_predicted_and_kept_in_order():
@@ -50,6 +57,27 @@ def test_taking_one_day_in_every_n_keeps_the_first():
     out = walked(perfect, X, y, "2024-01-10", "2024-01-20", every=5)
     assert list(out.index) == [pd.Timestamp("2024-01-10"), pd.Timestamp("2024-01-15"),
                                pd.Timestamp("2024-01-20")]
+
+
+def test_resuming_keeps_the_sampled_days_exactly_where_they_were():
+    # Reprendre no pot desplaçar la fase de `every`. Si el dia on es reprèn passés
+    # com a `first`, un dia de cada cinc des del 16 donaria el 16, el 21 i el 26, i
+    # cap d'ells és un dia que la passada sencera hagués predit.
+    X = y = frame_of(30)
+    whole = walked(perfect, X, y, "2024-01-10", "2024-01-26", every=5)
+    rest = walked(perfect, X, y, "2024-01-10", "2024-01-26", every=5,
+                  after=pd.Timestamp("2024-01-15"))
+    assert list(whole.index) == [pd.Timestamp(day) for day in
+                                 ("2024-01-10", "2024-01-15", "2024-01-20", "2024-01-25")]
+    assert list(rest.index) == list(whole.index[2:])
+
+
+def test_resuming_past_the_last_day_walks_nothing():
+    # Una execució que va caure entre l'últim dia i les mètriques: els dies ja hi són
+    # tots i el que queda per fer és tancar el directori.
+    X = y = frame_of(30)
+    assert forward(perfect, X, y, "2024-01-10", "2024-01-12",
+                   after=pd.Timestamp("2024-01-12")).empty
 
 
 def test_an_empty_period_fails_loudly():

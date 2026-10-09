@@ -10,7 +10,6 @@ primer error, que és el seu ofici, i acaba amb 1 si alguna comprovació ha fall
 """
 import collections
 import datetime
-import sys
 
 import pandas as pd
 
@@ -154,7 +153,3 @@ def main():
         return 1
     print("la capa de dades és coherent amb el que sabem de la font")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -63,8 +63,8 @@ def test_a_single_model_family_contributes_its_one_csv(tmp_path):
     folder = tmp_path / "mlp"
     one_model(folder, "mlp", 7.0)
     found = members(folder)
-    assert len(found) == 1
-    assert found[0].to_numpy().min() == 7.0
+    assert list(found) == ["mlp/mlp"]
+    assert found["mlp/mlp"].to_numpy().min() == 7.0
 
 
 def test_a_record_that_does_not_say_who_is_a_member_combines_nothing(tmp_path):
@@ -77,7 +77,7 @@ def test_a_record_that_does_not_say_who_is_a_member_combines_nothing(tmp_path):
     assert members(folder) is None
     one_model(tmp_path / "tree", "tree", 10.0)
     frame, found = combined([folder, tmp_path / "tree"])
-    assert frame is None and found == []
+    assert frame is None and found == {}
 
 
 def test_the_combination_is_the_simple_average_of_every_member(tmp_path):
@@ -88,6 +88,22 @@ def test_the_combination_is_the_simple_average_of_every_member(tmp_path):
     # (1 + 2 + 3 + 4 + 5 + 10) / 6, i no (3 + 10) / 2, que és el que donaria comptar
     # famílies en lloc de membres.
     assert frame.to_numpy().min() == 25.0 / 6
+
+
+def test_the_combination_is_never_a_member_of_itself(tmp_path):
+    # El seu directori porta registre, de manera que `family_folders` el dóna com un
+    # més i tot el que llegeix una execució el llegeix. Si `combined` no el saltés, la
+    # combinació es mitjanaria amb els seus propis membres i el pes de cada un ja no
+    # seria el que diu el registre.
+    ensemble(tmp_path / "lear", "lear", [1.0, 3.0])
+    one_model(tmp_path / "tree", "tree", 10.0)
+    folders = [tmp_path / "lear", tmp_path / "tree"]
+    frame, found = combined(folders)
+    one_model(tmp_path / run_files.COMBINATION, run_files.COMBINATION,
+              frame.to_numpy()[0, 0])
+    again, found_again = combined([*folders, tmp_path / run_files.COMBINATION])
+    assert list(found_again) == list(found)
+    assert (again == frame).to_numpy().all()
 
 
 def test_one_member_is_nothing_to_combine(tmp_path):

@@ -19,7 +19,7 @@ def test_the_record_of_every_family_is_writable():
     table = families()
     for name, family in table.items():
         record = runner.described("abc1234", "test", name, list(table), family,
-                                  forecasts, 1.0)
+                                  forecasts, 1.0, 1)
         json.dumps(record)
 
 
@@ -29,7 +29,7 @@ def test_the_record_says_which_families_the_invocation_chose():
     # en lloc de les famílies i seguia essent JSON vàlid.
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
     record = runner.described("abc1234", "test", "naive", ["lear", "naive"],
-                              families()["naive"], forecasts, 1.0)
+                              families()["naive"], forecasts, 1.0, 1)
     assert record["chosen"] == ["lear", "naive"]
     assert record["family"] == "naive"
 
@@ -40,7 +40,7 @@ def test_the_record_says_who_is_a_member_and_who_is_drawn():
     # coincideixen: els membres són les cinc finestres i la capçalera la seva mitjana.
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
     record = runner.described("abc1234", "test", "lear", ["lear"], families()["lear"],
-                              forecasts, 1.0)
+                              forecasts, 1.0, 1)
     assert record["headlines"] == ["lear"]
     assert len(record["members"]) == 5
     assert "lear" not in record["members"]

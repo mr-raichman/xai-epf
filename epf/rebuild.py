@@ -9,9 +9,6 @@ Viu a l'arrel del paquet i no a `results/` perquè toca les dues meitats d'una
 execució, la que puntua i la que explica, i un subpaquet no coneix el nom del seu
 germà (`architecture.md` 8.3).
 """
-import argparse
-import pathlib
-
 from epf import matrix
 from epf.attribution import figures as shap_figures
 from epf.attribution import stored
@@ -31,28 +28,24 @@ def rebuild(folder, actual):
             shap_figures.draw(folder, name)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("folder", type=pathlib.Path, nargs="+",
-                        help="directori d'una execució o d'una de les seves famílies")
-    folders = run_files.family_folders(parser.parse_args().folder)
-
+def main(arguments):
+    folders = run_files.family_folders(arguments.folder)
     actual = matrix.price_only(price.load()).actual
     for folder in folders:
+        # La combinació no hi passa: el seu pronòstic no surt de les prediccions que
+        # té al costat sinó dels membres de tota la configuració, i qui la refà
+        # sencera, figures incloses, és `combination.save`, aquí sota.
+        if run_files.is_combination(folder):
+            continue
         rebuild(folder, actual)
         print(f"refet {folder}")
 
-    # La combinació viu dins del `metrics.csv` de cada família i la reconstrucció
-    # l'acaba de sobreescriure, així que es torna a fer per cada configuració
-    # tocada, amb totes les famílies que hi hagi al disc.
+    # La combinació es refà per cada configuració tocada, amb tots els membres que hi
+    # hagi al disc, i les figures que comparen famílies darrere, perquè la volen a dins.
     for where in sorted({folder.resolve().parent for folder in folders}):
-        family_folders = run_files.family_folders([where])
-        counted = combination.add_combination(family_folders, actual)
-        figures.shared(where, combination.comparison(family_folders, actual), actual)
-        print(f"refetes les figures de {run_files.drawn(len(family_folders))} a {where}"
-              + (f", i la combinació de {counted} membres ajustats" if counted
+        counted = combination.save(where, run_files.recorded(where), actual)
+        forecasts = combination.comparison(run_files.recorded(where))
+        figures.shared(where, forecasts, actual)
+        print(f"refetes les figures de {len(forecasts)} pronòstics a {where}"
+              + (f", amb la combinació de {counted} membres ajustats" if counted
                  else ", sense combinació"))
-
-
-if __name__ == "__main__":
-    main()

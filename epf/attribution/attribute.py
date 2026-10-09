@@ -14,10 +14,6 @@ que fa que l'explicació sigui de la predicció que té al costat, i
 `stored.refuse_inconsistent` és qui ho comprova: la base més les contribucions contra
 el CSV, a través de les dues passades.
 """
-import argparse
-import pathlib
-import sys
-
 from epf import matrix
 from epf.attribution import figures, fitted, stored
 from epf.data import price
@@ -28,18 +24,19 @@ from epf.results import run_files
 def attribute(folder, tables):
     """Escriu l'atribució d'una família i la dibuixa, de l'ajust que va predir cada dia.
 
-    Torna el nom que ha escrit, o `None` si la família no s'atribueix. Valida tot el que
-    necessita abans de tocar el disc: la marca dels ajustos i que hi hagi un ajust per
-    cada dia predit.
+    Torna el nom que ha escrit, o `None` si el directori no s'explica: el registre de
+    la combinació no anomena cap família, i hi ha famílies sense cap mètode
+    d'atribució. Valida tot el que necessita abans de tocar el disc: la marca dels
+    ajustos i que hi hagi un ajust per cada dia predit.
 
     El `.npz` es diu per la família, que és també el nom del pronòstic de capçalera: és
     contra aquell CSV que es comprova l'additivitat, perquè és la predicció que l'ajust
     va donar.
     """
     record = run_files.load_record(folder)
-    name = record["family"]
-    family = families()[name]
-    if family.attribute is None:
+    name = record.get("family")
+    family = families().get(name)
+    if family is None or family.attribute is None:
         return None
 
     forecasts = run_files.load_forecasts(folder)
@@ -63,15 +60,8 @@ def attribute(folder, tables):
     return name
 
 
-def parse():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("folder", type=pathlib.Path, nargs="+",
-                        help="directori d'una execució o d'una de les seves famílies")
-    return parser.parse_args()
-
-
-def main():
-    folders = run_files.family_folders(parse().folder)
+def main(arguments):
+    folders = run_files.family_folders(arguments.folder)
     tables = matrices(matrix.price_only(price.load()))
 
     failed = []
@@ -83,13 +73,8 @@ def main():
             print(f"  ha fallat: {error}", flush=True)
             failed.append(folder.name)
         else:
-            print(f"  {written}" if written
-                  else "  aquesta família no s'atribueix", flush=True)
+            print(f"  {written}" if written else "  no s'atribueix", flush=True)
     if failed:
         print(f"no s'ha explicat: {', '.join(failed)}")
         return 1
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

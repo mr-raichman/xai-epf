@@ -1,8 +1,8 @@
 """Què hi ha dins del directori d'una execució, i on és.
 
-Un directori per configuració i família, perquè el que es compara és una execució
-sencera: totes les famílies d'una configuració, de cop. El període és dins de
-`run.json` i dins del nom que se li posa a la configuració.
+Un directori per configuració i família, més el de la combinació, perquè el que es
+compara és una execució sencera: totes les famílies d'una configuració, de cop. El
+període és dins de `run.json` i dins del nom que se li posa a la configuració.
 
 Tot el que hi ha aquí es deriva de les prediccions i del preu, de manera que es pot
 tornar a calcular sense tornar a ajustar res. L'atribució no: aquella surt del model
@@ -18,12 +18,18 @@ FORECASTS = "forecasts_{name}.csv"
 METRICS = "metrics.csv"
 RECORD = "run.json"
 
+# La combinació d'una execució: el nom del pronòstic i el del seu directori, que és un
+# de més dins del de la configuració. Viu aquí, i no a `combination.py`, perquè és un
+# dels noms que un directori d'execució porta a dins, i perquè qui l'ha de poder
+# reconèixer sense muntar-la és el que escriu i el que llegeix (`architecture.md` 8.1).
+COMBINATION = "combination"
+
 # Com es tornen a llegir els CSV. El lector per defecte de pandas pot errar l'últim
-# bit d'un float, i amb això una reconstrucció donava mètriques que es movien a la
-# 16a xifra significativa; `add_combination` torna a escriure el `metrics.csv` de cada
-# família, de manera que fins i tot els números del camí endavant hi passaven un cop.
-# Amb això una reconstrucció reprodueix l'execució bit a bit i un diff entre les dues
-# vol dir alguna cosa.
+# bit d'un float, i amb això una reconstrucció donava mètriques que es movien a la 16a
+# xifra significativa. Hi passen tots els números d'una execució: les mètriques es
+# calculen de les prediccions rellegides del disc, de manera que una execució represa
+# dóna el mateix que una de seguida, i una reconstrucció reprodueix l'execució bit a
+# bit, que és el que fa que un diff entre les dues vulgui dir alguna cosa.
 EXACT = "round_trip"
 
 
@@ -34,24 +40,48 @@ def run_folder(tier, stage, commit):
 
 
 def family_folders(paths):
-    """Els directoris de família que hi ha darrere dels camins donats.
+    """Els directoris amb registre que hi ha darrere dels camins donats.
 
     Un camí que ja ho és val tal qual; un que no ho és aporta els seus
     subdirectoris que sí que ho són, de manera que tant el directori d'una
     configuració com un glob que l'obre valen igual. El glob també agafa les
     figures de la configuració, que no són directoris i se salten.
+
+    El de la combinació hi entra com els altres, que és el que fa que surti a la taula
+    de `epf show-run` i es refaci com un més, i és per això que mitjanar-la és l'únic
+    lloc que l'ha de distingir (`combination.combined`).
     """
     found = []
     for path in paths:
         if not path.is_dir():
             continue
-        if (path / RECORD).exists():
+        if has_record(path):
             found.append(path)
         else:
-            found += sorted(child for child in path.iterdir() if (child / RECORD).exists())
+            found += recorded(path)
     if not found:
         raise ValueError(f"cap directori de família a {[str(path) for path in paths]}")
     return found
+
+
+def is_combination(folder):
+    """Si el directori és el de la combinació d'una configuració i no el d'una família."""
+    return folder.name == COMBINATION
+
+
+def has_record(folder):
+    """Si el directori porta registre, que és el que diu que l'execució és sencera.
+
+    `run.json` s'escriu l'últim, de manera que un directori a mig caminar no en té i
+    tot el que llegeix una execució el salta sense haver de saber que es pot reprendre.
+    """
+    return (folder / RECORD).exists()
+
+
+def recorded(where):
+    """Els directoris amb registre que hi ha dins d'una configuració, amb la combinació."""
+    return sorted(path for path in where.iterdir() if has_record(path)) \
+        if where.exists() else []
 
 
 def save_forecasts(folder, forecasts):
@@ -71,6 +101,47 @@ def load_forecasts(folder):
             for path in found}
 
 
+def append_forecasts(folder, frames):
+    """Afegeix un dia a cada fitxer de prediccions, una taula d'una fila per pronòstic.
+
+    El camí endavant escriu a mesura que camina, de manera que el directori d'una
+    família és el seu propi magatzem per reprendre-la: `metrics.csv` i `run.json`
+    arriben al final i `run.json` és el que diu que és sencera.
+
+    Una fila escrita així surt byte a byte igual que la mateixa fila dins del `to_csv`
+    de la taula sencera, que és el que fa que una execució represa deixi el mateix
+    fitxer que una de seguida. Això és mesurat i no raonat: `tests/test_run_files.py`
+    ho fixa.
+    """
+    for name, frame in sorted(frames.items()):
+        path = folder / FORECASTS.format(name=name)
+        starting = not path.exists()
+        frame.to_csv(path, mode="w" if starting else "a", header=starting)
+
+
+def last_common_day(folder):
+    """L'últim dia que tenen tots els pronòstics del directori, o `None` si no n'hi ha.
+
+    El mínim dels últims i no el màxim: si una execució va caure entre dos fitxers,
+    manda el curt, perquè reprendre des del llarg alinearia un pronòstic amb els dies
+    equivocats, que és el que `walk.forward` refusa dins de la memòria.
+    """
+    if not folder.exists() or not any(folder.glob(FORECASTS.format(name="*"))):
+        return None
+    forecasts = load_forecasts(folder)
+    last = [frame.index[-1] for frame in forecasts.values() if not frame.empty]
+    if len(last) != len(forecasts):
+        return None
+    return min(last)
+
+
+def drop_after(folder, day):
+    """Deixa tots els pronòstics acabats el mateix dia, esborrant les files de després."""
+    for name, frame in load_forecasts(folder).items():
+        if frame.index[-1] > day:
+            frame[frame.index <= day].to_csv(folder / FORECASTS.format(name=name))
+
+
 def save_metrics(folder, table):
     table.to_csv(folder / METRICS, index=False)
 
@@ -86,11 +157,6 @@ def summary(table):
     que qui decideix com es llegeix una execució és `evaluation.metrics`, que és qui
     les calcula.
     """
-    # La combinació és a `metrics.csv` de cada família, així que llegint-ne
-    # diverses arriba repetida. Files idèntiques es queden en una; si dues
-    # execucions donessin valors diferents, totes dues sobreviuen i el pivot peta,
-    # que és el que ha de passar.
-    table = table.drop_duplicates()
     singles = table[table["hour"].isna() | (table["hour"] == "")]
     order = list(singles["metric"].drop_duplicates())
     wide = singles.pivot(index="forecast", columns="metric", values="value")
@@ -104,11 +170,6 @@ def headlines(folder, forecasts):
     que es dibuixava aleshores.
     """
     return load_record(folder).get("headlines", sorted(forecasts))
-
-
-def drawn(families):
-    """«1 família» o «n famílies», perquè el que imprimeix un script és català."""
-    return "1 família" if families == 1 else f"{families} famílies"
 
 
 def save_record(folder, record):
