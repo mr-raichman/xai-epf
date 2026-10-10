@@ -10,14 +10,14 @@ Cap número de cap model hi és lligat: cada un els pren per defecte del seu pro
 més petits sense que el mòdul hagi de saber que hi ha proves.
 """
 import collections
-import importlib
 
 from epf.models.boosting import boosting
-from epf.models.ddnn import ddnn
+from epf.models.boosting import boosting_hyperparameters
+from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
-from epf.models.dnn import dnn
-from epf.models.lear import lear
-from epf.models.mlp import mlp
+from epf.models.dnn import dnn, dnn_hyperparameters
+from epf.models.lear import lear, lear_hyperparameters
+from epf.models.mlp import mlp, mlp_hyperparameters
 from epf.models.naive import naive
 
 DAILY, HOURLY = "daily", "hourly"
@@ -41,8 +41,14 @@ DAILY, HOURLY = "daily", "hourly"
 # distribució que la família treu i la funció que en dóna els paràmetres d'un dia: el
 # camí endavant els desa al costat de les prediccions, perquè una distribució no són 24
 # preus i tot el que llegeix una execució n'espera 24.
+#
+# `hyperparameters` és el mòdul que porta els números del model, o `None` on no en té
+# cap. Hi és en lloc de derivar-lo del nom de la família: dues famílies poden sortir
+# d'una sola carpeta, cosa que fan les dues distribucionals, i mentre el nom es
+# derivava, el `run.json` d'aquelles dues no portava cap número i no es queixava.
 Family = collections.namedtuple(
-    "Family", "matrix fit predict attribute distribution members headlines")
+    "Family",
+    "matrix fit predict attribute distribution hyperparameters members headlines")
 
 
 def matrices(data):
@@ -58,16 +64,19 @@ def families():
     aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
     """
     found = {
-        "naive": Family(DAILY, naive.fit, naive.predict, None, None,
+        "naive": Family(DAILY, naive.fit, naive.predict, None, None, None,
                         members=(), headlines=naive.NAMES),
         lear.NAME: Family(DAILY, lear.fit, lear.predict, lear.attribute, None,
+                          lear_hyperparameters,
                           members=lear.window_names(), headlines=(lear.NAME,)),
         boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
-                              boosting.attribute, None,
+                              boosting.attribute, None, boosting_hyperparameters,
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
         mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None, None,
+                         mlp_hyperparameters,
                          members=(mlp.NAME,), headlines=(mlp.NAME,)),
         dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None, None,
+                         dnn_hyperparameters,
                          members=(dnn.NAME,), headlines=(dnn.NAME,)),
     }
     # Una família per distribució de sortida, que és el que fa l'article. Totes dues
@@ -76,24 +85,25 @@ def families():
     for name, distribution in DISTRIBUTIONS.items():
         fit, predict, predicted = ddnn.bound(name, distribution)
         found[name] = Family(DAILY, fit, predict, None, predicted,
+                             ddnn_hyperparameters,
                              members=(name,), headlines=(name,))
     return found
 
 
 def hyperparameters(family):
-    """Els números del model d'una família, del seu fitxer i del que n'hagi cercat.
+    """Els números del model d'una família, del seu mòdul i del que n'hagi cercat.
 
-    Tot el que hi és en majúscules, que és la forma que tenen; així `run.json` els
-    recull sense que ningú n'hagi de mantenir una llista.
+    Tot el que el mòdul té en majúscules, que és la forma que tenen; així `run.json`
+    els recull sense que ningú n'hagi de mantenir una llista. Quin mòdul és ho diu el
+    registre i no el nom de la família: dues famílies poden compartir carpeta.
 
     Una família que es cerca els seus números els té al disc i no al mòdul, i els
     demana aquí perquè aquest és l'únic lloc que respon "els números d'aquesta
     família". Sense això el `run.json` d'aquella família no portaria el que ha fet la
     predicció, que és justament el que l'ha de portar quan el commit ja no ho fixa.
     """
-    try:
-        module = importlib.import_module(f"epf.models.{family}.{family}_hyperparameters")
-    except ModuleNotFoundError:
+    module = families()[family].hyperparameters
+    if module is None:
         return {}
     found = {name: getattr(module, name) for name in dir(module) if name.isupper()}
     if hasattr(module, "searched"):

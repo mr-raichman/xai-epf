@@ -138,6 +138,10 @@ def _distribution_rows(folder, name, family, actual):
     `None` per a una família que prediu 24 preus i prou, que són totes llevat de les
     dues distribucionals. Es llegeixen del disc i no de la memòria, com les
     prediccions, de manera que una execució represa en dóna les mateixes.
+
+    **Còpia deliberada de `rebuild.distribution_rows`**, que ho ha de fer igual sense
+    importar aquest mòdul: la diferència és només que allà la família surt del registre
+    del directori i aquí ja es té a la mà (`architecture.md` 8.4).
     """
     if family.distribution is None:
         return None

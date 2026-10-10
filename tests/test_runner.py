@@ -65,6 +65,21 @@ def test_the_record_says_who_is_a_member_and_who_is_drawn():
     assert "lear" not in record["members"]
 
 
+def test_every_family_with_numbers_records_some():
+    # Mesurat el 2026-10-10: mentre el mòdul dels números es derivava del nom de la
+    # família, les dues distribucionals en compartien carpeta, l'import fallava, i
+    # `hyperparameters` tornava un diccionari buit. El `run.json` seguia essent vàlid i
+    # no portava cap número dels que havien fet la predicció, que és justament el que
+    # ha de portar quan el commit ja no els fixa.
+    table = families()
+    for name, family in table.items():
+        found = hyperparameters(name)
+        if family.hyperparameters is None:
+            assert found == {}
+        else:
+            assert found, f"la família {name} no desa cap número"
+
+
 def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals():
     # És el que fa que una execució d'aquesta família es pugui tornar al que la va
     # fer, ara que el commit no en fixa els números. Si la composició es trenqués, el

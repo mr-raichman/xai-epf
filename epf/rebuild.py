@@ -9,19 +9,46 @@ Viu a l'arrel del paquet i no a `results/` perquè toca les dues meitats d'una
 execució, la que puntua i la que explica, i un subpaquet no coneix el nom del seu
 germà (`architecture.md` 8.3).
 """
+import pandas as pd
+
 from epf import matrix
 from epf.attribution import figures as shap_figures
 from epf.attribution import stored
 from epf.data import price
-from epf.evaluation import metrics
+from epf.evaluation import PERCENTILES, distribution_metrics, metrics
+from epf.models.families import families
 from epf.models.naive import naive
 from epf.results import combination, figures, run_files
+
+
+def distribution_rows(folder, actual):
+    """Les mètriques que només té una família que prediu una distribució, o `None`.
+
+    **Còpia deliberada de `runner._distribution_rows`**, i les dues es mantenen
+    iguals. Compartir-les voldria dir que aquest mòdul importés el corredor per
+    arribar-hi, que és la dependència de doble sentit que es va treure el 2026-10-07
+    quan la combinació va sortir d'allà (`architecture.md` 8.4).
+
+    Sense això una reconstrucció perdia el CRPS en silenci: `metrics` no el calcula,
+    perquè no surt de les prediccions sinó dels paràmetres que hi ha al costat.
+    """
+    record = run_files.load_record(folder)
+    family = families().get(record.get("family"))
+    if family is None or family.distribution is None:
+        return None
+    days, parameters, _ = run_files.load_distribution(folder, record["family"])
+    quantiles = family.distribution.quantiles(parameters, PERCENTILES)
+    return distribution_metrics(record["family"], actual.loc[days], quantiles)
 
 
 def rebuild(folder, actual):
     """Reescriu `metrics.csv` i torna a dibuixar totes les figures d'una família."""
     forecasts = run_files.load_forecasts(folder)
-    run_files.save_metrics(folder, metrics(forecasts, actual, naive.weekly_frame(actual)))
+    table = metrics(forecasts, actual, naive.weekly_frame(actual))
+    extra = distribution_rows(folder, actual)
+    if extra is not None:
+        table = pd.concat([table, extra], ignore_index=True)
+    run_files.save_metrics(folder, table)
     figures.draw(folder, actual)
     for name in sorted(forecasts):
         if stored.path(folder, name).exists():
