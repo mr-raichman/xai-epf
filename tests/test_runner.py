@@ -30,7 +30,7 @@ def searched(tmp_path, monkeypatch):
     aquella els demana a qui en tingui.
     """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
-    dnn_hyperparameters.save({"hyperparameters": SEARCHED})
+    dnn_hyperparameters.save({"trials": 20, "hyperparameters": SEARCHED})
 
 
 def test_the_record_of_every_family_is_writable():
@@ -73,6 +73,9 @@ def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals
     assert found["WINDOW"] == dnn_hyperparameters.WINDOW
     for name, value in SEARCHED.items():
         assert found[name] == value
+    # I d'on surten: una cerca de vint proves i una de mil deixarien el mateix rastre
+    # si el registre només portés els valors.
+    assert found["search"]["trials"] == 20
     json.dumps(found)
 
 

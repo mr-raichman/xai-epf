@@ -62,18 +62,26 @@ def path(stage=PRICE_ONLY):
 
 
 def searched(stage=PRICE_ONLY):
-    """El conjunt que va triar l'última cerca d'aquesta etapa.
+    """El conjunt que va triar l'última cerca d'aquesta etapa, i d'on surt.
 
     Refusa si no n'hi ha cap: aquesta família no té valors per defecte que fer servir
     mentre no s'hagi cercat, i arrencar-la amb uns d'inventats donaria un error que no
     diu res de la xarxa de l'article.
+
+    Torna els valors **i la procedència** sota `search`: quantes proves, quins dies i
+    quin error. Els valors tots sols dirien què s'ha fet servir i no si algú els havia
+    triat de debò, i una cerca de vint proves i una de mil deixen el mateix rastre al
+    `run.json` si no s'hi desa el número.
     """
     found = path(stage)
     if not found.exists():
         raise FileNotFoundError(
             f"no hi ha cap conjunt d'hiperparàmetres cercat a {found}; executa "
             f"`epf search-dnn` abans de caminar la família {NAME}")
-    return json.loads(found.read_text())["hyperparameters"]
+    record = json.loads(found.read_text())
+    return record["hyperparameters"] | {
+        "search": {name: value for name, value in record.items()
+                   if name != "hyperparameters"}}
 
 
 def save(record, stage=PRICE_ONLY):
