@@ -43,6 +43,62 @@ def refuse_missing(frame, what):
 
 
 
+def _daily_differential(actual, first, second):
+    """La sèrie diària de diferència de pèrdues entre dos pronòstics, i els seus dies.
+
+    `||e_A[d]||_1 - ||e_B[d]||_1`, que és la forma multivariant de Lago et al. (2021)
+    amb la pèrdua absoluta: una sola xifra per dia, perquè les 24 hores es pronostiquen
+    de cop des del mateix conjunt d'informació i 24 proves separades en serien 24
+    respostes a una pregunta.
+
+    La seva implementació de Giacomini-White pren la mitjana per hores i no la suma,
+    que és la mateixa sèrie multiplicada per 24. No canvia cap de les dues proves: a la
+    de Diebold-Mariano l'escala passa igual al numerador i al denominador, i a la de
+    Giacomini-White el R² de regressar uns sobre els instruments escalats és el mateix.
+    """
+    days = _days(first, actual).intersection(second.index)
+    for frame, what in ((first, "el primer pronòstic"), (second, "el segon"),
+                        (actual, "el preu real")):
+        refuse_missing(frame.loc[days], what)
+    errors = np.abs(actual.loc[days] - first.loc[days]).to_numpy().sum(axis=1)
+    return days, errors - np.abs(actual.loc[days] - second.loc[days]).to_numpy().sum(axis=1)
+
+
+def diebold_mariano(actual, first, second):
+    """p-valor de la prova de Diebold-Mariano multivariant entre dos pronòstics.
+
+    La prova de Lago et al. (2021) secció 5.5.1: una z asimptòtica que la mitjana de la
+    sèrie de diferència de pèrdues és zero. La variant multivariant, de Ziel i Weron,
+    "summarizes the comparison in a single p-value", que és el que es pot dibuixar en un
+    tauler d'escacs.
+
+    **És d'una banda i de la mateixa banda que la de Giacomini-White**, de manera que
+    les dues es poden llegir a la mateixa taula: el p-valor és petit quan el segon
+    pronòstic és el millor i val gairebé 1 quan ho és el primer.
+
+    La diferència amb la de Giacomini-White no és el que es mesura sinó què s'hi
+    condiciona: aquesta prova la mitjana de la diferència i prou, i aquella la regressa
+    sobre el conjunt d'informació del dia anterior, cosa que té en compte la incertesa
+    d'haver estimat els paràmetres. Per això l'article la prefereix, i per això totes
+    dues hi són: aquesta és la que la literatura reporta més i la que el capítol de
+    metodologia promet.
+
+    Comparar un pronòstic amb ell mateix no hi passa: la diferència és zero, la seva
+    desviació també, i la z seria zero partit per zero. Es refusa anomenant-ho, perquè
+    qui tria les parelles és qui sap de la diagonal; la de Giacomini-White sí que hi
+    passa i torna 1.
+    """
+    days, difference = _daily_differential(actual, first, second)
+    if len(days) < 2:
+        raise ValueError(f"{len(days)} dies compartits no donen per a una prova")
+    spread = difference.std(ddof=1)
+    if spread == 0:
+        raise ValueError("els dos pronòstics tenen la mateixa pèrdua tots els dies, "
+                         "de manera que no hi ha res a provar: la diagonal d'una "
+                         "taula de parelles se salta")
+    return float(1 - stats.norm.cdf(difference.mean() / (spread / np.sqrt(len(days)))))
+
+
 def giacomini_white(actual, first, second):
     """p-valor de la prova de Giacomini-White multivariant entre dos pronòstics.
 
@@ -77,16 +133,10 @@ def giacomini_white(actual, first, second):
     saber: aquí no es refusa res, perquè la prova no sap de quina finestra ve cada
     pronòstic.
     """
-    days = _days(first, actual).intersection(second.index)
+    days, difference = _daily_differential(actual, first, second)
     if len(days) < GW_LAGS + 2:
         raise ValueError(f"{len(days)} dies compartits no donen per a una prova amb "
                          f"{GW_LAGS} retard")
-    for frame, what in ((first, "el primer pronòstic"), (second, "el segon"),
-                        (actual, "el preu real")):
-        refuse_missing(frame.loc[days], what)
-
-    difference = (np.abs(actual.loc[days] - first.loc[days])
-                  - np.abs(actual.loc[days] - second.loc[days])).to_numpy().mean(axis=1)
     instruments = np.vstack([np.ones(len(difference) - GW_LAGS),
                              difference[:-GW_LAGS]])
     regressors = instruments * difference[GW_LAGS:]

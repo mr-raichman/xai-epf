@@ -1,4 +1,4 @@
-"""La prova de Giacomini-White multivariant, sobre casos amb resposta coneguda.
+"""Les dues proves de significació multivariants, sobre casos amb resposta coneguda.
 
 Una prova de significació és exactament el que pot donar una xifra plausible i
 equivocada: un p-valor surt sempre, i si el signe o els instruments estan al revés
@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.evaluation import giacomini_white
+from epf.evaluation import diebold_mariano, giacomini_white
 
 DAYS = 200
 
@@ -94,6 +94,57 @@ def test_too_few_shared_days_fails_loudly():
     one = off_by(actual, 1.0)
     with pytest.raises(ValueError):
         giacomini_white(actual.iloc[:2], one.iloc[:2], one.iloc[:2])
+
+
+def test_diebold_mariano_puts_a_clearly_better_first_forecast_near_one():
+    actual = prices()
+    assert diebold_mariano(actual, off_by(actual, 1.0), off_by(actual, 20.0)) > 0.99
+
+
+def test_diebold_mariano_puts_a_clearly_worse_first_forecast_near_zero():
+    actual = prices()
+    assert diebold_mariano(actual, off_by(actual, 20.0), off_by(actual, 1.0)) < 0.01
+
+
+def test_the_two_tests_read_the_same_way_round():
+    # És el que fa que es puguin posar a la mateixa taula. Si una de les dues tingués
+    # el signe al revés, totes dues seguirien donant p-valors plausibles i la taula
+    # diria el contrari en la meitat de les caselles.
+    actual = prices()
+    better, worse = off_by(actual, 1.0), off_by(actual, 20.0)
+    assert diebold_mariano(actual, better, worse) > 0.99
+    assert giacomini_white(actual, better, worse) > 0.99
+    assert diebold_mariano(actual, worse, better) < 0.01
+    assert giacomini_white(actual, worse, better) < 0.01
+
+
+def test_diebold_mariano_does_not_separate_two_forecasts_of_the_same_quality():
+    actual = prices()
+    one, other = off_by(actual, 5.0, seed=1), off_by(actual, 5.0, seed=2)
+    assert min(diebold_mariano(actual, one, other),
+               diebold_mariano(actual, other, one)) > 0.05
+
+
+def test_diebold_mariano_refuses_a_forecast_against_itself():
+    # La diferència de pèrdues és zero tots els dies i la z seria zero partit per
+    # zero. Es refusa en lloc de tornar un NaN que una taula dibuixaria com si fos un
+    # p-valor; la de Giacomini-White sí que hi passa i torna 1.
+    actual = prices()
+    same = off_by(actual, 5.0)
+    with pytest.raises(ValueError, match="diagonal"):
+        diebold_mariano(actual, same, same)
+    assert giacomini_white(actual, same, same) == pytest.approx(1.0)
+
+
+def test_diebold_mariano_refuses_too_few_days_and_a_missing_value():
+    actual = prices()
+    one, other = off_by(actual, 1.0), off_by(actual, 2.0)
+    with pytest.raises(ValueError):
+        diebold_mariano(actual.iloc[:1], one.iloc[:1], other.iloc[:1])
+    broken = one.copy()
+    broken.iloc[5, 3] = np.nan
+    with pytest.raises(ValueError, match="absents"):
+        diebold_mariano(actual, broken, other)
 
 
 def test_a_missing_value_is_refused_rather_than_skipped():
