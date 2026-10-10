@@ -20,6 +20,7 @@ dependencies = [
     # d'instal·lar en una màquina qualsevol.
     "tensorflow==2.21.0",
     "optuna==5.0.0",
+    "scipy==1.18.1",
 ]
 
 # Tot el que es tecleja a mà, en una sola ordre: `epf --help` és la llista.

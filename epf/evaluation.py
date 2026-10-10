@@ -9,8 +9,15 @@ el de prova.
 """
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from epf.market import HOURS_PER_DAY
+
+# La prova de Giacomini-White de Lago et al. (2021) secció 5.5.2: la diferència de
+# pèrdues es regressa sobre el conjunt d'informació del dia anterior, que és una
+# constant i els seus propis retards. Un retard, que és el que fa servir la seva
+# implementació, i per tant dos instruments i dos graus de llibertat.
+GW_LAGS = 1
 
 
 def refuse_missing(frame, what):
@@ -30,6 +37,61 @@ def refuse_missing(frame, what):
     raise ValueError(f"{int(missing.to_numpy().sum())} valors absents a {what}, "
                      f"el primer a {row} hora {column}")
 
+
+
+def giacomini_white(actual, first, second):
+    """p-valor de la prova de Giacomini-White multivariant entre dos pronòstics.
+
+    Afirmar que un model és millor que un altre demana una prova, i la simple de
+    Diebold-Mariano no val per a la predicció diària, perquè les 24 hores es
+    pronostiquen de cop des del mateix conjunt d'informació. Lago et al. (2021) secció
+    5.5.2 prefereix la de Giacomini-White perquè és la generalització condicional:
+    totes dues valen per a models imbricats, però només aquesta té en compte la
+    incertesa d'haver estimat els paràmetres.
+
+    La variant multivariant resumeix la comparació en un sol p-valor. Es fa la sèrie
+    diària de diferència de pèrdues `d`, es regressa sobre una constant i el seu propi
+    retard, i l'estadístic és `T` pel R² de regressar uns sobre els instruments
+    multiplicats per `d`, contra una khi quadrat amb tants graus de llibertat com
+    instruments.
+
+    **És d'una banda, i això és tota la lectura.** L'estadístic porta el signe de la
+    mitjana de `d`, de manera que el p-valor val 1 sempre que el primer pronòstic sigui
+    millor de mitjana, per poc que sigui, i és petit quan el millor és el segon. Un sol
+    valor no distingeix «no hi ha diferència» de «la diferència va a l'altre sentit»:
+    qui vulgui saber si dos pronòstics es poden separar ha de demanar les dues bandes.
+    L'article en diu dues proves d'una banda, i cada parella ordenada és una casella
+    del tauler de la seva figura 5.
+
+    La pèrdua és l'absoluta, `|e|`, que és la mateixa que mesura el MAE i la mateixa
+    que la xarxa minimitza. L'article admet també la quadràtica i aquí no hi és.
+
+    Hi ha una condició de la nota al peu 18 de l'article: la prova val mentre la
+    finestra de calibratge no creixi amb la mostra, cosa que es compleix per a una
+    finestra lliscant i no per a la de tot l'historial de LEAR. Les comparacions que
+    impliquen aquella finestra queden fora de la condició, i qui les demana ho ha de
+    saber: aquí no es refusa res, perquè la prova no sap de quina finestra ve cada
+    pronòstic.
+    """
+    days = _days(first, actual).intersection(second.index)
+    if len(days) < GW_LAGS + 2:
+        raise ValueError(f"{len(days)} dies compartits no donen per a una prova amb "
+                         f"{GW_LAGS} retard")
+    for frame, what in ((first, "el primer pronòstic"), (second, "el segon"),
+                        (actual, "el preu real")):
+        refuse_missing(frame.loc[days], what)
+
+    difference = (np.abs(actual.loc[days] - first.loc[days])
+                  - np.abs(actual.loc[days] - second.loc[days])).to_numpy().mean(axis=1)
+    instruments = np.vstack([np.ones(len(difference) - GW_LAGS),
+                             difference[:-GW_LAGS]])
+    regressors = instruments * difference[GW_LAGS:]
+
+    count = regressors.shape[1]
+    betas = np.linalg.lstsq(regressors.T, np.ones(count), rcond=None)[0]
+    residuals = np.ones(count) - regressors.T @ betas
+    statistic = count * (1 - np.mean(residuals ** 2)) * np.sign(difference.mean())
+    return float(1 - stats.chi2.cdf(statistic, regressors.shape[0]))
 
 
 def _days(predicted, actual):
