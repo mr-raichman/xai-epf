@@ -19,6 +19,10 @@ from epf.market import HOURS_PER_DAY
 # implementació, i per tant dos instruments i dos graus de llibertat.
 GW_LAGS = 1
 
+# Els percentils sobre els quals s'aproxima el CRPS. Marcjasz et al. (2023) en fan
+# servir 99, que és el pinball mitjà sobre tots els centils interiors.
+PERCENTILES = np.arange(1, 100) / 100
+
 
 def refuse_missing(frame, what):
     """Falla si la taula porta cap valor absent, anomenant on és el primer.
@@ -209,6 +213,41 @@ def extrema_price_deviations(predicted, actual):
 def extrema_price_deviation(predicted, actual):
     """MPD: la mitjana d'aquelles pèrdues. Com més baix, millor."""
     return float(extrema_price_deviations(predicted, actual).mean())
+
+
+def crps(actual, quantiles, probabilities=PERCENTILES):
+    """CRPS d'una predicció distribucional, pel pinball mitjà sobre els percentils.
+
+    El CRPS és la mesura pròpia d'una predicció distribucional: diu si tota la
+    distribució és bona i no només el seu centre, de manera que un model que encerta el
+    preu i s'equivoca en la incertesa en paga el preu. S'aproxima com fa Marcjasz et
+    al. (2023), amb el pinball mitjà sobre 99 percentils, que és l'aproximació
+    habitual.
+
+    El pinball d'un quantil `q` és `(1-q)(Q - y)` quan el preu real queda per sota del
+    quantil predit i `q(y - Q)` quan queda per sobre: penalitza més quedar-se curt als
+    quantils alts i llarg als baixos, que és el que fa que una distribució massa
+    estreta surti pitjor que una massa ampla amb el mateix centre.
+
+    `quantiles` és `(dies, hores, percentils)` i `actual` la taula de preus dels
+    mateixos dies, en el mateix ordre.
+    """
+    refuse_missing(actual, "el preu real")
+    if not np.isfinite(quantiles).all():
+        raise ValueError("els quantils predits porten valors no finits")
+    difference = actual.to_numpy()[:, :, None] - quantiles
+    return float(np.maximum(probabilities * difference,
+                            (probabilities - 1) * difference).mean())
+
+
+def distribution_metrics(name, actual, quantiles):
+    """Les files que una predicció distribucional afegeix a la taula de mètriques.
+
+    De moment una, el CRPS. Viu aquí i no al corredor perquè la forma d'una fila de
+    `metrics.csv` és d'aquest mòdul, i escrita en dos llocs es desincronitzaria.
+    """
+    return pd.DataFrame([{"forecast": name, "metric": "crps", "hour": "",
+                          "value": crps(actual, quantiles)}])
 
 
 def metrics(forecasts, actual, naive):

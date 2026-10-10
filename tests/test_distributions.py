@@ -1,0 +1,97 @@
+"""Les dues distribucions de sortida i el CRPS que les puntua.
+
+El que pot anar malament en silenci és la correspondència entre els paràmetres i el
+que se'n llegeix. Una escala que surt sense desfer l'escalat, un quantil calculat amb
+l'asimetria i el pes de la cua canviats de lloc o un pinball amb el signe al revés
+donen un CRPS perfectament plausible i equivocat, i com que ningú no té un CRPS de
+referència per a aquest mercat, no hi hauria res que ho delatés.
+"""
+import datetime
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from epf.calendar import HOUR_COLUMNS
+from epf.evaluation import PERCENTILES, crps
+from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL
+
+DAYS = 40
+
+
+def frame_of(values):
+    index = pd.DatetimeIndex([datetime.date(2024, 1, 1) + datetime.timedelta(days=day)
+                              for day in range(DAYS)], name="day")
+    return pd.DataFrame(values, index=index, columns=HOUR_COLUMNS)
+
+
+def normal_parameters(location, scale):
+    return np.stack([np.full((DAYS, len(HOUR_COLUMNS)), location),
+                     np.full((DAYS, len(HOUR_COLUMNS)), scale)], axis=-1)
+
+
+def test_the_normals_median_is_its_location():
+    parameters = normal_parameters(60.0, 5.0)
+    assert np.allclose(NORMAL.point(parameters), 60.0)
+
+
+def test_a_symmetric_johnson_su_has_its_location_as_median():
+    # Amb asimetria zero la de Johnson SU és simètrica al voltant de la localització,
+    # de manera que la mediana hi cau. Si l'asimetria i el pes de la cua estiguessin
+    # canviats de lloc, això fallaria i res més no se n'adonaria.
+    parameters = np.stack([np.full((DAYS, 24), 60.0), np.full((DAYS, 24), 5.0),
+                           np.zeros((DAYS, 24)), np.full((DAYS, 24), 2.0)], axis=-1)
+    assert np.allclose(JOHNSON_SU.point(parameters), 60.0, atol=1e-9)
+
+
+def test_a_positive_skew_moves_the_median_one_way_and_a_negative_the_other():
+    def median(skew):
+        parameters = np.stack([np.full((DAYS, 24), 60.0), np.full((DAYS, 24), 5.0),
+                               np.full((DAYS, 24), skew), np.full((DAYS, 24), 2.0)],
+                              axis=-1)
+        return JOHNSON_SU.point(parameters)[0, 0]
+    assert median(1.0) < 60.0 < median(-1.0)
+
+
+def test_the_quantiles_come_out_in_order_and_straddle_the_median():
+    quantiles = NORMAL.quantiles(normal_parameters(60.0, 5.0), PERCENTILES)
+    assert quantiles.shape == (DAYS, len(HOUR_COLUMNS), len(PERCENTILES))
+    assert (np.diff(quantiles, axis=-1) > 0).all()
+    assert quantiles[0, 0, len(PERCENTILES) // 2] == pytest.approx(60.0)
+
+
+def test_a_sharper_distribution_scores_better_when_it_is_centred_right():
+    # La mesura pròpia d'una predicció distribucional: encertar el centre no n'hi ha
+    # prou, i dir-ho amb més confiança quan es té raó ha de puntuar millor.
+    actual = frame_of(60.0)
+    sharp = crps(actual, NORMAL.quantiles(normal_parameters(60.0, 1.0), PERCENTILES))
+    wide = crps(actual, NORMAL.quantiles(normal_parameters(60.0, 20.0), PERCENTILES))
+    assert sharp < wide
+
+
+def test_a_sharper_distribution_scores_worse_when_it_is_centred_wrong():
+    # I l'altra meitat, que és la que fa del CRPS una mesura i no un premi a la
+    # confiança: equivocar-se amb seguretat ha de costar més que equivocar-se amb dubte.
+    actual = frame_of(60.0)
+    sharp = crps(actual, NORMAL.quantiles(normal_parameters(90.0, 1.0), PERCENTILES))
+    wide = crps(actual, NORMAL.quantiles(normal_parameters(90.0, 20.0), PERCENTILES))
+    assert sharp > wide
+
+
+def test_the_best_scale_is_the_one_the_prices_really_have():
+    # Amb preus normals de desviació coneguda, el CRPS ha de ser mínim a prop d'aquella
+    # desviació i no a zero ni a l'infinit.
+    rng = np.random.default_rng(0)
+    actual = frame_of(rng.normal(60.0, 8.0, size=(DAYS, len(HOUR_COLUMNS))))
+    scores = {scale: crps(actual, NORMAL.quantiles(normal_parameters(60.0, scale),
+                                                   PERCENTILES))
+              for scale in (1.0, 4.0, 8.0, 16.0, 40.0)}
+    assert min(scores, key=scores.get) == 8.0
+
+
+def test_a_non_finite_quantile_is_refused_rather_than_averaged_away():
+    actual = frame_of(60.0)
+    quantiles = NORMAL.quantiles(normal_parameters(60.0, 5.0), PERCENTILES)
+    quantiles[3, 2, 10] = np.inf
+    with pytest.raises(ValueError, match="no finits"):
+        crps(actual, quantiles)

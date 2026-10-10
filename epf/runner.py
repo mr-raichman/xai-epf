@@ -24,11 +24,13 @@ import sys
 import time
 import traceback
 
+import pandas as pd
+
 from epf import cli, matrix, parameters, paths
 from epf.attribution import fitted
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
-from epf.evaluation import metrics
+from epf.evaluation import PERCENTILES, distribution_metrics, metrics
 from epf.models.families import families, hyperparameters, matrices
 from epf.models.naive import naive
 from epf.results import combination, figures, run_files
@@ -38,7 +40,7 @@ from epf.walk import forward
 MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 
 
-def run(family, name, tables, tier, store, after, report):
+def run(family, name, tables, tier, store, folder, after, report):
     """Camí endavant d'una família: cada dia escrit a mesura que surt.
 
     Un ajust per dia i tots els pronòstics d'aquell ajust, de manera que les cinc
@@ -60,6 +62,12 @@ def run(family, name, tables, tier, store, after, report):
         model = family.fit(X, y, when)
         if family.attribute is not None:
             fitted.save(store, when, model)
+        if family.distribution is not None:
+            # Es demana la xarxa dues vegades per dia, aquí i a `predict`: són dues
+            # crides sobre una sola fila, i el preu de deixar `predict` genèric.
+            run_files.append_distribution(
+                folder, name, when, family.distribution.of_day(model, X, when),
+                family.distribution.names)
         return family.predict(model, X, when)
 
     first, last, every = parameters.PERIODS[tier]
@@ -124,7 +132,21 @@ def described(commit, tier, name, chosen, family, forecasts, walk_seconds, walke
     }
 
 
-def write(folder, forecasts, actual, record):
+def _distribution_rows(folder, name, family, actual):
+    """Les mètriques que només tenen sentit per a una predicció distribucional.
+
+    `None` per a una família que prediu 24 preus i prou, que són totes llevat de les
+    dues distribucionals. Es llegeixen del disc i no de la memòria, com les
+    prediccions, de manera que una execució represa en dóna les mateixes.
+    """
+    if family.distribution is None:
+        return None
+    days, parameters, _ = run_files.load_distribution(folder, name)
+    quantiles = family.distribution.quantiles(parameters, PERCENTILES)
+    return distribution_metrics(name, actual.loc[days], quantiles)
+
+
+def write(folder, forecasts, actual, record, extra=None):
     """Tanca el directori d'una família: les mètriques, i el registre l'últim.
 
     Les prediccions ja hi són, escrites dia a dia pel camí endavant, i arriben aquí
@@ -138,6 +160,8 @@ def write(folder, forecasts, actual, record):
     Torna la taula que ha desat, que és la que s'imprimeix.
     """
     table = metrics(forecasts, actual, naive.weekly_frame(actual))
+    if extra is not None:
+        table = pd.concat([table, extra], ignore_index=True)
     run_files.save_metrics(folder, table)
     run_files.save_record(folder, record)
     return table
@@ -225,8 +249,8 @@ def main(arguments):
         clock = time.perf_counter()
         started.clear()
         try:
-            walked = run(table[family], family, tables, arguments.tier, store, after,
-                         report)
+            walked = run(table[family], family, tables, arguments.tier, store,
+                         folder, after, report)
             seconds = time.perf_counter() - clock
             forecasts = run_files.load_forecasts(folder)
             if explains:
@@ -235,7 +259,9 @@ def main(arguments):
                     next(iter(forecasts.values())).index))
             measured = write(folder, forecasts, actual,
                              described(commit, arguments.tier, family, chosen,
-                                       table[family], forecasts, seconds, len(walked)))
+                                       table[family], forecasts, seconds, len(walked)),
+                             extra=_distribution_rows(folder, family, table[family],
+                                                      actual))
             figures.draw(folder, actual)
         except Exception:
             traceback.print_exc()

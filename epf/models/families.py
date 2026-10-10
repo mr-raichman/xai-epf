@@ -13,6 +13,8 @@ import collections
 import importlib
 
 from epf.models.boosting import boosting
+from epf.models.ddnn import ddnn
+from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.dnn import dnn
 from epf.models.lear import lear
 from epf.models.mlp import mlp
@@ -34,7 +36,13 @@ DAILY, HOURLY = "daily", "hourly"
 # `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
 # s'ajusta són les cinc finestres i el que es compara amb els altres models és la seva
 # mitjana, que no és cap model. Les ingènues no ajusten res i no són membres de res.
-Family = collections.namedtuple("Family", "matrix fit predict attribute members headlines")
+#
+# `distribution` és `None` a tot el que prediu 24 preus i prou. On no ho és, porta la
+# distribució que la família treu i la funció que en dóna els paràmetres d'un dia: el
+# camí endavant els desa al costat de les prediccions, perquè una distribució no són 24
+# preus i tot el que llegeix una execució n'espera 24.
+Family = collections.namedtuple(
+    "Family", "matrix fit predict attribute distribution members headlines")
 
 
 def matrices(data):
@@ -49,18 +57,27 @@ def families():
     `models/<nom>/<nom>_hyperparameters.py` i els pren per defecte, de manera que
     aquí no se'n lliga cap i el camí endavant tampoc no en sap res.
     """
-    return {
-        "naive": Family(DAILY, naive.fit, naive.predict, None,
+    found = {
+        "naive": Family(DAILY, naive.fit, naive.predict, None, None,
                         members=(), headlines=naive.NAMES),
-        lear.NAME: Family(DAILY, lear.fit, lear.predict, lear.attribute,
+        lear.NAME: Family(DAILY, lear.fit, lear.predict, lear.attribute, None,
                           members=lear.window_names(), headlines=(lear.NAME,)),
-        boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict, boosting.attribute,
+        boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
+                              boosting.attribute, None,
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
-        mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None,
+        mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None, None,
                          members=(mlp.NAME,), headlines=(mlp.NAME,)),
-        dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None,
+        dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None, None,
                          members=(dnn.NAME,), headlines=(dnn.NAME,)),
     }
+    # Una família per distribució de sortida, que és el que fa l'article. Totes dues
+    # són la mateixa xarxa amb un cap diferent, i el que les distingeix se'ls lliga a
+    # `ddnn.bound`.
+    for name, distribution in DISTRIBUTIONS.items():
+        fit, predict, predicted = ddnn.bound(name, distribution)
+        found[name] = Family(DAILY, fit, predict, None, predicted,
+                             members=(name,), headlines=(name,))
+    return found
 
 
 def hyperparameters(family):

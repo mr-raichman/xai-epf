@@ -10,13 +10,35 @@ que va predir el dia i la desa `attribution/stored.py`.
 """
 import json
 
+import numpy as np
 import pandas as pd
 
 from epf import paths
 
+# El nom de l'índex de tota taula d'una execució, que és el dia de lliurament. Ve de la
+# sèrie de preus i es torna a posar en llegir el que es desa sense índex de pandas.
+DAY = "day"
+
+# La columna de l'hora de les taules llargues d'una execució. La de `matrix.py` és la
+# de les matrius de característiques; aquesta és la mateixa paraula perquè és la
+# mateixa cosa, i no s'importa d'allà perquè `results/` no depèn de les matrius.
+HOUR = "hour"
+
 FORECASTS = "forecasts_{name}.csv"
 METRICS = "metrics.csv"
 RECORD = "run.json"
+
+# Els paràmetres de la distribució que una família distribucional ha predit cada dia,
+# una fila per dia i hora i una columna per paràmetre. Van a part i no a
+# `forecasts_<nom>.csv` perquè no són preus: una escala comparada amb el preu real
+# donaria un MAE que no vol dir res, i tot el que llegeix un pronòstic l'espera en
+# EUR/MWh. El CRPS és qui els demana.
+#
+# CSV i no un `.npz` perquè el camí endavant es reprèn: s'hi afegeix un dia cada
+# vegada, com a les prediccions, i es talla amb elles. Un `.npz` no s'hi pot afegir
+# res, de manera que una execució represa n'hauria desat només els dies de l'última
+# sessió i ningú no ho hauria notat.
+DISTRIBUTION = "distribution_{name}.csv"
 
 # La combinació d'una execució: el nom del pronòstic i el del seu directori, que és un
 # de més dins del de la configuració. Viu aquí, i no a `combination.py`, perquè és un
@@ -136,10 +158,49 @@ def last_common_day(folder):
 
 
 def drop_after(folder, day):
-    """Deixa tots els pronòstics acabats el mateix dia, esborrant les files de després."""
+    """Deixa tot el que el camí endavant va escrivint acabat el mateix dia.
+
+    Els pronòstics i, on n'hi hagi, els paràmetres de la distribució: tots dos
+    s'escriuen dia a dia, de manera que tots dos es poden haver passat del dia pel qual
+    es reprèn.
+    """
     for name, frame in load_forecasts(folder).items():
         if frame.index[-1] > day:
             frame[frame.index <= day].to_csv(folder / FORECASTS.format(name=name))
+    for path in sorted(folder.glob(DISTRIBUTION.format(name="*"))):
+        table = pd.read_csv(path, parse_dates=[DAY], float_precision=EXACT)
+        kept = table[table[DAY] <= day]
+        if len(kept) != len(table):
+            kept.to_csv(path, index=False)
+
+
+def append_distribution(folder, name, day, parameters, names):
+    """Afegeix els paràmetres d'un dia, `(hores, paràmetres)`, una fila per hora."""
+    path = folder / DISTRIBUTION.format(name=name)
+    rows = pd.DataFrame(parameters, columns=list(names))
+    rows.insert(0, HOUR, range(len(rows)))
+    rows.insert(0, DAY, day)
+    starting = not path.exists()
+    rows.to_csv(path, mode="w" if starting else "a", header=starting, index=False)
+
+
+def load_distribution(folder, name):
+    """Els dies i els paràmetres desats, `(dies, hores, paràmetres)`, i els seus noms.
+
+    Es tornen a muntar en el mateix ordre en què es van escriure, que és el de l'hora
+    dins del dia: si una fila hagués arribat fora d'ordre, el CRPS compararia una hora
+    amb el preu d'una altra.
+    """
+    table = pd.read_csv(folder / DISTRIBUTION.format(name=name),
+                        parse_dates=[DAY], float_precision=EXACT)
+    names = [column for column in table.columns if column not in (DAY, HOUR)]
+    days = pd.DatetimeIndex(table[DAY].unique(), name=DAY)
+    hours = table[HOUR].to_numpy().reshape(len(days), -1)
+    if not (hours == np.arange(hours.shape[1])).all():
+        raise ValueError(f"les hores de {DISTRIBUTION.format(name=name)} no van en "
+                         "ordre dins de cada dia")
+    return days, table[names].to_numpy().reshape(len(days), hours.shape[1],
+                                                 len(names)), names
 
 
 def save_metrics(folder, table):

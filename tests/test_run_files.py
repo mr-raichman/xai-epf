@@ -8,7 +8,9 @@ l'execució deixaria de voler dir res.
 """
 import datetime
 
+import numpy as np
 import pandas as pd
+import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.results import run_files
@@ -77,6 +79,50 @@ def test_dropping_after_the_resume_day_leaves_them_all_at_it(tmp_path):
     forecasts = run_files.load_forecasts(folder)
     assert {frame.index[-1] for frame in forecasts.values()} == {pd.Timestamp("2024-01-05")}
     assert run_files.last_common_day(folder) == pd.Timestamp("2024-01-05")
+
+
+def test_the_distribution_round_trips_day_by_day(tmp_path):
+    # S'hi afegeix un dia cada vegada com a les prediccions, perquè el camí endavant
+    # es reprèn. Si es desés sencer al final, una execució represa n'hauria desat
+    # només els dies de l'última sessió.
+    folder = tmp_path / "family"
+    folder.mkdir()
+    names = ("location", "scale")
+    rng = np.random.default_rng(0)
+    written = {}
+    for day in frame_of(4).index:
+        written[day] = rng.normal(60, 5, size=(24, len(names)))
+        run_files.append_distribution(folder, ONE, day, written[day], names)
+
+    days, parameters, found = run_files.load_distribution(folder, ONE)
+    assert found == list(names)
+    assert list(days) == list(written)
+    assert parameters.shape == (4, 24, 2)
+    assert np.allclose(parameters[0], written[days[0]], atol=1e-6)
+
+
+def test_dropping_after_a_day_truncates_the_distribution_too(tmp_path):
+    # Es talla amb les prediccions: si no, en reprendre quedaria més llarga que elles
+    # i el CRPS es calcularia sobre dies que les prediccions ja no tenen.
+    folder = tmp_path / "family"
+    appended(folder, {ONE: frame_of(5)})
+    for day in frame_of(5).index:
+        run_files.append_distribution(folder, ONE, day, np.zeros((24, 1)), ("scale",))
+
+    run_files.drop_after(folder, pd.Timestamp("2024-01-03"))
+    days, _, _ = run_files.load_distribution(folder, ONE)
+    assert days[-1] == pd.Timestamp("2024-01-03")
+
+
+def test_hours_out_of_order_in_the_distribution_fail_loudly(tmp_path):
+    # Les files es remunten per ordre, de manera que una fila fora de lloc faria
+    # comparar una hora amb el preu d'una altra sense que res petés.
+    folder = tmp_path / "family"
+    folder.mkdir()
+    path = folder / run_files.DISTRIBUTION.format(name=ONE)
+    path.write_text("day,hour,scale\n2024-01-01,1,5.0\n2024-01-01,0,5.0\n")
+    with pytest.raises(ValueError, match="ordre"):
+        run_files.load_distribution(folder, ONE)
 
 
 def test_a_directory_with_nothing_in_it_has_no_resume_day(tmp_path):
