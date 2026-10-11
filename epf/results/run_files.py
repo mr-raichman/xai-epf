@@ -45,6 +45,10 @@ def plain(value):
 
 
 FORECASTS = "forecasts_{name}.csv"
+
+# Els fitxers de la part B: una llavor per fitxer i el registre de la família al costat.
+SEED = "seed_{seed}.npz"
+SEED_RECORD = "record.json"
 METRICS = "metrics.csv"
 RECORD = "run.json"
 

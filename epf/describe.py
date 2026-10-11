@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from epf import matrix, parameters
-from epf.attribution.stored import TOLERANCE, TRANSFORMED_TOLERANCE
+from epf.attribution.stored import PRICE_UNITS, TOLERANCE, TRANSFORMED_TOLERANCE
 from epf.data import forecasts, price
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
@@ -28,7 +28,7 @@ from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.linear import linear, linear_hyperparameters
 from epf.parameters import (DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
                             INTERACTION_ROWS, MEASUREMENT, SHARES, TEST)
-from epf.results import run_files
+from epf.results import describe_figures, run_files
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
 Split = collections.namedtuple("Split", "training validation test")
@@ -108,13 +108,26 @@ FLOOR = "floor"
 # Grau del polinomi del sòl, el cúbic de Trebbien et al. (2023).
 FLOOR_DEGREE = 3
 
-RECORD = "record.json"
-SEED_FILE = "seed_{seed}.npz"
+
+# Les unitats d'una contribució que no és un preu: la de la xarxa elàstica, a l'espai de
+# la seva transformació, i l'asimetria i el pes de la cua d'una distribució.
+TRANSFORMED_UNITS, UNITLESS = "espai transformat", "sense unitats"
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
 # files de prova en el mateix ordre, el que es desa de l'explicació, i el pitjor residu
 # de l'explicació contra la predicció que explica, amb el marge que li toca.
 Described = collections.namedtuple("Described", "predicted actual arrays gap tolerance")
+
+
+def group(column):
+    """El grup d'una columna a la importància per grups: el dia abans, cada previsió, el
+    calendari i, a la prova de datació, el comptador de dies."""
+    if column.startswith("lag1_"):
+        return "previous_day"
+    for name in forecasts.INDICATORS:
+        if column == name or column.startswith(f"{name}_"):
+            return name
+    return "date" if column == matrix.DAY_COUNTER else "calendar"
 
 
 def _parts_of(X, parts, explained):
@@ -139,9 +152,12 @@ def _tree(X, y, parts, explained, seed):
     gap = max(np.abs(base + values.sum(axis=1) - boosting.predict_rows(model, X[shown])).max(),
               np.abs(interactions.sum(axis=2) - values[sample]).max())
     return Described(boosting.predict_rows(model, X[test]), y[test].to_numpy(),
-                     {"columns": np.array(X.columns), "values": values, "base": base,
-                      "interaction_rows": sample, "interactions": interactions,
-                      "trees": model.best_iteration_}, gap, TOLERANCE)
+                     {"columns": np.array(X.columns, dtype=str),
+                      "groups": np.array([group(column) for column in X.columns]),
+                      "inputs": X[shown].to_numpy(), "units": np.array([PRICE_UNITS]),
+                      "values": values, "base": base, "interaction_rows": sample,
+                      "interactions": interactions, "trees": model.best_iteration_},
+                     gap, TOLERANCE)
 
 
 def _net(X, y, parts, explained, seed):
@@ -153,7 +169,11 @@ def _net(X, y, parts, explained, seed):
     gap = np.abs(explanation.base + explanation.values.sum(axis=1)
                  - explanation.transformed).max()
     return Described(linear.predict_rows(model, X[test]).to_numpy(), y[test].to_numpy(),
-                     {"columns": np.array(explanation.values.columns),
+                     {"columns": np.array(explanation.values.columns, dtype=str),
+                      "groups": np.array([group(column)
+                                          for column in explanation.values.columns]),
+                      "inputs": X.loc[shown, explanation.values.columns].to_numpy(),
+                      "units": np.array([TRANSFORMED_UNITS]),
                       "values": explanation.values.to_numpy(),
                       "base": explanation.base.to_numpy(),
                       "transformed": explanation.transformed.to_numpy()},
@@ -180,6 +200,12 @@ def _network(distribution):
         return Described(distribution.point(found).ravel(), y[test].to_numpy().ravel(),
                          {"names": np.array(distribution.names),
                           "columns": np.array(explanation.columns),
+                          "groups": np.array([group(column)
+                                              for column in explanation.columns]),
+                          "inputs": X.loc[shown, explanation.columns].to_numpy(),
+                          # La localització i l'escala en EUR/MWh, la resta sense unitats.
+                          "units": np.array([PRICE_UNITS, PRICE_UNITS, UNITLESS,
+                                             UNITLESS][:len(distribution.names)]),
                           "values": explanation.values, "base": explanation.base,
                           "parameters": found}, gap, TOLERANCE)
     return described
@@ -192,7 +218,8 @@ def _floor(X, y, parts, explained, seed):
     load = (X["demand"] - X["wind"] - X["solar"]).to_numpy()
     coefficients = np.polyfit(load[train], y[train].to_numpy(), FLOOR_DEGREE)
     return Described(np.polyval(coefficients, load[test]), y[test].to_numpy(),
-                     {"coefficients": coefficients}, 0.0, TOLERANCE)
+                     {"coefficients": coefficients, "load_training": load[train],
+                      "actual_training": y[train].to_numpy()}, 0.0, TOLERANCE)
 
 
 # Qui es descriu: amb quina taula, sobre quins conjunts, com, i amb quins números. El sòl
@@ -295,7 +322,7 @@ def main(arguments):
             X, y = tables[name][describer.table]
             started, described_now = time.time(), []
             for seed in seeds:
-                path = folder / SEED_FILE.format(seed=seed)
+                path = folder / run_files.SEED.format(seed=seed)
                 if path.exists():
                     continue
                 parts = split(seed, DEVELOPMENT)
@@ -319,6 +346,8 @@ def main(arguments):
                       "described_now": described_now,
                       "seconds_now": round(time.time() - started, 1),
                       "parameters": swept}
-            (folder / RECORD).write_text(json.dumps(run_files.plain(record), indent=2))
-    print(f"la part B és a {where}")
+            (folder / run_files.SEED_RECORD).write_text(
+                json.dumps(run_files.plain(record), indent=2))
+    describe_figures.draw(where)
+    print(f"la part B és a {where}, amb les seves figures")
     return 0

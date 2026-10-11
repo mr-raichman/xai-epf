@@ -83,6 +83,9 @@ COMMANDS = {
     "describe": Command(
         "epf.describe", "descriu el preu amb el protocol de Trebbien et al. (2023), la part B",
         pass_arguments),
+    "describe-figures": Command(
+        "epf.results.describe_figures", "torna a dibuixar les figures d'un pas de la part B",
+        folder_arguments),
     "rebuild": Command(
         "epf.rebuild", "refà les mètriques i les figures d'una execució", folder_arguments),
     "attribute": Command(
