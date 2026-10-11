@@ -20,7 +20,8 @@ import numpy as np
 import pandas as pd
 
 from epf import matrix, parameters
-from epf.attribution.stored import PRICE_UNITS, TOLERANCE, TRANSFORMED_TOLERANCE
+from epf.attribution.stored import (PRICE_UNITS, TOLERANCE, TRANSFORMED_TOLERANCE,
+                                    TRANSFORMED_UNITS)
 from epf.data import forecasts, price
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
@@ -109,9 +110,9 @@ FLOOR = "floor"
 FLOOR_DEGREE = 3
 
 
-# Les unitats d'una contribució que no és un preu: la de la xarxa elàstica, a l'espai de
-# la seva transformació, i l'asimetria i el pes de la cua d'una distribució.
-TRANSFORMED_UNITS, UNITLESS = "espai transformat", "sense unitats"
+# Les unitats d'una contribució que no és un preu ni un preu transformat: l'asimetria i
+# el pes de la cua d'una distribució.
+UNITLESS = "sense unitats"
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
 # files de prova en el mateix ordre, el que es desa de l'explicació, i el pitjor residu

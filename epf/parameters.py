@@ -67,6 +67,12 @@ WARM_UP = max(LAGS)
 
 DAYS_PER_WEEK = 7
 
+# Quatre anys de calibratge en dies, un cop descomptat l'escalfament: la finestra de les
+# xarxes de Lago et al. (2021) i de Marcjasz et al. (2023), i la de l'arbre i la xarxa
+# elàstica al camí endavant, perquè una diferència entre ells sigui d'algorisme. Els
+# "anys" són de 364 dies, 52 setmanes exactes que mantenen alineat el dia de la setmana.
+FOUR_YEARS = 364 * 4 - WARM_UP
+
 # ------------------------------------------------- la descripció de la part B
 
 # El període que es descriu, del primer dia de les previsions D+1 al dia abans dels

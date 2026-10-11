@@ -3,7 +3,10 @@
 Punt de partida i no els valors per defecte de la llibreria, que arrenca en 100
 arbres i taxa 0,1.
 """
-WINDOW = 1085
+from epf.parameters import FOUR_YEARS
+
+# La finestra de les xarxes neuronals, al camí endavant.
+WINDOW = FOUR_YEARS
 TREES = 500
 RATE = 0.05
 LEAVES = 31

@@ -30,6 +30,10 @@ ONE = ("model",)
 
 PRICE_UNITS = "EUR/MWh"
 
+# Les d'una contribució a l'espai de la transformació de LEAR, on la base més les
+# contribucions són un preu transformat i no un preu.
+TRANSFORMED_UNITS = "espai transformat"
+
 # Marge de la comprovació d'additivitat. Les contribucions es desen en `float32` i
 # el residu mesurat és de l'ordre de 1e-5 EUR/MWh, de manera que això hi deixa dos
 # ordres de magnitud i és molt per sota de qualsevol diferència que vulgui dir res
@@ -76,14 +80,19 @@ def refuse_nonadditive(forecast, stored):
     per la distància al fons i la base és la predicció al fons, de manera que la suma
     és `intercept_ + coef_ @ x`, que és la predicció.
 
-    Quan les contribucions no són en EUR/MWh aquesta és l'única manera de
-    comprovar-ho, perquè la suma és a l'espai transformat i `sinh` no deixa
+    En EUR/MWh no hi ha res a fer aquí: la suma ja és el preu, i la compara amb el CSV
+    `refuse_inconsistent`. Quan les contribucions no són en EUR/MWh aquesta és l'única
+    manera de comprovar-ho, perquè la suma és a l'espai transformat i `sinh` no deixa
     convertir-la: es compara amb la predicció del model al mateix espai. Sense això, la
     família amb l'atribució exacta per construcció seria l'única que no comprova res
-    (`evidence.md` 5.4).
+    (`evidence.md` 5.4), i per això una que no la porta falla en lloc de passar.
     """
-    if stored.transformed is None:
+    if stored.units == PRICE_UNITS:
         return
+    if stored.transformed is None:
+        raise ValueError(f"l'atribució desada de {forecast} és a {stored.units} i no "
+                         "porta la predicció de cap membre al mateix espai: no hi ha res "
+                         "contra què comprovar-ne l'additivitat")
     worst = float(np.abs(stored.base + stored.values.sum(axis=2)
                          - stored.transformed).max())
     if worst > TRANSFORMED_TOLERANCE:
@@ -103,8 +112,9 @@ def refuse_inconsistent(folder, forecast, predicted):
     prediccions desades dels seus membres, un o diversos.
 
     Llegeix el que hi ha al disc i no el que hi havia a la memòria, de manera que
-    també agafa un error en desar. Torna el pitjor residu en EUR/MWh, o None si
-    l'atribució no porta prou per comprovar res.
+    també agafa un error en desar. Torna el pitjor residu en EUR/MWh. Una atribució que
+    no és en EUR/MWh i no porta les prediccions dels membres falla: no hi hauria res a
+    comparar amb el CSV, i la comprovació semblaria feta sense haver-se fet.
     """
     _, stored = load(folder, forecast)
     refuse_nonadditive(forecast, stored)
@@ -115,7 +125,9 @@ def refuse_inconsistent(folder, forecast, predicted):
         rebuilt = stored.forecasts.mean(axis=1)
         whose = "la mitjana de les prediccions dels membres"
     else:
-        return None
+        raise ValueError(f"l'atribució desada de {forecast} és a {stored.units} i no "
+                         "porta les prediccions dels membres en EUR/MWh: no hi ha res a "
+                         "comparar amb el CSV")
     worst = float(np.abs(rebuilt - predicted.to_numpy()).max())
     if worst > TOLERANCE:
         raise ValueError(f"l'atribució desada de {forecast} no reprodueix la seva "

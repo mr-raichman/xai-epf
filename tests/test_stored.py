@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.attribution.stored import (ONE, PRICE_UNITS, Attribution,
+from epf.attribution.stored import (ONE, PRICE_UNITS, TRANSFORMED_UNITS, Attribution,
                                     refuse_inconsistent, save)
 
 DAYS = 3
@@ -45,12 +45,13 @@ def test_an_attribution_that_does_not_add_up_fails_loudly(tmp_path):
         refuse_inconsistent(tmp_path, "tree", frame_of(99.0))
 
 
-def ensemble(folder, base, contributions, transformed, members=(10.0, 20.0, 30.0)):
+def ensemble(folder, base, contributions, transformed, members=(10.0, 20.0, 30.0),
+             without=None):
     """Un conjunt que atribueix en un espai transformat, amb tres finestres.
 
     `members` són les seves prediccions en EUR/MWh, que és el que ha de tornar el CSV,
     i `transformed` les mateixes al seu espai, que és contra el que es comprova
-    l'additivitat.
+    l'additivitat. `without` és el camp que l'`attribute` s'ha deixat de desar.
     """
     folder.mkdir(parents=True, exist_ok=True)
     count = len(members)
@@ -58,8 +59,10 @@ def ensemble(folder, base, contributions, transformed, members=(10.0, 20.0, 30.0
                         np.full((count, 2, 24), contributions),
                         np.full((count, 24), base),
                         np.repeat(np.array(members)[:, None], 24, axis=1),
-                        np.full((count, 24), transformed), "espai transformat")
+                        np.full((count, 24), transformed), TRANSFORMED_UNITS)
             for _ in range(DAYS)]
+    if without:
+        kept = [one._replace(**{without: None}) for one in kept]
     frame = frame_of(np.mean(members))
     save(folder, "lear", frame.index, kept)
     return frame
@@ -83,3 +86,16 @@ def test_an_ensemble_whose_base_does_not_add_up_fails_loudly(tmp_path):
     frame = ensemble(folder, base=0.4, contributions=0.1, transformed=99.0)
     with pytest.raises(ValueError, match="no és additiva"):
         refuse_inconsistent(folder, "lear", frame)
+
+
+def test_a_transformed_attribution_that_leaves_out_what_checks_it_is_refused(tmp_path):
+    # Sense les prediccions en EUR/MWh no hi ha res a comparar amb el CSV, i sense les
+    # del seu espai no hi ha res contra què sumar: totes dues comprovacions passarien
+    # sense haver-se fet.
+    for without, message in (("forecasts", "prediccions dels membres"),
+                             ("transformed", "additivitat")):
+        folder = tmp_path / without
+        frame = ensemble(folder, base=0.4, contributions=0.1, transformed=0.6,
+                         without=without)
+        with pytest.raises(ValueError, match=message):
+            refuse_inconsistent(folder, "lear", frame)

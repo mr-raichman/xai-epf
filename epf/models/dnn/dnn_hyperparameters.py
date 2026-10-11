@@ -14,15 +14,12 @@ que són de l'article, i el pressupost de l'entrenament i de la cerca.
 import json
 
 from epf import paths
-from epf.parameters import WARM_UP
+from epf.parameters import FOUR_YEARS
 
 NAME = "dnn"
 
-# Quatre anys de calibratge, que és el que fan tant Lago et al. (2021) com Marcjasz
-# et al. (2023). Els seus "anys" són de 364 dies, 52 setmanes exactes que mantenen
-# alineat el dia de la setmana, i el que es compta aquí són dies de calibratge un cop
-# descomptat l'escalfament, igual que a LEAR.
-WINDOW = 364 * 4 - WARM_UP
+# Quatre anys de calibratge, com a Lago et al. (2021) i a Marcjasz et al. (2023).
+WINDOW = FOUR_YEARS
 
 # Setmanes de la finestra que s'aparten per aturar l'entrenament quan deixa de
 # millorar. De Lago et al. (2021).

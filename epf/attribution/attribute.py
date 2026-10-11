@@ -55,8 +55,7 @@ def attribute(folder, tables):
     attributions = [family.attribute(fitted.load(store, day), X, day) for day in days]
     stored.save(folder, name, days, attributions)
     worst = stored.refuse_inconsistent(folder, name, forecasts[name])
-    if worst is not None:
-        print(f"  {name}: additivitat a {worst:.1e} EUR/MWh", flush=True)
+    print(f"  {name}: additivitat a {worst:.1e} EUR/MWh", flush=True)
     figures.draw(folder, name)
     return name
 

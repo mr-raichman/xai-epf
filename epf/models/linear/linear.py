@@ -9,7 +9,7 @@ per a les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per def
 perquè les tria una cerca.
 
 Tot és sobre files donades: la part B hi ajusta les files d'entrenament d'una llavor,
-i el camí endavant hi passarà les d'una finestra.
+i el camí endavant les d'una finestra, amb les tres funcions del final.
 """
 import collections
 
@@ -17,9 +17,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 
+from epf.attribution.stored import ONE, TRANSFORMED_UNITS, Attribution
 from epf.market import HOURS_PER_DAY
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR
-from epf.models.linear.linear_hyperparameters import MAX_ITER
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, calibration
+from epf.models.linear.linear_hyperparameters import MAX_ITER, MIXING, PENALTY, WINDOW
 from epf.models.scaling import Scaler
 
 NAME = "elastic_net"
@@ -109,3 +110,30 @@ def attribute_rows(model, X):
         transformed[rows] = fitted.model.predict(design)
     return Explanation(pd.DataFrame(values, index=X.index, columns=columns),
                        pd.Series(base, index=X.index), pd.Series(transformed, index=X.index))
+
+
+def fit(X, y, day, window=WINDOW, penalty=PENALTY, mixing=MIXING):
+    """Els 24 models ajustats només amb les hores dels dies anteriors a `day`."""
+    return fit_rows(*calibration(X, y, day, window), penalty, mixing)
+
+
+def predict(model, X, day):
+    """Els 24 preus de `day`, en ordre d'hora, per nom de pronòstic."""
+    return {NAME: predict_rows(model, X.loc[[day]]).to_numpy()}
+
+
+def attribute(model, X, day):
+    """L'atribució de les 24 hores de `day`, del model que les ha predit.
+
+    És a l'espai transformat, i es desa amb el que la deixa comprovar: la predicció de
+    cada hora en EUR/MWh, que és la del CSV, i la mateixa a l'espai transformat, que és
+    la que la base i les contribucions han de tornar. Les files del dia donen
+    `(hores, columnes)`, que es desa transposat, com la resta, en `(columna, hora)`.
+    """
+    rows = X.loc[[day]]
+    explained = attribute_rows(model, rows)
+    return Attribution(ONE, list(explained.values.columns),
+                       explained.values.to_numpy().T[np.newaxis],
+                       explained.base.to_numpy()[np.newaxis],
+                       predict_rows(model, rows).to_numpy()[np.newaxis],
+                       explained.transformed.to_numpy()[np.newaxis], TRANSFORMED_UNITS)

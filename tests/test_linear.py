@@ -1,11 +1,16 @@
-"""La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres, i
-l'atribució que torna la predicció."""
+"""La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres,
+l'atribució que torna la predicció, i el camí endavant en ordre d'hora i sense el dia
+que prediu."""
+import datetime
+
 import numpy as np
 import pandas as pd
 
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import HOUR, forecasts
-from epf.models.linear.linear import attribute_rows, fit_rows, predict_rows
+from epf.matrix import HOUR, build, forecasts, per_hour
+from epf.models.linear.linear import (NAME, attribute_rows, fit, fit_rows, predict,
+                                      predict_rows)
+from epf.parameters import LAGS
 
 PENALTY, MIXING = 0.01, 0.5
 
@@ -29,6 +34,18 @@ def per_hour_table(days=120, seed=0):
                  "wind": frame(rng.uniform(500, 15000, (days, 24))),
                  "solar": frame(solar)}
     return forecasts(frame(rng.uniform(-2, 200, (days, 24))), day_ahead).hourly
+
+
+# Preus sintètics amb un patró setmanal exacte, com als altres models.
+WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
+
+
+def hourly_prices(days, start=datetime.date(2014, 1, 1)):
+    """La taula per hora dels retards de preu, sobre un preu que puja un euro cada hora."""
+    index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in range(days)],
+                             name="day")
+    rows = [[WEEKLY_SHAPE[day.dayofweek] + hour for hour in range(24)] for day in index]
+    return per_hour(*build(pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS), LAGS))
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():
@@ -98,3 +115,22 @@ def test_the_base_and_the_contributions_return_the_rows_own_prediction():
         rows = (X[HOUR] == hour).to_numpy()
         back = model[hour].target.back(explained.transformed[rows].to_numpy()[:, None])
         assert np.allclose(back.ravel(), prices[rows])
+
+
+def test_the_walk_predicts_the_twenty_four_hours_in_order():
+    # Cada hora té el seu model, i amb aquest preu totes resolen el mateix problema
+    # desplaçat un euro: si les hores sortissin barrejades, els salts no serien d'u.
+    X, y = hourly_prices(200)
+    day = X.index[-1]
+    prices = predict(fit(X, y, day, window=100), X, day)[NAME]
+    assert prices.shape == (24,)
+    assert np.allclose(np.diff(prices), 1.0)
+
+
+def test_the_day_being_predicted_is_never_read():
+    X, y = hourly_prices(200)
+    day = X.index[-1]
+    corrupted = y.copy()
+    corrupted.loc[day] = 9999.0
+    before = predict(fit(X, y, day, window=100), X, day)[NAME]
+    assert np.array_equal(before, predict(fit(X, corrupted, day, window=100), X, day)[NAME])

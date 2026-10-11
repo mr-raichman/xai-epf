@@ -17,6 +17,7 @@ from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.dnn import dnn, dnn_hyperparameters
 from epf.models.lear import lear, lear_hyperparameters
+from epf.models.linear import linear, linear_hyperparameters
 from epf.models.naive import naive
 
 DAILY, HOURLY = "daily", "hourly"
@@ -70,6 +71,9 @@ def families():
         boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
                               boosting.attribute, None, boosting_hyperparameters,
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
+        linear.NAME: Family(HOURLY, linear.fit, linear.predict, linear.attribute, None,
+                            linear_hyperparameters,
+                            members=(linear.NAME,), headlines=(linear.NAME,)),
         dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None, None,
                          dnn_hyperparameters,
                          members=(dnn.NAME,), headlines=(dnn.NAME,)),
