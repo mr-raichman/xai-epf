@@ -13,15 +13,11 @@ import numpy as np
 from sklearn.linear_model import Lasso, LassoLarsIC
 from threadpoolctl import threadpool_limits
 
-from epf.models.lear.lear_hyperparameters import MAX_ITER, SHORT_LAGS, WINDOWS
-from epf.parameters import DAYS_PER_WEEK, LAGS
+from epf.models.lear.lear_hyperparameters import MAX_ITER, WINDOWS
+from epf.parameters import DAYS_PER_WEEK
 from epf.market import HOURS_PER_DAY
-from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
+from epf.matrix import calibration
 from epf.models.scaling import Scaler
-
-# Nom de la finestra que agafa tot l'historial.
-WHOLE_HISTORY = "all"
 
 # Nom del conjunt, que és la mitjana de les seves finestres, i nom de cada finestra.
 # Cada finestra és un pronòstic amb el seu CSV i les seves mètriques, perquè el que
@@ -30,8 +26,8 @@ NAME = "lear"
 
 
 def window_name(window):
-    """Nom del pronòstic d'una finestra: `lear_49`, i `lear_all` per tot l'historial."""
-    return f"{NAME}_{window if window else WHOLE_HISTORY}"
+    """Nom del pronòstic d'una finestra: `lear_49`."""
+    return f"{NAME}_{window}"
 
 
 def window_names(windows=WINDOWS):
@@ -39,10 +35,10 @@ def window_names(windows=WINDOWS):
 
 # El que queda ajustat d'una finestra, i tot el que la predicció necessita. Els 24 LASSO
 # hi són tal com es van ajustar i no com a matrius de coeficients, de manera que predir
-# és exactament la crida que els va predir. Hi va la mida de la finestra i no els seus
-# retards ni les seves columnes, que se'n deriven amb `lags_of`. `prices` és l'escalador
-# de les entrades i `target` el de les 24 sortides, que és qui torna a EUR/MWh. No
-# s'explica: LEAR és la referència, i les referències no s'interpreten.
+# és exactament la crida que els va predir. Totes les finestres llegeixen totes les
+# columnes del conjunt, com a l'article. `prices` és l'escalador de les entrades i
+# `target` el de les 24 sortides, que és qui torna a EUR/MWh. No s'explica: LEAR és la
+# referència, i les referències no s'interpreten.
 Window = collections.namedtuple("Window", "window models prices target")
 
 def _design(rows, scaler):
@@ -58,49 +54,34 @@ def _design(rows, scaler):
 def _fit_hour(features, target, max_iter):
     """Un LASSO per una hora: lambda per LARS amb AIC, ajust per descens de coordenades.
 
-    El sostre d'iteracions ve de la configuració: un ajust tallat a mitges no es
-    queixa, i a 2500 la meitat dels de les finestres llargues ho estaven.
+    El criteri pren com a variància del soroll la de l'objectiu, que és el que calculava
+    l'scikit-learn amb què va córrer Lago et al. (2021). Les versions d'ara l'estimen per
+    mínims quadrats si no se'ls dona, cosa que demana més files que columnes i refusa les
+    dues finestres curtes; donada, el mínim és el de l'article i totes les finestres
+    prenen totes les columnes. El sostre d'iteracions ve de la configuració: un ajust
+    tallat a mitges no es queixa, i a 2500 la meitat dels de les finestres llargues ho
+    estaven.
     """
-    alpha = LassoLarsIC(criterion="aic", max_iter=max_iter).fit(features, target).alpha_
+    alpha = LassoLarsIC(criterion="aic", max_iter=max_iter,
+                        noise_variance=np.var(target)).fit(features, target).alpha_
     return Lasso(alpha=alpha, max_iter=max_iter).fit(features, target)
-
-
-def lags_of(window):
-    """Retards que porta una finestra: els de l'etapa, o menys si és curta."""
-    return SHORT_LAGS.get(window, LAGS)
-
-
-def feature_columns(lags):
-    """Columnes de `matrix.build` que fa servir una finestra, en el mateix ordre.
-
-    Són també les de la matriu de disseny: l'escalat no canvia cap nom i els
-    indicadors ja arriben oberts.
-    """
-    return ([f"lag{lag}_{hour}" for lag in lags for hour in HOUR_COLUMNS]
-            + DAY_OF_WEEK_COLUMNS)
 
 
 def _fit_window(X, y, day, window, max_iter):
     """Els 24 LASSO d'una finestra, ajustats només amb dies anteriors, i els dos
     escaladors que cal per llegir-los."""
-    lags = lags_of(window)
-    columns = feature_columns(lags)
-    features, target = calibration(X[columns], y, day, window)
-    width = len(columns)
-    if len(features) <= width + 1:
-        raise ValueError(f"{len(features)} dies de calibratge per a {day}, "
-                         f"insuficients per a {width} columnes")
-
+    features, target = calibration(X, y, day, window)
     prices = Scaler(features.to_numpy()[:, :-DAYS_PER_WEEK])
     prices_target = Scaler(target.to_numpy())
     train = _design(features, prices)
     scaled = prices_target.forward(target.to_numpy())
 
-    # Un fil, a l'ajust i a la lectura. La matriu de disseny és de 1085 per 103 i a
-    # OpenBLAS li costa més repartir-la entre setze fils que fer-la en un: mesurat
-    # sobre tres dies, un fil va 2,05 a 2,18 vegades més ràpid i dóna el mateix
-    # resultat bit a bit. El límit és d'aquesta família i no de l'execució, perquè les
-    # altres sí que aprofiten els setze.
+    # Un fil, a l'ajust i a la lectura. La matriu de disseny és com a molt de 1449 per
+    # 247 i a OpenBLAS li costa més repartir-la entre setze fils que fer-la en un:
+    # mesurat el 2026-10-11 sobre tres dies de juny del 2023 al conjunt de Lago et al.
+    # (2021), un fil va 1,32 a 1,34 vegades més ràpid i dóna el mateix resultat bit a
+    # bit. El límit és d'aquesta família i no de l'execució, perquè les altres sí que
+    # aprofiten els setze.
     with threadpool_limits(limits=1):
         models = [_fit_hour(train, scaled[:, hour], max_iter)
                   for hour in range(HOURS_PER_DAY)]
@@ -109,8 +90,7 @@ def _fit_window(X, y, day, window, max_iter):
 
 def _rows_of(fitted, X, day):
     """La fila del dia que es prediu, escalada amb l'escalador de la finestra."""
-    columns = feature_columns(lags_of(fitted.window))
-    return _design(X.loc[[day], columns], fitted.prices)
+    return _design(X.loc[[day]], fitted.prices)
 
 
 def _window_prices(fitted, rows):

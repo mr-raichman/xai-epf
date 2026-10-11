@@ -32,7 +32,7 @@ DAILY, HOURLY = "daily", "hourly"
 #
 # `members` són els models ajustats que entren a la combinació d'una execució, i
 # `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
-# s'ajusta són les cinc finestres i el que es compara amb els altres models és la seva
+# s'ajusta són les quatre finestres i el que es compara amb els altres models és la seva
 # mitjana, que no és cap model. Les ingènues no ajusten res i no són membres de res.
 #
 # `distribution` és `None` a tot el que prediu 24 preus i prou. On no ho és, porta la

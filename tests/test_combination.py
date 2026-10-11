@@ -1,7 +1,7 @@
 """Quins pronòstics entren a la combinació, i amb quin pes.
 
 Qui és membre ho diu el `run.json` de cada família. Abans sortia del `.npz` i la
-combinació d'una execució acabada de fer comptava LEAR un sol cop en lloc de cinc,
+combinació d'una execució acabada de fer comptava LEAR un sol cop en lloc d'un per finestra,
 perquè l'atribució ja no s'escriu al camí endavant.
 """
 import datetime

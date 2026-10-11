@@ -56,12 +56,12 @@ def test_the_record_says_which_families_the_invocation_chose():
 def test_the_record_says_who_is_a_member_and_who_is_drawn():
     # La combinació i les figures surten del registre i no del registre de famílies,
     # de manera que una reconstrucció no ha de tornar a endevinar-ho. Amb LEAR no
-    # coincideixen: els membres són les cinc finestres i la capçalera la seva mitjana.
+    # coincideixen: els membres són les quatre finestres i la capçalera la seva mitjana.
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
     record = runner.described("abc1234", "test", "lear", ["lear"], families()["lear"],
                               forecasts, 1.0, 1)
     assert record["headlines"] == ["lear"]
-    assert len(record["members"]) == 5
+    assert len(record["members"]) == 4
     assert "lear" not in record["members"]
 
 
