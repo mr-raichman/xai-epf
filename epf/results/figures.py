@@ -38,12 +38,32 @@ def _chained(frame):
     return series.reindex(pd.date_range(hours[0], hours[-1], freq="h"))
 
 
+# Un traç per predicció ingènua, en l'ordre de `naive.NAMES`. Són el llistó i no un
+# model més, així que van en gris i es distingeixen pel traç, i els colors de línia
+# queden per als models.
+BENCHMARK_DASHES = ("--", ":", "-.")
+
+
+def _drawn(forecasts):
+    """Cada pronòstic, per ordre de nom, amb el color i el traç amb què es dibuixa.
+
+    `strict` fa petar una predicció ingènua nova que no tingui traç, que si no es
+    dibuixaria en color com si fos un model.
+    """
+    dashes = dict(zip(naive.NAMES, BENCHMARK_DASHES, strict=True))
+    styles = {name: (MUTED_INK, dash) for name, dash in dashes.items()}
+    styles |= {name: (colour, "-") for colour, name in
+               colours(name for name in sorted(forecasts) if name not in dashes)}
+    return [(name, frame, *styles[name]) for name, frame in sorted(forecasts.items())]
+
+
 def prices_against_forecasts(folder, forecasts, actual):
     """El preu real i el que cada pronòstic va dir, hora rere hora."""
     figure, axis = plt.subplots(figsize=(16, 4.5), facecolor=SURFACE)
     axis.plot(_chained(actual), color=INK, linewidth=0.7, label="preu real")
-    for colour, (name, frame) in colours(sorted(forecasts.items())):
-        axis.plot(_chained(frame), color=colour, linewidth=0.6, alpha=0.8, label=name)
+    for name, frame, colour, dash in _drawn(forecasts):
+        axis.plot(_chained(frame), color=colour, linestyle=dash, linewidth=0.6, alpha=0.8,
+                  label=name)
     axis.set_ylabel("EUR/MWh", color=MUTED_INK)
     axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     style(axis, "Preu real i predit")
@@ -63,13 +83,13 @@ def error_by_hour(folder, forecasts, actual, weekly):
               (lambda frame: rmae_per_hour(frame, actual, weekly),
                "MAE sobre el de la predicció ingènua", "Sense l'efecte de la dificultat"))
     for axis, (measure, label, title) in zip(axes, panels):
-        for colour, (name, frame) in colours(sorted(forecasts.items())):
+        for name, frame, colour, dash in _drawn(forecasts):
             axis.plot(range(len(HOUR_COLUMNS)), measure(frame).to_numpy(), color=colour,
-                      marker="o", markersize=3, label=name)
+                      linestyle=dash, marker="o", markersize=3, label=name)
         axis.set_xticks(range(len(HOUR_COLUMNS)), HOUR_COLUMNS, rotation=90, fontsize=7)
         axis.set_ylabel(label, color=MUTED_INK)
         style(axis, title)
-    axes[-1].axhline(1.0, color=MUTED_INK, linewidth=0.8, linestyle="--")
+    axes[-1].axhline(1.0, color=MUTED_INK, linewidth=0.8)
     axes[0].legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     save(figure, folder, "error_by_hour")
 
@@ -83,12 +103,12 @@ def curve_correlation_over_time(folder, forecasts, actual):
     """
     figure, axes = plt.subplots(1, 2, figsize=(18, 4), facecolor=SURFACE,
                                 width_ratios=[2.5, 1])
-    for colour, (name, frame) in colours(sorted(forecasts.items())):
+    for name, frame, colour, dash in _drawn(forecasts):
         daily = curve_correlations(frame, actual)
-        axes[0].plot(daily.index, daily.to_numpy(), color=colour, linewidth=0.7, alpha=0.8,
-                     label=f"{name} ({daily.mean():.3f})")
+        axes[0].plot(daily.index, daily.to_numpy(), color=colour, linestyle=dash,
+                     linewidth=0.7, alpha=0.8, label=f"{name} ({daily.mean():.3f})")
         axes[1].hist(daily.dropna().to_numpy(), bins=40, histtype="step", color=colour,
-                     orientation="horizontal")
+                     linestyle=dash, orientation="horizontal")
     for axis in axes:
         axis.set_ylim(-1.05, 1.05)
     axes[0].set_ylabel("correlació de Spearman del dia", color=MUTED_INK)
@@ -113,11 +133,12 @@ def daily_spread(folder, forecasts, actual):
                                 width_ratios=[2.5, 1])
     axes[0].plot(spread.index, spread.to_numpy(), color=INK, linewidth=0.8,
                  label="forquilla real")
-    for colour, (name, frame) in colours(sorted(forecasts.items())):
+    for name, frame, colour, dash in _drawn(forecasts):
         lost = extrema_price_deviations(frame, actual)
-        axes[0].plot(lost.index, (spread - lost).to_numpy(), color=colour, linewidth=0.7,
-                     alpha=0.8, label=f"{name} (MPD {lost.mean():.2f})")
-        axes[1].hist(lost.to_numpy(), bins=40, histtype="step", color=colour)
+        axes[0].plot(lost.index, (spread - lost).to_numpy(), color=colour, linestyle=dash,
+                     linewidth=0.7, alpha=0.8, label=f"{name} (MPD {lost.mean():.2f})")
+        axes[1].hist(lost.to_numpy(), bins=40, histtype="step", color=colour,
+                     linestyle=dash)
     axes[0].set_ylabel("EUR/MWh", color=MUTED_INK)
     axes[0].legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     axes[1].set_xlabel("MPD del dia (EUR/MWh)", color=MUTED_INK)
@@ -168,10 +189,11 @@ def error_over_time(folder, forecasts, actual):
     consecutive = len(days) < 2 or days.to_series().diff().dt.days.median() == 1
     step, period = ("W", "setmana a setmana") if consecutive else ("ME", "mes a mes")
     figure, axis = plt.subplots(figsize=(14, 4), facecolor=SURFACE)
-    for colour, (name, frame) in colours(sorted(forecasts.items())):
+    for name, frame, colour, dash in _drawn(forecasts):
         daily = (frame - actual.loc[frame.index]).abs().mean(axis="columns")
         grouped = daily.resample(step).mean()
-        axis.plot(grouped.index, grouped.to_numpy(), color=colour, label=name)
+        axis.plot(grouped.index, grouped.to_numpy(), color=colour, linestyle=dash,
+                  label=name)
     axis.set_ylabel("MAE (EUR/MWh)", color=MUTED_INK)
     axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     style(axis, f"Error {period}")
@@ -181,9 +203,10 @@ def error_over_time(folder, forecasts, actual):
 def error_distribution(folder, forecasts, actual):
     """Repartiment de l'error amb signe: on es queda curt i on es passa."""
     figure, axis = plt.subplots(figsize=(10, 4), facecolor=SURFACE)
-    for colour, (name, frame) in colours(sorted(forecasts.items())):
+    for name, frame, colour, dash in _drawn(forecasts):
         signed = (frame - actual.loc[frame.index]).to_numpy().reshape(-1)
-        axis.hist(signed, bins=120, histtype="step", color=colour, label=name)
+        axis.hist(signed, bins=120, histtype="step", color=colour, linestyle=dash,
+                  label=name)
     axis.set_xlabel("predicció menys preu real (EUR/MWh)", color=MUTED_INK)
     axis.legend(frameon=False, labelcolor=MUTED_INK, ncols=3)
     style(axis, "Repartiment de l'error")
