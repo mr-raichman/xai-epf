@@ -1,7 +1,8 @@
 """Matrius de característiques, totes dues alineades per dia de lliurament.
 
 La diària té una fila per dia i 24 sortides; la per hora té una fila per dia i
-hora, amb l'hora com a columna.
+hora, amb l'hora com a columna, i hi pren a l'hora de la fila la sèrie que s'hi pren
+a l'hora.
 
 Tota columna d'entrada ha de ser calculable abans del tancament de la subhasta
 del dia anterior al lliurament.
@@ -13,7 +14,7 @@ import pandas as pd
 
 from epf.calendar import HOUR_COLUMNS
 from epf.market import HOURS_PER_DAY
-from epf.parameters import DAYS_PER_WEEK, LAGS
+from epf.parameters import DAYS_PER_WEEK, LAGS, PREVIOUS_DAY
 
 HOUR = "hour"
 PRICE = "price"
@@ -54,16 +55,20 @@ def calibration(X, y, day, window=None):
     return features[kept], target[kept]
 
 
-def build(price, lags):
+def build(price, lags, day_ahead=None):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les.
+    `day_ahead` són previsions per nom, cada una amb les 24 hores del dia que es
+    lliura, i entren sense desplaçar: es publiquen el dia abans.
     """
     if list(price.columns) != HOUR_COLUMNS:
         raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}")
 
     blocks = [price.shift(lag, freq="D").reindex(price.index).add_prefix(f"lag{lag}_")
               for lag in lags]
+    blocks += [frame.reindex(price.index).add_prefix(f"{name}_")
+               for name, frame in (day_ahead or {}).items()]
     blocks.append(pd.DataFrame(np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
                                index=price.index, columns=DAY_OF_WEEK_COLUMNS))
     features = pd.concat(blocks, axis="columns", sort=False)
@@ -72,15 +77,22 @@ def build(price, lags):
     return features[complete], price[complete]
 
 
-def per_hour(X, y):
+def per_hour(X, y, at_the_hour=()):
     """Les mateixes files repartides en una per dia i hora, amb l'hora com a columna.
 
     El gradient boosting comparteix un sol model per a totes les hores i és la taula
     que li cal. L'índex continua sent el dia de lliurament, repetit 24 vegades,
     perquè `calibration` i el camí endavant hi segueixin triant per dia.
+
+    Una sèrie d'`at_the_hour` hi deixa les seves 24 columnes per una de sola, el valor
+    de l'hora de la fila, com Trebbien et al. (2023) prenen les previsions.
     """
     rows = X.loc[X.index.repeat(HOURS_PER_DAY)]
     rows[HOUR] = np.tile(np.arange(HOURS_PER_DAY), len(X))
+    for name in at_the_hour:
+        columns = [f"{name}_{hour}" for hour in HOUR_COLUMNS]
+        rows = rows.drop(columns=columns)
+        rows[name] = X[columns].to_numpy().reshape(-1)
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
@@ -100,3 +112,23 @@ def price_only(frame):
     """
     daily = build(frame, LAGS)
     return Matrices(daily, per_hour(*daily), daily[1])
+
+
+def previous_day(frame):
+    """Les dues matrius del conjunt de referència de la part B: les 24 hores del preu
+    del dia abans i el dia de la setmana."""
+    daily = build(frame, PREVIOUS_DAY)
+    return Matrices(daily, per_hour(*daily), daily[1])
+
+
+def forecasts(frame, day_ahead):
+    """Les dues matrius del conjunt de previsions de la part B: el de referència i les
+    previsions D+1 del dia que es lliura, per nom.
+
+    Cada família les pren com la seva font: la diària, que és la de la xarxa, amb les
+    24 hores de cada previsió, i la per hora, que és la de l'arbre i la dels models
+    d'una hora, amb la de l'hora de la fila. Es diu com el conjunt de dades de les
+    previsions i és una altra cosa, un conjunt d'informació.
+    """
+    daily = build(frame, PREVIOUS_DAY, day_ahead)
+    return Matrices(daily, per_hour(*daily, at_the_hour=tuple(day_ahead)), daily[1])

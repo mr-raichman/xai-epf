@@ -6,7 +6,7 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.parameters import LAGS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, calibration, per_hour
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, calibration, forecasts, per_hour
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -103,6 +103,24 @@ def test_the_per_hour_row_carries_its_day_and_its_own_hour():
         assert row[HOUR] == hour
         assert row["lag1_h00"] == X.loc[day, "lag1_h00"]
         assert target.loc[day].iloc[hour] == y.loc[day, HOUR_COLUMNS[hour]]
+
+
+def test_day_d_forecasts_sit_on_day_d_in_both_tables():
+    # Es publiquen el dia abans i són del dia que es lliura: desplaçades un dia, cada
+    # fila llegiria la previsió d'ahir, que és plausible i equivocada.
+    price = frame_of(range(30))
+    day_ahead = {"demand": frame_of(range(30)) * 10}
+    matrices = forecasts(price, day_ahead)
+    (X, _), (rows, target) = matrices.daily, matrices.hourly
+    day = X.index[10]
+    for hour, column in enumerate(HOUR_COLUMNS):
+        assert X.loc[day, f"demand_{column}"] == day_ahead["demand"].loc[day, column]
+        row = rows.loc[day].iloc[hour]
+        assert row[HOUR] == hour
+        assert row["demand"] == day_ahead["demand"].loc[day, column]
+        assert row[f"lag1_{column}"] == price.loc[day - pd.Timedelta(days=1), column]
+        assert target.loc[day].iloc[hour] == price.loc[day, column]
+    assert not any(column.startswith("demand_") for column in rows.columns)
 
 
 def test_the_window_counts_days_on_both_tables():

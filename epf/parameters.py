@@ -64,6 +64,29 @@ WARM_UP = max(LAGS)
 
 DAYS_PER_WEEK = 7
 
+# ------------------------------------------------- la descripció de la part B
+
+# El període que es descriu, del primer dia de les previsions D+1 al dia abans dels
+# anys de prova, on acaba la validació de la part A. Són 300 setmanes de dimarts a
+# dilluns, i totes les tries de la part B s'hi fan.
+DEVELOPMENT = (datetime.date(2019, 1, 1), VALIDATION[1])
+
+# Percentatge de les setmanes que va a entrenament, a validació i a prova, els de
+# Trebbien et al. (2023).
+SHARES = (48, 32, 20)
+
+# Dies que surten de l'entrenament a cada costat d'una setmana retinguda. El preu del
+# dia abans és una entrada, de manera que una setmana retinguda i el dia de cada costat
+# es miren l'un a l'altre.
+GAP = 1
+
+# Una partició per llavor. La dispersió entre totes és la robustesa que es reporta.
+SEEDS = tuple(range(10))
+
+# Retards de preu dels dos conjunts de la part B: el dia abans, les seves 24 hores, que
+# és d'on ha de venir el nivell.
+PREVIOUS_DAY = (1,)
+
 # ----------------------------------------------------------- aquesta execució
 
 # Primer dia, últim dia i cada quants se'n pren un, per nivell. El de prova és un
