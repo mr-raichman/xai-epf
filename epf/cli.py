@@ -60,6 +60,8 @@ def folder_arguments(parser):
 COMMANDS = {
     "download-price": Command(
         "epf.data.price", "baixa el preu de les dues fonts i diu què hi ha al disc", None),
+    "download-forecasts": Command(
+        "epf.data.forecasts", "baixa les previsions D+1 i diu què hi ha al disc", None),
     "audit-data": Command(
         "epf.data.audit", "el que només es pot preguntar a OMIE i a ESIOS", None),
     "figure-price": Command(

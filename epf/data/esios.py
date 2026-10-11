@@ -40,8 +40,8 @@ PBF_WIND = 12
 # la sèrie no pot valer zero i una hora absent queda absent. Amb àncora, una hora
 # absent val zero els dies en què l'àncora es va publicar.
 SERIES = {
-    # Demanda real i previsions D+1.
-    DEMAND: None, 1775: None, 1777: None, 1779: None, 10358: None,
+    # Demanda real, i la previsió D+1 d'eòlica més fotovoltaica.
+    DEMAND: None, 10358: None,
     # Generació en temps real.
     551: None, 1295: None, 10206: None, 10351: None, 10352: None,
     1294: DEMAND, 546: DEMAND, 547: DEMAND, 548: DEMAND, 549: DEMAND, 550: DEMAND,
@@ -203,7 +203,8 @@ def hourly(values, anchor_days=None):
             days.value_counts().reindex(index, fill_value=0))
 
 
-def _single_geography(values, indicator):
+def single_geography(values, indicator):
+    """Els valors, si són d'una sola geografia. Si no, aixeca: `hourly` les sumaria."""
     names = {value.get("geo_name") for value in values}
     if len(names) > 1:
         raise ValueError(f"l'indicador {indicator} té diverses geografies: {sorted(names)}")
@@ -224,7 +225,7 @@ def load(indicator, directory=ESIOS):
         raise KeyError(f"l'indicador {indicator} no és a la llista de sèries")
     stored = _stored(indicator, directory)
     if indicator not in PROVINCES:
-        _single_geography(stored, indicator)
+        single_geography(stored, indicator)
     anchor = SERIES[indicator]
     anchor_days = None if anchor is None else _published_days(_stored(anchor, directory))
     return hourly(stored, anchor_days)
@@ -235,4 +236,4 @@ def load_revised_forecast(indicator, directory=ESIOS):
     i les hores publicades cada dia."""
     if indicator not in REVISED_FORECASTS:
         raise KeyError(f"l'indicador {indicator} no és una previsió revisada")
-    return hourly(_single_geography(_stored(indicator, directory), indicator))
+    return hourly(single_geography(_stored(indicator, directory), indicator))

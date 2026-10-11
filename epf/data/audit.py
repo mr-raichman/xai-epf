@@ -2,8 +2,9 @@
 
 El contracte de qualsevol conjunt viu a `contract.py` i el crida el carregador, de
 manera que un marc que arriba aquí ja l'ha passat. Això és l'altra meitat: les
-versions dels fitxers d'OMIE, el dia desacoblat, les hores que cada àncora publica i
-la cobertura de cada indicador, que són fets de la font i no del conjunt.
+versions dels fitxers d'OMIE, el dia desacoblat, les hores que publiquen les previsions
+i el dia a què pertanyen, les hores que cada àncora publica i la cobertura de cada
+indicador, que són fets de la font i no del conjunt.
 
 Res d'aquí corre en una execució. Informa de tot el que troba en lloc de petar al
 primer error, que és el seu ofici, i acaba amb 1 si alguna comprovació ha fallat.
@@ -14,7 +15,7 @@ import datetime
 import pandas as pd
 
 from epf.calendar import local_hours
-from epf.data import esios, omie
+from epf.data import esios, forecasts, omie
 from epf.data.outliers import report
 from epf.data.price import (ESIOS_FIRST_DAY, NAME, OMIE_FROM, SPAIN,
                             from_esios, load)
@@ -98,6 +99,32 @@ def check_price():
     return price
 
 
+def check_forecasts():
+    """El que només es pot preguntar a ESIOS de les previsions D+1. Torna el conjunt."""
+    # Com al preu d'ESIOS: una hora fora de la graella es perdria sense dir-ho, i
+    # aquestes sèries no tenen cap segona font que ho destapés.
+    for name in forecasts.INDICATORS:
+        frame, published = forecasts.read(name)
+        short = frame.index[published != local_hours(frame.index)]
+        check(f"la previsió {name} publica exactament les hores de cada dia local",
+              short.empty, f"{len(frame)} dies, {len(short)} sense les seves hores")
+
+    # Una previsió D+1 és del dia que es lliura i no del dia que es publica. Si ESIOS
+    # canviés què vol dir `datetime`, totes es desplaçarien un dia i res no petaria, i
+    # només la demanda real ho pot dir: la previsió s'hi ha d'acostar més el mateix dia
+    # que el dia abans o el dia després.
+    frames = forecasts.load()
+    predicted = frames["demand"].mean(axis="columns")
+    actual = esios.load(esios.DEMAND)[0].mean(axis="columns")
+    errors = {shift: (predicted - actual.shift(shift, freq="D")).abs().mean()
+              for shift in (1, 0, -1)}
+    check("la previsió de demanda és del dia de lliurament",
+          errors[0] < min(errors[1], errors[-1]),
+          f"MAE de les mitjanes diàries contra la demanda real: {errors[0]:.0f} MW el "
+          f"mateix dia, {errors[1]:.0f} el dia abans i {errors[-1]:.0f} el dia després")
+    return frames
+
+
 def check_esios_series():
     """El que només es pot preguntar als indicadors que encara no són cap conjunt."""
     for anchor in sorted({a for a in esios.SERIES.values() if a is not None}):
@@ -134,7 +161,7 @@ def check_esios_series():
 
 
 def main():
-    # El carregador refusa un conjunt que no compleixi el contracte, de manera que
+    # Cada carregador refusa un conjunt que no compleixi el contracte, de manera que
     # arribar aquí ja és haver-lo passat. S'enganxa perquè l'auditoria informa i no
     # peta: sense això un conjunt trencat mataria la passada abans d'arribar a ESIOS.
     try:
@@ -146,6 +173,17 @@ def main():
     if price is not None:
         print()
         report(NAME, price)
+    print()
+    try:
+        frames = check_forecasts()
+        check(f"el conjunt {forecasts.NAME} compleix el contracte", True,
+              ", ".join(f"{name} {frame.shape}" for name, frame in frames.items()))
+    except (FileNotFoundError, ValueError) as error:
+        check(f"el conjunt {forecasts.NAME} compleix el contracte", False, str(error))
+        frames = {}
+    for name, frame in frames.items():
+        print()
+        report(f"{forecasts.NAME} {name}", frame)
     print()
     check_esios_series()
     if failures:
