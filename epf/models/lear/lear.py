@@ -18,6 +18,7 @@ from epf.parameters import DAYS_PER_WEEK, LAGS
 from epf.market import HOURS_PER_DAY
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
+from epf.models.scaling import Scaler
 from epf.attribution.stored import Attribution
 
 # Nom de la finestra que agafa tot l'historial.
@@ -51,32 +52,6 @@ def window_names(windows=WINDOWS):
 # la mitjana de cada columna de la matriu de disseny, `prices` l'escalador de les
 # entrades i `target` el de les 24 sortides, que és qui torna a EUR/MWh.
 Window = collections.namedtuple("Window", "window models background prices target")
-
-# La mediana de les desviacions absolutes dividida per aquesta constant estima la
-# desviació típica d'una normal; és el que fa `statsmodels.robust.mad`, i el que
-# la referència utilitza encara que l'article només digui "MAD".
-NORMAL_CONSISTENCY = 0.6744897501960817
-
-class Scaler:
-    """Transformació de variància estabilitzada: asinh del valor centrat i escalat.
-
-    Mediana i MAD de cada columna per separat, preses de la finestra de calibratge i
-    mai del dia que es prediu.
-    """
-
-    def __init__(self, values):
-        self.median = np.median(values, axis=0)
-        deviation = np.median(np.abs(values - self.median), axis=0)
-        if not deviation.all():
-            raise ValueError("alguna columna de la finestra de calibratge no té dispersió")
-        self.mad = deviation / NORMAL_CONSISTENCY
-
-    def forward(self, values):
-        return np.arcsinh((values - self.median) / self.mad)
-
-    def back(self, values):
-        return np.sinh(values) * self.mad + self.median
-
 
 def _design(rows, scaler):
     """Files de `matrix.build` com la matriu de LEAR: preus transformats i indicadors.

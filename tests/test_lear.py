@@ -10,8 +10,8 @@ from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build
 from epf.attribution.stored import TRANSFORMED_TOLERANCE
-from epf.models.lear.lear import (DESIGN_COLUMNS, NAME, Scaler, attribute,
-                                  feature_columns, fit, lags_of, predict)
+from epf.models.lear.lear import (DESIGN_COLUMNS, NAME, attribute, feature_columns,
+                                  fit, lags_of, predict)
 
 # Prou iteracions perquè els ajusts d'aquestes proves convergeixin; el valor que
 # fan servir les execucions és a la configuració.
@@ -39,29 +39,6 @@ def weekly_prices(days, start=datetime.date(2014, 1, 1)):
     index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in range(days)], name="day")
     rows = [[WEEKLY_SHAPE[day.dayofweek] + hour for hour in range(24)] for day in index]
     return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
-
-
-def test_the_scaler_round_trips():
-    values = np.array([[0.0, 5.0], [100.0, -3.0]])
-    scaler = Scaler(values)
-    assert np.allclose(scaler.back(scaler.forward(values)), values)
-
-
-def test_each_column_gets_its_own_median_and_spread():
-    # Una columna al voltant de 0 i una altra al voltant de 1000. Amb una mediana
-    # compartida, la primera columna quedaria tota desplaçada cap avall.
-    values = np.array([[0.0, 1000.0], [1.0, 1002.0], [2.0, 1004.0], [3.0, 1006.0]])
-    scaler = Scaler(values)
-    assert list(scaler.median) == [1.5, 1003.0]
-    transformed = scaler.forward(values)
-    assert abs(transformed[:, 0].mean()) < 1e-9
-    assert abs(transformed[:, 1].mean()) < 1e-9
-    assert np.allclose(scaler.back(transformed), values)
-
-
-def test_a_window_without_spread_fails_loudly():
-    with pytest.raises(ValueError):
-        Scaler(np.zeros((10, 24)))
 
 
 def test_a_weekly_pattern_is_reproduced():
