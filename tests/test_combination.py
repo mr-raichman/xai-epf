@@ -60,11 +60,11 @@ def test_the_mean_of_an_ensemble_is_not_a_member_of_itself(tmp_path):
 
 
 def test_a_single_model_family_contributes_its_one_csv(tmp_path):
-    folder = tmp_path / "mlp"
-    one_model(folder, "mlp", 7.0)
+    folder = tmp_path / "dnn"
+    one_model(folder, "dnn", 7.0)
     found = members(folder)
-    assert list(found) == ["mlp/mlp"]
-    assert found["mlp/mlp"].to_numpy().min() == 7.0
+    assert list(found) == ["dnn/dnn"]
+    assert found["dnn/dnn"].to_numpy().min() == 7.0
 
 
 def test_a_record_that_does_not_say_who_is_a_member_combines_nothing(tmp_path):

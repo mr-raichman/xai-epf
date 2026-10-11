@@ -17,7 +17,6 @@ from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.dnn import dnn, dnn_hyperparameters
 from epf.models.lear import lear, lear_hyperparameters
-from epf.models.mlp import mlp, mlp_hyperparameters
 from epf.models.naive import naive
 
 DAILY, HOURLY = "daily", "hourly"
@@ -26,11 +25,9 @@ DAILY, HOURLY = "daily", "hourly"
 # `predict` torna són què.
 #
 # `attribute` és `None` on no hi ha cap mètode i on no se'n vol cap. Les prediccions
-# ingènues perquè la seva atribució seria la columna que copien. L'MLP perquè TreeSHAP
-# no s'hi aplica i cap mètode exacte no és assumible dia a dia. I la xarxa de l'article
+# ingènues perquè la seva atribució seria la columna que copien. I la xarxa de l'article
 # perquè no és un model del qual s'esperi cap explicació: hi és per dir com de lluny
-# són LEAR i l'arbre, que són els que s'interpreten, del que es pot arribar a fer amb
-# aquestes dades.
+# queden els models que s'expliquen del que es pot arribar a fer amb aquestes dades.
 #
 # `members` són els models ajustats que entren a la combinació d'una execució, i
 # `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
@@ -72,9 +69,6 @@ def families():
         boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
                               boosting.attribute, None, boosting_hyperparameters,
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
-        mlp.NAME: Family(DAILY, mlp.fit, mlp.predict, None, None,
-                         mlp_hyperparameters,
-                         members=(mlp.NAME,), headlines=(mlp.NAME,)),
         dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None, None,
                          dnn_hyperparameters,
                          members=(dnn.NAME,), headlines=(dnn.NAME,)),
