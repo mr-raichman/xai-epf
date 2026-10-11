@@ -7,10 +7,11 @@ del dia.
 """
 import numpy as np
 import shap
-from lightgbm import LGBMRegressor
+from lightgbm import LGBMRegressor, early_stopping
 
 from epf.matrix import calibration
-from epf.models.boosting.boosting_hyperparameters import LEAVES, RATE, TREES, WINDOW
+from epf.models.boosting.boosting_hyperparameters import (LEAVES, PATIENCE, RATE, TREES,
+                                                          WINDOW)
 from epf.parameters import SEED
 from epf.attribution.stored import ONE, PRICE_UNITS, Attribution
 
@@ -35,31 +36,53 @@ def lightgbm(trees=TREES, rate=RATE, leaves=LEAVES, seed=SEED):
                          deterministic=True, force_row_wise=True)
 
 
-def fit(X, y, day, make=lightgbm, window=WINDOW):
-    """El model ajustat només amb les hores dels dies anteriors a `day`.
+def fit_rows(X, y, validation=(), make=lightgbm, patience=PATIENCE):
+    """Un model ajustat amb les files donades.
 
-    `make` torna un regressor nou cada vegada, de manera que cap dia no hereta res
-    de l'anterior.
+    Amb `validation`, parelles `(X, y)`, l'entrenament s'atura quan qualsevol d'elles
+    porta `patience` arbres sense millorar, i el model es queda amb el millor arbre
+    d'aquella: és l'aturada de Trebbien et al. (2023), que parteix la validació en
+    quatre. `make` torna un regressor nou cada vegada, de manera que cap ajust no
+    hereta res de l'anterior.
     """
-    features, target = calibration(X, y, day, window)
-    return make().fit(features, target)
+    if not validation:
+        return make().fit(X, y)
+    return make().fit(X, y, eval_set=list(validation),
+                      callbacks=[early_stopping(patience, verbose=False)])
+
+
+def predict_rows(model, X):
+    """El preu de cada fila."""
+    return model.predict(X)
+
+
+def attribute_rows(model, X):
+    """Els valors de SHAP de cada fila, `(files, columnes)`, i la base.
+
+    TreeSHAP al mode que LightGBM calcula ell mateix, i un sol model per a les 24
+    hores, de manera que la base és la mateixa per a totes les files.
+    """
+    explainer = shap.TreeExplainer(model)
+    return explainer.shap_values(X), float(np.ravel(explainer.expected_value)[0])
+
+
+def fit(X, y, day, make=lightgbm, window=WINDOW):
+    """El model ajustat només amb les hores dels dies anteriors a `day`."""
+    return fit_rows(*calibration(X, y, day, window), make=make)
 
 
 def predict(model, X, day):
     """Els 24 preus de `day`, en ordre d'hora, per nom de pronòstic."""
-    return {NAME: model.predict(X.loc[[day]])}
+    return {NAME: predict_rows(model, X.loc[[day]])}
 
 
 def attribute(model, X, day):
     """L'atribució de les 24 hores de `day`, del model que les ha predit.
 
-    TreeSHAP torna (hores, columnes) per a les 24 files del dia; es desa transposat,
-    com la resta, en (columna, hora).
+    Les 24 files del dia donen `(hores, columnes)`, que es desa transposat, com la
+    resta, en `(columna, hora)`.
     """
     rows = X.loc[[day]]
-    explainer = shap.TreeExplainer(model)
-    values = explainer.shap_values(rows)
-    # Un sol model per a les 24 hores, de manera que la base és la mateixa a totes.
-    base = np.full((1, len(rows)), float(np.ravel(explainer.expected_value)[0]))
-    return Attribution(ONE, list(X.columns), values.T[np.newaxis], base, None, None,
-                       PRICE_UNITS)
+    values, base = attribute_rows(model, rows)
+    return Attribution(ONE, list(X.columns), values.T[np.newaxis],
+                       np.full((1, len(rows)), base), None, None, PRICE_UNITS)

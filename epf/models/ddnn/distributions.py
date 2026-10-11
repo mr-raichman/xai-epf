@@ -26,16 +26,21 @@ from epf.market import HOURS_PER_DAY
 FLOOR = 1e-3
 
 # Una distribució de sortida. `units` són les sortides que vol la xarxa, `loss` la
-# pèrdua que minimitza, `parameters` llegeix la sortida crua en les unitats en què es
-# desa, `point` el preu puntual que se'n deriva, `quantiles` els quantils predits i
-# `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
+# pèrdua que minimitza, `flat` porta la sortida crua a les unitats en què es desen els
+# paràmetres, `point` el preu puntual que se'n deriva, `quantiles` els quantils predits
+# i `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
+#
+# `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
+# sortida crua, de manera que és alhora el que llegeix el camí endavant i l'última capa
+# del que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
+# s'escriu un sol cop i l'explicació no se'n pot separar.
 #
 # `of_day` és `None` aquí i el registre de famílies l'omple: és `(model, X, dia)` cap
 # als paràmetres d'aquell dia, i per tant demana el model, que és de la família i no de
 # la distribució. Va al mateix lloc perquè qui escriu els paràmetres al disc i qui en
 # calcula el CRPS volen les quatre coses alhora i no han de muntar-les.
 Distribution = collections.namedtuple(
-    "Distribution", "names units loss parameters point quantiles of_day",
+    "Distribution", "names units loss flat point quantiles of_day",
     defaults=(None,))
 
 
@@ -51,10 +56,15 @@ def _normal_loss(target, raw):
     return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
 
 
-def _normal_parameters(raw):
-    """Els paràmetres en les unitats en què es desen i es llegeixen."""
-    location, scale = _split(np.asarray(raw), 2)
-    return np.stack([location, FLOOR + np.logaddexp(0.0, scale)], axis=-1)
+def parameters(distribution, raw):
+    """Els paràmetres en les unitats en què es desen i es llegeixen, `(files, 24, P)`."""
+    flat = ops.convert_to_numpy(distribution.flat(raw))
+    return np.stack(_split(flat, len(distribution.names)), axis=-1)
+
+
+def _normal_flat(raw):
+    location, scale = _split(raw, 2)
+    return ops.concatenate([location, FLOOR + ops.softplus(scale)], axis=-1)
 
 
 def _normal_quantiles(parameters, probabilities):
@@ -78,10 +88,10 @@ def _johnson_loss(target, raw):
                     + ops.log(scale) + ops.log(root) - ops.log(tail), axis=-1)
 
 
-def _johnson_parameters(raw):
-    location, scale, skew, tail = _split(np.asarray(raw), 4)
-    return np.stack([location, FLOOR + np.logaddexp(0.0, scale), skew,
-                     FLOOR + np.logaddexp(0.0, tail)], axis=-1)
+def _johnson_flat(raw):
+    location, scale, skew, tail = _split(raw, 4)
+    return ops.concatenate([location, FLOOR + ops.softplus(scale), skew,
+                            FLOOR + ops.softplus(tail)], axis=-1)
 
 
 def _johnson_quantiles(parameters, probabilities):
@@ -97,7 +107,7 @@ def _johnson_quantiles(parameters, probabilities):
 # l'article per al MAE: la mediana és el que minimitza l'error absolut.
 NORMAL = Distribution(
     names=("location", "scale"), units=2 * HOURS_PER_DAY, loss=_normal_loss,
-    parameters=_normal_parameters,
+    flat=_normal_flat,
     # La mediana d'una normal és la seva localització.
     point=lambda parameters: parameters[..., 0],
     quantiles=_normal_quantiles)
@@ -105,7 +115,7 @@ NORMAL = Distribution(
 JOHNSON_SU = Distribution(
     names=("location", "scale", "skewness", "tail_weight"),
     units=4 * HOURS_PER_DAY, loss=_johnson_loss,
-    parameters=_johnson_parameters,
+    flat=_johnson_flat,
     point=lambda parameters: _johnson_quantiles(parameters, 0.5)[..., 0],
     quantiles=_johnson_quantiles)
 

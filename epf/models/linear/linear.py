@@ -71,13 +71,13 @@ def _by_hour(X):
     return [np.flatnonzero(hours == hour) for hour in range(HOURS_PER_DAY)]
 
 
-def fit(X, y, penalty, mixing, max_iter=MAX_ITER):
+def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
     """Els 24 models, cada un ajustat amb les files de la seva hora i cap més."""
     return tuple(_fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
                  for rows in _by_hour(X))
 
 
-def predict(model, X):
+def predict_rows(model, X):
     """El preu de cada fila en EUR/MWh, cada una amb el model de la seva hora."""
     prices = np.empty(len(X))
     for fitted, rows in zip(model, _by_hour(X)):
@@ -87,7 +87,7 @@ def predict(model, X):
     return pd.Series(prices, index=X.index, name=NAME)
 
 
-def attribute(model, X):
+def attribute_rows(model, X):
     """Les contribucions de cada fila, el valor de SHAP exacte d'un model lineal.
 
     La d'una columna és el seu coeficient per la distància a la mitjana de les files
