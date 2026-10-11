@@ -44,7 +44,7 @@ def test_no_day_of_a_lot_is_in_the_window_that_predicts_it():
     index = days()
     frame = pd.DataFrame(1.0, index=index, columns=["a"])
     for batch in lots(index):
-        features, _ = calibration(frame, frame, batch[0], window=200)
+        features, _ = calibration(frame, frame, batch[0], window=100)
         assert features.index.max() < batch[0]
         assert not set(batch) & set(features.index)
 

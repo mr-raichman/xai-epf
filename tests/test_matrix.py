@@ -6,7 +6,7 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.parameters import LAGS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, calibration, forecasts, per_hour
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, calibration, forecasts, lago, per_hour
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -132,3 +132,32 @@ def test_the_window_counts_days_on_both_tables():
     assert len(daily) == 5
     assert len(hourly) == 5 * 24
     assert list(hourly.index.unique()) == list(daily.index)
+
+
+def test_each_forecast_lag_of_r1s_set_lands_on_its_own_day():
+    # La previsió del dia, la del dia abans i la de fa una setmana: totes tres es
+    # publiquen abans del tancament, i una desplaçada a un altre dia seria plausible.
+    price = frame_of(range(30))
+    day_ahead = {"demand": frame_of(range(30)) * 10, "wind": frame_of(range(30)) * 3,
+                 "solar": frame_of(range(30)) + 7}
+    X, _ = lago(price, day_ahead).daily
+    day = X.index[-1]
+    for lag in (0, 1, 7):
+        source = day - pd.Timedelta(days=lag)
+        prefix = "" if lag == 0 else f"lag{lag}_"
+        for hour in HOUR_COLUMNS:
+            assert X.loc[day, f"demand_{prefix}{hour}"] == day_ahead["demand"].loc[source, hour]
+            assert X.loc[day, f"wind_solar_{prefix}{hour}"] == (
+                day_ahead["wind"].loc[source, hour] + day_ahead["solar"].loc[source, hour])
+    assert X.shape[1] == 96 + 2 * 3 * 24 + 7
+
+
+def test_a_window_that_cannot_be_filled_is_refused():
+    # El conjunt de Lago et al. (2021) comença el 2019-01-08 i la finestra de quatre anys
+    # no s'omple fins al final del 2022: més curta, passaria sense dir res.
+    X, y = build(frame_of(range(30)), LAGS)
+    day = X.index[-1]
+    available = len(X.index[X.index < day])
+    assert len(calibration(X, y, day, window=available)[0]) == available
+    with pytest.raises(ValueError, match="la finestra en demana"):
+        calibration(X, y, day, window=available + 1)

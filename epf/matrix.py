@@ -14,7 +14,7 @@ import pandas as pd
 
 from epf.calendar import HOUR_COLUMNS
 from epf.market import HOURS_PER_DAY
-from epf.parameters import DAYS_PER_WEEK, LAGS, PREVIOUS_DAY
+from epf.parameters import DAYS_PER_WEEK, LAGO_FORECAST_LAGS, LAGS, PREVIOUS_DAY
 
 HOUR = "hour"
 PRICE = "price"
@@ -53,25 +53,33 @@ def calibration(X, y, day, window=None):
         raise ValueError(f"cap dia anterior a {day} amb què calibrar")
     if window is None:
         return features, target
-    first = features.index.unique()[-window:][0]
+    days = features.index.unique()
+    if len(days) < window:
+        # Una finestra més curta del que diu el seu nom passaria sense queixar-se: el
+        # conjunt de Lago et al. (2021) comença el 2019-01-08 i la seva finestra de
+        # quatre anys no s'omple fins al 2022-12-27.
+        raise ValueError(f"{len(days)} dies abans de {day}, i la finestra en demana {window}")
+    first = days[-window:][0]
     kept = features.index >= first
     return features[kept], target[kept]
 
 
-def build(price, lags, day_ahead=None):
+def build(price, lags, day_ahead=None, day_ahead_lags=(0,)):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les.
     `day_ahead` són previsions per nom, cada una amb les 24 hores del dia que es
-    lliura, i entren sense desplaçar: es publiquen el dia abans.
+    lliura, i entren als retards de `day_ahead_lags`: la del retard 0 és la del dia que
+    es lliura, sense desplaçar, perquè es publica el dia abans.
     """
     if list(price.columns) != HOUR_COLUMNS:
         raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}")
 
     blocks = [price.shift(lag, freq="D").reindex(price.index).add_prefix(f"lag{lag}_")
               for lag in lags]
-    blocks += [frame.reindex(price.index).add_prefix(f"{name}_")
-               for name, frame in (day_ahead or {}).items()]
+    blocks += [frame.shift(lag, freq="D").reindex(price.index)
+               .add_prefix(f"{name}_lag{lag}_" if lag else f"{name}_")
+               for name, frame in (day_ahead or {}).items() for lag in day_ahead_lags]
     blocks.append(pd.DataFrame(np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
                                index=price.index, columns=DAY_OF_WEEK_COLUMNS))
     features = pd.concat(blocks, axis="columns", sort=False)
@@ -144,3 +152,18 @@ def date_probe(frame, day_ahead, start):
     rows, target = forecasts(frame, day_ahead).hourly
     counter = (rows.index - pd.Timestamp(start)).days
     return rows.assign(**{DAY_COUNTER: counter.to_numpy()}), target
+
+
+def lago(frame, day_ahead):
+    """Les dues matrius del conjunt de Lago et al. (2021): el preu de fa 1, 2, 3 i 7 dies,
+    les seves dues previsions del dia que es lliura, del dia abans i de fa una setmana,
+    i el dia de la setmana. 247 columnes.
+
+    Les dues previsions són la de demanda i la d'eòlica més fotovoltaica, la parella de
+    l'article per a EPEX-DE, i la segona és la suma de les dues que porta el conjunt de
+    dades. La taula per hora és la fila del dia sencera més l'hora, com a l'article.
+    """
+    pair = {"demand": day_ahead["demand"],
+            "wind_solar": day_ahead["wind"] + day_ahead["solar"]}
+    daily = build(frame, LAGS, pair, LAGO_FORECAST_LAGS)
+    return Matrices(daily, per_hour(*daily), daily[1])

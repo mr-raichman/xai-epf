@@ -58,6 +58,10 @@ PRICE_ONLY = "price"
 # diferència d'algorisme.
 LAGS = (1, 2, 3, 7)
 
+# Retards de les dues previsions del conjunt de Lago et al. (2021): el dia que es
+# lliura, el dia abans i fa una setmana.
+LAGO_FORECAST_LAGS = (0, 1, 7)
+
 # Dies que es perden al principi de qualsevol tram: cap fila es pot formar fins
 # que hi ha tots els retards.
 WARM_UP = max(LAGS)
@@ -109,7 +113,7 @@ INTERACTION_ROWS = 1000
 # la comparació.
 PERIODS = {
     MEASUREMENT: (VALIDATION[0], VALIDATION[1], 8),
-    TEST: (datetime.date(2022, 6, 1), datetime.date(2022, 6, 30), 1),
+    TEST: (datetime.date(2023, 1, 1), datetime.date(2023, 1, 31), 1),
 }
 
 # Llavor de tota família que en faci servir. És de l'execució i no d'un model, de
