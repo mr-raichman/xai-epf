@@ -12,3 +12,8 @@ LEAVES = 31
 # l'entrenament de la part B. Trebbien et al. (2023) en diuen "a specific number of
 # epochs" sense el número: és inventat, sense cercar, fins que la cerca el triï.
 PATIENCE = 50
+
+
+def searched():
+    """El que ha triat la cerca: res encara, i el `run.json` ho diu."""
+    return {"unsearched": True}

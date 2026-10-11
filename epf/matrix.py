@@ -107,24 +107,6 @@ def per_hour(X, y, at_the_hour=()):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
-def price_only(frame):
-    """Les dues matrius del conjunt d'informació de només preu: la diària i la per
-    hora, ja alineades.
-
-    Els 96 retards de preu i els set indicadors del dia de la setmana, que és el
-    model de només preu de Lago et al. (2021). Tot és calculable molt abans que
-    tanqui la subhasta del dia anterior al lliurament, perquè els preus del dia d-1
-    es van publicar el d-2.
-    L'any més antic que es pot entrenar és el primer del preu, perquè no hi entra
-    cap sèrie que comenci més tard.
-
-    Pren el conjunt ja carregat i no el carrega, que és d'una altra capa; `price.load`
-    ja n'ha comprovat el contracte.
-    """
-    daily = build(frame, LAGS)
-    return Matrices(daily, per_hour(*daily), daily[1])
-
-
 def previous_day(frame):
     """Les dues matrius del conjunt de referència de la part B: les 24 hores del preu
     del dia abans i el dia de la setmana."""

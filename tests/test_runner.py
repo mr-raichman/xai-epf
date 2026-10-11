@@ -30,14 +30,15 @@ def searched(tmp_path, monkeypatch):
     aquella els demana a qui en tingui.
     """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
-    dnn_hyperparameters.save({"trials": 20, "hyperparameters": SEARCHED})
+    dnn_hyperparameters.save(dnn_hyperparameters.BORROWED,
+                             {"trials": 20, "hyperparameters": SEARCHED})
 
 
 def test_the_record_of_every_family_is_writable():
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
     table = families()
     for name, family in table.items():
-        record = runner.described("abc1234", "test", name, list(table), family,
+        record = runner.described("abc1234", "test", "lago", name, list(table), family,
                                   forecasts, 1.0, 1)
         json.dumps(record)
 
@@ -47,7 +48,7 @@ def test_the_record_says_which_families_the_invocation_chose():
     # quan es deia igual que l'argument, el registre desava els noms dels paràmetres
     # en lloc de les famílies i seguia essent JSON vàlid.
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
-    record = runner.described("abc1234", "test", "naive", ["lear", "naive"],
+    record = runner.described("abc1234", "test", "lago", "naive", ["lear", "naive"],
                               families()["naive"], forecasts, 1.0, 1)
     assert record["chosen"] == ["lear", "naive"]
     assert record["family"] == "naive"
@@ -58,7 +59,7 @@ def test_the_record_says_who_is_a_member_and_who_is_drawn():
     # de manera que una reconstrucció no ha de tornar a endevinar-ho. Amb LEAR no
     # coincideixen: els membres són les quatre finestres i la capçalera la seva mitjana.
     forecasts = {"x": pd.DataFrame(0.0, index=pd.DatetimeIndex(["2024-01-01"]), columns=["h0"])}
-    record = runner.described("abc1234", "test", "lear", ["lear"], families()["lear"],
+    record = runner.described("abc1234", "test", "lago", "lear", ["lear"], families()["lear"],
                               forecasts, 1.0, 1)
     assert record["headlines"] == ["lear"]
     assert len(record["members"]) == 4
@@ -91,13 +92,16 @@ def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals
     # I d'on surten: una cerca de vint proves i una de mil deixarien el mateix rastre
     # si el registre només portés els valors.
     assert found["search"]["trials"] == 20
+    # I que no es van triar per al conjunt que es camina: sense la marca, un `run.json`
+    # de Lago et al. (2021) no diria que els seus números són d'una altra cerca.
+    assert found["unsearched"] is True
     json.dumps(found)
 
 
 def test_a_family_that_has_not_been_searched_refuses_instead_of_inventing():
     # Arrencar la xarxa amb números inventats donaria un error que no diu res de la
     # xarxa de l'article, i una xifra que ningú no podria tornar a res.
-    dnn_hyperparameters.path().unlink()
-    with pytest.raises(FileNotFoundError, match="search-dnn"):
+    dnn_hyperparameters.path(dnn_hyperparameters.BORROWED).unlink()
+    with pytest.raises(FileNotFoundError, match="només preu"):
         hyperparameters("dnn")
 

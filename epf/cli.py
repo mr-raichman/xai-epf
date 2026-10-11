@@ -41,17 +41,25 @@ def pass_arguments(parser):
     return parser
 
 
-def run_arguments(parser):
-    """Els arguments del camí endavant, els mateixos per `epf run` i per `python -m`."""
-    pass_arguments(parser)
-    parser.add_argument("--price-only", action="store_true", required=True,
-                        help="conjunt d'informació de només preu, l'únic que hi ha")
+def inputs_argument(parser):
+    """El conjunt d'informació, obligatori encara que n'hi hagi un de sol, de manera que
+    ni una execució ni una cerca no endevinin mai sobre quin conjunt treballen."""
+    parser.add_argument("--inputs", choices=parameters.INPUTS, required=True,
+                        help="conjunt d'informació: lago, el de Lago et al. (2021)")
     return parser
 
 
+def run_arguments(parser):
+    """Els arguments del camí endavant, els mateixos per `epf run` i per `python -m`."""
+    pass_arguments(parser)
+    return inputs_argument(parser)
+
+
 def search_arguments(parser):
-    """Les proves que fa la cerca d'hiperparàmetres. Quantes es decideix amb el cost
-    d'una mesurat, i el valor per defecte viu amb la xarxa i no aquí."""
+    """El conjunt i les proves que fa la cerca d'hiperparàmetres. Quantes proves es
+    decideix amb el cost d'una mesurat, i el valor per defecte viu amb la xarxa i no
+    aquí."""
+    inputs_argument(parser)
     parser.add_argument("--trials", type=int,
                         help="proves que es fan; per defecte, les del seu fitxer")
     return parser

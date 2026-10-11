@@ -19,8 +19,7 @@ from epf.data.contract import refuse_incoherent
 from epf.paths import PRICE
 
 # El nom del conjunt, que és el seu i no de ningú més: el porta el contracte quan
-# refusa. `parameters.PRICE_ONLY` s'escriu igual i és una altra cosa, el conjunt
-# d'informació d'una execució, que algun dia en tindrà un altre.
+# refusa.
 NAME = "price"
 
 # Indicador del preu a ESIOS. No és a `esios.SERIES` i no es llegeix amb

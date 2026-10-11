@@ -14,3 +14,8 @@ MAX_ITER = 10000
 # Sense cercar.
 MIXING = 0.75
 PENALTY = 0.001
+
+
+def searched():
+    """El que ha triat la cerca: res encara, i el `run.json` ho diu."""
+    return {"unsearched": True}

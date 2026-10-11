@@ -26,6 +26,7 @@ import pandas as pd
 
 from epf import cli, matrix, parameters
 from epf.attribution import fitted
+from epf.data import forecasts as day_ahead
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
 from epf.evaluation import PERCENTILES, distribution_metrics, metrics
@@ -41,7 +42,7 @@ MEASUREMENT, TEST = parameters.MEASUREMENT, parameters.TEST
 def run(family, name, tables, tier, store, folder, after, report):
     """Camí endavant d'una família: cada dia escrit a mesura que surt.
 
-    Un ajust per dia i tots els pronòstics d'aquell ajust, de manera que les cinc
+    Un ajust per dia i tots els pronòstics d'aquell ajust, de manera que les quatre
     finestres de LEAR i els tres pronòstics ingenus no caminen el període una vegada
     cada un.
 
@@ -73,7 +74,8 @@ def run(family, name, tables, tier, store, folder, after, report):
                    on_day=functools.partial(report, name))
 
 
-def described(commit, tier, name, chosen, family, forecasts, walk_seconds, walked):
+def described(commit, tier, stage, name, chosen, family, forecasts, walk_seconds,
+              walked):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
     Els paràmetres de l'execució i els números del model hi van tal com estaven, de
@@ -88,7 +90,7 @@ def described(commit, tier, name, chosen, family, forecasts, walk_seconds, walke
              if name.isupper() and not name.startswith("_")}
     return {
         "commit": commit,
-        "stage": parameters.PRICE_ONLY,
+        "stage": stage,
         "tier": tier,
         "family": name,
         # Quines famílies ha triat la invocació, i no només aquesta. L'últim bit d'una
@@ -171,17 +173,18 @@ def main(arguments):
         return 1
 
     # `load` ja ha passat el contracte. L'informe de veïnatge no refusa res i no és
-    # cap comprovació: el llegeix Teo.
+    # cap comprovació: el llegeix Teo. Només el del preu: el de les tres previsions és a
+    # `epf audit-data`.
     frame = load()
     neighbour_report(NAME, frame)
-    data = matrix.price_only(frame)
+    data = matrix.lago(frame, day_ahead.load())
 
     tables = matrices(data)
     actual = data.actual
     table = families()
     chosen = arguments.family or list(table)
 
-    where = run_files.run_folder(arguments.tier, parameters.PRICE_ONLY, commit[:7])
+    where = run_files.run_folder(arguments.tier, arguments.inputs, commit[:7])
     folders = {family: where / family for family in chosen}
 
     # Reprendre és del nivell de mesura i prou. El de prova admet l'arbre brut i el
@@ -208,7 +211,7 @@ def main(arguments):
     for family in chosen:
         folder = folders[family]
         explains = table[family].attribute is not None
-        store = fitted.folder(arguments.tier, parameters.PRICE_ONLY, family)
+        store = fitted.folder(arguments.tier, arguments.inputs, family)
 
         if resuming and family in complete:
             print(f"{family}: ja hi és sencera a {folder}, no es torna a caminar",
@@ -241,11 +244,12 @@ def main(arguments):
             forecasts = run_files.load_forecasts(folder)
             if explains:
                 fitted.save_stamp(store, fitted.describe(
-                    commit, arguments.tier, parameters.PRICE_ONLY, family,
+                    commit, arguments.tier, arguments.inputs, family,
                     next(iter(forecasts.values())).index))
             measured = write(folder, forecasts, actual,
-                             described(commit, arguments.tier, family, chosen,
-                                       table[family], forecasts, seconds, len(walked)),
+                             described(commit, arguments.tier, arguments.inputs, family,
+                                       chosen, table[family], forecasts, seconds,
+                                       len(walked)),
                              extra=_distribution_rows(folder, family, table[family],
                                                       actual))
             figures.draw(folder, actual)

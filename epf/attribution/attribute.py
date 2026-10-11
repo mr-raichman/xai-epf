@@ -16,6 +16,7 @@ el CSV, a través de les dues passades.
 """
 from epf import matrix
 from epf.attribution import figures, fitted, stored
+from epf.data import forecasts as day_ahead
 from epf.data import price
 from epf.models.families import families, matrices
 from epf.results import run_files
@@ -62,7 +63,7 @@ def attribute(folder, tables):
 
 def main(arguments):
     folders = run_files.family_folders(arguments.folder)
-    tables = matrices(matrix.price_only(price.load()))
+    tables = matrices(matrix.lago(price.load(), day_ahead.load()))
 
     failed = []
     for folder in folders:

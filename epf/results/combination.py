@@ -114,7 +114,7 @@ def comparison(folders):
     """Els pronòstics que es comparen en una configuració: el de capçalera de cada
     directori, amb el de la combinació, que té el seu.
 
-    No tots els que hi ha al disc: les cinc finestres de LEAR tenen el seu CSV i les
+    No tots els que hi ha al disc: les quatre finestres de LEAR tenen el seu CSV i les
     seves mètriques, però el que es compara amb els altres models és la seva mitjana.
     Un registre que no diu quins són de capçalera dóna tots els seus, que és el que
     feia abans que ho digués.

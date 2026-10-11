@@ -14,6 +14,7 @@ import pandas as pd
 from epf import matrix
 from epf.attribution import figures as shap_figures
 from epf.attribution import stored
+from epf.data import forecasts as day_ahead
 from epf.data import price
 from epf.evaluation import PERCENTILES, distribution_metrics, metrics
 from epf.models.families import families
@@ -57,7 +58,7 @@ def rebuild(folder, actual):
 
 def main(arguments):
     folders = run_files.family_folders(arguments.folder)
-    actual = matrix.price_only(price.load()).actual
+    actual = matrix.lago(price.load(), day_ahead.load()).actual
     for folder in folders:
         # La combinació no hi passa: el seu pronòstic no surt de les prediccions que
         # té al costat sinó dels membres de tota la configuració, i qui la refà

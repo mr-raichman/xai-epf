@@ -95,7 +95,9 @@ def hyperparameters(family):
     Una família que es cerca els seus números els té al disc i no al mòdul, i els
     demana aquí perquè aquest és l'únic lloc que respon "els números d'aquesta
     família". Sense això el `run.json` d'aquella família no portaria el que ha fet la
-    predicció, que és justament el que l'ha de portar quan el commit ja no ho fixa.
+    predicció, que és justament el que l'ha de portar quan el commit ja no ho fixa. Una
+    que encara no s'ha cercat respon pel mateix camí amb `unsearched`, de manera que el
+    `run.json` de qualsevol família diu si algú n'ha triat els números.
     """
     module = families()[family].hyperparameters
     if module is None:

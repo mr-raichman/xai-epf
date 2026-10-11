@@ -46,16 +46,15 @@ TEST_PERIODS = {
 # es pugui llegir mai com una mesura.
 MEASUREMENT, TEST = "measurement", "test"
 
-# Conjunt d'informació d'una execució, que va al camí. De moment només n'hi ha un:
-# el preu i res més. L'etapa amb fonaments arriba amb les seves variables.
-PRICE_ONLY = "price"
+# Els conjunts d'informació que es poden caminar, pel nom que prenen `--inputs` i el
+# camí de l'execució. Un de sol, el de Lago et al. (2021), que és `matrix.lago`.
+INPUTS = ("lago",)
 
 # ------------------------------------------------- el conjunt d'informació
 
-# Retards de preu que admet l'etapa del preu, els del model de referència de Lago
-# et al. (2021): fa 1, 2, 3 i 7 dies, les 24 hores de cada un. Totes les famílies
-# els comparteixen, que és el que fa que una diferència entre elles sigui una
-# diferència d'algorisme.
+# Retards de preu del conjunt de Lago et al. (2021): fa 1, 2, 3 i 7 dies, les 24 hores
+# de cada un. Totes les famílies els comparteixen, que és el que fa que una diferència
+# entre elles sigui una diferència d'algorisme.
 LAGS = (1, 2, 3, 7)
 
 # Retards de les dues previsions del conjunt de Lago et al. (2021): el dia que es

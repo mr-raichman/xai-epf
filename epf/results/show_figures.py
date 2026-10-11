@@ -9,12 +9,13 @@ família sola hi escrivia la comparació de l'execució sencera amb una sola sè
 que hi havia desapareixia fins que alguna cosa la refeia.
 """
 from epf import matrix
+from epf.data import forecasts as day_ahead
 from epf.data import price
 from epf.results import combination, figures, run_files
 
 
 def main(arguments):
-    actual = matrix.price_only(price.load()).actual
+    actual = matrix.lago(price.load(), day_ahead.load()).actual
     for into in arguments.folder:
         forecasts = combination.comparison(run_files.family_folders([into]))
         figures.shared(into, forecasts, actual)

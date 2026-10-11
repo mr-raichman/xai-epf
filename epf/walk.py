@@ -19,7 +19,7 @@ def forward(predict, X, y, first, last, every=1, after=None, on_day=None):
 
     `predict` és una funció `(X, y, day)` que torna un diccionari de nom de pronòstic
     a les 24 hores del dia; cada família s'hi adapta i cap coneix les altres. Un sol
-    ajust pot donar diversos pronòstics, que és el cas de les cinc finestres de LEAR i
+    ajust pot donar diversos pronòstics, que és el cas de les quatre finestres de LEAR i
     dels tres pronòstics ingenus: així el dia s'ajusta un sol cop i es camina un sol
     cop.
     `every` en pren un dia de cada N i no canvia res del que veu el model: cada dia

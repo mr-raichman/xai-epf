@@ -4,8 +4,9 @@
 tria `search.py` i no una persona, i els llegeix `searched()`. Aquesta família és
 l'excepció a que els números d'un model siguin al seu fitxer, i el preu és que el
 commit tot sol ja no fixa el que ha fet la predicció: qui ho fixa és el `run.json` de
-l'execució, que els recull tots. Una execució d'aquesta família no pot arrencar sense
-que la cerca hagi passat, i l'únic que els substitueix és una altra cerca.
+l'execució, que els recull tots. Mentre no s'ha cercat sobre el conjunt de Lago et al.
+(2021), en manlleva els d'una altra cerca, marcats; sense aquella cerca al disc, la
+família no arrenca.
 
 Els que hi són són els que ningú no cerca: la finestra i les setmanes de validació,
 que són de l'article, i el pressupost de l'entrenament i de la cerca.
@@ -13,7 +14,7 @@ que són de l'article, i el pressupost de l'entrenament i de la cerca.
 import json
 
 from epf import paths
-from epf.parameters import PRICE_ONLY, WARM_UP
+from epf.parameters import WARM_UP
 
 NAME = "dnn"
 
@@ -52,40 +53,43 @@ RECALIBRATIONS = 13
 BATCH_DAYS = 28
 
 
-def path(stage=PRICE_ONLY):
-    """On viu el conjunt que ha triat la cerca d'una etapa.
+# La cerca d'on surten els números mentre no se n'ha fet cap sobre el conjunt de Lago
+# et al. (2021): la del conjunt de només preu, ja retirat. Tria retards de preu i el dia
+# de la setmana i cap previsió, de manera que cap xifra d'aquesta família no diu res
+# fins que la cerca sobre aquell conjunt la substitueixi.
+BORROWED = "price"
 
-    L'etapa es pren de `parameters` com la pren tothom mentre n'hi ha una de sola; el
-    dia que n'hi hagi dues, passarà a ser un argument alhora a tot el projecte.
-    """
+
+def path(stage):
+    """On viu el conjunt que ha triat la cerca sobre un conjunt d'informació."""
     return paths.SEARCHES / stage / f"{NAME}.json"
 
 
-def searched(stage=PRICE_ONLY):
-    """El conjunt que va triar l'última cerca d'aquesta etapa, i d'on surt.
+def searched():
+    """Els números de la cerca manllevada, d'on surten, i marcats com a sense cercar.
 
-    Refusa si no n'hi ha cap: aquesta família no té valors per defecte que fer servir
-    mentre no s'hagi cercat, i arrencar-la amb uns d'inventats donaria un error que no
-    diu res de la xarxa de l'article.
+    Refusa si no hi és: aquesta família no té valors per defecte, i arrencar-la amb uns
+    d'inventats donaria un error que no diu res de la xarxa de l'article.
 
-    Torna els valors **i la procedència** sota `search`: quantes proves, quins dies i
-    quin error. Els valors tots sols dirien què s'ha fet servir i no si algú els havia
-    triat de debò, i una cerca de vint proves i una de mil deixen el mateix rastre al
-    `run.json` si no s'hi desa el número.
+    Torna els valors **i la procedència** sota `search`: quantes proves, quins dies,
+    sobre quin conjunt i quin error. Els valors tots sols dirien què s'ha fet servir i no
+    si algú els havia triat de debò, i una cerca de vint proves i una de mil deixen el
+    mateix rastre al `run.json` si no s'hi desa el número.
     """
-    found = path(stage)
+    found = path(BORROWED)
     if not found.exists():
         raise FileNotFoundError(
-            f"no hi ha cap conjunt d'hiperparàmetres cercat a {found}; executa "
-            f"`epf search-dnn` abans de caminar la família {NAME}")
+            f"no hi ha a {found} la cerca del conjunt de només preu, que la família "
+            f"{NAME} fa servir mentre no se n'hagi fet cap sobre el de Lago et al. (2021)")
     record = json.loads(found.read_text())
     return record["hyperparameters"] | {
+        "unsearched": True,
         "search": {name: value for name, value in record.items()
                    if name != "hyperparameters"}}
 
 
-def save(record, stage=PRICE_ONLY):
-    """Desa el que ha trobat una cerca, substituint el que hi hagi."""
+def save(stage, record):
+    """Desa el que ha trobat una cerca sobre un conjunt, substituint el que hi hagi."""
     found = path(stage)
     found.parent.mkdir(parents=True, exist_ok=True)
     found.write_text(json.dumps(record, indent=2) + "\n")
