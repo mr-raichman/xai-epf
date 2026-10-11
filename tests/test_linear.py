@@ -69,6 +69,22 @@ def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
         assert np.isclose(explained.base[rows].iloc[0], explained.transformed[rows].mean())
 
 
+def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
+    # L'ordre de la matriu del model, les escalades i després els indicadors, no és el de
+    # la taula: una contribució escrita a la columna que no toca sumaria igual i tindria
+    # la mateixa mitjana.
+    X, y = per_hour_table()
+    model = fit(X, y, PENALTY, MIXING)
+    before = attribute(model, X).values
+    shifted = X.copy()
+    rows = (shifted[HOUR] == 13).to_numpy()
+    shifted.loc[rows, "wind"] += 1000.0
+    moved = attribute(model, shifted).values - before
+    assert (moved.loc[rows, "wind"] != 0).all()
+    assert (moved.drop(columns="wind") == 0).all().all()
+    assert (moved.loc[~rows] == 0).all().all()
+
+
 def test_the_base_and_the_contributions_return_the_rows_own_prediction():
     # Dos camins independents: les contribucions surten de `coef_` i `intercept_`, la
     # predicció de `predict`, i `sinh` torna aquesta al preu que dona el model.

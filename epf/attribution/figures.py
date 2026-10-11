@@ -36,10 +36,11 @@ def _blocks(columns):
 def per_hour_scale(importance, units):
     """Divisor de cada hora de lliurament, per posar-les totes en una escala llegible.
 
-    LEAR escala l'objectiu de cada hora amb la seva pròpia mediana i MAD, així que
-    les contribucions de dues hores no són en les mateixes unitats i una sola escala
-    de color les compara malament: mesurat, les MAD d'un mateix dia es diferencien un
-    factor 1,26 a la finestra de 1085 dies i 2,21 a la de 49. Cada hora es divideix
+    Un model lineal escala l'objectiu de cada hora amb la seva pròpia mediana i
+    escala, així que les contribucions de dues hores no són en les mateixes unitats i
+    una sola escala de color les compara malament: mesurat sobre LEAR, les MAD d'un
+    mateix dia es diferencien un factor 1,26 a la finestra de 1085 dies i 2,21 a la de
+    49. Cada hora es divideix
     per la seva pròpia contribució més gran, de manera que el color és una part de
     l'hora i no una magnitud. Un arbre atribueix en EUR/MWh a totes les hores i sí
     que comparteix escala, així que allà el divisor és 1.
@@ -105,7 +106,7 @@ def importance_totals(folder, label, stem, columns, importance, units):
     Sense el divisor per hora de les altres figures: cada fila és la suma de 24
     columnes i dividir-la per la contribució més gran d'una sola columna donaria
     una part de l'hora més gran que u. Es queda en les unitats desades, de manera
-    que a LEAR les hores d'aquesta figura no es comparen entre elles.
+    que en un model lineal les hores d'aquesta figura no es comparen entre elles.
     """
     lags, others = _blocks(columns)
     rows = [importance[positions].sum(axis=0) for _, positions in sorted(lags.items())]
@@ -127,8 +128,9 @@ def importance_over_time(folder, label, stem, columns, values, days, scale, unit
     """Les columnes més importants al llarg del temps, mes a mes o, si el període
     és curt, setmana a setmana.
 
-    La mitjana és sobre les hores del dia, que a LEAR no són en les mateixes
-    unitats, de manera que cada hora es divideix pel seu divisor abans de mitjanar.
+    La mitjana és sobre les hores del dia, que en un model lineal no són en les
+    mateixes unitats, de manera que cada hora es divideix pel seu divisor abans de
+    mitjanar.
     """
     averaged = (np.abs(values) / scale).mean(axis=2)
     order = averaged.mean(axis=0).argsort()[::-1][:FOLLOWED]

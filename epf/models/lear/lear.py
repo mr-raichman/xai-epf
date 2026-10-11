@@ -19,7 +19,6 @@ from epf.market import HOURS_PER_DAY
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
 from epf.models.scaling import Scaler
-from epf.attribution.stored import Attribution
 
 # Nom de la finestra que agafa tot l'historial.
 WHOLE_HISTORY = "all"
@@ -31,27 +30,20 @@ NAME = "lear"
 
 
 def window_name(window):
-    """Nom del pronòstic d'una finestra: `lear_49`, i `lear_all` per tot l'historial.
-
-    Dins de l'atribució de la família els membres es diuen només per la finestra,
-    `49` i `all`, perquè ja són dins d'`attribution_lear.npz` i el prefix hi seria
-    dues vegades.
-    """
+    """Nom del pronòstic d'una finestra: `lear_49`, i `lear_all` per tot l'historial."""
     return f"{NAME}_{window if window else WHOLE_HISTORY}"
 
 
 def window_names(windows=WINDOWS):
     return tuple(window_name(window) for window in windows)
 
-# El que queda ajustat d'una finestra, i tot el que la predicció i les contribucions
-# necessiten. Els 24 LASSO hi són tal com es van ajustar i no com a matrius de
-# coeficients, de manera que predir és exactament la crida que els va predir. Hi va la
-# mida de la finestra i no els seus retards ni les seves columnes, que se'n deriven:
-# els retards amb `lags_of` i les columnes dues vegades, per llegir la fila i per
-# col·locar les contribucions. També és el nom del membre a l'atribució. `background` és
-# la mitjana de cada columna de la matriu de disseny, `prices` l'escalador de les
-# entrades i `target` el de les 24 sortides, que és qui torna a EUR/MWh.
-Window = collections.namedtuple("Window", "window models background prices target")
+# El que queda ajustat d'una finestra, i tot el que la predicció necessita. Els 24 LASSO
+# hi són tal com es van ajustar i no com a matrius de coeficients, de manera que predir
+# és exactament la crida que els va predir. Hi va la mida de la finestra i no els seus
+# retards ni les seves columnes, que se'n deriven amb `lags_of`. `prices` és l'escalador
+# de les entrades i `target` el de les 24 sortides, que és qui torna a EUR/MWh. No
+# s'explica: LEAR és la referència, i les referències no s'interpreten.
+Window = collections.namedtuple("Window", "window models prices target")
 
 def _design(rows, scaler):
     """Files de `matrix.build` com la matriu de LEAR: preus transformats i indicadors.
@@ -88,12 +80,9 @@ def feature_columns(lags):
             + DAY_OF_WEEK_COLUMNS)
 
 
-DESIGN_COLUMNS = feature_columns(LAGS)
-
-
 def _fit_window(X, y, day, window, max_iter):
-    """Els 24 LASSO d'una finestra, ajustats només amb dies anteriors, i el que cal
-    per llegir-los: la mitjana de la finestra i els dos escaladors."""
+    """Els 24 LASSO d'una finestra, ajustats només amb dies anteriors, i els dos
+    escaladors que cal per llegir-los."""
     lags = lags_of(window)
     columns = feature_columns(lags)
     features, target = calibration(X[columns], y, day, window)
@@ -115,7 +104,7 @@ def _fit_window(X, y, day, window, max_iter):
     with threadpool_limits(limits=1):
         models = [_fit_hour(train, scaled[:, hour], max_iter)
                   for hour in range(HOURS_PER_DAY)]
-    return Window(window, models, train.mean(axis=0), prices, prices_target)
+    return Window(window, models, prices, prices_target)
 
 
 def _rows_of(fitted, X, day):
@@ -124,36 +113,12 @@ def _rows_of(fitted, X, day):
     return _design(X.loc[[day], columns], fitted.prices)
 
 
-def _window_outputs(fitted, rows):
-    """Els 24 valors que donen els models d'una finestra, al seu espai transformat.
-
-    És amb aquests que es comprova l'additivitat de l'atribució: la base més les
-    contribucions són al mateix espai i `sinh` no deixa convertir-ne la suma.
-    """
-    with threadpool_limits(limits=1):
-        return np.array([model.predict(rows)[0] for model in fitted.models])
-
-
 def _window_prices(fitted, rows):
-    """Els 24 preus d'una finestra, en EUR/MWh."""
-    return fitted.target.back(_window_outputs(fitted, rows))
-
-
-def _window_contributions(fitted, rows):
-    """(contribucions, base) d'una finestra, en el seu espai transformat.
-
-    Les contribucions són els valors de SHAP exactes d'un model lineal, el
-    coeficient per la distància de la columna a la mitjana de la finestra, i no van
-    en EUR/MWh. La base és la predicció a aquella mitjana, en el mateix espai, i
-    cada hora té la seva perquè l'objectiu s'escala per columna: base més la suma de
-    les contribucions torna la predicció del membre.
-    """
+    """Els 24 preus d'una finestra, en EUR/MWh: els models donen l'espai transformat i
+    l'escalador de l'objectiu el desfà."""
     with threadpool_limits(limits=1):
-        contributions = [model.coef_ * (rows[0] - fitted.background)
-                         for model in fitted.models]
-        base = [model.intercept_ + model.coef_ @ fitted.background
-                for model in fitted.models]
-    return np.array(contributions).T, np.array(base)
+        outputs = np.array([model.predict(rows)[0] for model in fitted.models])
+    return fitted.target.back(outputs)
 
 
 def fit(X, y, day, windows=WINDOWS, max_iter=MAX_ITER):
@@ -176,37 +141,3 @@ def predict(model, X, day):
               for fitted in model}
     return {NAME: np.mean(list(prices.values()), axis=0), **prices}
 
-
-def attribute(model, X, day):
-    """Contribucions de cada finestra, desades per separat.
-
-    Cada finestra escala la seva pròpia finestra amb la seva mediana i la seva MAD,
-    de manera que dues finestres no tenen les contribucions en les mateixes unitats i
-    mitjanar-les no voldria dir res. Les columnes que una finestra curta no porta hi
-    són a zero.
-
-    Es desen dues prediccions de cada finestra i no una. `forecasts` és en EUR/MWh,
-    perquè la del CSV és la mitjana de les cinc i cada finestra ha de tenir la seva;
-    `transformed` és la mateixa abans de desfer la transformació, que és l'única
-    contra la qual es pot comprovar que la base més les contribucions tornen la
-    predicció. Les dues surten de `model.predict` i les contribucions de `coef_` i
-    `intercept_`, de manera que la comprovació lliga dos camins independents.
-    """
-    forecasts, transformed, values, bases = [], [], [], []
-    for fitted in model:
-        rows = _rows_of(fitted, X, day)
-        contributions, base = _window_contributions(fitted, rows)
-        outputs = _window_outputs(fitted, rows)
-        transformed.append(outputs)
-        forecasts.append(fitted.target.back(outputs))
-        bases.append(base)
-        whole = np.zeros((len(DESIGN_COLUMNS), HOURS_PER_DAY))
-        carried = feature_columns(lags_of(fitted.window))
-        whole[[DESIGN_COLUMNS.index(name) for name in carried]] = contributions
-        values.append(whole)
-    # Els noms surten de les finestres que s'han ajustat i no de `WINDOWS`: una crida
-    # amb un subconjunt n'ha de donar els seus i no cinc.
-    members = tuple(str(fitted.window) if fitted.window else WHOLE_HISTORY
-                    for fitted in model)
-    return Attribution(members, DESIGN_COLUMNS, np.array(values), np.array(bases),
-                       np.array(forecasts), np.array(transformed), "espai transformat")

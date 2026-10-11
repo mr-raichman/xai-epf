@@ -9,14 +9,14 @@ import collections
 
 import numpy as np
 
-# `members` és un sol element per a les famílies d'un sol model, i les finestres de
-# calibratge per a LEAR, que escala cada finestra amb la seva pròpia mediana i MAD i
-# per tant no les té en unitats comparables entre elles, ni tampoc entre hores.
+# `members` és un sol element per a les famílies d'un sol model, i un per model per a
+# una família de diversos, on cada un escala les seves pròpies files i per tant no
+# tenen unitats comparables entre ells, ni tampoc entre hores.
 # `values` és (membre, columna, hora) per a un dia i `base` és (membre, hora): el
 # valor del qual parteix cada contribució, de manera que la base més la suma de les
 # contribucions torna la predicció i això es pot comprovar. `forecasts` és
-# (membre, hora) només per a un conjunt com LEAR, on cada finestra té la seva pròpia
-# predicció i la que es desa al CSV és la mitjana; per a una família d'un sol model
+# (membre, hora) només per a una família de diversos membres, on cada un té la seva
+# pròpia predicció i la que es desa al CSV és la mitjana; per a una d'un sol model
 # és None, perquè la predicció del membre ja és la del CSV. `transformed` és la
 # predicció de cada membre a les unitats de l'atribució i no en EUR/MWh, i hi és
 # només on aquelles dues no coincideixen: és contra ella que es comprova
@@ -77,9 +77,9 @@ def refuse_nonadditive(forecast, stored):
 
     Quan les contribucions no són en EUR/MWh aquesta és l'única manera de
     comprovar-ho, perquè la suma és a l'espai transformat i `sinh` no deixa
-    convertir-la: es compara amb la predicció del model al mateix espai. Mentre no es
-    desava, la base de cada finestra de LEAR no la comprovava res i la família amb
-    l'atribució exacta per construcció era l'única sense comprovar (`evidence.md` 5.4).
+    convertir-la: es compara amb la predicció del model al mateix espai. Sense això, la
+    família amb l'atribució exacta per construcció seria l'única que no comprova res
+    (`evidence.md` 5.4).
     """
     if stored.transformed is None:
         return
@@ -97,9 +97,8 @@ def refuse_inconsistent(folder, forecast, predicted):
 
     Dues comprovacions i no una. L'additivitat de cada membre és de
     `refuse_nonadditive`, i aquí es comprova que el que s'ha desat torni el CSV: per a
-    una família que atribueix en EUR/MWh les dues coses són la mateixa, i per a un
-    conjunt com LEAR qui ha de tornar el CSV és la mitjana de les prediccions dels
-    seus membres.
+    una família que atribueix en EUR/MWh les dues coses són la mateixa, i per a una de
+    diversos membres qui ha de tornar el CSV és la mitjana de les seves prediccions.
 
     Llegeix el que hi ha al disc i no el que hi havia a la memòria, de manera que
     també agafa un error en desar. Torna el pitjor residu en EUR/MWh, o None si

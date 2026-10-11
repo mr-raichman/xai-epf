@@ -66,8 +66,8 @@ def ensemble(folder, base, contributions, transformed, members=(10.0, 20.0, 30.0
 
 
 def test_an_ensemble_is_checked_against_the_mean_of_its_members(tmp_path):
-    # Les contribucions de LEAR són a l'espai transformat i no es poden comparar
-    # amb el CSV; qui ha de reproduir-lo és la mitjana de les seves finestres.
+    # Les contribucions a l'espai transformat no es poden comparar amb el CSV; d'una
+    # família de diversos membres, qui ha de reproduir-lo és la mitjana dels membres.
     folder = tmp_path / "lear"
     frame = ensemble(folder, base=0.4, contributions=0.1, transformed=0.6)
     assert refuse_inconsistent(folder, "lear", frame) < 1e-3

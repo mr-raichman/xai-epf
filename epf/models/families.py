@@ -25,9 +25,10 @@ DAILY, HOURLY = "daily", "hourly"
 # `predict` torna són què.
 #
 # `attribute` és `None` on no hi ha cap mètode i on no se'n vol cap. Les prediccions
-# ingènues perquè la seva atribució seria la columna que copien. I la xarxa de l'article
-# perquè no és un model del qual s'esperi cap explicació: hi és per dir com de lluny
-# queden els models que s'expliquen del que es pot arribar a fer amb aquestes dades.
+# ingènues perquè la seva atribució seria la columna que copien. LEAR i la xarxa de
+# l'article perquè són referències i no models dels quals s'esperi cap explicació: LEAR
+# és el que els altres han de superar, i la xarxa diu com de lluny queden els models
+# que s'expliquen del que es pot arribar a fer amb aquestes dades.
 #
 # `members` són els models ajustats que entren a la combinació d'una execució, i
 # `headlines` els que es comparen a les figures. Per a LEAR no són els mateixos: el que
@@ -63,7 +64,7 @@ def families():
     found = {
         "naive": Family(DAILY, naive.fit, naive.predict, None, None, None,
                         members=(), headlines=naive.NAMES),
-        lear.NAME: Family(DAILY, lear.fit, lear.predict, lear.attribute, None,
+        lear.NAME: Family(DAILY, lear.fit, lear.predict, None, None,
                           lear_hyperparameters,
                           members=lear.window_names(), headlines=(lear.NAME,)),
         boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
