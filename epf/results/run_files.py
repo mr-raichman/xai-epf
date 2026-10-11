@@ -8,7 +8,9 @@ Tot el que hi ha aquí es deriva de les prediccions i del preu, de manera que es
 tornar a calcular sense tornar a ajustar res. L'atribució no: aquella surt del model
 que va predir el dia i la desa `attribution/stored.py`.
 """
+import datetime
 import json
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -23,6 +25,24 @@ DAY = "day"
 # de les matrius de característiques; aquesta és la mateixa paraula perquè és la
 # mateixa cosa, i no s'importa d'allà perquè `results/` no depèn de les matrius.
 HOUR = "hour"
+
+def git(*arguments):
+    """La sortida d'una ordre de git sobre el repositori. Una execució es diu pel commit
+    que la fa, i el camí endavant i la part B el demanen per igual."""
+    return subprocess.run(("git", *arguments), cwd=paths.ROOT, check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def plain(value):
+    """El valor tal com es pot escriure a JSON, sense perdre què era."""
+    if isinstance(value, dict):
+        return {str(key): plain(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [plain(item) for item in value]
+    if isinstance(value, (datetime.date, datetime.timedelta)):
+        return str(value)
+    return value
+
 
 FORECASTS = "forecasts_{name}.csv"
 METRICS = "metrics.csv"

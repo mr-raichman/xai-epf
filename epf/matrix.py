@@ -19,6 +19,9 @@ from epf.parameters import DAYS_PER_WEEK, LAGS, PREVIOUS_DAY
 HOUR = "hour"
 PRICE = "price"
 
+# La columna del conjunt de la prova de datació: els dies des del primer del període.
+DAY_COUNTER = "day_counter"
+
 # El dia de la setmana, en set indicadors i no en un enter. Els escriu la matriu i no
 # cap família, perquè és l'única manera que totes vegin el mateix: mentre l'enter hi
 # era, LEAR l'obria en set i la resta el prenia tal qual, de manera que una diferència
@@ -132,3 +135,12 @@ def forecasts(frame, day_ahead):
     """
     daily = build(frame, PREVIOUS_DAY, day_ahead)
     return Matrices(daily, per_hour(*daily, at_the_hour=tuple(day_ahead)), daily[1])
+
+
+def date_probe(frame, day_ahead, start):
+    """El conjunt de previsions amb un comptador de dies, els que han passat des de
+    `start`: la prova de datació de Trebbien et al. (2023), que treu el que un model pot
+    fer amb la data i res més. Només la taula per hora, perquè només l'arbre l'ajusta."""
+    rows, target = forecasts(frame, day_ahead).hourly
+    counter = (rows.index - pd.Timestamp(start)).days
+    return rows.assign(**{DAY_COUNTER: counter.to_numpy()}), target

@@ -28,17 +28,24 @@ from epf import parameters
 Command = collections.namedtuple("Command", "module help arguments")
 
 
-def run_arguments(parser):
-    """Els arguments del camí endavant, els mateixos per `epf run` i per `python -m`."""
+def pass_arguments(parser):
+    """Els arguments d'una passada, els mateixos pel camí endavant i per la part B: el
+    nivell, quines famílies i si es comença de zero."""
     parser.add_argument("--tier", choices=(parameters.TEST, parameters.MEASUREMENT),
                         required=True,
                         help="de prova, que no dóna cap xifra, o de mesura, que sí")
-    parser.add_argument("--price-only", action="store_true", required=True,
-                        help="conjunt d'informació de només preu, l'únic que hi ha")
     parser.add_argument("--family", action="append",
                         help="només aquesta família; es pot repetir")
     parser.add_argument("--replace", action="store_true",
                         help="comença de zero, encara que hi hagi una execució a mig fer")
+    return parser
+
+
+def run_arguments(parser):
+    """Els arguments del camí endavant, els mateixos per `epf run` i per `python -m`."""
+    pass_arguments(parser)
+    parser.add_argument("--price-only", action="store_true", required=True,
+                        help="conjunt d'informació de només preu, l'únic que hi ha")
     return parser
 
 
@@ -73,6 +80,9 @@ COMMANDS = {
         search_arguments),
     "run": Command(
         "epf.runner", "camina el període endavant amb totes les famílies", run_arguments),
+    "describe": Command(
+        "epf.describe", "descriu el preu amb el protocol de Trebbien et al. (2023), la part B",
+        pass_arguments),
     "rebuild": Command(
         "epf.rebuild", "refà les mètriques i les figures d'una execució", folder_arguments),
     "attribute": Command(

@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.describe import split
+from epf.describe import split, validation_parts
 from epf.parameters import DEVELOPMENT, SEEDS
 
 ONE_DAY = pd.Timedelta(days=1)
@@ -52,3 +52,12 @@ def test_a_period_of_broken_weeks_is_refused():
     # Les setmanes de calendari deixarien una primera de sis dies i una última d'un.
     with pytest.raises(ValueError, match="setmanes senceres"):
         split(0, (datetime.date(2019, 1, 1), datetime.date(2024, 9, 29)))
+
+
+def test_the_validation_parts_are_whole_weeks_that_share_out_the_validation_days():
+    for seed in SEEDS:
+        parts = validation_parts(seed, DEVELOPMENT)
+        assert [len(part) for part in parts] == [24 * 7] * 4
+        joined = parts[0].append(parts[1:]).sort_values()
+        assert joined.is_unique
+        assert joined.equals(split(seed, DEVELOPMENT).validation)

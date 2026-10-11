@@ -106,6 +106,8 @@ def attribute_rows(distribution, fitted, X, background):
     """
     explained = keras.Model(fitted.network.input,
                             keras.layers.Lambda(distribution.flat)(fitted.network.output))
+    # shap avisa que retalla el fons a 100 files, però ho fa l'emmascarador de la seva
+    # classe base, que aquest explicador no fa servir: el càlcul les pren totes.
     explainer = shap.DeepExplainer(
         explained, fitted.inputs.transform(background[fitted.columns]))
     values = np.asarray(explainer.shap_values(

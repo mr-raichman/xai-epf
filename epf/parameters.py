@@ -87,6 +87,18 @@ SEEDS = tuple(range(10))
 # és d'on ha de venir el nivell.
 PREVIOUS_DAY = (1,)
 
+# Llavors i dies de prova que s'expliquen, per nivell. `None` vol dir tots. El de prova
+# és una llavor i 50 dies a propòsit, prou per passar tota la maquinària i prou curt per
+# esperar-s'hi; el de mesura és el protocol sencer.
+DESCRIPTIONS = {
+    MEASUREMENT: (SEEDS, None),
+    TEST: ((0,), 50),
+}
+
+# Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,
+# triades a l'atzar amb la llavor. Totes costarien unes onze vegades més.
+INTERACTION_ROWS = 1000
+
 # ----------------------------------------------------------- aquesta execució
 
 # Primer dia, últim dia i cada quants se'n pren un, per nivell. El de prova és un

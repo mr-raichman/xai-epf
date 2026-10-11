@@ -47,7 +47,8 @@ def fit_rows(X, y, validation=(), make=lightgbm, patience=PATIENCE):
     """
     if not validation:
         return make().fit(X, y)
-    return make().fit(X, y, eval_set=list(validation),
+    parts, targets = zip(*validation)
+    return make().fit(X, y, eval_X=parts, eval_y=targets,
                       callbacks=[early_stopping(patience, verbose=False)])
 
 
@@ -64,6 +65,11 @@ def attribute_rows(model, X):
     """
     explainer = shap.TreeExplainer(model)
     return explainer.shap_values(X), float(np.ravel(explainer.expected_value)[0])
+
+
+def interaction_rows(model, X):
+    """Els valors d'interacció de SHAP de cada fila, `(files, columnes, columnes)`."""
+    return shap.TreeExplainer(model).shap_interaction_values(X)
 
 
 def fit(X, y, day, make=lightgbm, window=WINDOW):

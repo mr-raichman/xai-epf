@@ -7,6 +7,7 @@ donaria un fitxer diferent d'una de seguida i un diff entre una reconstrucció i
 l'execució deixaria de voler dir res.
 """
 import datetime
+import json
 
 import numpy as np
 import pandas as pd
@@ -129,3 +130,8 @@ def test_a_directory_with_nothing_in_it_has_no_resume_day(tmp_path):
     assert run_files.last_common_day(tmp_path / "absent") is None
     (tmp_path / "empty").mkdir()
     assert run_files.last_common_day(tmp_path / "empty") is None
+
+
+def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
+    with pytest.raises(TypeError):
+        json.dumps(run_files.plain({"bad": object()}))

@@ -16,17 +16,15 @@ que una mesura no arrenca amb l'arbre brut: el nom mentiria. És també per aix�
 reprendre és només del nivell de mesura, l'únic que exigeix l'arbre net.
 """
 import argparse
-import datetime
 import functools
 import shutil
-import subprocess
 import sys
 import time
 import traceback
 
 import pandas as pd
 
-from epf import cli, matrix, parameters, paths
+from epf import cli, matrix, parameters
 from epf.attribution import fitted
 from epf.data.outliers import report as neighbour_report
 from epf.data.price import NAME, load
@@ -75,22 +73,6 @@ def run(family, name, tables, tier, store, folder, after, report):
                    on_day=functools.partial(report, name))
 
 
-def _git(*arguments):
-    return subprocess.run(("git", *arguments), cwd=paths.ROOT, check=True,
-                          capture_output=True, text=True).stdout.strip()
-
-
-def _plain(value):
-    """El valor tal com es pot escriure a JSON, sense perdre què era."""
-    if isinstance(value, dict):
-        return {str(key): _plain(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_plain(item) for item in value]
-    if isinstance(value, (datetime.date, datetime.timedelta)):
-        return str(value)
-    return value
-
-
 def described(commit, tier, name, chosen, family, forecasts, walk_seconds, walked):
     """El que `run.json` ha de dir perquè una xifra es pugui tornar al codi que la va fer.
 
@@ -127,8 +109,8 @@ def described(commit, tier, name, chosen, family, forecasts, walk_seconds, walke
         # donant el cost per dia i cap de les dues no menteix.
         "walked_days": walked,
         "walk_seconds": round(walk_seconds, 1),
-        "parameters": _plain(swept),
-        "hyperparameters": _plain(hyperparameters(name)),
+        "parameters": run_files.plain(swept),
+        "hyperparameters": run_files.plain(hyperparameters(name)),
     }
 
 
@@ -181,8 +163,8 @@ def parse():
 
 
 def main(arguments):
-    commit = _git("rev-parse", "HEAD")
-    if arguments.tier == MEASUREMENT and _git("status", "--porcelain"):
+    commit = run_files.git("rev-parse", "HEAD")
+    if arguments.tier == MEASUREMENT and run_files.git("status", "--porcelain"):
         print("l'arbre té canvis sense desar. El directori d'una mesura es diu pel "
               "commit, i amb canvis sense desar el nom no diria quin codi l'ha fet. "
               f"Fes un commit, o fes servir --tier {TEST}.")

@@ -101,7 +101,3 @@ def test_a_family_that_has_not_been_searched_refuses_instead_of_inventing():
     with pytest.raises(FileNotFoundError, match="search-dnn"):
         hyperparameters("dnn")
 
-
-def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
-    with pytest.raises(TypeError):
-        json.dumps(runner._plain({"bad": object()}))
