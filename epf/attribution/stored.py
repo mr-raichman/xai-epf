@@ -15,9 +15,10 @@ import numpy as np
 # `values` és (membre, columna, hora) per a un dia i `base` és (membre, hora): el
 # valor del qual parteix cada contribució, de manera que la base més la suma de les
 # contribucions torna la predicció i això es pot comprovar. `forecasts` és
-# (membre, hora) només per a una família de diversos membres, on cada un té la seva
-# pròpia predicció i la que es desa al CSV és la mitjana; per a una d'un sol model
-# és None, perquè la predicció del membre ja és la del CSV. `transformed` és la
+# (membre, hora), la predicció de cada membre en EUR/MWh, allà on l'atribució no és en
+# EUR/MWh: és el que es compara amb el CSV, la d'un sol membre o la mitjana de diversos,
+# i sense ella aquella comprovació no té res a comparar. On l'atribució és en EUR/MWh
+# és None, perquè la base més les contribucions ja és el preu. `transformed` és la
 # predicció de cada membre a les unitats de l'atribució i no en EUR/MWh, i hi és
 # només on aquelles dues no coincideixen: és contra ella que es comprova
 # l'additivitat quan la suma de les contribucions no és un preu.
@@ -97,8 +98,9 @@ def refuse_inconsistent(folder, forecast, predicted):
 
     Dues comprovacions i no una. L'additivitat de cada membre és de
     `refuse_nonadditive`, i aquí es comprova que el que s'ha desat torni el CSV: per a
-    una família que atribueix en EUR/MWh les dues coses són la mateixa, i per a una de
-    diversos membres qui ha de tornar el CSV és la mitjana de les seves prediccions.
+    una família que atribueix en EUR/MWh les dues coses són la mateixa, i per a una que
+    atribueix a l'espai transformat qui ha de tornar el CSV és la mitjana de les
+    prediccions desades dels seus membres, un o diversos.
 
     Llegeix el que hi ha al disc i no el que hi havia a la memòria, de manera que
     també agafa un error en desar. Torna el pitjor residu en EUR/MWh, o None si
