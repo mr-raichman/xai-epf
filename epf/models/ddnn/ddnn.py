@@ -30,7 +30,7 @@ from epf.models.ddnn.ddnn_hyperparameters import (BATCH, EPOCHS, MEMBERS, PATIEN
 from epf.models.ddnn.distributions import parameters as raw_parameters
 from epf.models.dnn import network
 from epf.models.dnn.dnn import columns_of
-from epf.parameters import SEED
+from epf.parameters import DAYS_PER_WEEK, SEED
 
 # Una xarxa ajustada i el que cal per llegir-la: els dos escaladors, el de l'objectiu
 # el que torna els paràmetres a EUR/MWh, i les columnes que llegeix, en el seu ordre.
@@ -40,6 +40,21 @@ Fitted = collections.namedtuple("Fitted", "network inputs outputs columns")
 # `base` `(24, paràmetres)`, en les unitats en què es desa cada paràmetre, EUR/MWh la
 # localització i l'escala i sense unitats l'asimetria i el pes de la cua.
 Explanation = collections.namedtuple("Explanation", "names columns values base")
+
+
+def split(count, weeks, generator):
+    """Índexs d'entrenament i de validació d'una finestra de `count` dies.
+
+    S'aparten `weeks` setmanes de dies solts, triats barrejant tota la finestra en lloc
+    de prendre'n el tram final, de manera que la xarxa s'entrena també amb els dies més
+    recents.
+    """
+    days = weeks * DAYS_PER_WEEK
+    if days >= count:
+        raise ValueError(f"la finestra de {count} dies no dóna {weeks} setmanes de "
+                         "validació i prou dies per entrenar")
+    order = generator.permutation(count)
+    return order[days:], order[:days]
 
 
 def fit_rows(distribution, train, validate, tuned, batch=BATCH, epochs=EPOCHS,
@@ -130,11 +145,12 @@ def fit(distribution, X, y, day, tuned=None, window=WINDOW, members=MEMBERS,
     és el que fa l'article per predir, i ajusta amb la resta.
     """
     tuned = searched() if tuned is None else tuned
-    features, target = calibration(X[columns_of(tuned["blocks"])], y, day, window)
+    features, target = calibration(X[columns_of(X.columns, tuned["blocks"])], y, day,
+                                   window)
     fitted = []
     for member in range(members):
-        train, validate = network.split(len(features), validation_weeks,
-                                        np.random.default_rng(seed + member))
+        train, validate = split(len(features), validation_weeks,
+                                np.random.default_rng(seed + member))
         fitted.append(fit_rows(
             distribution, (features.iloc[train], target.iloc[train]),
             (features.iloc[validate], target.iloc[validate]), tuned, batch, epochs,

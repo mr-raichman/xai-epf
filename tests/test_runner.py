@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from epf import paths, runner
+from epf.models.ddnn import ddnn_hyperparameters
 from epf.models.dnn import dnn_hyperparameters
 from epf.models.families import families, hyperparameters
 
@@ -24,13 +25,13 @@ SEARCHED = {"blocks": ["lag1", "day_of_week"], "hidden": [32, 64],
 
 @pytest.fixture(autouse=True)
 def searched(tmp_path, monkeypatch):
-    """La família que es cerca els seus números els vol al disc, i no al del projecte.
+    """Les famílies que manlleven una cerca la volen al disc, i no al del projecte.
 
     `autouse` perquè el registre de qualsevol família passa per `hyperparameters`, i
     aquella els demana a qui en tingui.
     """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
-    dnn_hyperparameters.save(dnn_hyperparameters.BORROWED,
+    dnn_hyperparameters.save(ddnn_hyperparameters.BORROWED,
                              {"trials": 20, "hyperparameters": SEARCHED})
 
 
@@ -85,8 +86,8 @@ def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals
     # És el que fa que una execució d'aquesta família es pugui tornar al que la va
     # fer, ara que el commit no en fixa els números. Si la composició es trenqués, el
     # `run.json` seguiria essent vàlid i hi faltaria tot el que defineix la xarxa.
-    found = hyperparameters("dnn")
-    assert found["WINDOW"] == dnn_hyperparameters.WINDOW
+    found = hyperparameters("ddnn_normal")
+    assert found["WINDOW"] == ddnn_hyperparameters.WINDOW
     for name, value in SEARCHED.items():
         assert found[name] == value
     # I d'on surten: una cerca de vint proves i una de mil deixarien el mateix rastre
@@ -99,9 +100,9 @@ def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals
 
 
 def test_a_family_that_has_not_been_searched_refuses_instead_of_inventing():
-    # Arrencar la xarxa amb números inventats donaria un error que no diu res de la
-    # xarxa de l'article, i una xifra que ningú no podria tornar a res.
-    dnn_hyperparameters.path(dnn_hyperparameters.BORROWED).unlink()
+    # Arrencar la xarxa distribucional amb números inventats donaria un error que no
+    # diu res de la xarxa de l'article, i una xifra que ningú no podria tornar a res.
+    dnn_hyperparameters.path(ddnn_hyperparameters.BORROWED).unlink()
     with pytest.raises(FileNotFoundError, match="només preu"):
-        hyperparameters("dnn")
+        hyperparameters("ddnn_normal")
 
