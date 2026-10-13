@@ -19,6 +19,7 @@ de triat.
 """
 import json
 
+from epf import paths
 from epf.models.dnn import dnn_hyperparameters
 
 # La finestra, el sostre d'èpoques i la paciència, els de la xarxa de punt, perquè
@@ -43,6 +44,11 @@ MEMBERS = 1
 BORROWED = "price"
 
 
+def borrowed():
+    """On és el fitxer d'aquella cerca, que era d'una sola xarxa i no d'un membre."""
+    return paths.SEARCHES / BORROWED / f"{dnn_hyperparameters.NAME}.json"
+
+
 def searched():
     """Els números que fa servir una xarxa distribucional, amb d'on surten.
 
@@ -53,7 +59,7 @@ def searched():
     defecte, i arrencar-les amb uns d'inventats donaria un error que no diu res de la
     xarxa de l'article.
     """
-    found = dnn_hyperparameters.path(BORROWED)
+    found = borrowed()
     if not found.exists():
         raise FileNotFoundError(
             f"no hi ha a {found} la cerca de la xarxa de punt sobre el conjunt de només "

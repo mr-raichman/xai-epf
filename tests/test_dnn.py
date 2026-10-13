@@ -16,7 +16,7 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS
-from epf.models.dnn.dnn import SCALINGS, fit_rows, improved, inputs, split
+from epf.models.dnn.dnn import SCALINGS, fit, fit_rows, improved, inputs, split
 from epf.parameters import DAYS_PER_WEEK, FOUR_YEARS
 
 # Una xarxa petita i un entrenament curt: el que es comprova són els escaladors, que no
@@ -96,3 +96,21 @@ def test_the_day_is_one_column_from_monday_zero_to_sunday_six():
     values = inputs(X, ["day_of_week", "lag1"])
     assert values.shape == (DAYS_PER_WEEK, 1 + len(HOUR_COLUMNS))
     assert list(values[:, 0]) == list(days.dayofweek)
+
+
+def test_each_member_fits_on_its_own_numbers():
+    # A l'article cada membre surt de la seva cerca, amb els seus blocs i la seva xarxa.
+    # Si tots prenguessin els del primer, la mitjana seria d'una xarxa repetida i el
+    # pronòstic sortiria igual de plausible.
+    days = pd.date_range("2024-01-01", periods=130, freq="D")
+    rng = np.random.default_rng(0)
+    columns = [f"{block}_{hour}" for block in ("lag1", "lag2") for hour in HOUR_COLUMNS]
+    X = pd.DataFrame(rng.normal(size=(len(days), len(columns))), index=days,
+                     columns=columns)
+    y = pd.DataFrame(50 + 10 * rng.normal(size=(len(days), 24)), index=days,
+                     columns=HOUR_COLUMNS)
+    members = [TUNED | {"blocks": ["lag1"], "seed": 1},
+               TUNED | {"blocks": ["lag1", "lag2"], "seed": 2}]
+    model = fit(X, y, days[-1], members, window=120, epochs=2)
+    assert [member.blocks for member in model] == [["lag1"], ["lag1", "lag2"]]
+    assert [member.fitted.network.input_shape[-1] for member in model] == [24, 48]

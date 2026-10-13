@@ -14,7 +14,8 @@ creïbles són les heurístiques que se'ls llegeixen, i no un model del qual s'e
 explicació.
 
 **Els números que la defineixen els tria la cerca i no una persona**, i `fit` els pren
-en un sol objecte perquè és així com es trien, es desen i se substitueixen: tots junts.
+en un objecte per membre perquè és així com es trien, es desen i se substitueixen: tots
+els d'un membre junts, de la seva cerca.
 
 Tot és sobre files donades: `fit_rows` ajusta una xarxa amb les files d'entrenament i
 les de validació que se li donin, i `fit`, el camí endavant, les treu de la finestra
@@ -29,15 +30,19 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
 from epf.models.dnn import network
-from epf.models.dnn.dnn_hyperparameters import (BATCH, CLIP, EPOCHS, MEMBERS, NAME,
-                                                PATIENCE, SMALLEST_LAYER,
-                                                VALIDATION_SHARE, WINDOW, searched)
+from epf.models.dnn.dnn_hyperparameters import (BATCH, CLIP, EPOCHS, NAME, PATIENCE,
+                                                SMALLEST_LAYER, VALIDATION_SHARE, WINDOW,
+                                                searched)
 from epf.models.scaling import Median, Scaler
 from epf.parameters import DAYS_PER_WEEK
 
 # Una xarxa ajustada i el que cal per llegir-la: els escaladors de les entrades i de la
 # sortida, el segon el que torna a EUR/MWh.
 Fitted = collections.namedtuple("Fitted", "network inputs outputs")
+
+# Un membre del camí endavant: la seva xarxa ajustada i els blocs que llegeix, que són
+# els de la seva cerca i no els d'un altre membre.
+Member = collections.namedtuple("Member", "fitted blocks")
 
 # El bloc del dia de la setmana, que la matriu escriu en set indicadors i aquesta xarxa
 # llegeix en una sola columna.
@@ -193,6 +198,12 @@ class Stopping(keras.callbacks.Callback):
         self.model.set_weights(self.weights)
 
 
+def prices(fitted, values):
+    """Els preus en EUR/MWh que dóna una xarxa ajustada per a les entrades `values`."""
+    return fitted.outputs.back(fitted.network.predict(fitted.inputs.forward(values),
+                                                      verbose=0))
+
+
 def fit_rows(train, validate, tuned, seed, batch=BATCH, epochs=EPOCHS,
              patience=PATIENCE):
     """Una xarxa ajustada amb les files de `train` i aturada amb les de `validate`,
@@ -223,32 +234,30 @@ def fit_rows(train, validate, tuned, seed, batch=BATCH, epochs=EPOCHS,
     return Fitted(model, scaled_inputs, outputs)
 
 
-def fit(X, y, day, tuned=None, window=WINDOW, members=MEMBERS, batch=BATCH,
-        epochs=EPOCHS, patience=PATIENCE):
-    """Les xarxes d'un dia, ajustades només amb dies anteriors, i els blocs que llegeixen.
+def fit(X, y, day, members=None, window=WINDOW, batch=BATCH, epochs=EPOCHS,
+        patience=PATIENCE):
+    """Les xarxes d'un dia, una per membre, ajustades només amb dies anteriors.
 
-    `members` xarxes. A l'article cada membre surt d'una cerca pròpia, amb la seva
-    llavor; aquí la cerca encara no s'ha repetit, de manera que el que varia entre
-    membres és la llavor i prou, la cercada més el número del membre. La llavor fixa
-    també quines setmanes s'aparten, cosa que el codi fa amb la mateixa llavor cercada.
+    `members` són els números de cada membre, que per defecte són els de `searched()`.
+    Cada un porta els de la seva pròpia cerca, com a l'article: els seus blocs, la seva
+    xarxa i la seva llavor, que fixa també quines setmanes s'aparten, cosa que el codi fa
+    amb la mateixa llavor cercada.
     """
-    tuned = searched() if tuned is None else tuned
+    members = searched()["members"] if members is None else members
     features, target = calibration(X, y, day, window)
-    values, prices = inputs(features, tuned["blocks"]), target.to_numpy(dtype=float)
+    found = target.to_numpy(dtype=float)
     fitted = []
-    for member in range(members):
-        seed = tuned["seed"] + member
-        train, validate = split(len(values), np.random.default_rng(seed))
-        fitted.append(fit_rows((values[train], prices[train]),
-                               (values[validate], prices[validate]), tuned, seed,
-                               batch, epochs, patience))
-    return fitted, tuned["blocks"]
+    for tuned in members:
+        values = inputs(features, tuned["blocks"])
+        train, validate = split(len(values), np.random.default_rng(tuned["seed"]))
+        fitted.append(Member(fit_rows((values[train], found[train]),
+                                      (values[validate], found[validate]), tuned,
+                                      tuned["seed"], batch, epochs, patience),
+                             tuned["blocks"]))
+    return fitted
 
 
 def predict(model, X, day):
-    """Els 24 preus de `day`, la mitjana de les xarxes del model, per nom."""
-    fitted, names = model
-    row = inputs(X.loc[[day]], names)
-    return {NAME: np.mean([one.outputs.back(
-        one.network.predict(one.inputs.forward(row), verbose=0))[0] for one in fitted],
-        axis=0)}
+    """Els 24 preus de `day`, la mitjana de les xarxes dels membres, per nom."""
+    return {NAME: np.mean([prices(member.fitted, inputs(X.loc[[day]], member.blocks))[0]
+                           for member in model], axis=0)}

@@ -12,7 +12,6 @@ import pytest
 
 from epf import paths, runner
 from epf.models.ddnn import ddnn_hyperparameters
-from epf.models.dnn import dnn_hyperparameters
 from epf.models.families import families, hyperparameters
 
 # Un conjunt cercat qualsevol, de la forma que desa la cerca: llistes de text, llistes
@@ -31,8 +30,9 @@ def searched(tmp_path, monkeypatch):
     aquella els demana a qui en tingui.
     """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
-    dnn_hyperparameters.save(ddnn_hyperparameters.BORROWED,
-                             {"trials": 20, "hyperparameters": SEARCHED})
+    found = ddnn_hyperparameters.borrowed()
+    found.parent.mkdir(parents=True)
+    found.write_text(json.dumps({"trials": 20, "hyperparameters": SEARCHED}))
 
 
 def test_the_record_of_every_family_is_writable():
@@ -102,7 +102,7 @@ def test_the_record_carries_the_numbers_a_search_chose_and_not_only_the_literals
 def test_a_family_that_has_not_been_searched_refuses_instead_of_inventing():
     # Arrencar la xarxa distribucional amb números inventats donaria un error que no
     # diu res de la xarxa de l'article, i una xifra que ningú no podria tornar a res.
-    dnn_hyperparameters.path(ddnn_hyperparameters.BORROWED).unlink()
+    ddnn_hyperparameters.borrowed().unlink()
     with pytest.raises(FileNotFoundError, match="només preu"):
         hyperparameters("ddnn_normal")
 

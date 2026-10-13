@@ -21,6 +21,7 @@ import importlib
 import pathlib
 
 from epf import parameters
+from epf.models.dnn.dnn_hyperparameters import MEMBERS
 
 # Una subordre: quin mòdul l'executa, què en diu `epf --help` i qui li declara els
 # arguments. `arguments` és `None` quan no en pren cap, i és també el que diu que el
@@ -56,10 +57,12 @@ def run_arguments(parser):
 
 
 def search_arguments(parser):
-    """El conjunt i les proves que fa la cerca d'hiperparàmetres. Quantes proves es
-    decideix amb el cost d'una mesurat, i el valor per defecte viu amb la xarxa i no
-    aquí."""
+    """El conjunt, el membre i les proves de la cerca d'hiperparàmetres. Cada membre de la
+    xarxa és una cerca pròpia; el nombre de membres i el de proves viuen amb la xarxa i
+    no aquí."""
     inputs_argument(parser)
+    parser.add_argument("--member", type=int, choices=range(MEMBERS), required=True,
+                        help="quin membre de la xarxa es cerca")
     parser.add_argument("--trials", type=int,
                         help="proves que es fan; per defecte, les del seu fitxer")
     return parser

@@ -15,9 +15,11 @@ el d'Optuna tal com Optuna el dóna, amb les vint proves a l'atzar de hyperopt a
 començar a guiar-se. L'altra cosa en què els dos difereixen, quantes de les proves fetes
 compten com a bones, Optuna ja no la deixa triar.
 
-Una cerca interrompuda no perd res: l'estudi es desa a cada prova, i tornar-la a
-cridar la reprèn. `--trials 0` no en fa cap de nova i desa el millor que l'estudi ja
-té, que és com es tanca una cerca que va caure abans d'arribar-hi.
+Cada membre de la xarxa és una cerca pròpia, `--member`, amb el seu estudi, el seu
+registre i la seva llavor inicial, que és com l'article obté les seves quatre xarxes. Una
+cerca interrompuda no perd res: l'estudi es desa a cada prova, i tornar-la a cridar la
+reprèn. `--trials 0` no en fa cap de nova i desa el millor que l'estudi ja té, que és
+com es tanca una cerca que va caure abans d'arribar-hi.
 """
 import datetime
 
@@ -83,18 +85,20 @@ def space(trial, names):
     }
 
 
-def study(store):
-    """L'estudi de la cerca, desat a `store`, amb un estimador que no repeteix el que
-    l'estudi ja ha provat.
+def study(store, member):
+    """L'estudi de la cerca d'un membre, desat a `store`, amb un estimador que no repeteix
+    el que l'estudi ja ha provat ni el que proven els altres membres.
 
-    Cada crida en fa un de nou, i amb la mateixa llavor tornaria a proposar les mateixes
-    proves a l'atzar del començament: una cerca represa repetiria les primeres i no en
-    faria de noves. La llavor compta, per això, les proves que l'estudi ja porta.
+    La llavor de l'estimador surt del membre i de les proves que l'estudi ja porta. Del
+    membre, perquè quatre cerques amb la mateixa llavor serien la mateixa cerca quatre
+    vegades. De les proves, perquè cada crida en fa un de nou, i amb la mateixa llavor
+    tornaria a proposar les proves a l'atzar del començament: una cerca represa repetiria
+    les primeres i no en faria de noves.
     """
-    found = optuna.create_study(study_name=NAME, direction="minimize",
+    found = optuna.create_study(study_name=f"{NAME}_{member}", direction="minimize",
                                 load_if_exists=True, storage=f"sqlite:///{store}")
-    found.sampler = optuna.samplers.TPESampler(n_startup_trials=STARTUP,
-                                               seed=SEED + len(found.trials))
+    seed = np.random.SeedSequence([SEED, member, len(found.trials)]).generate_state(1)[0]
+    found.sampler = optuna.samplers.TPESampler(n_startup_trials=STARTUP, seed=int(seed))
     return found
 
 
@@ -106,13 +110,11 @@ def window(X, y):
 def score(tuned, features, target):
     """El MAE en EUR/MWh d'un conjunt: un ajust amb `features`, puntuat a la seva quarta
     part final, la mateixa que l'atura."""
-    values, prices = dnn.inputs(features, tuned["blocks"]), target.to_numpy(dtype=float)
+    values, found = dnn.inputs(features, tuned["blocks"]), target.to_numpy(dtype=float)
     train, validate = dnn.split(len(values))
-    fitted = dnn.fit_rows((values[train], prices[train]),
-                          (values[validate], prices[validate]), tuned, tuned["seed"])
-    predicted = fitted.outputs.back(fitted.network.predict(
-        fitted.inputs.forward(values[validate]), verbose=0))
-    return float(np.mean(np.abs(predicted - prices[validate])))
+    fitted = dnn.fit_rows((values[train], found[train]),
+                          (values[validate], found[validate]), tuned, tuned["seed"])
+    return float(np.mean(np.abs(dnn.prices(fitted, values[validate]) - found[validate])))
 
 
 def main(arguments):
@@ -123,18 +125,19 @@ def main(arguments):
     features, target = window(X, y)
     names = list(dnn.blocks(features.columns))
     validated = features.index[dnn.split(len(features))[1]]
-    print(f"{trials} proves, cada una d'un ajust sobre {len(features)} dies, de "
-          f"{features.index[0].date()} a {features.index[-1].date()}, puntuat de "
-          f"{validated[0].date()} a {validated[-1].date()}", flush=True)
+    member = arguments.member
+    print(f"membre {member}: {trials} proves, cada una d'un ajust sobre {len(features)} "
+          f"dies, de {features.index[0].date()} a {features.index[-1].date()}, puntuat "
+          f"de {validated[0].date()} a {validated[-1].date()}", flush=True)
 
     def objective(trial):
         return score(space(trial, names), features, target)
 
     # L'estudi es desa al costat del resultat, de manera que una cerca interrompuda es
     # reprèn en lloc de tornar a començar: una de sencera són hores.
-    store = dnn_hyperparameters.path(arguments.inputs).with_suffix(".db")
+    store = dnn_hyperparameters.path(arguments.inputs, member).with_suffix(".db")
     store.parent.mkdir(parents=True, exist_ok=True)
-    searching = study(store)
+    searching = study(store, member)
     searching.optimize(objective, n_trials=trials)
 
     done = [one for one in searching.trials
@@ -143,8 +146,9 @@ def main(arguments):
         print("cap prova acabada: no es desa res")
         return 1
 
-    dnn_hyperparameters.save(arguments.inputs, {
+    dnn_hyperparameters.save(arguments.inputs, member, {
         "taken": str(datetime.date.today()),
+        "member": member,
         "trials": len(done),
         "first": str(features.index[0].date()),
         "last": str(features.index[-1].date()),
@@ -154,5 +158,5 @@ def main(arguments):
         "hyperparameters": space(optuna.trial.FixedTrial(searching.best_params), names),
     })
     print(f"millor MAE {searching.best_value:.3f} EUR/MWh de {len(done)} proves, desat a "
-          f"{dnn_hyperparameters.path(arguments.inputs)}")
+          f"{dnn_hyperparameters.path(arguments.inputs, member)}")
     return 0
