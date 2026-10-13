@@ -47,10 +47,8 @@ CLIP = 10000
 # que la cerca tria també si la xarxa té una capa o dues.
 SMALLEST_LAYER = 50
 
-# El pressupost de la cerca. Marcjasz et al. (2023) en fan 2048 amb Optuna i Lago et
-# al. (2021) 1500 amb un estimador de Parzen; quants se'n fan aquí es decideix amb el
-# cost d'una prova mesurat i no amb els seus.
-TRIALS = 50
+# El pressupost de la cerca de cada membre, les proves de Lago et al. (2021).
+TRIALS = 1500
 
 # Els números mentre no se n'ha cercat cap sobre el conjunt de Lago et al. (2021): el
 # millor de les 1500 proves de la cerca de l'article per al mercat alemany sense augment
