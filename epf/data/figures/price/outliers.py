@@ -73,4 +73,3 @@ def main():
     figure.tight_layout()
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(OUTPUT, dpi=DPI)
-    print(f"desat a {OUTPUT}")
