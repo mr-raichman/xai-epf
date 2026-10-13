@@ -6,7 +6,7 @@ l'excepció a que els números d'un model siguin al seu fitxer, i el preu és qu
 commit tot sol ja no fixa el que ha fet la predicció: qui ho fixa és el `run.json` de
 l'execució, que els recull tots. Mentre no s'ha cercat sobre el conjunt de Lago et al.
 (2021), `searched()` torna els que la cerca de l'article va triar per a un altre
-mercat, copiats aquí i marcats.
+mercat, copiats aquí i marcats; un cop s'hi ha cercat, els de la cerca.
 
 Els que hi són són els que ningú no cerca, tots del codi de l'article: la finestra, la
 part de validació, el lot, el sostre d'èpoques, la paciència, el retall del gradient i
@@ -15,7 +15,7 @@ la capa més petita que es manté; i el pressupost de la cerca.
 import json
 
 from epf import paths
-from epf.parameters import FOUR_YEARS
+from epf.parameters import FOUR_YEARS, INPUTS
 
 NAME = "dnn"
 
@@ -52,12 +52,6 @@ SMALLEST_LAYER = 50
 # cost d'una prova mesurat i no amb els seus.
 TRIALS = 50
 
-# Com es puntua una prova, que és l'esquema de Marcjasz et al. (2023) secció 4.2.1:
-# tretze reajustos sobre lots de 28 dies, amb la finestra rodant 28 dies a cada pas.
-# Tretze per vint-i-vuit són els 364 dies que es puntuen.
-RECALIBRATIONS = 13
-BATCH_DAYS = 28
-
 # Els números mentre no se n'ha cercat cap sobre el conjunt de Lago et al. (2021): el
 # millor de les 1500 proves de la cerca de l'article per al mercat alemany sense augment
 # de dades, el fitxer `COPIED_FROM` del seu repositori, amb els noms d'aquí. Hi engega
@@ -89,14 +83,26 @@ def path(stage):
 
 
 def searched():
-    """Els números de la xarxa, d'on surten, i marcats com a sense cercar.
+    """Els números de la xarxa i d'on surten.
 
-    Torna els valors **i la procedència** sota `search`: de quin fitxer i de quantes
-    proves. Els valors tots sols dirien què s'ha fet servir i no si algú els havia
-    triat de debò per a aquest mercat.
+    Els de la cerca sobre el conjunt que es camina, si n'hi ha cap; si no, els copiats,
+    marcats com a sense cercar. Tots dos amb la procedència sota `search`: quantes
+    proves, i quins dies o de quin fitxer. Els valors tots sols dirien què s'ha fet
+    servir i no si algú els havia triat de debò per a aquest mercat, i una cerca de vint
+    proves i una de mil deixarien el mateix rastre al `run.json`.
+
+    El conjunt que es camina és un de sol, i el desempaquetat peta el dia que n'hi hagi
+    dos, que és quan aquesta funció haurà de saber quin.
     """
-    return COPIED | {"unsearched": True,
-                     "search": {"copied_from": COPIED_FROM, "trials": COPIED_TRIALS}}
+    (stage,) = INPUTS
+    found = path(stage)
+    if not found.exists():
+        return COPIED | {"unsearched": True,
+                         "search": {"copied_from": COPIED_FROM, "trials": COPIED_TRIALS}}
+    record = json.loads(found.read_text())
+    return record["hyperparameters"] | {
+        "search": {name: value for name, value in record.items()
+                   if name != "hyperparameters"}}
 
 
 def save(stage, record):

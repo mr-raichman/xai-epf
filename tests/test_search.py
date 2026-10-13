@@ -1,63 +1,61 @@
-"""Els lots de la cerca: que cap dia que es puntua no entri a l'ajust que el prediu.
+"""La cerca de la xarxa: el que s'hi pot trencar en silenci.
 
-És l'esquema de Marcjasz et al. (2023): tretze reajustos sobre lots de 28 dies, amb la
-finestra rodant 28 dies a cada pas. El que es pot trencar en silenci és la frontera.
-Si un dia d'un lot entrés a la finestra del seu propi ajust, la puntuació d'una prova
-sortiria massa bona, la cerca triaria els números que més hi filtren, i el model que en
-sortís seria pitjor que el que diu el seu MAE sense que res petés.
+Una prova que s'ajustés amb algun dia de prova puntuaria massa bé, la cerca triaria els
+números que més hi filtren, i el model que en sortís seria pitjor que el que diu el seu
+MAE. Una regla de hyperopt mal copiada canviaria quines proves guien les següents, i la
+cerca seguiria rodant. Una cerca represa que repetís les seves primeres proves gastaria
+ajustos sense provar res de nou. I una cerca desada que el camí no llegís deixaria la
+xarxa sobre els números copiats. Cap de les quatre no dóna cap error.
 """
 import datetime
 
 import pandas as pd
-import pytest
 
-from epf.matrix import calibration
-from epf.models.dnn.search import lots
-
-DAYS = 500
-
-
-def days(count=DAYS):
-    return pd.DatetimeIndex([datetime.date(2023, 1, 1) + datetime.timedelta(days=day)
-                             for day in range(count)], name="day")
+from epf import paths
+from epf.models.dnn import dnn_hyperparameters
+from epf.models.dnn.dnn_hyperparameters import COPIED, WINDOW
+from epf.models.dnn.search import FIRST_TEST_DAY, good, study, window
+from epf.parameters import INPUTS
 
 
-def test_thirteen_lots_of_twenty_eight_cover_the_last_year():
-    batches = lots(days())
-    assert len(batches) == 13
-    assert {len(batch) for batch in batches} == {28}
-    assert batches[-1][-1] == days()[-1]
-    assert sum(len(batch) for batch in batches) == 364
-
-
-def test_the_lots_are_consecutive_and_do_not_overlap():
-    batches = lots(days())
-    joined = pd.DatetimeIndex([day for batch in batches for day in batch])
-    assert joined.is_monotonic_increasing
-    assert joined.is_unique
-    assert (joined[1:] - joined[:-1]).unique().tolist() == [pd.Timedelta(days=1)]
-
-
-def test_no_day_of_a_lot_is_in_the_window_that_predicts_it():
-    # La finestra de cada lot acaba abans del seu primer dia, de manera que l'ajust
-    # que prediu el dia 28 no ha vist cap dia del lot, ni el primer.
-    index = days()
+def test_a_trial_fits_the_four_years_before_the_first_test_day_and_none_of_it():
+    index = pd.date_range(FIRST_TEST_DAY - datetime.timedelta(days=WINDOW + 30),
+                          periods=WINDOW + 100, freq="D")
     frame = pd.DataFrame(1.0, index=index, columns=["a"])
-    for batch in lots(index):
-        features, _ = calibration(frame, frame, batch[0], window=100)
-        assert features.index.max() < batch[0]
-        assert not set(batch) & set(features.index)
+    features, _ = window(frame, frame["a"])
+    assert len(features) == WINDOW
+    assert features.index[-1] == FIRST_TEST_DAY - datetime.timedelta(days=1)
 
 
-def test_a_period_too_short_for_the_lots_fails_loudly():
-    with pytest.raises(ValueError):
-        lots(days(13 * 28 - 1))
+def test_the_good_trials_follow_hyperopts_rule():
+    # `tpe.ap_split_trials` de hyperopt 0.3.0: les `ceil(0.25 * sqrt(n))` millors de
+    # les n fetes, i mai més de 25.
+    trials = (1, 16, 17, 100, 9216, 9999, 40000)
+    assert [good(count) for count in trials] == [1, 1, 2, 3, 24, 25, 25]
 
 
-def test_the_lots_end_at_the_period_and_do_not_start_at_it():
-    # Es puntuen els dies més propers als de prova, de manera que sobren dies al
-    # començament i no al final.
-    index = days()
-    batches = lots(index)
-    assert batches[0][0] == index[-364]
-    assert batches[0][0] > index[0]
+def test_a_saved_search_replaces_the_copied_numbers(tmp_path, monkeypatch):
+    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    copied = dnn_hyperparameters.searched()
+    assert copied["unsearched"] is True
+    assert copied["seed"] == COPIED["seed"]
+    chosen = COPIED | {"seed": 7, "activation": "tanh"}
+    dnn_hyperparameters.save(INPUTS[0], {"trials": 3, "hyperparameters": chosen})
+    found = dnn_hyperparameters.searched()
+    assert "unsearched" not in found
+    assert (found["seed"], found["activation"]) == (7, "tanh")
+    assert found["search"]["trials"] == 3
+
+
+def test_a_resumed_search_does_not_repeat_its_first_trials(tmp_path):
+    # Mesurat el 2026-10-13 en una cerca de prova sobre la matriu real: amb la llavor
+    # fixa, la primera prova de la represa era la mateixa que la primera de totes.
+    store = tmp_path / "dnn.db"
+
+    def objective(trial):
+        return trial.suggest_float("x", 0.0, 1.0)
+
+    study(store).optimize(objective, n_trials=2)
+    resumed = study(store)
+    resumed.optimize(objective, n_trials=1)
+    assert resumed.trials[2].params != resumed.trials[0].params
