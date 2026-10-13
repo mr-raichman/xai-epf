@@ -120,6 +120,9 @@ def attribute_rows(distribution, fitted, X, background):
     explainer = shap.DeepExplainer(
         explained, inputs(background, fitted.names).to_numpy())
     shown = inputs(X, fitted.names)
+    # Keras avisa que l'estructura de les entrades no és l'esperada perquè DeepExplainer
+    # li passa el tensor dins d'una llista; el model el pren igual, i la suma de cada
+    # paràmetre, que es comprova, ho confirma.
     values = np.asarray(explainer.shap_values(shown.to_numpy(), check_additivity=False))
     count = len(distribution.names)
     values = values.reshape(len(X), shown.shape[1], count, -1).transpose(0, 1, 3, 2)
