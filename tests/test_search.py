@@ -2,10 +2,9 @@
 
 Una prova que s'ajustés amb algun dia de prova puntuaria massa bé, la cerca triaria els
 números que més hi filtren, i el model que en sortís seria pitjor que el que diu el seu
-MAE. Una regla de hyperopt mal copiada canviaria quines proves guien les següents, i la
-cerca seguiria rodant. Una cerca represa que repetís les seves primeres proves gastaria
-ajustos sense provar res de nou. I una cerca desada que el camí no llegís deixaria la
-xarxa sobre els números copiats. Cap de les quatre no dóna cap error.
+MAE. Una cerca represa que repetís les seves primeres proves gastaria ajustos sense
+provar res de nou. I una cerca desada que el camí no llegís deixaria la xarxa sobre els
+números copiats. Cap de les tres no dóna cap error.
 """
 import datetime
 
@@ -14,7 +13,7 @@ import pandas as pd
 from epf import paths
 from epf.models.dnn import dnn_hyperparameters
 from epf.models.dnn.dnn_hyperparameters import COPIED, WINDOW
-from epf.models.dnn.search import FIRST_TEST_DAY, good, study, window
+from epf.models.dnn.search import FIRST_TEST_DAY, study, window
 from epf.parameters import INPUTS
 
 
@@ -25,13 +24,6 @@ def test_a_trial_fits_the_four_years_before_the_first_test_day_and_none_of_it():
     features, _ = window(frame, frame["a"])
     assert len(features) == WINDOW
     assert features.index[-1] == FIRST_TEST_DAY - datetime.timedelta(days=1)
-
-
-def test_the_good_trials_follow_hyperopts_rule():
-    # `tpe.ap_split_trials` de hyperopt 0.3.0: les `ceil(0.25 * sqrt(n))` millors de
-    # les n fetes, i mai més de 25.
-    trials = (1, 16, 17, 100, 9216, 9999, 40000)
-    assert [good(count) for count in trials] == [1, 1, 2, 3, 24, 25, 25]
 
 
 def test_a_saved_search_replaces_the_copied_numbers(tmp_path, monkeypatch):

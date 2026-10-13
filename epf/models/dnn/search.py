@@ -11,14 +11,15 @@ prova sobre el període de prova i ho imprimeix; aquí no se'l toca mai.
 
 L'espai és el del codi, `_build_space`, amb els seus intervals i els seus noms d'opció.
 L'estimador és el de Parzen en arbre que l'article fa servir a través de hyperopt, aquí
-el d'Optuna amb els paràmetres de hyperopt allà on els dos no coincideixen.
+el d'Optuna tal com Optuna el dóna, amb les vint proves a l'atzar de hyperopt abans de
+començar a guiar-se. L'altra cosa en què els dos difereixen, quantes de les proves fetes
+compten com a bones, Optuna ja no la deixa triar.
 
 Una cerca interrompuda no perd res: l'estudi es desa a cada prova, i tornar-la a
 cridar la reprèn. `--trials 0` no en fa cap de nova i desa el millor que l'estudi ja
 té, que és com es tanca una cerca que va caure abans d'arribar-hi.
 """
 import datetime
-import math
 
 import numpy as np
 import optuna
@@ -47,20 +48,9 @@ DROPOUT = (0.0, 1.0)
 LEARNING_RATE = (5e-4, 0.1)
 SEEDS = (1, 1000)
 
-# Els paràmetres del `tpe.suggest` de hyperopt que no són els d'Optuna: les proves a
-# l'atzar abans que comenci a guiar-se per les anteriors, 20 on Optuna en fa 10, i
-# quantes de les fetes compten com a bones, la part `GOOD` de l'arrel del seu nombre i
-# mai més de `GOOD_CAP`, on Optuna en compta la desena part. La resta del seu estimador
-# ja és la d'Optuna. L'argument amb què Optuna pren aquesta regla, `gamma`, desapareix a
-# la seva versió 6: el projecte la fixa a la 5.0.0, i moure-la obliga a tornar a triar.
+# Les proves a l'atzar abans que l'estimador comenci a guiar-se per les anteriors: les
+# del `tpe.suggest` de hyperopt que va fer servir l'article, on Optuna en fa 10.
 STARTUP = 20
-GOOD = 0.25
-GOOD_CAP = 25
-
-
-def good(trials):
-    """Quantes de les `trials` proves fetes compten com a bones, amb la regla de hyperopt."""
-    return min(math.ceil(GOOD * math.sqrt(trials)), GOOD_CAP)
 
 
 def space(trial, names):
@@ -103,7 +93,7 @@ def study(store):
     """
     found = optuna.create_study(study_name=NAME, direction="minimize",
                                 load_if_exists=True, storage=f"sqlite:///{store}")
-    found.sampler = optuna.samplers.TPESampler(n_startup_trials=STARTUP, gamma=good,
+    found.sampler = optuna.samplers.TPESampler(n_startup_trials=STARTUP,
                                                seed=SEED + len(found.trials))
     return found
 
