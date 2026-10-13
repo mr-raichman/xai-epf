@@ -31,7 +31,8 @@ Command = collections.namedtuple("Command", "module help arguments")
 # Les famílies que `epf search` cerca, i el mòdul que en fa la cerca. Com a `COMMANDS`, el
 # nom del mòdul i no el mòdul: la cerca de la xarxa porta TensorFlow.
 SEARCHES = {"dnn": "epf.models.dnn.search", "lightgbm": "epf.models.boosting.search",
-            "elastic_net": "epf.models.linear.search"}
+            "elastic_net": "epf.models.linear.search",
+            "ddnn_jsu": "epf.models.ddnn.search", "ddnn_normal": "epf.models.ddnn.search"}
 
 
 def pass_arguments(parser):
@@ -63,16 +64,16 @@ def run_arguments(parser):
 
 def search_arguments(parser):
     """La família, el conjunt, el membre i les proves de la cerca d'hiperparàmetres. Cada
-    membre de la xarxa és una cerca pròpia, i l'arbre no en té; el nombre de membres i el
-    de proves viuen amb cada família i no aquí."""
+    membre de la xarxa és una cerca pròpia, i les altres famílies no en tenen; el nombre
+    de membres viu amb la xarxa i el de proves amb les cerques, i no aquí."""
     parser.add_argument("--family", choices=tuple(SEARCHES), required=True,
                         help="la família que es cerca")
     inputs_argument(parser)
     parser.add_argument("--member", type=int, choices=range(MEMBERS),
                         help="quin membre de la xarxa es cerca; per a la xarxa, obligatori")
     parser.add_argument("--trials", type=int,
-                        help="proves que es fan; per defecte, les del seu fitxer, o la "
-                             "graella sencera")
+                        help="proves que es fan; per defecte, les de Lago et al. (2021), "
+                             "o la graella sencera")
     return parser
 
 

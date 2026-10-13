@@ -1,28 +1,32 @@
-"""La cerca de la xarxa: el que s'hi pot trencar en silenci.
+"""Les cerques: el que s'hi pot trencar en silenci.
 
 Una prova que s'ajustés amb algun dia de prova puntuaria massa bé, la cerca triaria els
 números que més hi filtren, i el model que en sortís seria pitjor que el que diu el seu
 MAE, i un dia amb unes hores a cada banda faria el mateix a l'arbre. Una cerca represa
-que repetís les seves primeres proves gastaria ajustos sense provar res de nou, quatre
-membres que cerquessin amb la mateixa llavor serien la mateixa xarxa quatre vegades, i
+que repetís les seves primeres proves gastaria ajustos sense provar res de nou, dues
+cerques que comencessin amb la mateixa llavor serien la mateixa cerca dues vegades, i
 una graella que es saltés punts o en repetís deixaria l'arbre sense haver provat el que
-diu. I una cerca desada que el camí no llegís, o llegís per a un altre membre, deixaria
-un model sobre uns números que no són els seus. Cap d'aquestes coses no dóna cap
-error.
+diu. Una cerca desada que el camí no llegís, o llegís per a un altre membre o una altra
+distribució, deixaria un model sobre uns números que no són els seus, i una L1 de
+paràmetre llegida per posició i no pel nom penalitzaria el paràmetre equivocat. Cap
+d'aquestes coses no dóna cap error.
 """
 import datetime
 
+import optuna
 import pandas as pd
 
 from epf import paths
 from epf.models.boosting import boosting_hyperparameters
 from epf.models.boosting import search as tree_search
+from epf.models.ddnn import ddnn_hyperparameters
+from epf.models.ddnn import search as ddnn_search
+from epf.models.ddnn.distributions import JOHNSON_SU
 from epf.models.dnn import dnn_hyperparameters
 from epf.models.dnn.dnn_hyperparameters import COPIED
-from epf.models.dnn.search import study
 from epf.models.linear import linear_hyperparameters
 from epf.models.linear import search as net_search
-from epf.models.search import FIRST_TEST_DAY, parts, window
+from epf.models.search import FIRST_TEST_DAY, guided, parts, window
 from epf.parameters import FOUR_YEARS, INPUTS
 
 
@@ -61,24 +65,25 @@ def test_a_resumed_search_does_not_repeat_its_first_trials(tmp_path):
     def objective(trial):
         return trial.suggest_float("x", 0.0, 1.0)
 
-    study(store, 0).optimize(objective, n_trials=2)
-    resumed = study(store, 0)
+    guided(store, "dnn_0").optimize(objective, n_trials=2)
+    resumed = guided(store, "dnn_0")
     resumed.optimize(objective, n_trials=1)
     assert resumed.trials[2].params != resumed.trials[0].params
 
 
-def test_each_member_searches_from_its_own_seed(tmp_path):
-    # L'article obté les seves quatre xarxes repetint la cerca amb una llavor inicial
-    # diferent; amb la mateixa, les quatre proposarien les mateixes proves.
+def test_each_search_starts_from_its_own_seed(tmp_path):
+    # L'article de la xarxa obté les seves quatre xarxes repetint la cerca amb una llavor
+    # inicial diferent; amb la mateixa, les quatre proposarien les mateixes proves, i les
+    # dues distribucions començarien igual.
     def objective(trial):
         return trial.suggest_float("x", 0.0, 1.0)
 
     first = []
-    for member in (0, 1):
-        searching = study(tmp_path / f"dnn_{member}.db", member)
+    for name in ("dnn_0", "dnn_1", "ddnn_jsu", "ddnn_normal"):
+        searching = guided(tmp_path / f"{name}.db", name)
         searching.optimize(objective, n_trials=1)
-        first.append(searching.trials[0].params)
-    assert first[0] != first[1]
+        first.append(searching.trials[0].params["x"])
+    assert len(set(first)) == len(first)
 
 
 def test_a_per_hour_trials_validation_takes_whole_days():
@@ -132,3 +137,34 @@ def test_a_saved_net_search_replaces_the_unsearched_numbers(tmp_path, monkeypatc
     found = linear_hyperparameters.searched()
     assert "unsearched" not in found
     assert (found["penalty"], found["mixing"]) == (0.02, 0.25)
+
+
+def test_a_saved_ddnn_search_replaces_its_own_familys_copied_numbers_alone(tmp_path,
+                                                                          monkeypatch):
+    # Les dues distribucions comparteixen el mòdul dels números i no els números.
+    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    chosen = ddnn_hyperparameters.COPIED["ddnn_jsu"] | {"hidden": [64, 32]}
+    ddnn_hyperparameters.save(INPUTS[0], "ddnn_jsu", {"trials": 3,
+                                                      "hyperparameters": chosen})
+    found = ddnn_hyperparameters.searched("ddnn_jsu")
+    assert "unsearched" not in found
+    assert found["hidden"] == [64, 32]
+    assert found["search"]["trials"] == 3
+    other = ddnn_hyperparameters.searched("ddnn_normal")
+    assert other["unsearched"] is True
+    assert other["hidden"] == ddnn_hyperparameters.COPIED["ddnn_normal"]["hidden"]
+
+
+def test_each_parameters_l1_is_the_one_named_after_it():
+    # El codi de l'article posa el pes de la cua de Johnson SU abans de l'asimetria: una
+    # L1 presa per posició penalitzaria l'un amb la de l'altre.
+    rates = {"location": 1e-4, "scale": 1e-3, "skewness": 1e-2, "tail_weight": 1e-1}
+    fixed = {"use_lag1": True, "neurons_1": 32, "neurons_2": 16,
+             "activation_1": "relu", "activation_2": "elu", "dropout": False,
+             "regularize_h1_kernel": False, "regularize_h2_kernel": False,
+             "regularize_h1_activation": False, "regularize_h2_activation": False,
+             "learning_rate": 1e-3}
+    fixed |= {f"regularize_{name}": True for name in rates}
+    fixed |= {f"{name}_l1": rate for name, rate in rates.items()}
+    tuned = ddnn_search.space(optuna.trial.FixedTrial(fixed), ["lag1"], JOHNSON_SU)
+    assert tuned["parameter_l1"] == [rates[name] for name in JOHNSON_SU.names]

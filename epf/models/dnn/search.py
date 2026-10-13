@@ -10,12 +10,9 @@ del gas, que no s'assemblen a cap dels dos anys de prova. El codi puntua també 
 prova sobre el període de prova i ho imprimeix; aquí no se'l toca mai.
 
 Les files d'una prova i la seva partició són les de `models/search.py`, que comparteix
-amb la cerca de l'arbre. L'espai és el del codi, `_build_space`, amb els seus intervals i
-els seus noms d'opció.
-L'estimador és el de Parzen en arbre que l'article fa servir a través de hyperopt, aquí
-el d'Optuna tal com Optuna el dóna, amb les vint proves a l'atzar de hyperopt abans de
-començar a guiar-se. L'altra cosa en què els dos difereixen, quantes de les proves fetes
-compten com a bones, Optuna ja no la deixa triar.
+amb la cerca de l'arbre, i l'estimador i el pressupost també, que comparteix amb la de
+les xarxes distribucionals. L'espai és el del codi, `_build_space`, amb els seus intervals
+i els seus noms d'opció.
 
 Cada membre de la xarxa és una cerca pròpia, `epf search --family dnn --member`, amb el
 seu estudi, el seu
@@ -33,9 +30,8 @@ from epf import matrix
 from epf.data import forecasts, price
 from epf.models.blocks import blocks, inputs
 from epf.models.dnn import dnn, dnn_hyperparameters
-from epf.models.dnn.dnn_hyperparameters import NAME, TRIALS
-from epf.models.search import completed, split, window
-from epf.parameters import SEED
+from epf.models.dnn.dnn_hyperparameters import NAME
+from epf.models.search import TRIALS, completed, guided, split, switched_on, window
 
 # L'espai del codi de Lago et al. (2021): les neurones de cada capa amagada, la segona
 # fora si en té menys de `dnn_hyperparameters.SMALLEST_LAYER`; les set activacions i les
@@ -50,25 +46,15 @@ DROPOUT = (0.0, 1.0)
 LEARNING_RATE = (5e-4, 0.1)
 SEEDS = (1, 1000)
 
-# Les proves a l'atzar abans que l'estimador comenci a guiar-se per les anteriors: les
-# del `tpe.suggest` de hyperopt que va fer servir l'article, on Optuna en fa 10.
-STARTUP = 20
-
 
 def space(trial, names):
     """Els hiperparàmetres d'una prova, demanats un per un a Optuna, sobre els blocs
     `names`.
 
-    La L1 es demana com al codi: primer si n'hi ha, i el coeficient només si n'hi ha. Una
-    prova que no deixa cap bloc engegat es poda, perquè donaria a la xarxa una entrada
-    buida.
+    La L1 es demana com al codi: primer si n'hi ha, i el coeficient només si n'hi ha.
     """
-    chosen = [name for name in names
-              if trial.suggest_categorical(f"use_{name}", (False, True))]
-    if not chosen:
-        raise optuna.TrialPruned("cap bloc d'entrada engegat")
     return {
-        "blocks": chosen,
+        "blocks": switched_on(trial, names),
         "hidden": [trial.suggest_int(f"neurons_{layer}", *bounds)
                    for layer, bounds in enumerate(NEURONS)],
         "activation": trial.suggest_categorical("activation", ACTIVATIONS),
@@ -83,23 +69,6 @@ def space(trial, names):
         "scale_outputs": trial.suggest_categorical("scale_outputs", tuple(dnn.SCALINGS)),
         "seed": trial.suggest_int("seed", *SEEDS),
     }
-
-
-def study(store, member):
-    """L'estudi de la cerca d'un membre, desat a `store`, amb un estimador que no repeteix
-    el que l'estudi ja ha provat ni el que proven els altres membres.
-
-    La llavor de l'estimador surt del membre i de les proves que l'estudi ja porta. Del
-    membre, perquè quatre cerques amb la mateixa llavor serien la mateixa cerca quatre
-    vegades. De les proves, perquè cada crida en fa un de nou, i amb la mateixa llavor
-    tornaria a proposar les proves a l'atzar del començament: una cerca represa repetiria
-    les primeres i no en faria de noves.
-    """
-    found = optuna.create_study(study_name=f"{NAME}_{member}", direction="minimize",
-                                load_if_exists=True, storage=f"sqlite:///{store}")
-    seed = np.random.SeedSequence([SEED, member, len(found.trials)]).generate_state(1)[0]
-    found.sampler = optuna.samplers.TPESampler(n_startup_trials=STARTUP, seed=int(seed))
-    return found
 
 
 def score(tuned, features, target):
@@ -135,7 +104,7 @@ def main(arguments):
     # reprèn en lloc de tornar a començar: una de sencera són hores.
     store = dnn_hyperparameters.path(arguments.inputs, member).with_suffix(".db")
     store.parent.mkdir(parents=True, exist_ok=True)
-    searching = study(store, member)
+    searching = guided(store, f"{NAME}_{member}")
     searching.optimize(objective, n_trials=trials)
 
     done = completed(searching)

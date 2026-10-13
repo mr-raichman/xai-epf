@@ -1,7 +1,7 @@
 """Els números de les dues xarxes distribucionals, que arriben de dos llocs.
 
 Com els de la xarxa de punt, els que tria una cerca no són aquí sinó al disc, un fitxer
-per família, i `searched(name)` els llegeix. **I encara no s'han cercat**: mentre no,
+per família que desa `search.py`, i `searched(name)` els llegeix. **I encara no s'han cercat**: mentre no,
 cada família fa servir el millor conjunt de les cerques que Marcjasz et al. (2023) van
 publicar per al mercat alemany, copiat aquí i marcat. Es van triar amb les dades d'un
 altre mercat, de manera que **cap xifra d'aquestes famílies no diu res fins que tinguin
@@ -78,3 +78,11 @@ def searched(name):
     record = json.loads(found.read_text())
     return record["hyperparameters"] | {
         "search": {key: value for key, value in record.items() if key != "hyperparameters"}}
+
+
+def save(stage, name, record):
+    """Desa el que ha trobat la cerca de la família `name` sobre un conjunt, substituint el
+    que hi hagi."""
+    found = path(stage, name)
+    found.parent.mkdir(parents=True, exist_ok=True)
+    found.write_text(json.dumps(record, indent=2) + "\n")

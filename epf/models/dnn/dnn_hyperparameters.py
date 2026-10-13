@@ -11,8 +11,8 @@ marcats; un cop s'hi ha cercat, els de la cerca.
 
 Els que hi són són els que ningú no cerca, tots del codi de l'article: la finestra, el
 lot, el sostre d'èpoques, la paciència, el retall del gradient i la capa més petita que
-es manté; i el pressupost de la cerca. La part de validació la comparteix amb l'arbre, a
-`models/search.py`.
+es manté. La part de validació la comparteix amb l'arbre, i el pressupost de la cerca amb
+les xarxes distribucionals, a `models/search.py`.
 """
 import json
 
@@ -44,9 +44,6 @@ CLIP = 10000
 # (2021) en cerca de 25 a 400 a la segona capa i deixa fora les de sota 50, de manera
 # que la cerca tria també si la xarxa té una capa o dues.
 SMALLEST_LAYER = 50
-
-# El pressupost de la cerca de cada membre, les proves de Lago et al. (2021).
-TRIALS = 1500
 
 # Els números de cada membre mentre no se n'ha cercat cap sobre el conjunt de Lago et al.
 # (2021): el millor de les 1500 proves de cada una de les quatre cerques que l'article
