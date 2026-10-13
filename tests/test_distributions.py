@@ -4,17 +4,21 @@ El que pot anar malament en silenci és la correspondència entre els paràmetre
 que se'n llegeix. Una escala que surt sense desfer l'escalat, un quantil calculat amb
 l'asimetria i el pes de la cua canviats de lloc o un pinball amb el signe al revés
 donen un CRPS perfectament plausible i equivocat, i com que ningú no té un CRPS de
-referència per a aquest mercat, no hi hauria res que ho delatés.
+referència per a aquest mercat, no hi hauria res que ho delatés. I una pèrdua que perdés
+precisió lluny de la localització faria aprendre la xarxa d'una densitat que no és la de
+l'article, sense cap error fins que es tornés infinita.
 """
 import datetime
 
+import keras
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from epf.calendar import HOUR_COLUMNS
 from epf.evaluation import PERCENTILES, crps
-from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL
+from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
 
 DAYS = 40
 
@@ -95,3 +99,20 @@ def test_a_non_finite_quantile_is_refused_rather_than_averaged_away():
     quantiles[3, 2, 10] = np.inf
     with pytest.raises(ValueError, match="no finits"):
         crps(actual, quantiles)
+
+
+def test_the_johnson_su_loss_is_its_density_far_below_the_location():
+    # Mesurat el 2026-10-13: amb asinh escrit com a `log(z + sqrt(1 + z^2))`, en float32
+    # la pèrdua es desviava a z = -1000, a z = -4097 hi faltava més d'una unitat sencera
+    # d'asinh, i a z = -10000 era infinita. La de l'article és la densitat de TFP.
+    z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
+    raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")
+    raw[:, len(HOUR_COLUMNS):2 * len(HOUR_COLUMNS)] = -5.0
+    location, scale, skew, tail = np.moveaxis(parameters(JOHNSON_SU, raw), -1, 0)
+    target = (location + z * scale).astype("float32")
+    loss = keras.ops.convert_to_numpy(JOHNSON_SU.loss(target, raw))
+    # La pèrdua deixa fora la constant de la normal, que no mou cap gradient.
+    density = stats.johnsonsu.logpdf(target.astype(float), skew, tail, loc=location,
+                                     scale=scale)
+    expected = (-density - 0.5 * np.log(2 * np.pi)).mean(axis=1)
+    np.testing.assert_allclose(loss, expected, rtol=1e-5)

@@ -95,9 +95,10 @@ def _johnson_loss(target, raw):
     location, scale, skew, tail = _split(raw, 4)
     scale, tail = _scale(scale), _tail(tail)
     z = (target - location) / scale
-    root = ops.sqrt(1 + z ** 2)
-    return ops.mean(0.5 * (skew + tail * ops.log(z + root)) ** 2
-                    + ops.log(scale) + ops.log(root) - ops.log(tail), axis=-1)
+    # `arcsinh` i no `log(z + sqrt(1 + z^2))`, que en float32 es cancel·la per a z
+    # negatives: a z = -10000 dóna menys infinit.
+    return ops.mean(0.5 * (skew + tail * ops.arcsinh(z)) ** 2
+                    + ops.log(scale) + 0.5 * ops.log(1 + z ** 2) - ops.log(tail), axis=-1)
 
 
 def _johnson_flat(raw):
