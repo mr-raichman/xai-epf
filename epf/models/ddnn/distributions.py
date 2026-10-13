@@ -21,9 +21,13 @@ from scipy import stats
 
 from epf.market import HOURS_PER_DAY
 
-# Terra de tot paràmetre d'escala, perquè `softplus` pot donar zero i un zero a
-# l'escala fa infinita la log-versemblança.
+# Com surten l'escala i el pes de la cua de la sortida crua, al codi de Marcjasz et al.
+# (2023): `FLOOR + STRETCH * softplus` l'escala, que no pot ser zero perquè un zero hi fa
+# infinita la log-versemblança, i `TAIL_FLOOR + STRETCH * softplus` el pes de la cua de
+# Johnson SU, que mai no baixa d'1.
 FLOOR = 1e-3
+STRETCH = 3
+TAIL_FLOOR = 1
 
 # Una distribució de sortida. `units` són les sortides que vol la xarxa, `loss` la
 # pèrdua que minimitza, `flat` porta la sortida crua a les unitats en què es desen els
@@ -50,9 +54,17 @@ def _split(raw, count):
             for number in range(count)]
 
 
+def _scale(raw):
+    return FLOOR + STRETCH * ops.softplus(raw)
+
+
+def _tail(raw):
+    return TAIL_FLOOR + STRETCH * ops.softplus(raw)
+
+
 def _normal_loss(target, raw):
     location, scale = _split(raw, 2)
-    scale = FLOOR + ops.softplus(scale)
+    scale = _scale(scale)
     return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
 
 
@@ -64,7 +76,7 @@ def parameters(distribution, raw):
 
 def _normal_flat(raw):
     location, scale = _split(raw, 2)
-    return ops.concatenate([location, FLOOR + ops.softplus(scale)], axis=-1)
+    return ops.concatenate([location, _scale(scale)], axis=-1)
 
 
 def _normal_quantiles(parameters, probabilities):
@@ -81,7 +93,7 @@ def _johnson_loss(target, raw):
     de cap paràmetre i que per tant no mouen cap gradient.
     """
     location, scale, skew, tail = _split(raw, 4)
-    scale, tail = FLOOR + ops.softplus(scale), FLOOR + ops.softplus(tail)
+    scale, tail = _scale(scale), _tail(tail)
     z = (target - location) / scale
     root = ops.sqrt(1 + z ** 2)
     return ops.mean(0.5 * (skew + tail * ops.log(z + root)) ** 2
@@ -90,8 +102,7 @@ def _johnson_loss(target, raw):
 
 def _johnson_flat(raw):
     location, scale, skew, tail = _split(raw, 4)
-    return ops.concatenate([location, FLOOR + ops.softplus(scale), skew,
-                            FLOOR + ops.softplus(tail)], axis=-1)
+    return ops.concatenate([location, _scale(scale), skew, _tail(tail)], axis=-1)
 
 
 def _johnson_quantiles(parameters, probabilities):

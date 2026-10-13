@@ -10,6 +10,7 @@ Cap número de cap model hi és lligat: cada un els pren per defecte del seu pro
 més petits sense que el mòdul hagi de saber que hi ha proves.
 """
 import collections
+import functools
 
 from epf.models.boosting import boosting
 from epf.models.boosting import boosting_hyperparameters
@@ -45,9 +46,14 @@ DAILY, HOURLY = "daily", "hourly"
 # cap. Hi és en lloc de derivar-lo del nom de la família: dues famílies poden sortir
 # d'una sola carpeta, cosa que fan les dues distribucionals, i mentre el nom es
 # derivava, el `run.json` d'aquelles dues no portava cap número i no es queixava.
+#
+# `searched` torna els números que ha triat la cerca de la família i d'on surten, o és
+# `None` on no se'n cerca cap. Es lliga aquí i no es demana al mòdul perquè les dues
+# distribucionals, que en comparteixen un, tenen cada una els seus.
 Family = collections.namedtuple(
     "Family",
-    "matrix fit predict attribute distribution hyperparameters members headlines")
+    "matrix fit predict attribute distribution hyperparameters searched members "
+    "headlines")
 
 
 def matrices(data):
@@ -64,18 +70,20 @@ def families():
     """
     found = {
         "naive": Family(DAILY, naive.fit, naive.predict, None, None, None,
-                        members=(), headlines=naive.NAMES),
+                        searched=None, members=(), headlines=naive.NAMES),
         lear.NAME: Family(DAILY, lear.fit, lear.predict, None, None,
-                          lear_hyperparameters,
+                          lear_hyperparameters, searched=None,
                           members=lear.window_names(), headlines=(lear.NAME,)),
         boosting.NAME: Family(HOURLY, boosting.fit, boosting.predict,
                               boosting.attribute, None, boosting_hyperparameters,
+                              searched=boosting_hyperparameters.searched,
                               members=(boosting.NAME,), headlines=(boosting.NAME,)),
         linear.NAME: Family(HOURLY, linear.fit, linear.predict, linear.attribute, None,
                             linear_hyperparameters,
+                            searched=linear_hyperparameters.searched,
                             members=(linear.NAME,), headlines=(linear.NAME,)),
         dnn.NAME: Family(DAILY, dnn.fit, dnn.predict, None, None,
-                         dnn_hyperparameters,
+                         dnn_hyperparameters, searched=dnn_hyperparameters.searched,
                          members=(dnn.NAME,), headlines=(dnn.NAME,)),
     }
     # Una família per distribució de sortida, que és el que fa l'article. Totes dues
@@ -85,6 +93,8 @@ def families():
         fit, predict, predicted = ddnn.bound(name, distribution)
         found[name] = Family(DAILY, fit, predict, None, predicted,
                              ddnn_hyperparameters,
+                             searched=functools.partial(ddnn_hyperparameters.searched,
+                                                        name),
                              members=(name,), headlines=(name,))
     return found
 
@@ -103,10 +113,11 @@ def hyperparameters(family):
     que encara no s'ha cercat respon pel mateix camí amb `unsearched`, de manera que el
     `run.json` de qualsevol família diu si algú n'ha triat els números.
     """
-    module = families()[family].hyperparameters
+    entry = families()[family]
+    module = entry.hyperparameters
     if module is None:
         return {}
     found = {name: getattr(module, name) for name in dir(module) if name.isupper()}
-    if hasattr(module, "searched"):
-        found |= module.searched()
+    if entry.searched is not None:
+        found |= entry.searched()
     return found

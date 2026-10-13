@@ -19,7 +19,9 @@ els d'un membre junts, de la seva cerca.
 
 Tot és sobre files donades: `fit_rows` ajusta una xarxa amb les files d'entrenament i
 les de validació que se li donin, i `fit`, el camí endavant, les treu de la finestra
-amb `models.search.split`, barrejant setmanes senceres.
+amb `models.search.split`, barrejant setmanes senceres. Les entrades, per blocs i amb el
+dia en una sola columna, són les de `models/blocks.py`, que la xarxa distribucional
+llegeix igual.
 """
 import collections
 
@@ -28,8 +30,8 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
-from epf.models.dnn import network
+from epf.matrix import calibration
+from epf.models.blocks import inputs
 from epf.models.dnn.dnn_hyperparameters import (BATCH, CLIP, EPOCHS, NAME, PATIENCE,
                                                 SMALLEST_LAYER, WINDOW, searched)
 from epf.models.scaling import Median, Scaler
@@ -43,12 +45,16 @@ Fitted = collections.namedtuple("Fitted", "network inputs outputs")
 # els de la seva cerca i no els d'un altre membre.
 Member = collections.namedtuple("Member", "fitted blocks")
 
-# El bloc del dia de la setmana, que la matriu escriu en set indicadors i aquesta xarxa
-# llegeix en una sola columna.
-DAY = "day_of_week"
+# Les activacions que el codi de Lago et al. (2021) posa com una capa a part, darrere
+# d'una `Dense` lineal, amb el pendent negatiu del seu `LeakyReLU`.
+SEPARATE = {"LeakyReLU": lambda: keras.layers.LeakyReLU(negative_slope=0.001),
+            "PReLU": keras.layers.PReLU}
 
-# La inicialització que el codi de Lago et al. (2021) imposa a totes les capes, la
-# sortida inclosa, quan l'activació és `selu`, sigui quina sigui la que s'hagi cercat.
+# L'activació amb la qual el codi de l'article apaga neurones amb `AlphaDropout` i no
+# amb `Dropout`, el que manté la mitjana i la variància que `selu` necessita, i amb la
+# qual imposa `SELU_INITIALISER` a totes les capes, la sortida inclosa, sigui quina sigui
+# la inicialització que s'hagi cercat.
+SELU = "selu"
 SELU_INITIALISER = "lecun_normal"
 
 
@@ -92,42 +98,41 @@ SCALINGS = {
 }
 
 
-def blocks(columns):
-    """Les columnes de la matriu per bloc: cada sèrie a cada retard, amb les seves 24
-    hores, i el dia de la setmana.
+def build(columns, tuned):
+    """La xarxa del codi de Lago et al. (2021) amb uns números, compilada.
 
-    Són el que la cerca de Lago et al. (2021) engega i apaga, onze al seu conjunt: el
-    dia, els quatre retards del preu, i les dues previsions al dia que es lliura, al
-    d'abans i a fa una setmana. El bloc és el nom de la columna sense el que va després
-    de l'últim guió baix, que és l'hora o el número del dia, de manera que surten de la
-    matriu i no d'una llista que se'n pugui separar.
+    Cada capa amagada és `Dense` amb l'activació a dins, o lineal i l'activació darrere si
+    és de `SEPARATE`; després la normalització per lots si hi és, i el dropout al final.
+    **La normalització va després de l'activació i no abans**, que és el que diu la seva
+    implementació i el contrari del que se'n diria de memòria. Una sola activació i una
+    sola L1 per a tota la xarxa, la sortida inclosa, i una capa de menys de
+    `SMALLEST_LAYER` neurones no hi és.
     """
-    found = {}
-    for column in columns:
-        found.setdefault(column.rsplit("_", 1)[0], []).append(column)
-    return found
-
-
-def columns_of(columns, names):
-    """Les columnes dels blocs anomenats, en l'ordre de la matriu."""
-    found = blocks(columns)
-    return [column for name in found if name in names for column in found[name]]
-
-
-def inputs(X, names):
-    """Les entrades dels blocs anomenats, amb el dia de la setmana al davant en una sola
-    columna, de dilluns 0 a diumenge 6, com el codi de l'article el dóna a la xarxa.
-
-    Els set indicadors de la matriu no hi entren: escalats per la mediana, cada un es
-    dividiria per una MAD de zero.
-    """
-    kept = [column for column in columns_of(X.columns, names)
-            if column not in DAY_OF_WEEK_COLUMNS]
-    values = X[kept].to_numpy(dtype=float)
-    if DAY in names:
-        day = X[DAY_OF_WEEK_COLUMNS].to_numpy().argmax(axis=1)
-        values = np.column_stack([day, values])
-    return values
+    activation = tuned["activation"]
+    initialiser = SELU_INITIALISER if activation == SELU else tuned["initialiser"]
+    entry = keras.Input(shape=(columns,))
+    tensor = entry
+    for neurons in tuned["hidden"]:
+        if neurons < SMALLEST_LAYER:
+            continue
+        tensor = keras.layers.Dense(
+            neurons, activation=None if activation in SEPARATE else activation,
+            kernel_initializer=initialiser,
+            kernel_regularizer=keras.regularizers.L1(tuned["l1"]))(tensor)
+        if activation in SEPARATE:
+            tensor = SEPARATE[activation]()(tensor)
+        if tuned["batch_normalisation"]:
+            tensor = keras.layers.BatchNormalization()(tensor)
+        if tuned["dropout"] > 0:
+            switch = keras.layers.AlphaDropout if activation == SELU else keras.layers.Dropout
+            tensor = switch(tuned["dropout"])(tensor)
+    output = keras.layers.Dense(len(HOUR_COLUMNS), kernel_initializer=initialiser,
+                                kernel_regularizer=keras.regularizers.L1(tuned["l1"]))(tensor)
+    model = keras.Model(entry, output)
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=tuned["learning_rate"],
+                                                  clipvalue=CLIP),
+                  loss="mae")
+    return model
 
 
 def improved(best, loss, error):
@@ -197,16 +202,7 @@ def fit_rows(train, validate, tuned, seed, batch=BATCH, epochs=EPOCHS,
     scaled_inputs = SCALINGS[tuned["scale_inputs"]](X)
     outputs = SCALINGS[tuned["scale_outputs"]](y)
     keras.utils.set_random_seed(seed)
-    selu = tuned["activation"] == network.SELU
-    initialiser = SELU_INITIALISER if selu else tuned["initialiser"]
-    hidden = [neurons for neurons in tuned["hidden"] if neurons >= SMALLEST_LAYER]
-    model = network.build(
-        X.shape[1], hidden, [tuned["activation"]] * len(hidden), tuned["dropout"],
-        tuned["batch_normalisation"], [tuned["l1"]] * len(hidden), initialiser,
-        head=lambda tensor: keras.layers.Dense(
-            len(HOUR_COLUMNS), kernel_initializer=initialiser,
-            kernel_regularizer=keras.regularizers.L1(tuned["l1"]))(tensor),
-        loss="mae", learning_rate=tuned["learning_rate"], clip=CLIP)
+    model = build(X.shape[1], tuned)
     rows = scaled_inputs.forward(X_validate)
     model.fit(scaled_inputs.forward(X), outputs.forward(y), batch_size=batch,
               epochs=epochs, validation_data=(rows, outputs.forward(y_validate)),
@@ -228,7 +224,7 @@ def fit(X, y, day, members=None, window=WINDOW, batch=BATCH, epochs=EPOCHS,
     found = target.to_numpy(dtype=float)
     fitted = []
     for tuned in members:
-        values = inputs(features, tuned["blocks"])
+        values = inputs(features, tuned["blocks"]).to_numpy()
         train, validate = split(len(values), np.random.default_rng(tuned["seed"]))
         fitted.append(Member(fit_rows((values[train], found[train]),
                                       (values[validate], found[validate]), tuned,
@@ -239,5 +235,6 @@ def fit(X, y, day, members=None, window=WINDOW, batch=BATCH, epochs=EPOCHS,
 
 def predict(model, X, day):
     """Els 24 preus de `day`, la mitjana de les xarxes dels membres, per nom."""
-    return {NAME: np.mean([prices(member.fitted, inputs(X.loc[[day]], member.blocks))[0]
+    return {NAME: np.mean([prices(member.fitted,
+                                  inputs(X.loc[[day]], member.blocks).to_numpy())[0]
                            for member in model], axis=0)}

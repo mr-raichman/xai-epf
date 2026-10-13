@@ -31,6 +31,7 @@ import optuna
 
 from epf import matrix
 from epf.data import forecasts, price
+from epf.models.blocks import blocks, inputs
 from epf.models.dnn import dnn, dnn_hyperparameters
 from epf.models.dnn.dnn_hyperparameters import NAME, TRIALS
 from epf.models.search import completed, split, window
@@ -104,7 +105,8 @@ def study(store, member):
 def score(tuned, features, target):
     """El MAE en EUR/MWh d'un conjunt: un ajust amb `features`, puntuat a la seva quarta
     part final, la mateixa que l'atura."""
-    values, found = dnn.inputs(features, tuned["blocks"]), target.to_numpy(dtype=float)
+    values = inputs(features, tuned["blocks"]).to_numpy()
+    found = target.to_numpy(dtype=float)
     train, validate = split(len(values))
     fitted = dnn.fit_rows((values[train], found[train]),
                           (values[validate], found[validate]), tuned, tuned["seed"])
@@ -120,7 +122,7 @@ def main(arguments):
     trials = TRIALS if arguments.trials is None else arguments.trials
     X, y = matrix.lago(price.load(), forecasts.load()).daily
     features, target = window(X, y)
-    names = list(dnn.blocks(features.columns))
+    names = list(blocks(features.columns))
     validated = features.index[split(len(features))[1]]
     print(f"membre {member}: {trials} proves, cada una d'un ajust sobre {len(features)} "
           f"dies, de {features.index[0].date()} a {features.index[-1].date()}, puntuat "

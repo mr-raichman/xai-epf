@@ -182,13 +182,14 @@ def _net(X, y, parts, explained, seed):
                      gap, TRANSFORMED_TOLERANCE)
 
 
-def _network(distribution):
+def _network(name, distribution):
     """La xarxa distribucional d'una distribució, aturada sobre tota la validació, i
     explicada paràmetre a paràmetre contra els dies d'entrenament de la llavor."""
     def described(X, y, parts, explained, seed):
         train, validate, test, shown = _parts_of(X, parts, explained)
         fitted = ddnn.fit_rows(distribution, (X[train], y[train]),
-                               (X[validate], y[validate]), ddnn_hyperparameters.searched())
+                               (X[validate], y[validate]),
+                               ddnn_hyperparameters.searched(name))
         explanation = ddnn.attribute_rows(distribution, fitted, X[shown],
                                           background=X[train])
         # Dues sumes: la base més les contribucions torna cada paràmetre, i la base és la
@@ -204,7 +205,7 @@ def _network(distribution):
                           "columns": np.array(explanation.columns),
                           "groups": np.array([group(column)
                                               for column in explanation.columns]),
-                          "inputs": X.loc[shown, explanation.columns].to_numpy(),
+                          "inputs": explanation.inputs,
                           # La localització i l'escala en EUR/MWh, la resta sense unitats.
                           "units": np.array([PRICE_UNITS, PRICE_UNITS, UNITLESS,
                                              UNITLESS][:len(distribution.names)]),
@@ -246,8 +247,8 @@ def describers():
     }
     for name, distribution in DISTRIBUTIONS.items():
         found[name] = Describer(
-            "daily", (FORECASTS, PREVIOUS_DAY), _network(distribution),
-            ddnn_hyperparameters.searched() | {
+            "daily", (FORECASTS, PREVIOUS_DAY), _network(name, distribution),
+            ddnn_hyperparameters.searched(name) | {
                 "batch": ddnn_hyperparameters.BATCH, "epochs": ddnn_hyperparameters.EPOCHS,
                 "patience": ddnn_hyperparameters.PATIENCE, "unsearched": True})
     found[FLOOR] = Describer("hourly", (FORECASTS,), _floor, {"degree": FLOOR_DEGREE})

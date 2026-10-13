@@ -1,11 +1,11 @@
 """Les xarxes distribucionals de Marcjasz et al. (2023), sobre la matriu diària.
 
-La mateixa xarxa de Lago et al. (2021) amb la sortida redefinida: on aquella dóna 24
-preus, aquestes donen els paràmetres d'una distribució per hora i minimitzen una
-log-versemblança en lloc de l'error absolut. L'article ho diu així: les dues "differ
-only in the output construction in the network and hyperparameters corresponding to the
-missing distribution layer", de manera que aquí no es torna a escriure cap capa
-amagada, només el cap i la pèrdua, sobre `models/dnn/network.py`.
+Com les construeix el codi de l'article, que és el que va produir les seves xifres: les
+entrades normalitzades per lots com a primera capa, sense cap escalador i amb els preus
+sense escalar; un dropout opcional després de l'entrada; dues capes amagades, cada una
+amb la seva activació i una L1 als pesos i una altra a la sortida; i una capa lineal per
+paràmetre de la distribució, cada una amb la seva L1. Minimitzen una log-versemblança
+on la xarxa de punt minimitza l'error absolut.
 
 Una família per distribució, que és el que fa l'article, i la diferència entre les dues
 és la seva pròpia evidència que els moments alts compten.
@@ -20,88 +20,83 @@ import functools
 
 import keras
 import numpy as np
-import pandas as pd
 import shap
-from sklearn.preprocessing import StandardScaler
 
+from epf.calendar import HOUR_COLUMNS
 from epf.matrix import calibration
-from epf.models.ddnn.ddnn_hyperparameters import (BATCH, EPOCHS, MEMBERS, PATIENCE,
-                                                  VALIDATION_WEEKS, WINDOW, searched)
+from epf.models.blocks import blocks, columns_of, inputs
+from epf.models.ddnn.ddnn_hyperparameters import (BATCH, EPOCHS, HELD_OUT, MEMBERS,
+                                                  PATIENCE, WINDOW, searched)
 from epf.models.ddnn.distributions import parameters as raw_parameters
-from epf.models.dnn import network
-from epf.models.dnn.dnn import columns_of
-from epf.parameters import DAYS_PER_WEEK, SEED
+from epf.parameters import SEED
 
-# Una xarxa ajustada i el que cal per llegir-la: els dos escaladors, el de l'objectiu
-# el que torna els paràmetres a EUR/MWh, i les columnes que llegeix, en el seu ordre.
-Fitted = collections.namedtuple("Fitted", "network inputs outputs columns")
+# Una xarxa ajustada i els blocs que llegeix, que són els que la tornen a llegir.
+Fitted = collections.namedtuple("Fitted", "network names")
 
-# L'atribució de cada paràmetre: `values` és `(files, columnes, 24, paràmetres)` i
-# `base` `(24, paràmetres)`, en les unitats en què es desa cada paràmetre, EUR/MWh la
-# localització i l'escala i sense unitats l'asimetria i el pes de la cua.
-Explanation = collections.namedtuple("Explanation", "names columns values base")
+# L'atribució de cada paràmetre: `values` és `(files, columnes, 24, paràmetres)`, `base`
+# `(24, paràmetres)` i `inputs` les entrades explicades, una columna per a cada una de
+# `columns`, en les unitats en què es desa cada paràmetre: EUR/MWh la localització i
+# l'escala, i sense unitats l'asimetria i el pes de la cua.
+Explanation = collections.namedtuple("Explanation", "names columns inputs values base")
 
 
-def split(count, weeks, generator):
-    """Índexs d'entrenament i de validació d'una finestra de `count` dies.
-
-    S'aparten `weeks` setmanes de dies solts, triats barrejant tota la finestra en lloc
-    de prendre'n el tram final, de manera que la xarxa s'entrena també amb els dies més
-    recents.
-    """
-    days = weeks * DAYS_PER_WEEK
-    if days >= count:
-        raise ValueError(f"la finestra de {count} dies no dóna {weeks} setmanes de "
-                         "validació i prou dies per entrenar")
+def held_out(count, generator):
+    """Els dies d'entrenament i els que s'aparten per aturar-se, d'una finestra de
+    `count` dies: una part `HELD_OUT` de dies solts triats a l'atzar d'entre tots, com fa
+    el codi de l'article cada dia que recalibra."""
     order = generator.permutation(count)
-    return order[days:], order[:days]
+    cut = int((1 - HELD_OUT) * count)
+    return order[:cut], order[cut:]
+
+
+def build(distribution, columns, tuned):
+    """La xarxa del codi de l'article per a una distribució i uns números, compilada."""
+    entry = keras.Input(shape=(columns,))
+    tensor = keras.layers.BatchNormalization()(entry)
+    if tuned["dropout"] > 0:
+        tensor = keras.layers.Dropout(tuned["dropout"])(tensor)
+    for neurons, activation, weights, outputs in zip(
+            tuned["hidden"], tuned["activation"], tuned["l1"], tuned["activity_l1"],
+            strict=True):
+        tensor = keras.layers.Dense(
+            neurons, activation=activation,
+            kernel_regularizer=keras.regularizers.L1(weights),
+            activity_regularizer=keras.regularizers.L1(outputs))(tensor)
+    heads = [keras.layers.Dense(len(HOUR_COLUMNS),
+                                kernel_regularizer=keras.regularizers.L1(penalty))(tensor)
+             for penalty in tuned["parameter_l1"]]
+    if len(heads) != len(distribution.names):
+        raise ValueError(f"{len(heads)} L1 de paràmetre per a una distribució de "
+                         f"{len(distribution.names)} paràmetres")
+    model = keras.Model(entry, keras.layers.Concatenate()(heads))
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=tuned["learning_rate"]),
+                  loss=distribution.loss)
+    return model
 
 
 def fit_rows(distribution, train, validate, tuned, batch=BATCH, epochs=EPOCHS,
              patience=PATIENCE, seed=SEED):
     """Una xarxa ajustada amb les files de `train` i aturada quan deixa de millorar a
-    les de `validate`, totes dues parelles `(X, y)`.
-
-    Els escaladors s'ajusten amb les dues, que són totes les files que la xarxa mira i
-    cap de les que es prediuen. L'objectiu s'escala com a la xarxa de punt, i els
-    paràmetres en tornen a les unitats del preu desfent aquell escalat.
-    """
+    les de `validate`, totes dues parelles `(X, y)`, sobre tots els blocs de `X`."""
     (X, y), (X_validate, y_validate) = train, validate
-    inputs = StandardScaler().fit(pd.concat([X, X_validate]))
-    outputs = StandardScaler().fit(pd.concat([y, y_validate]))
+    names = list(blocks(X.columns))
+    values = inputs(X, names).to_numpy()
     keras.utils.set_random_seed(seed)
-    model = network.build(
-        X.shape[1], tuned["hidden"], tuned["activation"], tuned["dropout"],
-        tuned["batch_normalisation"], tuned["l1"], tuned["initialiser"],
-        head=lambda tensor: keras.layers.Dense(distribution.units)(tensor),
-        loss=distribution.loss, learning_rate=tuned["learning_rate"])
-    model.fit(inputs.transform(X), outputs.transform(y), batch_size=batch,
+    model = build(distribution, values.shape[1], tuned)
+    model.fit(values, y.to_numpy(dtype=float), batch_size=batch,
               epochs=epochs,
-              validation_data=(inputs.transform(X_validate), outputs.transform(y_validate)),
+              validation_data=(inputs(X_validate, names).to_numpy(),
+                               y_validate.to_numpy(dtype=float)),
               callbacks=[keras.callbacks.EarlyStopping(
                   monitor="val_loss", patience=patience, restore_best_weights=True)],
               verbose=0)
-    return Fitted(model, inputs, outputs, list(X.columns))
-
-
-def _undone(found, outputs):
-    """Paràmetres a les unitats del preu, desfent l'escalat de l'objectiu.
-
-    El centre només mou la localització i la dispersió mou tota distància, de manera
-    que l'escala i les localitzacions no es desfan igual. L'asimetria i el pes de la
-    cua no tenen unitats i es queden.
-    """
-    centre, spread = outputs.mean_, np.sqrt(outputs.var_)
-    undone = found.copy()
-    undone[..., 0] = found[..., 0] * spread + centre
-    undone[..., 1] = found[..., 1] * spread
-    return undone
+    return Fitted(model, names)
 
 
 def parameters_rows(distribution, fitted, X):
-    """Els paràmetres de cada fila en EUR/MWh, `(files, 24, paràmetres)`."""
-    raw = fitted.network.predict(fitted.inputs.transform(X[fitted.columns]), verbose=0)
-    return _undone(raw_parameters(distribution, raw), fitted.outputs)
+    """Els paràmetres de cada fila, `(files, 24, paràmetres)`."""
+    raw = fitted.network.predict(inputs(X, fitted.names).to_numpy(), verbose=0)
+    return raw_parameters(distribution, raw)
 
 
 def predict_rows(distribution, fitted, X):
@@ -112,45 +107,40 @@ def predict_rows(distribution, fitted, X):
 def attribute_rows(distribution, fitted, X, background):
     """L'atribució de cada paràmetre de cada fila, amb DeepExplainer.
 
-    S'explica cada paràmetre tal com el dona la xarxa, i res que se'n construeixi:
+    S'explica cada paràmetre tal com el dóna la xarxa, i res que se'n construeixi:
     DeepExplainer no hi té cap regla per a `Log`, `Sinh` ni `Neg`, i no suma bé a
     través de cap combinació de paràmetres. La base és la sortida mitjana sobre
-    `background`, que per a la part B són les files d'entrenament de la llavor. La
-    localització i l'escala es tornen a EUR/MWh amb l'escalat de l'objectiu, que és
-    lineal en cada una i per tant manté la suma.
+    `background`, que per a la part B són les files d'entrenament de la llavor. Com que
+    la xarxa no escala el preu, la localització i l'escala surten ja en EUR/MWh.
     """
     explained = keras.Model(fitted.network.input,
                             keras.layers.Lambda(distribution.flat)(fitted.network.output))
     # shap avisa que retalla el fons a 100 files, però ho fa l'emmascarador de la seva
     # classe base, que aquest explicador no fa servir: el càlcul les pren totes.
     explainer = shap.DeepExplainer(
-        explained, fitted.inputs.transform(background[fitted.columns]))
-    values = np.asarray(explainer.shap_values(
-        fitted.inputs.transform(X[fitted.columns]), check_additivity=False))
+        explained, inputs(background, fitted.names).to_numpy())
+    shown = inputs(X, fitted.names)
+    values = np.asarray(explainer.shap_values(shown.to_numpy(), check_additivity=False))
     count = len(distribution.names)
-    values = values.reshape(len(X), len(fitted.columns), count, -1).transpose(0, 1, 3, 2)
+    values = values.reshape(len(X), shown.shape[1], count, -1).transpose(0, 1, 3, 2)
     base = np.asarray(explainer.expected_value).reshape(count, -1).T
-
-    values[..., :2] *= np.sqrt(fitted.outputs.var_)[:, np.newaxis]
-    base = _undone(base, fitted.outputs)
-    return Explanation(distribution.names, fitted.columns, values, base)
+    return Explanation(distribution.names, list(shown.columns), shown.to_numpy(), values,
+                       base)
 
 
-def fit(distribution, X, y, day, tuned=None, window=WINDOW, members=MEMBERS,
-        batch=BATCH, epochs=EPOCHS, patience=PATIENCE,
-        validation_weeks=VALIDATION_WEEKS, seed=SEED):
+def fit(distribution, name, X, y, day, tuned=None, window=WINDOW, members=MEMBERS,
+        batch=BATCH, epochs=EPOCHS, patience=PATIENCE, seed=SEED):
     """Les xarxes d'un dia, ajustades només amb dies anteriors.
 
-    Cada membre aparta les seves setmanes de validació barrejant tota la finestra, que
-    és el que fa l'article per predir, i ajusta amb la resta.
+    Cada membre aparta els seus dies a l'atzar, com fa el codi de l'article per predir,
+    i ajusta amb la resta. Els números per defecte són els de la família `name`.
     """
-    tuned = searched() if tuned is None else tuned
+    tuned = searched(name) if tuned is None else tuned
     features, target = calibration(X[columns_of(X.columns, tuned["blocks"])], y, day,
                                    window)
     fitted = []
     for member in range(members):
-        train, validate = split(len(features), validation_weeks,
-                                np.random.default_rng(seed + member))
+        train, validate = held_out(len(features), np.random.default_rng(seed + member))
         fitted.append(fit_rows(
             distribution, (features.iloc[train], target.iloc[train]),
             (features.iloc[validate], target.iloc[validate]), tuned, batch, epochs,
@@ -159,7 +149,7 @@ def fit(distribution, X, y, day, tuned=None, window=WINDOW, members=MEMBERS,
 
 
 def parameters(distribution, model, X, day):
-    """Els paràmetres de la distribució d'un dia, `(24, paràmetres)`, en EUR/MWh.
+    """Els paràmetres de la distribució d'un dia, `(24, paràmetres)`.
 
     La mitjana dels membres es fa sobre els paràmetres i no sobre les distribucions:
     amb un sol membre no canvia res, i amb més d'un és la mitjana que l'article anomena
@@ -175,13 +165,15 @@ def predict(distribution, model, X, day, name):
 
 
 def bound(name, distribution):
-    """Les tres funcions d'una família i la seva distribució, amb aquesta ja lligada.
+    """Les tres funcions d'una família i la seva distribució, amb aquesta i el nom de la
+    família ja lligats.
 
     `families.py` les crida sense saber de quina distribució són, de manera que es
-    lliga aquí. És el primer argument de totes tres a propòsit, que és el que deixa
-    fer-ho amb `functools.partial` i no amb res més enginyós.
+    lliga aquí. Són els primers arguments de totes tres a propòsit, que és el que deixa
+    fer-ho amb `functools.partial` i no amb res més enginyós; el nom tria els números de
+    la família.
     """
-    return (functools.partial(fit, distribution),
+    return (functools.partial(fit, distribution, name),
             functools.partial(predict, distribution, name=name),
             distribution._replace(
                 of_day=functools.partial(parameters, distribution)))

@@ -16,7 +16,8 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS
-from epf.models.dnn.dnn import SCALINGS, fit, fit_rows, improved, inputs
+from epf.models.blocks import inputs
+from epf.models.dnn.dnn import SCALINGS, fit, fit_rows, improved
 from epf.models.search import split
 from epf.parameters import DAYS_PER_WEEK, FOUR_YEARS
 
@@ -96,7 +97,7 @@ def test_the_day_is_one_column_from_monday_zero_to_sunday_six():
     X[[f"lag1_{hour}" for hour in HOUR_COLUMNS]] = 1.0
     values = inputs(X, ["day_of_week", "lag1"])
     assert values.shape == (DAYS_PER_WEEK, 1 + len(HOUR_COLUMNS))
-    assert list(values[:, 0]) == list(days.dayofweek)
+    assert list(values["day_of_week"]) == list(days.dayofweek)
 
 
 def test_each_member_fits_on_its_own_numbers():

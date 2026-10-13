@@ -1,71 +1,80 @@
-"""Els números de les dues xarxes distribucionals.
+"""Els números de les dues xarxes distribucionals, que arriben de dos llocs.
 
-Com la xarxa de punt, els que tria una cerca no són aquí sinó al disc. **I encara no
-s'han cercat**: mentre la cerca està ajornada, aquestes famílies prenen els que va
-triar la cerca de la xarxa de punt sobre el conjunt de només preu, ja retirat, llegits
-del seu fitxer. La xarxa de punt segueix ara el codi de Lago et al. (2021), amb escalats,
-una sola activació i una llavor que la de Marcjasz et al. (2023) no té, i aquestes es
-queden amb la seva xarxa i amb el seu entrenament.
+Com els de la xarxa de punt, els que tria una cerca no són aquí sinó al disc, un fitxer
+per família, i `searched(name)` els llegeix. **I encara no s'han cercat**: mentre no,
+cada família fa servir el millor conjunt de les cerques que Marcjasz et al. (2023) van
+publicar per al mercat alemany, copiat aquí i marcat. Es van triar amb les dades d'un
+altre mercat, de manera que **cap xifra d'aquestes famílies no diu res fins que tinguin
+la seva pròpia cerca**.
 
-El sostre d'aquesta simplificació, i és gros: aquells números es van triar minimitzant
-l'error absolut d'una predicció puntual, i aquestes xarxes minimitzen una
-log-versemblança. No hi ha cap raó per esperar que els mateixos siguin bons per a les
-dues coses, de manera que **cap xifra d'aquestes famílies no diu res mentre no tinguin
-la seva pròpia cerca**. El que ho aixeca és una entrada per família a `searches/`.
-
-L'L1 de la capa de distribució, que l'article cerca per separat per a cada paràmetre,
-és zero mentre no se cerqui: l'article en té `2P` hiperparàmetres i aquí no n'hi ha cap
-de triat.
+Els que hi són són els que ningú no cerca, tots del codi de l'article: la finestra, el
+lot, el sostre d'èpoques, la paciència i la part de dies que s'aparta per aturar-se.
 """
 import json
 
 from epf import paths
 from epf.models.dnn import dnn_hyperparameters
+from epf.parameters import INPUTS
 
-# La finestra, el sostre d'èpoques i la paciència, els de la xarxa de punt, perquè
-# l'article les comparteix: les dues xarxes "differ only in the output construction in
-# the network and hyperparameters corresponding to the missing distribution layer".
+# Quatre anys de calibratge, els de la xarxa de punt: el codi de l'article ajusta cada
+# dia amb els últims 1456 dies menys els set de l'escalfament.
 WINDOW = dnn_hyperparameters.WINDOW
-EPOCHS = dnn_hyperparameters.EPOCHS
-PATIENCE = dnn_hyperparameters.PATIENCE
 
-# Setmanes de la finestra que s'aparten per aturar l'entrenament, de Lago et al. (2021)
-# segons el seu text, i la mida del lot. Les de la xarxa de punt abans que seguís el codi
-# de l'article, que aquestes conserven mentre no tinguin la seva cerca.
-VALIDATION_WEEKS = 42
+# Mida del lot, sostre d'èpoques i paciència de l'aturada, i la part dels dies de la
+# finestra que s'aparta a l'atzar per aturar-se, dies solts: els del codi de l'article.
 BATCH = 32
+EPOCHS = 1500
+PATIENCE = 50
+HELD_OUT = 0.2
 
 # Una xarxa per distribució, on Marcjasz et al. (2023) en mitjanen quatre: cada membre
 # és una cerca més, i el que costa és la cerca.
 MEMBERS = 1
 
-# La cerca d'on surten els números: la de la xarxa de punt sobre el conjunt de només
-# preu, que tria retards de preu i el dia de la setmana i cap previsió.
-BORROWED = "price"
+# Els números de cada família mentre no s'ha cercat: de les quatre cerques de 2048 proves
+# que l'article va publicar per distribució, la de millor puntuació pròpia, el fitxer
+# `COPIED_FROM` del seu repositori, amb els noms d'aquí. Els blocs dels combustibles no hi
+# són, perquè el conjunt d'aquí no en porta, i el de l'eòlica més solar de fa una setmana
+# hi és apagat, perquè la seva cerca no el té. L'L1 dels paràmetres va en l'ordre de
+# `distributions`, i no en el del codi de l'article, que posa el pes de la cua de Johnson
+# SU abans de l'asimetria.
+COPIED = {
+    "ddnn_jsu": {
+        "blocks": ["day_of_week", "lag1", "demand", "demand_lag7", "wind_solar",
+                   "wind_solar_lag1"],
+        "hidden": [243, 895], "activation": ["softplus", "elu"], "dropout": 0.0,
+        "l1": [0.0, 0.0], "activity_l1": [0.0, 0.0], "parameter_l1": [0.0, 0.0, 0.0, 0.0],
+        "learning_rate": 0.000281493495779889},
+    "ddnn_normal": {
+        "blocks": ["lag1", "lag2", "lag7", "demand", "demand_lag7", "wind_solar",
+                   "wind_solar_lag1"],
+        "hidden": [110, 823], "activation": ["softplus", "relu"], "dropout": 0.0,
+        "l1": [0.0, 0.0], "activity_l1": [1.0076687725977794e-05, 0.0],
+        "parameter_l1": [0.0, 0.0], "learning_rate": 0.00032041091802416773},
+}
+COPIED_FROM = {"ddnn_jsu": "FINAL_DE_selection_prob_jsu3",
+               "ddnn_normal": "FINAL_DE_selection_prob_normal4"}
+COPIED_TRIALS = 2048
 
 
-def borrowed():
-    """On és el fitxer d'aquella cerca, que era d'una sola xarxa i no d'un membre."""
-    return paths.SEARCHES / BORROWED / f"{dnn_hyperparameters.NAME}.json"
+def path(stage, name):
+    """On viu el que ha triat la cerca d'una família sobre un conjunt d'informació."""
+    return paths.SEARCHES / stage / f"{name}.json"
 
 
-def searched():
-    """Els números que fa servir una xarxa distribucional, amb d'on surten.
+def searched(name):
+    """Els números de la família `name` i d'on surten.
 
-    Els de la cerca de la xarxa de punt sobre el conjunt de només preu, marcats com a
-    sense cercar i manllevats, de manera que el `run.json` de qualsevol execució
-    d'aquestes famílies diu que els seus números es van triar per a una altra pèrdua.
-    Refusa si aquella cerca no és al disc: aquestes famílies no tenen valors per
-    defecte, i arrencar-les amb uns d'inventats donaria un error que no diu res de la
-    xarxa de l'article.
+    Els de la seva cerca sobre el conjunt que es camina, si n'hi ha; si no, els copiats,
+    marcats com a sense cercar, amb el fitxer d'on surten. El conjunt que es camina és un
+    de sol, i el desempaquetat peta el dia que n'hi hagi dos.
     """
-    found = borrowed()
+    (stage,) = INPUTS
+    found = path(stage, name)
     if not found.exists():
-        raise FileNotFoundError(
-            f"no hi ha a {found} la cerca de la xarxa de punt sobre el conjunt de només "
-            "preu, que les xarxes distribucionals fan servir mentre no tinguin la seva")
+        return COPIED[name] | {"unsearched": True,
+                               "search": {"copied_from": COPIED_FROM[name],
+                                          "trials": COPIED_TRIALS}}
     record = json.loads(found.read_text())
-    provenance = {name: value for name, value in record.items()
-                  if name != "hyperparameters"}
     return record["hyperparameters"] | {
-        "unsearched": True, "search": provenance | {"borrowed_from": "dnn"}}
+        "search": {key: value for key, value in record.items() if key != "hyperparameters"}}
