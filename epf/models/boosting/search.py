@@ -25,7 +25,7 @@ from epf import matrix
 from epf.data import forecasts, price
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.boosting.boosting_hyperparameters import MOST_TREES, NAME
-from epf.models.search import split, window
+from epf.models.search import completed, parts, split, through_grid, window
 from epf.parameters import SEED
 
 # La graella del codi de Kruse, Schäfer i Witthaut per a l'activació de la reserva
@@ -45,14 +45,6 @@ def space(trial):
     return {name: trial.suggest_categorical(name, values) for name, values in GRID.items()}
 
 
-def parts(X):
-    """Les files d'entrenament i les de validació, com a màscares, partides per dies
-    sencers: les 24 hores d'un dia van totes a la mateixa banda."""
-    days = X.index.unique()
-    train, validate = split(len(days))
-    return X.index.isin(days[train]), X.index.isin(days[validate])
-
-
 def score(point, X, y):
     """El MAE en EUR/MWh d'un punt sobre els dies de validació, i quants arbres va fer
     l'ajust abans d'aturar-se."""
@@ -61,12 +53,6 @@ def score(point, X, y):
                               validation=[(X[validate], y[validate])])
     predicted = boosting.predict_rows(model, X[validate])
     return float(np.mean(np.abs(predicted - y[validate].to_numpy()))), model.best_iteration_
-
-
-def completed(searching):
-    """Les proves acabades d'un estudi."""
-    return [one for one in searching.trials
-            if one.state == optuna.trial.TrialState.COMPLETE]
 
 
 def study(store):
@@ -98,11 +84,7 @@ def main(arguments):
     store = boosting_hyperparameters.path(arguments.inputs).with_suffix(".db")
     store.parent.mkdir(parents=True, exist_ok=True)
     searching = study(store)
-    # Els punts que falten, o menys si `--trials` ho diu. Una graella ja sencera no en
-    # fa cap: el mostrejador d'Optuna en tornaria a provar un a l'atzar.
-    remaining = POINTS - len(completed(searching))
-    searching.optimize(objective, n_trials=remaining if arguments.trials is None
-                       else min(arguments.trials, remaining))
+    through_grid(searching, objective, POINTS, arguments.trials)
 
     done = completed(searching)
     if not done:

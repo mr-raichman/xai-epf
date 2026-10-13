@@ -5,14 +5,19 @@ import datetime
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import ElasticNetCV
 
+from epf import paths
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import HOUR, build, forecasts, per_hour
-from epf.models.linear.linear import (NAME, attribute_rows, fit, fit_rows, predict,
-                                      predict_rows)
-from epf.parameters import LAGS
+from epf.models.linear import linear_hyperparameters
+from epf.models.linear.linear import (NAME, _by_hour, _prepared, attribute_rows, fit,
+                                      fit_rows, predict, predict_rows)
+from epf.models.linear.search import penalties
+from epf.parameters import INPUTS, LAGS
 
 PENALTY, MIXING = 0.01, 0.5
+NUMBERS = {"penalty": PENALTY, "mixing": MIXING}
 
 # Hores en què la previsió solar val zero tots els dies, i l'hora del vespre en què val
 # zero més de la meitat dels dies: les dues formes que pren a les dades de debò.
@@ -122,7 +127,7 @@ def test_the_walk_predicts_the_twenty_four_hours_in_order():
     # desplaçat un euro: si les hores sortissin barrejades, els salts no serien d'u.
     X, y = hourly_prices(200)
     day = X.index[-1]
-    prices = predict(fit(X, y, day, window=100), X, day)[NAME]
+    prices = predict(fit(X, y, day, window=100, numbers=NUMBERS), X, day)[NAME]
     assert prices.shape == (24,)
     assert np.allclose(np.diff(prices), 1.0)
 
@@ -132,5 +137,34 @@ def test_the_day_being_predicted_is_never_read():
     day = X.index[-1]
     corrupted = y.copy()
     corrupted.loc[day] = 9999.0
-    before = predict(fit(X, y, day, window=100), X, day)[NAME]
-    assert np.array_equal(before, predict(fit(X, corrupted, day, window=100), X, day)[NAME])
+    before = predict(fit(X, y, day, window=100, numbers=NUMBERS), X, day)[NAME]
+    assert np.array_equal(before, predict(fit(X, corrupted, day, window=100, numbers=NUMBERS), X, day)[NAME])
+
+
+def test_each_sequence_starts_at_the_smallest_penalty_that_empties_every_hour():
+    # La seqüència de `lasso.m` comença al càstig més petit que deixa a zero tots els
+    # coeficients. Una escala equivocada, sense centrar o d'una sola hora, començaria
+    # lluny del model buit o ja a dins seu, i la graella semblaria igual de bona. Que una
+    # mica per sota el model ja no sigui buit no es pot comprovar ajustant: el
+    # solucionador torna el model buit mentre la diferència li cap a la tolerància. El que
+    # es compara és el valor de scikit-learn mateix, el primer de la seqüència de
+    # `ElasticNetCV`, hora per hora.
+    X, y = per_hour_table()
+    for mixing, steps in penalties(X, y).items():
+        theirs = [ElasticNetCV(l1_ratio=mixing, alphas=2, cv=2).fit(design, target).alphas_[0]
+                  for design, target in (_prepared(X.iloc[rows], y.iloc[rows])[1:]
+                                         for rows in _by_hour(X))]
+        assert np.isclose(steps[0], max(theirs), rtol=1e-9)
+        top = fit_rows(X, y, steps[0], mixing)
+        assert max(np.abs(hour.model.coef_).max() for hour in top) < 1e-12
+
+
+def test_the_walk_takes_a_saved_searchs_penalty_and_mixing(tmp_path, monkeypatch):
+    # Si el camí no llegís la cerca desada, seguiria amb els números de prova sense
+    # que res petés.
+    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    linear_hyperparameters.save(INPUTS[0], {"trials": 102, "hyperparameters":
+                                            {"penalty": 0.02, "mixing": 0.25}})
+    X, y = hourly_prices(200)
+    model = fit(X, y, X.index[-1], window=100)
+    assert {(hour.model.alpha, hour.model.l1_ratio) for hour in model} == {(0.02, 0.25)}

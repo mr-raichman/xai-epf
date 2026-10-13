@@ -2,11 +2,13 @@
 
 Una prova és un ajust, com al codi de Lago et al. (2021): amb els quatre anys anteriors
 al primer dia de prova, aturat i puntuat amb la seva quarta part final en ordre de
-calendari. La partició de la quarta part és també la que fa servir la xarxa de l'article
-quan recalibra cada dia, aleshores barrejant setmanes senceres. Cada família té la seva
-cerca a la seva carpeta, i `epf search --family` tria quina.
+calendari, partida per dies sencers a la taula per hora. La partició de la quarta part
+és també la que fa servir la xarxa de l'article quan recalibra cada dia, aleshores
+barrejant setmanes senceres. Cada família té la seva cerca a la seva carpeta, i
+`epf search --family` tria quina.
 """
 import numpy as np
+import optuna
 import pandas as pd
 
 from epf.matrix import calibration
@@ -44,3 +46,30 @@ def split(count, generator=None):
         order = np.concatenate([order[start:start + DAYS_PER_WEEK] for start in starts])
     validation = int(VALIDATION_SHARE * count)
     return order[:count - validation], order[count - validation:]
+
+
+def parts(X):
+    """Les files d'entrenament i les de validació d'una prova sobre la taula per hora, com
+    a màscares, partides per dies sencers en ordre de calendari: les 24 hores d'un dia
+    van totes a la mateixa banda."""
+    days = X.index.unique()
+    train, validate = split(len(days))
+    return X.index.isin(days[train]), X.index.isin(days[validate])
+
+
+def completed(searching):
+    """Les proves acabades d'un estudi."""
+    return [one for one in searching.trials
+            if one.state == optuna.trial.TrialState.COMPLETE]
+
+
+def through_grid(searching, objective, points, trials=None):
+    """Els punts d'una graella de `points` que l'estudi encara no ha provat, o menys si
+    `trials` ho diu.
+
+    Una graella ja sencera no en fa cap: el mostrejador d'Optuna en tornaria a provar un
+    a l'atzar.
+    """
+    remaining = points - len(completed(searching))
+    searching.optimize(objective, n_trials=remaining if trials is None
+                       else min(trials, remaining))

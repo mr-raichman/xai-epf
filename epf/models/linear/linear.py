@@ -20,10 +20,8 @@ from sklearn.linear_model import ElasticNet
 from epf.attribution.stored import ONE, TRANSFORMED_UNITS, Attribution
 from epf.market import HOURS_PER_DAY
 from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, calibration
-from epf.models.linear.linear_hyperparameters import MAX_ITER, MIXING, PENALTY, WINDOW
+from epf.models.linear.linear_hyperparameters import MAX_ITER, NAME, WINDOW, searched
 from epf.models.scaling import Scaler
-
-NAME = "elastic_net"
 
 # El model d'una hora i el que cal per llegir-lo. `columns` són les de la matriu del
 # model en el seu ordre, les escalades i després els indicadors del dia de la setmana,
@@ -45,8 +43,9 @@ def _design(rows, fitted):
     return np.hstack([fitted.inputs.forward(values[:, :scaled]), values[:, scaled:]])
 
 
-def _fit_hour(rows, target, penalty, mixing, max_iter):
-    """El model d'una hora, amb les seves files i prou.
+def _prepared(rows, target):
+    """Les files d'una hora com les veu el seu model: el que cal per llegir-lo, encara
+    sense model, la matriu i l'objectiu transformat.
 
     Una columna que no es mou a les files de l'hora no hi entra, que és la previsió solar
     de nit. La que es mou sense MAD s'escala per la seva desviació típica, que és la
@@ -59,8 +58,13 @@ def _fit_hour(rows, target, penalty, mixing, max_iter):
     inputs = Scaler(rows[scaled].to_numpy(dtype=float), std_where_flat=True)
     output = Scaler(target.to_numpy(dtype=float)[:, np.newaxis])
     fitted = Hour(None, scaled + dummies, inputs, output, None)
-    design = _design(rows, fitted)
     scaled_target = output.forward(target.to_numpy(dtype=float)[:, np.newaxis]).ravel()
+    return fitted, _design(rows, fitted), scaled_target
+
+
+def _fit_hour(rows, target, penalty, mixing, max_iter):
+    """El model d'una hora, amb les seves files i prou."""
+    fitted, design, scaled_target = _prepared(rows, target)
     model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=max_iter)
     return fitted._replace(model=model.fit(design, scaled_target),
                            background=design.mean(axis=0))
@@ -76,6 +80,23 @@ def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
     """Els 24 models, cada un ajustat amb les files de la seva hora i cap més."""
     return tuple(_fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
                  for rows in _by_hour(X))
+
+
+def largest_penalty(X, y, mixing):
+    """El càstig més petit que deixa a zero tots els coeficients de les 24 hores, amb
+    aquesta barreja.
+
+    El de cada hora és el de scikit-learn, el màxim sobre les columnes de `|X'y|` dividit
+    per les files i per la barreja, sobre la matriu i l'objectiu del model de l'hora
+    centrats, perquè el model ajusta un terme constant. Un sol càstig serveix les 24
+    hores, i per deixar-les totes a zero ha de ser el més gran dels 24.
+    """
+    found = []
+    for rows in _by_hour(X):
+        _, design, target = _prepared(X.iloc[rows], y.iloc[rows])
+        product = (design - design.mean(axis=0)).T @ (target - target.mean())
+        found.append(np.abs(product).max() / (len(target) * mixing))
+    return max(found)
 
 
 def predict_rows(model, X):
@@ -112,9 +133,15 @@ def attribute_rows(model, X):
                        pd.Series(base, index=X.index), pd.Series(transformed, index=X.index))
 
 
-def fit(X, y, day, window=WINDOW, penalty=PENALTY, mixing=MIXING):
-    """Els 24 models ajustats només amb les hores dels dies anteriors a `day`."""
-    return fit_rows(*calibration(X, y, day, window), penalty, mixing)
+def fit(X, y, day, window=WINDOW, numbers=None):
+    """Els 24 models ajustats només amb les hores dels dies anteriors a `day`.
+
+    El càstig i la barreja són els de `searched()` si no se'n passen, els mateixos cada
+    dia, com Uniejewski et al. (2016) mantenen el seu durant tot el període de prova.
+    """
+    numbers = searched() if numbers is None else numbers
+    return fit_rows(*calibration(X, y, day, window), numbers["penalty"],
+                    numbers["mixing"])
 
 
 def predict(model, X, day):

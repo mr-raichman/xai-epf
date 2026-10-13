@@ -20,7 +20,9 @@ from epf.models.boosting import search as tree_search
 from epf.models.dnn import dnn_hyperparameters
 from epf.models.dnn.dnn_hyperparameters import COPIED
 from epf.models.dnn.search import study
-from epf.models.search import FIRST_TEST_DAY, window
+from epf.models.linear import linear_hyperparameters
+from epf.models.linear import search as net_search
+from epf.models.search import FIRST_TEST_DAY, parts, window
 from epf.parameters import FOUR_YEARS, INPUTS
 
 
@@ -79,14 +81,14 @@ def test_each_member_searches_from_its_own_seed(tmp_path):
     assert first[0] != first[1]
 
 
-def test_the_trees_validation_takes_whole_days():
+def test_a_per_hour_trials_validation_takes_whole_days():
     # La taula per hora porta 24 files per dia; partir-les per files posaria unes hores
     # d'un dia a cada banda, i l'aturada miraria hores veïnes de les que ha après.
     # 41 dies: la quarta part de les files no cau en una frontera de dia, de manera
     # que una partició per files en partiria un.
     days = pd.date_range("2024-01-01", periods=41, freq="D")
     X = pd.DataFrame({"hour": list(range(24)) * len(days)}, index=days.repeat(24))
-    train, validate = tree_search.parts(X)
+    train, validate = parts(X)
     assert set(X.index[train]).isdisjoint(X.index[validate])
     assert list(X.index[validate].unique()) == list(days[-10:])
     assert validate.sum() == 10 * 24
@@ -112,3 +114,21 @@ def test_a_saved_tree_search_replaces_the_unsearched_point(tmp_path, monkeypatch
     assert "unsearched" not in found
     assert {name: found[name] for name in chosen} == chosen
     assert found["search"]["trials"] == 288
+
+
+def test_the_nets_grid_is_tried_once_each(tmp_path):
+    searching = net_search.study(tmp_path / "elastic_net.db")
+    searching.optimize(lambda trial: sum(net_search.space(trial)),
+                       n_trials=net_search.POINTS)
+    seen = [tuple(sorted(trial.params.items())) for trial in searching.trials]
+    assert len(seen) == len(set(seen)) == net_search.POINTS == 102
+
+
+def test_a_saved_net_search_replaces_the_unsearched_numbers(tmp_path, monkeypatch):
+    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    assert linear_hyperparameters.searched()["unsearched"] is True
+    linear_hyperparameters.save(INPUTS[0], {"trials": 102, "hyperparameters":
+                                            {"penalty": 0.02, "mixing": 0.25}})
+    found = linear_hyperparameters.searched()
+    assert "unsearched" not in found
+    assert (found["penalty"], found["mixing"]) == (0.02, 0.25)

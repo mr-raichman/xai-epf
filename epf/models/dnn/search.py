@@ -33,7 +33,7 @@ from epf import matrix
 from epf.data import forecasts, price
 from epf.models.dnn import dnn, dnn_hyperparameters
 from epf.models.dnn.dnn_hyperparameters import NAME, TRIALS
-from epf.models.search import split, window
+from epf.models.search import completed, split, window
 from epf.parameters import SEED
 
 # L'espai del codi de Lago et al. (2021): les neurones de cada capa amagada, la segona
@@ -136,8 +136,7 @@ def main(arguments):
     searching = study(store, member)
     searching.optimize(objective, n_trials=trials)
 
-    done = [one for one in searching.trials
-            if one.state == optuna.trial.TrialState.COMPLETE]
+    done = completed(searching)
     if not done:
         print("cap prova acabada: no es desa res")
         return 1

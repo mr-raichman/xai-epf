@@ -30,7 +30,8 @@ Command = collections.namedtuple("Command", "module help arguments")
 
 # Les famílies que `epf search` cerca, i el mòdul que en fa la cerca. Com a `COMMANDS`, el
 # nom del mòdul i no el mòdul: la cerca de la xarxa porta TensorFlow.
-SEARCHES = {"dnn": "epf.models.dnn.search", "lightgbm": "epf.models.boosting.search"}
+SEARCHES = {"dnn": "epf.models.dnn.search", "lightgbm": "epf.models.boosting.search",
+            "elastic_net": "epf.models.linear.search"}
 
 
 def pass_arguments(parser):
