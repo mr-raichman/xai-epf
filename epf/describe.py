@@ -142,7 +142,8 @@ def _tree(X, y, parts, explained, seed):
     train, _, test, shown = _parts_of(X, parts, explained)
     validation = [(X[part], y[part]) for part in
                   (X.index.isin(days) for days in validation_parts(seed, DEVELOPMENT))]
-    model = boosting.fit_rows(X[train], y[train], validation=validation)
+    model = boosting.fit_rows(X[train], y[train], boosting_hyperparameters.UNSEARCHED,
+                              boosting_hyperparameters.MOST_TREES, validation=validation)
     values, base = boosting.attribute_rows(model, X[shown])
     count = int(shown.sum())
     sample = np.sort(np.random.default_rng(seed).choice(
@@ -235,8 +236,9 @@ def describers():
     found = {
         boosting.NAME: Describer(
             "hourly", (FORECASTS, PREVIOUS_DAY, DATE_PROBE), _tree,
-            {"trees": tree.TREES, "rate": tree.RATE, "leaves": tree.LEAVES,
-             "patience": tree.PATIENCE, "unsearched": True}),
+            {name: value for name, value in tree.UNSEARCHED.items() if name != "trees"}
+            | {"most_trees": tree.MOST_TREES, "patience": tree.PATIENCE,
+               "unsearched": True}),
         linear.NAME: Describer(
             "hourly", (FORECASTS, PREVIOUS_DAY), _net,
             {"penalty": net.PENALTY, "mixing": net.MIXING, "max_iter": net.MAX_ITER,

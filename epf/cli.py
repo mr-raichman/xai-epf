@@ -28,6 +28,10 @@ from epf.models.dnn.dnn_hyperparameters import MEMBERS
 # seu `main` es crida sense res.
 Command = collections.namedtuple("Command", "module help arguments")
 
+# Les famílies que `epf search` cerca, i el mòdul que en fa la cerca. Com a `COMMANDS`, el
+# nom del mòdul i no el mòdul: la cerca de la xarxa porta TensorFlow.
+SEARCHES = {"dnn": "epf.models.dnn.search", "lightgbm": "epf.models.boosting.search"}
+
 
 def pass_arguments(parser):
     """Els arguments d'una passada, els mateixos pel camí endavant i per la part B: el
@@ -57,14 +61,17 @@ def run_arguments(parser):
 
 
 def search_arguments(parser):
-    """El conjunt, el membre i les proves de la cerca d'hiperparàmetres. Cada membre de la
-    xarxa és una cerca pròpia; el nombre de membres i el de proves viuen amb la xarxa i
-    no aquí."""
+    """La família, el conjunt, el membre i les proves de la cerca d'hiperparàmetres. Cada
+    membre de la xarxa és una cerca pròpia, i l'arbre no en té; el nombre de membres i el
+    de proves viuen amb cada família i no aquí."""
+    parser.add_argument("--family", choices=tuple(SEARCHES), required=True,
+                        help="la família que es cerca")
     inputs_argument(parser)
-    parser.add_argument("--member", type=int, choices=range(MEMBERS), required=True,
-                        help="quin membre de la xarxa es cerca")
+    parser.add_argument("--member", type=int, choices=range(MEMBERS),
+                        help="quin membre de la xarxa es cerca; per a la xarxa, obligatori")
     parser.add_argument("--trials", type=int,
-                        help="proves que es fan; per defecte, les del seu fitxer")
+                        help="proves que es fan; per defecte, les del seu fitxer, o la "
+                             "graella sencera")
     return parser
 
 
@@ -86,9 +93,8 @@ COMMANDS = {
         "epf.data.figures.price.price", "tots els preus horaris, del 2014 endavant", None),
     "figure-outliers": Command(
         "epf.data.figures.price.outliers", "la distància de cada preu als seus veïns", None),
-    "search-dnn": Command(
-        "epf.models.dnn.search", "cerca els hiperparàmetres de la xarxa",
-        search_arguments),
+    "search": Command(
+        None, "cerca els hiperparàmetres d'una família de la part A", search_arguments),
     "run": Command(
         "epf.runner", "camina el període endavant amb totes les famílies", run_arguments),
     "describe": Command(
@@ -123,5 +129,7 @@ def main():
 
     arguments = parser.parse_args()
     command = COMMANDS[arguments.command]
-    module = importlib.import_module(command.module)
+    # La cerca és l'única ordre el mòdul de la qual depèn d'un argument: el de la família.
+    module = importlib.import_module(SEARCHES[arguments.family] if command.module is None
+                                     else command.module)
     return module.main() if command.arguments is None else module.main(arguments)

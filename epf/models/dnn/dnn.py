@@ -19,7 +19,7 @@ els d'un membre junts, de la seva cerca.
 
 Tot és sobre files donades: `fit_rows` ajusta una xarxa amb les files d'entrenament i
 les de validació que se li donin, i `fit`, el camí endavant, les treu de la finestra
-amb `split`.
+amb `models.search.split`, barrejant setmanes senceres.
 """
 import collections
 
@@ -31,10 +31,9 @@ from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS, calibration
 from epf.models.dnn import network
 from epf.models.dnn.dnn_hyperparameters import (BATCH, CLIP, EPOCHS, NAME, PATIENCE,
-                                                SMALLEST_LAYER, VALIDATION_SHARE, WINDOW,
-                                                searched)
+                                                SMALLEST_LAYER, WINDOW, searched)
 from epf.models.scaling import Median, Scaler
-from epf.parameters import DAYS_PER_WEEK
+from epf.models.search import split
 
 # Una xarxa ajustada i el que cal per llegir-la: els escaladors de les entrades i de la
 # sortida, el segon el que torna a EUR/MWh.
@@ -129,25 +128,6 @@ def inputs(X, names):
         day = X[DAY_OF_WEEK_COLUMNS].to_numpy().argmax(axis=1)
         values = np.column_stack([day, values])
     return values
-
-
-def split(count, generator=None):
-    """Les files d'entrenament i les de validació d'una finestra de `count` dies, com
-    les parteix el codi de Lago et al. (2021).
-
-    La validació és la `VALIDATION_SHARE` final de les files. Amb `generator`, abans s'hi
-    barregen setmanes senceres, de set files a comptar de la primera, perquè dos dies
-    veïns no quedin un a cada banda: és el que fa el codi en recalibrar, i la xarxa
-    s'entrena també amb els dies més recents. Sense, l'ordre és el del calendari, que és
-    el de la cerca. El tall és a un nombre de files i no de setmanes, de manera que una
-    setmana pot quedar partida entre les dues bandes, com al codi.
-    """
-    order = np.arange(count)
-    if generator is not None:
-        starts = generator.permutation(order[::DAYS_PER_WEEK])
-        order = np.concatenate([order[start:start + DAYS_PER_WEEK] for start in starts])
-    validation = int(VALIDATION_SHARE * count)
-    return order[:count - validation], order[count - validation:]
 
 
 def improved(best, loss, error):

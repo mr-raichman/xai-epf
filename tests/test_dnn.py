@@ -16,7 +16,8 @@ import pytest
 
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import DAY_OF_WEEK_COLUMNS
-from epf.models.dnn.dnn import SCALINGS, fit, fit_rows, improved, inputs, split
+from epf.models.dnn.dnn import SCALINGS, fit, fit_rows, improved, inputs
+from epf.models.search import split
 from epf.parameters import DAYS_PER_WEEK, FOUR_YEARS
 
 # Una xarxa petita i un entrenament curt: el que es comprova són els escaladors, que no

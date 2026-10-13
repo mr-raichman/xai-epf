@@ -9,9 +9,10 @@ s'ha cercat sobre el conjunt de Lago et al. (2021), `searched()` torna per a cad
 els que una de les cerques de l'article va triar per a un altre mercat, copiats aquí i
 marcats; un cop s'hi ha cercat, els de la cerca.
 
-Els que hi són són els que ningú no cerca, tots del codi de l'article: la finestra, la
-part de validació, el lot, el sostre d'èpoques, la paciència, el retall del gradient i
-la capa més petita que es manté; i el pressupost de la cerca.
+Els que hi són són els que ningú no cerca, tots del codi de l'article: la finestra, el
+lot, el sostre d'èpoques, la paciència, el retall del gradient i la capa més petita que
+es manté; i el pressupost de la cerca. La part de validació la comparteix amb l'arbre, a
+`models/search.py`.
 """
 import json
 
@@ -22,10 +23,6 @@ NAME = "dnn"
 
 # Quatre anys de calibratge, com a Lago et al. (2021) i a Marcjasz et al. (2023).
 WINDOW = FOUR_YEARS
-
-# La part de la finestra que s'aparta per aturar l'entrenament, en files: el
-# `percentage_val` del codi de Lago et al. (2021).
-VALIDATION_SHARE = 0.25
 
 # Xarxes que es mitjanen, cada una de la seva cerca: les quatre de Lago et al. (2021),
 # que fa la cerca quatre vegades amb una llavor inicial diferent perquè cada una troba

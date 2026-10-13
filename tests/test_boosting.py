@@ -1,6 +1,5 @@
 """Alineació, absència de filtració i forma de l'atribució del gradient boosting."""
 import datetime
-import functools
 
 import numpy as np
 import pandas as pd
@@ -8,12 +7,13 @@ import pandas as pd
 from epf.parameters import LAGS
 from epf.calendar import HOUR_COLUMNS
 from epf.matrix import build, per_hour
-from epf.models.boosting.boosting import NAME, attribute, fit, lightgbm, predict
+from epf.models.boosting.boosting import NAME, attribute, fit, predict
+from epf.models.boosting.boosting_hyperparameters import UNSEARCHED
 
 # Preus sintètics amb un patró setmanal exacte, com als altres models.
 WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
 
-SMALL = functools.partial(lightgbm, trees=20, rate=0.05, leaves=31, seed=0)
+SMALL = UNSEARCHED | {"trees": 20}
 
 
 def forecast(X, y, day, **parameters):
@@ -33,7 +33,7 @@ def hourly_prices(days, start=datetime.date(2014, 1, 1)):
 
 def test_it_predicts_the_twenty_four_hours_in_order():
     X, y = hourly_prices(200)
-    prices = forecast(X, y, X.index[-1], make=SMALL, window=100)
+    prices = forecast(X, y, X.index[-1], point=SMALL, window=100)
     assert prices.shape == (24,)
     # El preu sintètic creix amb l'hora; un arbre arrodoneix per fulles, així que
     # el que ha de sortir és una corba que no baixa, no pas 24 valors diferents.
@@ -44,14 +44,14 @@ def test_it_predicts_the_twenty_four_hours_in_order():
 def test_the_attribution_is_columns_by_delivery_hour():
     X, y = hourly_prices(200)
     day = X.index[-1]
-    model = fit(X, y, day, make=SMALL, window=100)
+    model = fit(X, y, day, point=SMALL, window=100)
     attribution = attribute(model, X, day)
     assert attribution.values.shape == (1, X.shape[1], 24)
     assert list(attribution.columns) == list(X.columns)
     # L'atribució surt del mateix ajust que la predicció, i un segon ajust del mateix
     # dia dóna el mateix model: `deterministic` a `boosting.lightgbm`.
     assert np.array_equal(predict(model, X, day)[NAME],
-                          forecast(X, y, day, make=SMALL, window=100))
+                          forecast(X, y, day, point=SMALL, window=100))
 
 
 def test_the_day_being_predicted_is_never_read():
@@ -59,5 +59,14 @@ def test_the_day_being_predicted_is_never_read():
     day = X.index[-1]
     corrupted = y.copy()
     corrupted.loc[day] = 9999.0
-    before = forecast(X, y, day, make=SMALL, window=100)
-    assert np.array_equal(before, forecast(X, corrupted, day, make=SMALL, window=100))
+    before = forecast(X, y, day, point=SMALL, window=100)
+    assert np.array_equal(before, forecast(X, corrupted, day, point=SMALL, window=100))
+
+
+def test_the_walk_makes_the_searched_trees_without_stopping_early():
+    # El codi d'on surt la graella torna a ajustar el punt triat amb el nombre d'arbres
+    # en què es va aturar la cerca, sencer. Si el camí s'aturés pel seu compte, faria un
+    # altre nombre d'arbres cada dia i cap no seria el que es va triar.
+    X, y = hourly_prices(200)
+    model = fit(X, y, X.index[-1], point=SMALL, window=100)
+    assert model.booster_.num_trees() == SMALL["trees"]

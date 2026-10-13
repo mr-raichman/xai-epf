@@ -9,13 +9,16 @@ dels quatre anys, més de la meitat de les de validació serien de la crisi o de
 del gas, que no s'assemblen a cap dels dos anys de prova. El codi puntua també cada
 prova sobre el període de prova i ho imprimeix; aquí no se'l toca mai.
 
-L'espai és el del codi, `_build_space`, amb els seus intervals i els seus noms d'opció.
+Les files d'una prova i la seva partició són les de `models/search.py`, que comparteix
+amb la cerca de l'arbre. L'espai és el del codi, `_build_space`, amb els seus intervals i
+els seus noms d'opció.
 L'estimador és el de Parzen en arbre que l'article fa servir a través de hyperopt, aquí
 el d'Optuna tal com Optuna el dóna, amb les vint proves a l'atzar de hyperopt abans de
 començar a guiar-se. L'altra cosa en què els dos difereixen, quantes de les proves fetes
 compten com a bones, Optuna ja no la deixa triar.
 
-Cada membre de la xarxa és una cerca pròpia, `--member`, amb el seu estudi, el seu
+Cada membre de la xarxa és una cerca pròpia, `epf search --family dnn --member`, amb el
+seu estudi, el seu
 registre i la seva llavor inicial, que és com l'article obté les seves quatre xarxes. Una
 cerca interrompuda no perd res: l'estudi es desa a cada prova, i tornar-la a cridar la
 reprèn. `--trials 0` no en fa cap de nova i desa el millor que l'estudi ja té, que és
@@ -25,17 +28,13 @@ import datetime
 
 import numpy as np
 import optuna
-import pandas as pd
 
 from epf import matrix
 from epf.data import forecasts, price
-from epf.matrix import calibration
 from epf.models.dnn import dnn, dnn_hyperparameters
-from epf.models.dnn.dnn_hyperparameters import NAME, TRIALS, WINDOW
-from epf.parameters import SEED, TEST_PERIODS
-
-# El primer dia de prova. La cerca s'ajusta amb els quatre anys d'abans i no en toca cap.
-FIRST_TEST_DAY = pd.Timestamp(min(first for first, _ in TEST_PERIODS.values()))
+from epf.models.dnn.dnn_hyperparameters import NAME, TRIALS
+from epf.models.search import split, window
+from epf.parameters import SEED
 
 # L'espai del codi de Lago et al. (2021): les neurones de cada capa amagada, la segona
 # fora si en té menys de `dnn_hyperparameters.SMALLEST_LAYER`; les set activacions i les
@@ -102,16 +101,11 @@ def study(store, member):
     return found
 
 
-def window(X, y):
-    """Les files de totes les proves: els `WINDOW` dies anteriors al primer de prova."""
-    return calibration(X, y, FIRST_TEST_DAY, WINDOW)
-
-
 def score(tuned, features, target):
     """El MAE en EUR/MWh d'un conjunt: un ajust amb `features`, puntuat a la seva quarta
     part final, la mateixa que l'atura."""
     values, found = dnn.inputs(features, tuned["blocks"]), target.to_numpy(dtype=float)
-    train, validate = dnn.split(len(values))
+    train, validate = split(len(values))
     fitted = dnn.fit_rows((values[train], found[train]),
                           (values[validate], found[validate]), tuned, tuned["seed"])
     return float(np.mean(np.abs(dnn.prices(fitted, values[validate]) - found[validate])))
@@ -120,12 +114,14 @@ def score(tuned, features, target):
 def main(arguments):
     # `--trials 0` no és «cap valor»: és demanar que es desi el que l'estudi ja sap,
     # que és com es recupera una cerca que va caure abans d'arribar a desar res.
+    member = arguments.member
+    if member is None:
+        raise SystemExit("la xarxa es cerca membre a membre: falta --member")
     trials = TRIALS if arguments.trials is None else arguments.trials
     X, y = matrix.lago(price.load(), forecasts.load()).daily
     features, target = window(X, y)
     names = list(dnn.blocks(features.columns))
-    validated = features.index[dnn.split(len(features))[1]]
-    member = arguments.member
+    validated = features.index[split(len(features))[1]]
     print(f"membre {member}: {trials} proves, cada una d'un ajust sobre {len(features)} "
           f"dies, de {features.index[0].date()} a {features.index[-1].date()}, puntuat "
           f"de {validated[0].date()} a {validated[-1].date()}", flush=True)
