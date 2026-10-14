@@ -34,17 +34,17 @@ FLOOR = 1e-3
 STRETCH = 3
 TAIL_FLOOR = 1
 
-# Una distribució de sortida. `units` són les sortides que vol la xarxa, `loss` la
-# pèrdua que minimitza, `flat` porta la sortida crua a les unitats en què es desen els
-# paràmetres, `point` el preu puntual que se'n deriva, `quantiles` els quantils predits
-# i `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
+# Una distribució de sortida. `loss` és la pèrdua que minimitza, `flat` porta la sortida
+# crua a les unitats en què es desen els paràmetres, `point` el preu puntual que se'n
+# deriva, `quantiles` els quantils predits i `names` com es diuen els seus paràmetres, en
+# l'ordre en què surten de la xarxa.
 #
 # `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
 # sortida crua, de manera que és alhora el que llegeix `parameters` i l'última capa del
 # que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
 # s'escriu un sol cop i l'explicació no se'n pot separar.
 Distribution = collections.namedtuple(
-    "Distribution", "names units loss flat point quantiles")
+    "Distribution", "names loss flat point quantiles")
 
 
 def _split(raw, count):
@@ -117,7 +117,7 @@ def _johnson_quantiles(parameters, probabilities):
 # El preu puntual és la mediana de la distribució i no la mitjana, que és el que fa
 # l'article per al MAE: la mediana és el que minimitza l'error absolut.
 NORMAL = Distribution(
-    names=("location", "scale"), units=2 * HOURS_PER_DAY, loss=_normal_loss,
+    names=("location", "scale"), loss=_normal_loss,
     flat=_normal_flat,
     # La mediana d'una normal és la seva localització.
     point=lambda parameters: parameters[..., 0],
@@ -125,8 +125,7 @@ NORMAL = Distribution(
 
 JOHNSON_SU = Distribution(
     names=("location", "scale", "skewness", "tail_weight"),
-    units=4 * HOURS_PER_DAY, loss=_johnson_loss,
-    flat=_johnson_flat,
+    loss=_johnson_loss, flat=_johnson_flat,
     point=lambda parameters: _johnson_quantiles(parameters, 0.5)[..., 0],
     quantiles=_johnson_quantiles)
 
@@ -136,7 +135,7 @@ FAMILIES = {"ddnn_normal": NORMAL, "ddnn_jsu": JOHNSON_SU}
 # La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
 # absolut, la pèrdua `'mae'` del seu codi.
 POINT = Distribution(
-    names=("price",), units=HOURS_PER_DAY, loss=keras.losses.mean_absolute_error,
+    names=("price",), loss=keras.losses.mean_absolute_error,
     flat=lambda raw: raw, point=lambda parameters: parameters[..., 0], quantiles=None)
 
 # Com es diu la família de la xarxa de punt, que es puntua i no s'explica.

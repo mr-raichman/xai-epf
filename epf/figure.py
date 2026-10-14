@@ -40,8 +40,8 @@ def colours(names):
 
     Peta si n'hi ha més que colors. `zip(LINES, ...)` els deixaria fora sense dir-ho,
     i una figura que perd un model en silenci és pitjor que una figura que no es
-    dibuixa (`safety.md` 10.3). Repetir-ne un no val: dues línies del mateix color en
-    una llegenda no es distingeixen.
+    dibuixa. Repetir-ne un no val: dues línies del mateix color en una llegenda no es
+    distingeixen.
     """
     names = list(names)
     if len(names) > len(LINES):
