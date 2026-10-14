@@ -6,8 +6,8 @@ preu del dia abans és una entrada, i per això l'entrenament perd el dia de cad
 d'una setmana retinguda.
 
 `epf describe` ajusta cada família explicada sobre cada conjunt i cada llavor, la puntua
-sobre les setmanes de prova al costat del sòl de l'ordre de mèrit i de les prediccions
-ingènues, i n'explica les files de prova. Tot es desa per llavor, de manera que les figures surten del que hi ha al disc
+sobre les setmanes de prova al costat del sòl de l'ordre de mèrit, de les prediccions
+ingènues i de la xarxa de punt, i n'explica les files de prova. Tot es desa per llavor, de manera que les figures surten del que hi ha al disc
 i no d'un ajust nou. Mentre la cerca no s'ha fet, cada família hi entra amb uns números
 que no s'han cercat, i el registre de cada una ho diu.
 """
@@ -24,6 +24,7 @@ from epf.data import forecasts, price, schedule
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
+from epf.models.ddnn.distributions import POINT, POINT_FAMILY
 from epf.models.linear import linear, linear_hyperparameters
 from epf.models.naive import naive
 from epf.parameters import (BLACKOUT_WEEK, DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
@@ -243,6 +244,16 @@ def _network(name, distribution):
     return described
 
 
+def _point_network(X, y, parts, explained, seed):
+    """La xarxa de punt de Marcjasz et al. (2023), la distribucional amb la sortida
+    canviada, ajustada sobre les mateixes files i aturada igual."""
+    train, validate, test, _ = _parts_of(X, parts, explained)
+    fitted = ddnn.fit_rows(POINT, (X[train], y[train]), (X[validate], y[validate]),
+                           ddnn_hyperparameters.COPIED[POINT_FAMILY])
+    return Described(ddnn.predict_rows(POINT, fitted, X[test]).ravel(),
+                     y[test].to_numpy().ravel(), {}, 0.0, TOLERANCE)
+
+
 def _floor(X, y, parts, explained, seed):
     """El sòl de l'ordre de mèrit de Trebbien et al. (2023): un polinomi cúbic de la
     càrrega residual a l'hora, la demanda menys l'eòlica i la fotovoltaica previstes."""
@@ -269,6 +280,16 @@ def _naive(forecast):
 Describer = collections.namedtuple("Describer", "table sets describe numbers")
 
 
+def _copied(name):
+    """Els números d'una xarxa mentre no s'ha cercat, d'on es van copiar i els que ningú
+    no cerca."""
+    networks = ddnn_hyperparameters
+    return networks.COPIED[name] | {
+        "copied_from": networks.COPIED_FROM[name], "copied_trials": networks.COPIED_TRIALS,
+        "batch": networks.BATCH, "epochs": networks.EPOCHS, "patience": networks.PATIENCE,
+        "unsearched": True}
+
+
 def describers():
     """Cada família que es descriu, per nom."""
     tree = boosting_hyperparameters
@@ -285,13 +306,10 @@ def describers():
              "unsearched": True}),
     }
     for name, distribution in DISTRIBUTIONS.items():
-        found[name] = Describer(
-            "daily", (SCHEDULE,), _network(name, distribution),
-            ddnn_hyperparameters.COPIED[name] | {
-                "copied_from": ddnn_hyperparameters.COPIED_FROM[name],
-                "copied_trials": ddnn_hyperparameters.COPIED_TRIALS,
-                "batch": ddnn_hyperparameters.BATCH, "epochs": ddnn_hyperparameters.EPOCHS,
-                "patience": ddnn_hyperparameters.PATIENCE, "unsearched": True})
+        found[name] = Describer("daily", (SCHEDULE,), _network(name, distribution),
+                                _copied(name))
+    found[POINT_FAMILY] = Describer("daily", (SCHEDULE,), _point_network,
+                                    _copied(POINT_FAMILY))
     found[FLOOR] = Describer("hourly", (SCHEDULE,), _floor, {"degree": FLOOR_DEGREE})
     for name, (forecast, numbers) in naive.FORECASTS.items():
         found[name] = Describer("price", (SCHEDULE,), _naive(forecast), numbers)

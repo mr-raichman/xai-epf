@@ -12,9 +12,14 @@ seria tenir la definició en dos llocs.
 
 La pèrdua és la log-versemblança negativa, que és el que l'article minimitza allà on la
 xarxa de punt minimitza el MAE, i és tota la diferència entre les dues.
+
+La sortida de la xarxa de punt també és aquí, com una tercera, encara que no sigui cap
+distribució: la xarxa la construeix i l'ajusta igual que les altres dues, i no té
+quantils.
 """
 import collections
 
+import keras
 import numpy as np
 from keras import ops
 from scipy import stats
@@ -127,3 +132,12 @@ JOHNSON_SU = Distribution(
 
 # Com es diu cada família i quina distribució treu.
 FAMILIES = {"ddnn_normal": NORMAL, "ddnn_jsu": JOHNSON_SU}
+
+# La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
+# absolut, la pèrdua `'mae'` del seu codi.
+POINT = Distribution(
+    names=("price",), units=HOURS_PER_DAY, loss=keras.losses.mean_absolute_error,
+    flat=lambda raw: raw, point=lambda parameters: parameters[..., 0], quantiles=None)
+
+# Com es diu la família de la xarxa de punt, que es puntua i no s'explica.
+POINT_FAMILY = "dnn"
