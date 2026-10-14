@@ -7,8 +7,9 @@ El directori es dona, no es deriva de l'indicador: la sèrie del preu viu plana 
 la resta del seu conjunt de dades i no en un directori propi. `series_folder` és el
 que hi viu a `ESIOS`, que és la resta d'indicadors.
 
-Aquí hi ha el client i els fets de com ESIOS serveix cada sèrie. Quins indicadors
-formen un conjunt de dades és del conjunt, i es declara al seu mòdul.
+Aquí hi ha el client, amb la clau que llegeix del fitxer `api-keys` de l'arrel, i els
+fets de com ESIOS serveix cada sèrie. Quins indicadors formen un conjunt de dades és del
+conjunt, i es declara al seu mòdul.
 """
 import datetime
 import json
@@ -17,9 +18,8 @@ import pathlib
 import pandas as pd
 import requests
 
-from epf.data.keys import api_key
 from epf.market import MARKET_TIMEZONE
-from epf.paths import ESIOS
+from epf.paths import ESIOS, KEYS
 from epf.calendar import HOUR_COLUMNS, repair_dst
 
 URL = "https://api.esios.ree.es/indicators/"
@@ -101,6 +101,19 @@ def _json_or_empty(response):
         return response.json()
     except ValueError:
         return {}
+
+
+def api_key(name, path=KEYS):
+    """Valor de la línia `name=valor` del fitxer de claus de l'arrel."""
+    try:
+        lines = path.read_text().splitlines()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no existeix {path}; ha de contenir la línia {name}=...") from None
+    for line in lines:
+        found, separator, value = line.partition("=")
+        if separator and found.strip() == name and value.strip():
+            return value.strip()
+    raise KeyError(f"falta la línia {name}=... a {path}")
 
 
 def session_for(key=None):

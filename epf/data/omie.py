@@ -54,9 +54,17 @@ def read_periods(path):
 
 
 def to_hourly(periods):
-    """Redueix els períodes quart-horaris a hores, amb la mitjana de cada quatre."""
+    """Redueix els períodes quart-horaris a hores, amb la mitjana de cada quatre.
+
+    Un dia quart-horari en té quatre per cada hora del dia local, de 23, 24 o 25: amb
+    qualsevol altre nombre es refusa, perquè agrupar-los de quatre en quatre en deixaria
+    el residu fora sense dir-ho.
+    """
     if len(periods) <= HOURS_PER_DAY + 1:
         return periods
+    hours = (HOURS_PER_DAY - 1, HOURS_PER_DAY, HOURS_PER_DAY + 1)
+    if len(periods) not in {QUARTERS_PER_HOUR * count for count in hours}:
+        raise ValueError(f"{len(periods)} períodes no fan cap dia quart-horari")
     return [statistics.mean(periods[i * QUARTERS_PER_HOUR:(i + 1) * QUARTERS_PER_HOUR])
             for i in range(len(periods) // QUARTERS_PER_HOUR)]
 
@@ -66,9 +74,22 @@ def load(directory=PRICE):
     chosen = latest_version_per_day(directory)
     if not chosen:
         raise FileNotFoundError(f"no hi ha cap fitxer de preus a {directory}")
-    rows = [repair_dst(to_hourly(read_periods(path))) for path in chosen.values()]
+    rows = []
+    for path in chosen.values():
+        try:
+            rows.append(repair_dst(to_hourly(read_periods(path))))
+        except ValueError as error:
+            raise ValueError(f"{path.name}: {error}") from None
     index = pd.DatetimeIndex(list(chosen), name="day")
     return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
+
+
+def _save(target, content):
+    """Escriu primer a un fitxer a part i després al seu nom, de manera que un fitxer amb
+    nom és sempre sencer: un de tallat no es tornaria a baixar mai."""
+    partial = target.with_name(target.name + ".part")
+    partial.write_bytes(content)
+    partial.replace(target)
 
 
 def _fetch(filename, directory):
@@ -80,7 +101,7 @@ def _fetch(filename, directory):
     if response.status_code != 200 or not response.content.startswith(b"MARGINALPDBC"):
         print(f"no s'ha pogut baixar {filename}: HTTP {response.status_code}", flush=True)
         return False
-    target.write_bytes(response.content)
+    _save(target, response.content)
     return True
 
 
@@ -88,7 +109,8 @@ def download(directory=PRICE):
     """Actualitza el directori de preus amb tot el que llista OMIE."""
     directory = pathlib.Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    existing = {path.name for path in directory.glob("marginalpdbc_*")}
+    existing = {path.name for path in directory.glob("marginalpdbc_*")
+                if FILENAME.fullmatch(path.name)}
 
     listing = requests.get(LISTING, timeout=60)
     listing.raise_for_status()
@@ -101,8 +123,10 @@ def download(directory=PRICE):
             print(f"no s'ha pogut baixar l'any {year}: HTTP {response.status_code}", flush=True)
             continue
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-            archive.extractall(directory)
-        print(f"{year} desempaquetat", flush=True)
+            names = [name for name in archive.namelist() if FILENAME.fullmatch(name)]
+            for name in names:
+                _save(directory / name, archive.read(name))
+        print(f"{year}: {len(names)} fitxers desempaquetats", flush=True)
 
     wanted = sorted({f"marginalpdbc_{m[1]}.{m[2]}" for m in FILENAME.finditer(listing.text)})
     written = sum(_fetch(name, directory) for name in wanted if name not in existing)

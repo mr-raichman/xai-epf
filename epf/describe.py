@@ -114,17 +114,15 @@ PRICE_UNITS = "EUR/MWh"
 TRANSFORMED_UNITS = "espai transformat"
 UNITLESS = "sense unitats"
 
-# Marge de la comprovació d'additivitat, en EUR/MWh. El residu mesurat d'una atribució
-# desada en `float32` és de l'ordre de 1e-5 EUR/MWh, de manera que això hi deixa dos
-# ordres de magnitud i és molt per sota de qualsevol diferència que vulgui dir res en un
-# preu.
+# Marge de la comprovació d'additivitat, en EUR/MWh: molt per sota de qualsevol
+# diferència que vulgui dir res en un preu. Es comprova sobre el que hi ha a la memòria,
+# abans de desar, i el residu de cada llavor s'imprimeix al costat de les seves
+# puntuacions.
 TOLERANCE = 1e-3
 
 # Marge de l'additivitat a l'espai transformat, a part perquè és en les seves unitats i
-# no en un preu. Sobre valors transformats d'ordre 1 la identitat es compleix a 1,3e-15
-# en memòria, i després del pas a `float32` queda per sota de 2e-6: un factor 50 de
-# marge, que en EUR/MWh val tant com el de dalt, perquè a prop d'1 la derivada de `sinh`
-# és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
+# no en un preu: en EUR/MWh val tant com el de dalt, perquè a prop d'1 la derivada de
+# `sinh` és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
 TRANSFORMED_TOLERANCE = 1e-4
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les

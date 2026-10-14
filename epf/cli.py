@@ -51,9 +51,9 @@ COMMANDS = {
     "audit-data": Command(
         "epf.data.audit", "el que només es pot preguntar a OMIE i a ESIOS", None),
     "figure-price": Command(
-        "epf.data.figures.price.price", "tots els preus horaris, del 2014 endavant", None),
+        "epf.data.figures.price_series", "tots els preus horaris, del 2014 endavant", None),
     "figure-outliers": Command(
-        "epf.data.figures.price.outliers", "la distància de cada preu als seus veïns", None),
+        "epf.data.figures.price_outliers", "la distància de cada preu als seus veïns", None),
     "describe": Command(
         "epf.describe", "descriu el preu amb el protocol de Trebbien et al. (2023)",
         pass_arguments),

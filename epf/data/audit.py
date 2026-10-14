@@ -17,8 +17,7 @@ import pandas as pd
 from epf.calendar import local_hours
 from epf.data import esios, forecasts, omie
 from epf.data.outliers import report
-from epf.data.price import (ESIOS_FIRST_DAY, NAME, OMIE_FROM, SPAIN,
-                            from_esios, load)
+from epf.data.price import ESIOS_FIRST_DAY, NAME, OMIE_FROM, from_esios, load
 from epf.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
 
 
@@ -39,89 +38,120 @@ DECOUPLED_DAY, DECOUPLED_HOUR, SPANISH_PRICE = datetime.date(2024, 6, 1), 14, -0
 KNOWN_GAPS = {esios.PBF_WIND: pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")}
 
 
+def attempt(description, function, *arguments):
+    """El que torna `function`, o `None` amb la comprovació `description` fallida pel seu
+    error: l'auditoria informa de tot el que troba, i un error que l'aturés amagaria les
+    comprovacions que encara podien córrer."""
+    try:
+        return function(*arguments)
+    except (FileNotFoundError, KeyError, ValueError) as error:
+        check(description, False, str(error))
+        return None
+
+
 def check_price():
-    """El que només es pot preguntar a les dues fonts del preu."""
-    chosen = omie.latest_version_per_day()
-    from_omie = omie.load()
-    periods = {day: len(omie.read_periods(path)) for day, path in chosen.items()}
-    first, last = min(chosen), max(chosen)
-    expected_days = (last - first).days + 1
+    """El que només es pot preguntar a les dues fonts del preu. Torna el conjunt, o
+    `None` si no s'ha pogut carregar."""
+    from_omie = attempt("els fitxers d'OMIE es llegeixen", omie.load)
+    if from_omie is not None:
+        chosen = omie.latest_version_per_day()
+        periods = {day: len(omie.read_periods(path)) for day, path in chosen.items()}
+        first, last = min(chosen), max(chosen)
+        expected_days = (last - first).days + 1
 
-    check("OMIE comença on comença el seu arxiu", first == OMIE_FROM, f"{first}")
-    check("cap dia buit entre el primer i l'últim", len(chosen) == expected_days,
-          f"{len(chosen)} de {expected_days}, de {first} a {last}")
+        check("OMIE comença on comença el seu arxiu", first == OMIE_FROM, f"{first}")
+        check("cap dia buit entre el primer i l'últim", len(chosen) == expected_days,
+              f"{len(chosen)} de {expected_days}, de {first} a {last}")
 
-    quarter = {day for day, n in periods.items() if n > HOURS_PER_DAY + 1}
-    check("cap dia quart-horari abans del canvi de mercat",
-          all(day >= QUARTER_HOURLY_FROM for day in quarter),
-          f"{len(quarter)} dies" + (f", el primer {min(quarter)}" if quarter else ""))
-    check("tots els dies a partir del canvi són quart-horaris",
-          all(n > HOURS_PER_DAY + 1 for day, n in periods.items() if day >= QUARTER_HOURLY_FROM))
+        quarter = {day for day, n in periods.items() if n > HOURS_PER_DAY + 1}
+        check("cap dia quart-horari abans del canvi de mercat",
+              all(day >= QUARTER_HOURLY_FROM for day in quarter),
+              f"{len(quarter)} dies" + (f", el primer {min(quarter)}" if quarter else ""))
+        check("tots els dies a partir del canvi són quart-horaris",
+              all(n > HOURS_PER_DAY + 1 for day, n in periods.items()
+                  if day >= QUARTER_HOURLY_FROM))
 
-    repaired = {day for day, n in periods.items() if n % HOURS_PER_DAY != 0}
-    springs = {day for day in repaired if day.month == 3}
-    autumns = {day for day in repaired if day.month == 10}
-    check("els dies reparats són els de canvi d'hora i cap més",
-          repaired == springs | autumns and all(day.weekday() == 6 for day in repaired),
-          f"{len(springs)} de març, {len(autumns)} d'octubre, tots diumenges")
+        repaired = {day for day, n in periods.items() if n % HOURS_PER_DAY != 0}
+        springs = {day for day in repaired if day.month == 3}
+        autumns = {day for day in repaired if day.month == 10}
+        check("els dies reparats són els de canvi d'hora i cap més",
+              repaired == springs | autumns and all(day.weekday() == 6 for day in repaired),
+              f"{len(springs)} de març, {len(autumns)} d'octubre, tots diumenges")
 
-    versions = collections.Counter(int(path.suffix[1:]) for path in chosen.values())
-    check("s'usa alguna versió superior a la primera", sum(versions.values()) > versions[1],
-          f"{dict(sorted(versions.items()))}")
+        versions = collections.Counter(int(path.suffix[1:]) for path in chosen.values())
+        check("s'usa alguna versió superior a la primera",
+              sum(versions.values()) > versions[1], f"{dict(sorted(versions.items()))}")
 
-    check("es llegeix la columna espanyola i no la portuguesa",
-          abs(from_omie.loc[str(DECOUPLED_DAY)].iloc[DECOUPLED_HOUR] - SPANISH_PRICE) < 1e-9,
-          f"{DECOUPLED_DAY} hora {DECOUPLED_HOUR}")
+        decoupled = from_omie.loc[str(DECOUPLED_DAY)].iloc[DECOUPLED_HOUR]
+        check("es llegeix la columna espanyola i no la portuguesa",
+              abs(decoupled - SPANISH_PRICE) < 1e-9, f"{DECOUPLED_DAY} hora {DECOUPLED_HOUR}")
 
-    price = load()
-    check("el preu unit comença on comença ESIOS",
-          price.index[0].date() == ESIOS_FIRST_DAY, f"{price.index[0].date()}")
-    seam = pd.Timestamp(OMIE_FROM)
-    check("el preu unit és continu al canvi de font",
-          {seam - pd.Timedelta(days=1), seam} <= set(price.index))
+    contract = f"el conjunt {NAME} es carrega i compleix el contracte"
+    price = attempt(contract, load)
+    if price is not None:
+        check(contract, True, f"{price.shape}")
+        check("el preu unit comença on comença ESIOS",
+              price.index[0].date() == ESIOS_FIRST_DAY, f"{price.index[0].date()}")
+        seam = pd.Timestamp(OMIE_FROM)
+        check("el preu unit és continu al canvi de font",
+              {seam - pd.Timedelta(days=1), seam} <= set(price.index))
 
-    spain, spain_hours = from_esios(SPAIN)
-    overlap = from_omie.index.intersection(spain.index)
-    largest = (from_omie.loc[overlap] - spain.loc[overlap]).abs().max().max()
-    check("el preu espanyol d'ESIOS coincideix amb el d'OMIE",
-          len(overlap) > 0 and largest < 0.01,
-          f"{len(overlap)} dies comuns, diferència màxima {largest:.4f}")
+    esios_price = attempt("els fitxers d'ESIOS del preu es llegeixen", from_esios)
+    if esios_price is not None:
+        spain, spain_hours = esios_price
+        if from_omie is not None:
+            overlap = from_omie.index.intersection(spain.index)
+            largest = (from_omie.loc[overlap] - spain.loc[overlap]).abs().max().max()
+            check("el preu espanyol d'ESIOS coincideix amb el d'OMIE",
+                  len(overlap) > 0 and largest < 0.01,
+                  f"{len(overlap)} dies comuns, diferència màxima {largest:.4f}")
 
-    # Cada dia del preu d'ESIOS ha d'arribar amb les hores que té el dia local. Si en
-    # portés de més, alguna cauria fora de la graella i es perdria sense dir-ho, i el
-    # 2014 a 2017 és l'únic tram del preu sense una segona font que ho destapés.
-    calendar_hours = local_hours(spain.index)
-    short = spain.index[spain_hours != calendar_hours]
-    changes = spain_hours[calendar_hours != HOURS_PER_DAY].value_counts().sort_index()
-    check("el preu d'ESIOS publica exactament les hores de cada dia local", short.empty,
-          f"{len(spain)} dies, als canvis d'hora "
-          + " i ".join(f"{count} de {hours} h" for hours, count in changes.items()))
+        # Cada dia del preu d'ESIOS ha d'arribar amb les hores que té el dia local. Si en
+        # portés de més, alguna cauria fora de la graella i es perdria sense dir-ho, i el
+        # 2014 a 2017 és l'únic tram del preu sense una segona font que ho destapés.
+        calendar_hours = local_hours(spain.index)
+        short = spain.index[spain_hours != calendar_hours]
+        changes = spain_hours[calendar_hours != HOURS_PER_DAY].value_counts().sort_index()
+        check("el preu d'ESIOS publica exactament les hores de cada dia local", short.empty,
+              f"{len(spain)} dies, als canvis d'hora "
+              + " i ".join(f"{count} de {hours} h" for hours, count in changes.items()))
     return price
 
 
 def check_forecasts():
-    """El que només es pot preguntar a ESIOS de les previsions D+1. Torna el conjunt."""
+    """El que només es pot preguntar a ESIOS de les previsions D+1. Torna el conjunt, buit
+    si no s'ha pogut carregar."""
     # Com al preu d'ESIOS: una hora fora de la graella es perdria sense dir-ho, i
     # aquestes sèries no tenen cap segona font que ho destapés.
     for name in forecasts.INDICATORS:
-        frame, published = forecasts.read(name)
+        read = attempt(f"la previsió {name} es llegeix", forecasts.read, name)
+        if read is None:
+            continue
+        frame, published = read
         short = frame.index[published != local_hours(frame.index)]
         check(f"la previsió {name} publica exactament les hores de cada dia local",
               short.empty, f"{len(frame)} dies, {len(short)} sense les seves hores")
+
+    contract = f"el conjunt {forecasts.NAME} es carrega i compleix el contracte"
+    frames = attempt(contract, forecasts.load)
+    if frames is None:
+        return {}
+    check(contract, True, ", ".join(f"{name} {frame.shape}" for name, frame in frames.items()))
 
     # Una previsió D+1 és del dia que es lliura i no del dia que es publica. Si ESIOS
     # canviés què vol dir `datetime`, totes es desplaçarien un dia i res no petaria, i
     # només la demanda real ho pot dir: la previsió s'hi ha d'acostar més el mateix dia
     # que el dia abans o el dia després.
-    frames = forecasts.load()
-    predicted = frames["demand"].mean(axis="columns")
-    actual = esios.load(esios.DEMAND)[0].mean(axis="columns")
-    errors = {shift: (predicted - actual.shift(shift, freq="D")).abs().mean()
-              for shift in (1, 0, -1)}
-    check("la previsió de demanda és del dia de lliurament",
-          errors[0] < min(errors[1], errors[-1]),
-          f"MAE de les mitjanes diàries contra la demanda real: {errors[0]:.0f} MW el "
-          f"mateix dia, {errors[1]:.0f} el dia abans i {errors[-1]:.0f} el dia després")
+    demand = attempt(f"la demanda real, {esios.DEMAND}, es llegeix", esios.load, esios.DEMAND)
+    if demand is not None:
+        predicted = frames["demand"].mean(axis="columns")
+        actual = demand[0].mean(axis="columns")
+        errors = {shift: (predicted - actual.shift(shift, freq="D")).abs().mean()
+                  for shift in (1, 0, -1)}
+        check("la previsió de demanda és del dia de lliurament",
+              errors[0] < min(errors[1], errors[-1]),
+              f"MAE de les mitjanes diàries contra la demanda real: {errors[0]:.0f} MW el "
+              f"mateix dia, {errors[1]:.0f} el dia abans i {errors[-1]:.0f} el dia després")
     return frames
 
 
@@ -142,11 +172,10 @@ def check_esios_series():
     print("cobertura de les sèries d'ESIOS: primer dia, últim dia, dies, hores absents")
     overfull = []
     for indicator in sorted(esios.SERIES):
-        try:
-            series, published = esios.load(indicator)
-        except (FileNotFoundError, ValueError) as error:
-            check(f"l'indicador {indicator} es llegeix", False, str(error))
+        found = attempt(f"l'indicador {indicator} es llegeix", esios.load, indicator)
+        if found is None:
             continue
+        series, published = found
         if series.empty:
             print(f"  {indicator:>6}  sense cap valor")
             continue
@@ -161,26 +190,12 @@ def check_esios_series():
 
 
 def main():
-    # Cada carregador refusa un conjunt que no compleixi el contracte, de manera que
-    # arribar aquí ja és haver-lo passat. S'enganxa perquè l'auditoria informa i no
-    # peta: sense això un conjunt trencat mataria la passada abans d'arribar a ESIOS.
-    try:
-        price = check_price()
-        check(f"el conjunt {NAME} compleix el contracte", True, f"{price.shape}")
-    except ValueError as error:
-        check(f"el conjunt {NAME} compleix el contracte", False, str(error))
-        price = None
+    price = check_price()
     if price is not None:
         print()
         report(NAME, price)
     print()
-    try:
-        frames = check_forecasts()
-        check(f"el conjunt {forecasts.NAME} compleix el contracte", True,
-              ", ".join(f"{name} {frame.shape}" for name, frame in frames.items()))
-    except (FileNotFoundError, ValueError) as error:
-        check(f"el conjunt {forecasts.NAME} compleix el contracte", False, str(error))
-        frames = {}
+    frames = check_forecasts()
     for name, frame in frames.items():
         print()
         report(f"{forecasts.NAME} {name}", frame)

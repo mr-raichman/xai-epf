@@ -27,7 +27,6 @@ NAME = "price"
 # de sumar-se, i d'aquestes la que es demana és Espanya.
 ESIOS_PRICE = 600
 SPAIN = "España"
-PRICE_COUNTRIES = ("España", "Portugal", "Francia")
 
 # Primer dia que ESIOS serveix el preu, mesurat: una sol·licitud directa a l'API no
 # en torna cap abans. És un fet de la font i no una tria nostra, que viu a
@@ -38,12 +37,11 @@ ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
 OMIE_FROM = datetime.date(2018, 1, 1)
 
 
-def from_esios(country, directory=PRICE):
-    """Preu del mercat diari d'un país en EUR/MWh, i les hores publicades cada dia."""
-    if country not in PRICE_COUNTRIES:
-        raise KeyError(f"cap preu desat per a {country}; n'hi ha per a {PRICE_COUNTRIES}")
+def from_esios(directory=PRICE):
+    """Preu espanyol del mercat diari d'ESIOS en EUR/MWh, i les hores publicades cada
+    dia."""
     stored = esios.values(directory)
-    return esios.hourly([value for value in stored if value["geo_name"] == country])
+    return esios.hourly([value for value in stored if value["geo_name"] == SPAIN])
 
 
 def load(directory=PRICE):
@@ -51,7 +49,7 @@ def load(directory=PRICE):
 
     Ha passat el contracte: qui carrega és qui comprova.
     """
-    early, _ = from_esios(SPAIN, directory)
+    early, _ = from_esios(directory)
     early = early[early.index < pd.Timestamp(OMIE_FROM)]
     return refuse_incoherent(NAME, pd.concat([early, omie.load(directory)]))
 
