@@ -84,6 +84,11 @@ def per_hour(X, y, at_the_hour=()):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
+# Els noms dels conjunts, que són carpetes de les passades i de les cerques. `schedule` es
+# diu com el conjunt de dades del programa, que és el que hi afegeix, i és una altra cosa.
+SCHEDULE, DATE_PROBE = "schedule", "date_probe"
+
+
 def schedule(frame, day_ahead, scheduled):
     """Les dues matrius del conjunt: les 24 hores del preu del dia abans, les previsions
     D+1 del dia que es lliura i el programa del dia abans, cada sèrie per nom, i el dia

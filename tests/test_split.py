@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.describe import _deal, split, validation_parts
+from epf.split import _deal, split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, SEEDS, SHARES
 
 ONE_DAY = pd.Timedelta(days=1)

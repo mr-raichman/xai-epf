@@ -1,9 +1,5 @@
-"""El protocol de Trebbien et al. (2023) sobre el període que es descriu.
-
-Les setmanes es barregen per llavor i es reparteixen en entrenament, validació i
-prova, i la robustesa és la dispersió entre llavors. A diferència del seu article, el
-preu del dia abans és una entrada, i per això l'entrenament perd el dia de cada costat
-d'una setmana retinguda.
+"""El protocol de Trebbien et al. (2023) sobre el període que es descriu, amb la
+partició de `split.py`: la robustesa és la dispersió entre llavors.
 
 `epf describe` ajusta cada família explicada sobre cada conjunt i cada llavor, la puntua
 sobre les setmanes de prova al costat del sòl de l'ordre de mèrit, de les prediccions
@@ -19,9 +15,9 @@ import shutil
 import time
 
 import numpy as np
-import pandas as pd
 
 from epf import evaluation, matrix, parameters
+from epf.matrix import DATE_PROBE, SCHEDULE
 from epf.data import forecasts, price, schedule
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
@@ -29,85 +25,10 @@ from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.ddnn.distributions import POINT, POINT_FAMILY
 from epf.models.linear import linear, linear_hyperparameters
 from epf.models.naive import naive
-from epf.parameters import (BLACKOUT_WEEK, DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
-                            INTERACTION_ROWS, MEASUREMENT, SHARES, SMOKE)
+from epf.parameters import (BLACKOUT_WEEK, DESCRIPTIONS, DEVELOPMENT, INTERACTION_ROWS,
+                            MEASUREMENT, SMOKE)
 from epf.results import describe_figures, run_files
-
-# Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
-Split = collections.namedtuple("Split", "training validation test")
-
-# Parts en què es parteix la validació perquè l'entrenament s'aturi quan qualsevol
-# d'elles deixa de millorar, les de Trebbien et al. (2023).
-VALIDATION_PARTS = 4
-
-
-def _deal(seed, period, deleted, shares):
-    """Els dies del període i, per a cada part, les setmanes que li toquen, en l'ordre
-    en què la llavor les ha repartit.
-
-    El període es talla en setmanes de set dies des del primer, i la setmana `deleted`
-    en surt i no és de cap part. La resta es barregen amb la llavor i es reparteixen en
-    l'ordre de `Split`: a la validació, la seva part de `shares` arrodonida a un múltiple
-    de `VALIDATION_PARTS`, perquè es parteixi en parts iguals; a la prova, la seva
-    arrodonida; i a l'entrenament, la resta.
-    """
-    days = pd.date_range(*period, freq="D")
-    weeks, remainder = divmod(len(days), DAYS_PER_WEEK)
-    if remainder:
-        raise ValueError(f"{len(days)} dies no són setmanes senceres")
-    first = days.get_indexer([pd.Timestamp(deleted[0])])[0]
-    if first < 0 or first % DAYS_PER_WEEK or (
-            pd.Timestamp(deleted[1]) - pd.Timestamp(deleted[0])).days != DAYS_PER_WEEK - 1:
-        raise ValueError(f"{deleted} no és cap de les setmanes del període")
-    kept = np.delete(np.arange(weeks), first // DAYS_PER_WEEK)
-    order = np.random.default_rng(seed).permutation(kept)
-    _, validation_share, test_share = shares
-    validation = VALIDATION_PARTS * round(len(kept) * validation_share / 100
-                                          / VALIDATION_PARTS)
-    test = round(len(kept) * test_share / 100)
-    ends = np.cumsum([len(kept) - validation - test, validation, test])
-    return days, [order[start:end] for start, end in zip([0, *ends[:-1]], ends)]
-
-
-def _days_of(days, weeks):
-    """Els dies de les setmanes donades, en ordre de data."""
-    return days[np.sort(np.concatenate([np.arange(week * DAYS_PER_WEEK,
-                                                  (week + 1) * DAYS_PER_WEEK)
-                                        for week in weeks]))]
-
-
-def split(seed, period, deleted, shares=SHARES, gap=GAP):
-    """Els dies d'entrenament, de validació i de prova d'una llavor.
-
-    Després de repartir les setmanes surt de l'entrenament tot dia que tingui un dia
-    retingut a `gap` dies o menys, a qualsevol costat: aquest dia no és de cap part. La
-    setmana suprimida no és retinguda, i els dies del seu costat es reparteixen com
-    qualsevol altre.
-    """
-    days, dealt = _deal(seed, period, deleted, shares)
-    part_of_week = np.full(len(days) // DAYS_PER_WEEK, -1)
-    for part, weeks in enumerate(dealt):
-        part_of_week[weeks] = part
-    part_of_day = np.repeat(part_of_week, DAYS_PER_WEEK)
-
-    training = part_of_day == 0
-    held_out = (part_of_day == 1) | (part_of_day == 2)
-    beside = np.zeros(len(days), dtype=bool)
-    for offset in range(1, gap + 1):
-        beside[offset:] |= held_out[:-offset]
-        beside[:-offset] |= held_out[offset:]
-    return Split(days[training & ~beside], days[part_of_day == 1], days[part_of_day == 2])
-
-
-def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARES):
-    """Les setmanes de validació d'una llavor en `count` parts iguals, en l'ordre en
-    què la llavor les ha repartit, de manera que cada part és de setmanes a l'atzar."""
-    days, dealt = _deal(seed, period, deleted, shares)
-    weeks = dealt[Split._fields.index("validation")]
-    if len(weeks) % count:
-        raise ValueError(f"{len(weeks)} setmanes de validació no fan {count} parts iguals")
-    return [_days_of(days, chunk) for chunk in np.split(weeks, count)]
-
+from epf.split import split, validation_parts
 
 # -------------------------------------------------------------------- la passada
 
@@ -115,10 +36,8 @@ def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARE
 # amb els conjunts en carpetes per sota.
 STAGE = "describe"
 
-# Els conjunts, que són carpetes de la passada, i el sòl de l'ordre de mèrit, que hi és
-# com una família més perquè es puntua igual. `schedule` es diu com el conjunt de dades
-# del programa, que és el que hi afegeix, i és una altra cosa.
-SCHEDULE, DATE_PROBE = "schedule", "date_probe"
+# El sòl de l'ordre de mèrit, que és a la passada com una família més perquè es puntua
+# igual.
 FLOOR = "floor"
 
 # Grau del polinomi del sòl, el cúbic de Trebbien et al. (2023).
