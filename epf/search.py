@@ -15,6 +15,7 @@ altres files, i una cerca no es reprèn sobre unes altres files.
 """
 import collections
 import json
+import os
 import shutil
 import time
 
@@ -165,6 +166,9 @@ def run(store, family, searcher, X, y, parts, seed, trials):
         numbers, score = searcher.trial(trial, (X[train], y[train]),
                                         (X[validate], y[validate]), seed)
         trial.set_user_attr("numbers", run_files.plain(numbers))
+        # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna desa,
+        # porti les condicions en què es va prendre.
+        trial.set_user_attr("load", os.getloadavg())
         print(f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
               f"{score:.4g}, {time.time() - start:.1f} s", flush=True)
         return score
@@ -227,6 +231,13 @@ def main(arguments):
         return 1
 
     seeds, trials = SEARCH_TRIALS[arguments.tier]
+    if arguments.seed:
+        outside = sorted(set(arguments.seed) - set(seeds))
+        if outside:
+            print(f"les llavors {outside} no són del nivell {arguments.tier}, que en té "
+                  f"{list(seeds)}")
+            return 1
+        seeds = [seed for seed in seeds if seed in arguments.seed]
     # Reprendre és de la mesura i prou, com a la passada.
     if arguments.tier == SMOKE or arguments.replace:
         for family in chosen:

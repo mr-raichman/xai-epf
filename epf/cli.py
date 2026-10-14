@@ -37,6 +37,14 @@ def pass_arguments(parser):
     return parser
 
 
+def search_arguments(parser):
+    """Els arguments d'una cerca: els d'una passada, i quines llavors."""
+    pass_arguments(parser)
+    parser.add_argument("--seed", type=int, action="append",
+                        help="només aquesta llavor del nivell; es pot repetir")
+    return parser
+
+
 def folder_arguments(parser):
     """El directori d'una passada, que és el que pren qui en llegeix una."""
     parser.add_argument("folder", type=pathlib.Path, nargs="+",
@@ -63,7 +71,7 @@ COMMANDS = {
         pass_arguments),
     "search": Command(
         "epf.search", "cerca els números de cada família amb la cerca a l'atzar de "
-        "Trebbien et al. (2023)", pass_arguments),
+        "Trebbien et al. (2023)", search_arguments),
     "describe-figures": Command(
         "epf.results.describe_figures", "torna a dibuixar les figures d'una passada",
         folder_arguments),
