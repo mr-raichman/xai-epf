@@ -59,3 +59,16 @@ def test_one_absent_value_is_refused():
 def test_the_dataset_name_is_in_the_message():
     with pytest.raises(ValueError, match="el conjunt demanda no és coherent"):
         refuse_incoherent("demanda", frame_of(columns=HOUR_COLUMNS[:-1]))
+
+
+def test_only_the_declared_gap_may_be_absent():
+    # Les hores de l'apagada, que ESIOS no publica al programa, s'admeten perquè el conjunt
+    # les declara; una hora absent a qualsevol altre lloc segueix refusada, també al costat.
+    frame = frame_of()
+    gap = pd.date_range("2024-01-03 12:00", "2024-01-04 23:00", freq="h")
+    frame.iloc[2, 12:] = None
+    frame.iloc[3, :] = None
+    assert refuse_incoherent("schedule", frame, gap) is frame
+    frame.iloc[2, 11] = None
+    with pytest.raises(ValueError, match="2024-01-03 11:00"):
+        refuse_incoherent("schedule", frame, gap)

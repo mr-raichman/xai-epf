@@ -36,6 +36,14 @@ NUCLEAR = [
 ]
 
 
+def hours_of(*days):
+    """Els instants, en UTC, de totes les hores locals dels dies donats: el que publica
+    una àncora un dia sencer."""
+    return {instant.tz_convert("UTC") for day in days
+            for instant in pd.date_range(pd.Timestamp(day).tz_localize(MARKET_TIMEZONE),
+                                         periods=24, freq="h")}
+
+
 def rest_of_day(day, known, value=0.0):
     """Completa amb `value` les hores locals del dia que no són a `known`."""
     start = pd.Timestamp(day).tz_localize(MARKET_TIMEZONE)
@@ -56,22 +64,36 @@ def test_spring_inserts_the_missing_hour():
 
 
 def test_provinces_are_summed_and_an_absent_province_adds_nothing():
-    day = hourly(NUCLEAR, anchor_days={datetime.date(2024, 3, 9)})[0].iloc[0]
+    day = hourly(NUCLEAR, hours_of("2024-03-09"))[0].iloc[0]
     assert day["h01"] == pytest.approx(1063.9 + 1005.8 + 3032.8 + 1003.4)
     assert day["h02"] == pytest.approx(1005.8 + 3032.8 + 1003.4)
 
 
-def test_an_absent_hour_is_zero_only_on_an_anchor_day():
-    day = datetime.date(2024, 3, 9)
-    assert hourly(NUCLEAR, anchor_days={day})[0].iloc[0]["h05"] == 0.0
-    assert pd.isna(hourly(NUCLEAR, anchor_days=set())[0].iloc[0]["h05"])
+def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
+    # El 2025-04-28 l'àncora del PBF va publicar fins a les 11:00 i prou, l'apagada: per
+    # dies, la tarda de cada sèrie del programa hi valia zero.
+    anchor = hours_of("2024-03-09")
+    assert hourly(NUCLEAR, anchor)[0].iloc[0]["h05"] == 0.0
+    morning = {instant for instant in anchor
+               if instant.tz_convert(MARKET_TIMEZONE).hour < 4}
+    assert pd.isna(hourly(NUCLEAR, morning)[0].iloc[0]["h05"])
+    assert pd.isna(hourly(NUCLEAR, set())[0].iloc[0]["h05"])
     assert pd.isna(hourly(NUCLEAR)[0].iloc[0]["h05"])
 
 
 def test_zeros_never_extend_beyond_the_published_days():
-    anchors = {datetime.date(2024, 3, 8), datetime.date(2024, 3, 9), datetime.date(2024, 3, 10)}
-    days = hourly(NUCLEAR, anchor_days=anchors)[0].index
+    anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
+    days = hourly(NUCLEAR, anchor)[0].index
     assert list(days) == [pd.Timestamp("2024-03-09")]
+
+
+def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_before():
+    # El carbó del programa va deixar de publicar-se mentre l'àncora seguia: després del
+    # seu últim dia val zero, i abans del primer no es toca.
+    anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
+    frame = hourly(NUCLEAR, anchor, past_last_day=True)[0]
+    assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
+    assert (frame.loc["2024-03-10"] == 0.0).all()
 
 
 def test_the_published_count_is_of_local_hours_and_not_of_repaired_ones():

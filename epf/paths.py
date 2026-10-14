@@ -9,12 +9,13 @@ KEYS = ROOT / "api-keys"
 # contrast amb una còpia transformada que no existeix. Un conjunt de dades, una
 # carpeta: la del preu és plana perquè és un sol conjunt amb dues fonts, i els seus
 # noms no xoquen: `marginalpdbc_<dia>.<versió>` d'OMIE i `<any>.json` d'ESIOS. La de
-# les previsions en té una per indicador, perquè un fitxer d'ESIOS només porta el
-# període al nom. La resta d'indicadors d'ESIOS encara no són cap conjunt amb nom i
-# es queden un directori per indicador.
+# les previsions i la del programa en tenen una per indicador, perquè un fitxer d'ESIOS
+# només porta el període al nom. La resta d'indicadors d'ESIOS encara no són cap
+# conjunt amb nom i es queden un directori per indicador.
 DOWNLOADS = ROOT / "downloads"
 PRICE = DOWNLOADS / "price"
 FORECASTS = DOWNLOADS / "forecasts"
+SCHEDULE = DOWNLOADS / "schedule"
 ESIOS = DOWNLOADS / "esios"
 
 # Figures de les dades d'origen, una carpeta per conjunt. Fora de l'arbre que es

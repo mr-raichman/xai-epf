@@ -3,10 +3,11 @@
 El contracte de qualsevol conjunt viu a `contract.py` i el crida el carregador, de
 manera que un marc que arriba aquí ja l'ha passat. Això és l'altra meitat: les
 versions dels fitxers d'OMIE, el dia desacoblat, les hores que publiquen les previsions
-i el dia a què pertanyen, les hores que cada àncora publica i la cobertura de cada
-indicador, que són fets de la font i no del conjunt.
+i el dia a què pertanyen, el programa a tots dos costats del canvi de format, les hores
+que cada àncora publica i la cobertura de cada indicador, que són fets de la font i no
+del conjunt.
 
-Res d'aquí corre en una execució. Informa de tot el que troba en lloc de petar al
+Res d'aquí corre en una passada. Informa de tot el que troba en lloc de petar al
 primer error, que és el seu ofici, i acaba amb 1 si alguna comprovació ha fallat.
 """
 import collections
@@ -15,10 +16,11 @@ import datetime
 import pandas as pd
 
 from epf.calendar import local_hours
-from epf.data import esios, forecasts, omie
+from epf.data import esios, forecasts, omie, schedule
 from epf.data.outliers import report
 from epf.data.price import ESIOS_FIRST_DAY, NAME, OMIE_FROM, from_esios, load
 from epf.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
+from epf.parameters import DAYS_PER_WEEK
 
 
 failures = []
@@ -34,8 +36,14 @@ def check(description, condition, detail=""):
 # Dia amb Espanya i Portugal desacoblats: a l'hora 14, -0.60 a Espanya i -0.58 a Portugal.
 DECOUPLED_DAY, DECOUPLED_HOUR, SPANISH_PRICE = datetime.date(2024, 6, 1), 14, -0.60
 
-# Hores que ESIOS no publica en una àncora: el PBF de l'apagada del 28 d'abril de 2025.
-KNOWN_GAPS = {esios.PBF_WIND: pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")}
+# Hores que ESIOS no publica en una àncora: el PBF de l'apagada, que declara el conjunt
+# del programa.
+KNOWN_GAPS = {esios.PBF_WIND: schedule.BLACKOUT}
+
+# Mínim del programa nuclear de la setmana que comença el 2025-10-01 sobre la d'abans.
+# Una caiguda a la quarta part, la de servir l'energia d'un quart d'hora com si fos la de
+# l'hora, dona 0,25 i cap caiguda dona 1: el llindar és a mig camí.
+SEAM_FLOOR = 0.5
 
 
 def attempt(description, function, *arguments):
@@ -155,6 +163,54 @@ def check_forecasts():
     return frames
 
 
+def check_schedule():
+    """El que només es pot preguntar a ESIOS del programa. Torna el conjunt, buit si no
+    s'ha pogut carregar."""
+    anchor = attempt("l'àncora del programa es llegeix", schedule.anchor_instants)
+    if anchor is not None:
+        # Cada hora que l'àncora no publica queda absent a tot el conjunt, de manera que
+        # la regla del zero només és certa si l'àncora les publica totes menys l'apagada.
+        # El primer i l'últim dia poden ser parcials: l'inici de la publicació i avui.
+        frame, _ = schedule.read(schedule.ANCHOR, anchor)
+        interior = frame.reindex(pd.date_range(frame.index[0], frame.index[-1], freq="D")[1:-1])
+        days, hours = interior.isna().to_numpy().nonzero()
+        absent = interior.index[days] + pd.to_timedelta(hours, unit="h")
+        unexpected = absent.difference(schedule.BLACKOUT)
+        check("l'àncora del programa publica totes les hores fora de l'apagada",
+              unexpected.empty, f"{len(absent)} hores buides, {len(unexpected)} inesperades")
+
+        print()
+        print("sèries del programa: primer i últim dia publicat, dies publicats")
+        for name, indicators in schedule.GROUPS.items():
+            for indicator in indicators:
+                read = attempt(f"la sèrie {indicator} del programa es llegeix", schedule.read,
+                               indicator, anchor)
+                if read is None:
+                    continue
+                published = read[1][read[1] > 0].index
+                print(f"  {indicator:>3}  {name:<9}  {published[0].date()}  "
+                      f"{published[-1].date()}  {len(published):>5}")
+        print()
+
+    contract = f"el conjunt {schedule.NAME} es carrega i compleix el contracte"
+    frames = attempt(contract, schedule.load)
+    if frames is None:
+        return {}
+    check(contract, True, ", ".join(f"{name} {frame.shape}" for name, frame in frames.items()))
+
+    # Des del 2025-10-01 ESIOS serveix el programa per quarts d'hora: si el servidor en
+    # fes la mitjana i no la suma, cada hora en valdria la quarta part a partir d'aquell dia.
+    seam = pd.Timestamp(QUARTER_HOURLY_FROM)
+    week = pd.Timedelta(days=DAYS_PER_WEEK)
+    nuclear = frames["nuclear"]
+    before = nuclear[(nuclear.index >= seam - week) & (nuclear.index < seam)].mean().mean()
+    after = nuclear[(nuclear.index >= seam) & (nuclear.index < seam + week)].mean().mean()
+    check("el programa nuclear no cau a la quarta part el 2025-10-01",
+          after / before > SEAM_FLOOR,
+          f"la setmana que hi comença fa {after / before:.2f} de la d'abans")
+    return frames
+
+
 def check_esios_series():
     """El que només es pot preguntar als indicadors que encara no són cap conjunt."""
     for anchor in sorted({a for a in esios.SERIES.values() if a is not None}):
@@ -199,6 +255,11 @@ def main():
     for name, frame in frames.items():
         print()
         report(f"{forecasts.NAME} {name}", frame)
+    print()
+    frames = check_schedule()
+    for name, frame in frames.items():
+        print()
+        report(f"{schedule.NAME} {name}", frame)
     print()
     check_esios_series()
     if failures:

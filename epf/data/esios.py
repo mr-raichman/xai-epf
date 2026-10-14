@@ -38,7 +38,7 @@ PBF_WIND = 12
 
 # Indicador i la seva àncora. ESIOS omet les hores que valen zero. Sense àncora,
 # la sèrie no pot valer zero i una hora absent queda absent. Amb àncora, una hora
-# absent val zero els dies en què l'àncora es va publicar.
+# absent val zero si l'àncora la va publicar.
 SERIES = {
     # Demanda real, i la previsió D+1 d'eòlica més fotovoltaica.
     DEMAND: None, 10358: None,
@@ -48,9 +48,11 @@ SERIES = {
     1296: DEMAND, 1297: DEMAND, 2078: DEMAND, 2079: DEMAND, 2344: DEMAND,
     # Saldo net de les interconnexions en temps real.
     10207: DEMAND, 10208: DEMAND, 10209: DEMAND,
-    # Programa base de funcionament (PBF), per tecnologia i interconnexió.
+    # Programa base de funcionament (PBF), per tecnologia i interconnexió. Les nou que
+    # suma el conjunt del programa són al seu mòdul; l'eòlica hi és igualment, perquè és
+    # l'àncora de les altres.
     PBF_WIND: None,
-    **{indicator: PBF_WIND for indicator in range(1, 36) if indicator != PBF_WIND},
+    **{indicator: PBF_WIND for indicator in (5, 6, 10, 13, 14, 15, 16, *range(18, 36))},
     10104: PBF_WIND, 10113: PBF_WIND, 10122: PBF_WIND, 10186: PBF_WIND, 462: PBF_WIND,
     # Potència disponible, publicada per província.
     **{indicator: PBF_WIND for indicator in range(472, 480)}, 10001: PBF_WIND,
@@ -128,11 +130,12 @@ def series_folder(indicator, directory=ESIOS):
     return pathlib.Path(directory) / str(indicator)
 
 
-def download(indicator, folder, session=None):
+def download(indicator, folder, session=None, aggregation="average"):
     """Baixa cada període d'un indicador que encara no tingui un fitxer complet.
 
     Un indicador i no tots: qui en vol diversos els recorre, i és el conjunt de
-    dades qui diu quins són seus i on van.
+    dades qui diu quins són seus i on van, i com ha d'agregar el servidor el que publica
+    per sota de l'hora: la mitjana, o la suma per a una energia per quart d'hora.
     """
     session = session or session_for()
     folder = pathlib.Path(folder)
@@ -144,7 +147,7 @@ def download(indicator, folder, session=None):
         # ESIOS interpreta les dates en hora local.
         response = session.get(URL + str(indicator), timeout=600, params={
             "start_date": f"{first}T00:00", "end_date": f"{last}T23:59",
-            "time_trunc": "hour", "time_agg": "average"})
+            "time_trunc": "hour", "time_agg": aggregation})
         if response.status_code != 200 or "indicator" not in _json_or_empty(response):
             print(f"no s'ha pogut baixar l'indicador {indicator} de {name}: "
                   f"HTTP {response.status_code}", flush=True)
@@ -171,19 +174,21 @@ def values(folder, monthly=False):
     return [value for path in paths for value in json.loads(path.read_text())["indicator"]["values"]]
 
 
-def _published_days(values):
-    """Dies locals amb algun valor."""
-    instants = pd.to_datetime([value["datetime"] for value in values], format="ISO8601", utc=True)
-    return set(instants.tz_convert(MARKET_TIMEZONE).date)
+def published_instants(values):
+    """Els instants, en UTC, en què hi ha algun valor."""
+    return set(pd.to_datetime([value["datetime"] for value in values], format="ISO8601",
+                              utc=True))
 
 
-def hourly(values, anchor_days=None):
+def hourly(values, anchor=None, past_last_day=False):
     """Valors d'ESIOS com a dies per hores, sumant les geografies de cada instant, i
     quantes hores va publicar la resposta cada dia local.
 
     La clau és `datetime`, que porta el desplaçament horari: `datetime_utc` etiqueta
-    malament la primera 02:00 del canvi d'hora d'octubre. Amb `anchor_days`, una
-    hora absent val zero els dies d'àncora entre el primer i l'últim dia publicat.
+    malament la primera 02:00 del canvi d'hora d'octubre. Amb `anchor`, els instants
+    que va publicar l'àncora, una hora absent val zero si l'àncora la va publicar, entre
+    el primer i l'últim dia publicat de la sèrie, o fins a l'últim de l'àncora amb
+    `past_last_day`.
 
     El recompte és d'hores i no de valors: una sèrie per províncies en porta una per
     província a cada instant. Comparat amb `local_hours`, diu si la resposta té la
@@ -198,16 +203,19 @@ def hourly(values, anchor_days=None):
 
     published = set(series.index.tz_convert(MARKET_TIMEZONE).date)
     first, last = min(published), max(published)
-    zero_days = set() if anchor_days is None else {d for d in anchor_days if first <= d <= last}
+    if anchor and past_last_day:
+        last = max(last, max(pd.DatetimeIndex(list(anchor)).tz_convert(MARKET_TIMEZONE).date))
 
     start = pd.Timestamp(first).tz_localize(MARKET_TIMEZONE)
     end = pd.Timestamp(last).tz_localize(MARKET_TIMEZONE) + pd.DateOffset(days=1)
     grid = pd.date_range(start, end, freq="h", inclusive="left")
+    zero = grid.tz_convert("UTC").isin(list(anchor or ()))
     frame = pd.DataFrame({"day": grid.tz_localize(None).normalize(),
-                          "value": series.reindex(grid.tz_convert("UTC")).to_numpy()})
+                          "value": series.reindex(grid.tz_convert("UTC")).to_numpy(),
+                          "zero": zero})
+    frame.loc[frame["zero"], "value"] = frame.loc[frame["zero"], "value"].fillna(0.0)
+    zero_days = set(frame.loc[frame["zero"], "day"].dt.date)
     frame = frame[frame["day"].dt.date.isin(published | zero_days)]
-    zero = frame["day"].dt.date.isin(zero_days)
-    frame.loc[zero, "value"] = frame.loc[zero, "value"].fillna(0.0)
 
     rows = {day: repair_dst(hours.tolist()) for day, hours in frame.groupby("day")["value"]}
     index = pd.DatetimeIndex(list(rows), name="day")
@@ -240,8 +248,8 @@ def load(indicator, directory=ESIOS):
     if indicator not in PROVINCES:
         single_geography(stored, indicator)
     anchor = SERIES[indicator]
-    anchor_days = None if anchor is None else _published_days(_stored(anchor, directory))
-    return hourly(stored, anchor_days)
+    return hourly(stored, None if anchor is None else
+                  published_instants(_stored(anchor, directory)))
 
 
 def load_revised_forecast(indicator, directory=ESIOS):
