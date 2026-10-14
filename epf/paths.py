@@ -26,3 +26,7 @@ PRICE_FIGURES = FIGURES / "price"
 # Fora del paquet, perquè la roda es construeix de `epf/` i s'hi enduria qualsevol
 # cosa que hi pengés, i fora de git.
 RUNS = ROOT / "runs"
+
+# Les cerques, al costat de les passades i no a dins: una cerca és d'un conjunt i d'una
+# partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles files.
+SEARCHES = ROOT / "searches"

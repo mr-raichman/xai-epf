@@ -25,14 +25,15 @@ Command = collections.namedtuple("Command", "module help arguments")
 
 
 def pass_arguments(parser):
-    """Els arguments d'una passada: el nivell, quines famílies i si es comença de zero."""
+    """Els arguments d'una passada o d'una cerca: el nivell, quines famílies i si es
+    comença de zero."""
     parser.add_argument("--tier", choices=(parameters.SMOKE, parameters.MEASUREMENT),
                         required=True,
                         help="assaig, que no dóna cap xifra, o mesura, que sí")
     parser.add_argument("--family", action="append",
                         help="només aquesta família; es pot repetir")
     parser.add_argument("--replace", action="store_true",
-                        help="comença de zero, encara que hi hagi una passada a mig fer")
+                        help="comença de zero, encara que n'hi hagi una a mig fer")
     return parser
 
 
@@ -60,6 +61,9 @@ COMMANDS = {
     "describe": Command(
         "epf.describe", "descriu el preu amb el protocol de Trebbien et al. (2023)",
         pass_arguments),
+    "search": Command(
+        "epf.search", "cerca els números de cada família amb la cerca a l'atzar de "
+        "Trebbien et al. (2023)", pass_arguments),
     "describe-figures": Command(
         "epf.results.describe_figures", "torna a dibuixar les figures d'una passada",
         folder_arguments),

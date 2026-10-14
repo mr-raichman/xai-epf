@@ -62,6 +62,16 @@ DESCRIPTIONS = {
     SMOKE: ((0,), 50),
 }
 
+# Llavors i proves de la cerca de cada família, per nivell, i quantes de les millors se
+# n'expliquen: Trebbien et al. (2023) en guarden les deu millors i no diuen quantes en
+# proven, i cinquanta és el nombre del projecte. L'assaig és una llavor i dues proves,
+# prou per passar tota la maquinària.
+SEARCH_TRIALS = {
+    MEASUREMENT: (SEEDS, 50),
+    SMOKE: ((0,), 2),
+}
+BEST = 10
+
 # Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,
 # triades a l'atzar amb la llavor. Totes costarien unes onze vegades més.
 INTERACTION_ROWS = 1000

@@ -17,6 +17,9 @@ MIXINGS = (0.25, 0.5, 0.75)
 STEPS = 34
 RATIO = 1e-4
 
+# La graella: cada barreja amb cada pas de la seva seqüència, 102 punts.
+GRID = {"mixing": MIXINGS, "step": tuple(range(STEPS))}
+
 
 def penalties(X, y):
     """Per a cada barreja, els seus `STEPS` càstigs, del que deixa a zero tots els
@@ -30,5 +33,4 @@ def penalties(X, y):
 
 def space(trial):
     """El punt de la graella d'una prova: la barreja i el pas de la seva seqüència."""
-    return (trial.suggest_categorical("mixing", MIXINGS),
-            trial.suggest_categorical("step", tuple(range(STEPS))))
+    return tuple(trial.suggest_categorical(name, values) for name, values in GRID.items())

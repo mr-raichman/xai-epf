@@ -1,6 +1,6 @@
-"""L'espai de la cerca de les xarxes distribucionals, el del codi de Marcjasz et al.
-(2023), `nn.py`, sense els seus selectors de blocs d'entrada: cada xarxa llegeix totes
-les columnes, com les altres famílies."""
+"""L'espai de la cerca de les xarxes, les distribucionals i la de punt, el del codi de
+Marcjasz et al. (2023), `nn.py`, sense els seus selectors de blocs d'entrada: cada xarxa
+llegeix totes les columnes, com les altres famílies."""
 
 # L'espai del codi de Marcjasz et al. (2023): dues capes amagades, les neurones de cada
 # una, les sis activacions pels seus noms, el dropout de després de l'entrada, el
@@ -22,8 +22,11 @@ def penalty(trial, name):
     return trial.suggest_float(f"{name}_l1", *L1, log=True)
 
 
-def space(trial, distribution):
+def space(trial, distribution, penalised=True):
     """Els hiperparàmetres d'una prova, en la forma en què els llegeix `ddnn.build`.
+
+    Sense `penalised`, la capa de sortida no té cap L1 i no se'n cerca cap, que és la
+    xarxa de punt de l'article: qui crida ho diu, i no s'endevina de la distribució.
 
     L'L1 de cada paràmetre es demana pel nom que té a `distribution`, i en el seu ordre:
     el codi de l'article posa el pes de la cua de Johnson SU abans de l'asimetria.
@@ -37,6 +40,7 @@ def space(trial, distribution):
                     if trial.suggest_categorical("dropout", (False, True)) else 0.0),
         "l1": [penalty(trial, f"h{layer}_kernel") for layer in layers],
         "activity_l1": [penalty(trial, f"h{layer}_activation") for layer in layers],
-        "parameter_l1": [penalty(trial, name) for name in distribution.names],
+        "parameter_l1": ([penalty(trial, name) for name in distribution.names] if penalised
+                         else [0.0] * len(distribution.names)),
         "learning_rate": trial.suggest_float("learning_rate", *LEARNING_RATE, log=True),
     }
