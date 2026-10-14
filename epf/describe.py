@@ -20,12 +20,12 @@ import numpy as np
 import pandas as pd
 
 from epf import matrix, parameters
-from epf.data import forecasts, price
+from epf.data import forecasts, price, schedule
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.linear import linear, linear_hyperparameters
-from epf.parameters import (DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
+from epf.parameters import (BLACKOUT_WEEK, DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
                             INTERACTION_ROWS, MEASUREMENT, SHARES, SMOKE)
 from epf.results import describe_figures, run_files
 
@@ -37,21 +37,31 @@ Split = collections.namedtuple("Split", "training validation test")
 VALIDATION_PARTS = 4
 
 
-def _deal(seed, period, shares):
+def _deal(seed, period, deleted, shares):
     """Els dies del període i, per a cada part, les setmanes que li toquen, en l'ordre
     en què la llavor les ha repartit.
 
-    El període es talla en setmanes de set dies des del primer, que es barregen amb la
-    llavor i es reparteixen en l'ordre de `Split` segons els percentatges de `shares`.
+    El període es talla en setmanes de set dies des del primer, i la setmana `deleted`
+    en surt i no és de cap part. La resta es barregen amb la llavor i es reparteixen en
+    l'ordre de `Split`: a la validació, la seva part de `shares` arrodonida a un múltiple
+    de `VALIDATION_PARTS`, perquè es parteixi en parts iguals; a la prova, la seva
+    arrodonida; i a l'entrenament, la resta.
     """
     days = pd.date_range(*period, freq="D")
     weeks, remainder = divmod(len(days), DAYS_PER_WEEK)
     if remainder:
         raise ValueError(f"{len(days)} dies no són setmanes senceres")
-    if sum(shares) != 100 or any(weeks * share % 100 for share in shares):
-        raise ValueError(f"{shares} no reparteix {weeks} setmanes senceres")
-    order = np.random.default_rng(seed).permutation(weeks)
-    ends = np.cumsum([weeks * share // 100 for share in shares])
+    first = days.get_indexer([pd.Timestamp(deleted[0])])[0]
+    if first < 0 or first % DAYS_PER_WEEK or (
+            pd.Timestamp(deleted[1]) - pd.Timestamp(deleted[0])).days != DAYS_PER_WEEK - 1:
+        raise ValueError(f"{deleted} no és cap de les setmanes del període")
+    kept = np.delete(np.arange(weeks), first // DAYS_PER_WEEK)
+    order = np.random.default_rng(seed).permutation(kept)
+    _, validation_share, test_share = shares
+    validation = VALIDATION_PARTS * round(len(kept) * validation_share / 100
+                                          / VALIDATION_PARTS)
+    test = round(len(kept) * test_share / 100)
+    ends = np.cumsum([len(kept) - validation - test, validation, test])
     return days, [order[start:end] for start, end in zip([0, *ends[:-1]], ends)]
 
 
@@ -62,30 +72,33 @@ def _days_of(days, weeks):
                                         for week in weeks]))]
 
 
-def split(seed, period, shares=SHARES, gap=GAP):
+def split(seed, period, deleted, shares=SHARES, gap=GAP):
     """Els dies d'entrenament, de validació i de prova d'una llavor.
 
     Després de repartir les setmanes surt de l'entrenament tot dia que tingui un dia
-    retingut a `gap` dies o menys, a qualsevol costat: aquest dia no és de cap part.
+    retingut a `gap` dies o menys, a qualsevol costat: aquest dia no és de cap part. La
+    setmana suprimida no és retinguda, i els dies del seu costat es reparteixen com
+    qualsevol altre.
     """
-    days, dealt = _deal(seed, period, shares)
-    part_of_week = np.empty(len(days) // DAYS_PER_WEEK, dtype=int)
+    days, dealt = _deal(seed, period, deleted, shares)
+    part_of_week = np.full(len(days) // DAYS_PER_WEEK, -1)
     for part, weeks in enumerate(dealt):
         part_of_week[weeks] = part
     part_of_day = np.repeat(part_of_week, DAYS_PER_WEEK)
 
     training = part_of_day == 0
+    held_out = (part_of_day == 1) | (part_of_day == 2)
     beside = np.zeros(len(days), dtype=bool)
     for offset in range(1, gap + 1):
-        beside[offset:] |= ~training[:-offset]
-        beside[:-offset] |= ~training[offset:]
+        beside[offset:] |= held_out[:-offset]
+        beside[:-offset] |= held_out[offset:]
     return Split(days[training & ~beside], days[part_of_day == 1], days[part_of_day == 2])
 
 
-def validation_parts(seed, period, count=VALIDATION_PARTS, shares=SHARES):
+def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARES):
     """Les setmanes de validació d'una llavor en `count` parts iguals, en l'ordre en
     què la llavor les ha repartit, de manera que cada part és de setmanes a l'atzar."""
-    days, dealt = _deal(seed, period, shares)
+    days, dealt = _deal(seed, period, deleted, shares)
     weeks = dealt[Split._fields.index("validation")]
     if len(weeks) % count:
         raise ValueError(f"{len(weeks)} setmanes de validació no fan {count} parts iguals")
@@ -99,9 +112,9 @@ def validation_parts(seed, period, count=VALIDATION_PARTS, shares=SHARES):
 STAGE = "describe"
 
 # Els conjunts, que són carpetes de la passada, i el sòl de l'ordre de mèrit, que hi és
-# com una família més perquè es puntua igual. `forecasts` es diu com el conjunt de dades
-# de les previsions i és una altra cosa.
-FORECASTS, PREVIOUS_DAY, DATE_PROBE = "forecasts", "previous_day", "date_probe"
+# com una família més perquè es puntua igual. `schedule` es diu com el conjunt de dades
+# del programa, que és el que hi afegeix, i és una altra cosa.
+SCHEDULE, DATE_PROBE = "schedule", "date_probe"
 FLOOR = "floor"
 
 # Grau del polinomi del sòl, el cúbic de Trebbien et al. (2023).
@@ -132,11 +145,11 @@ Described = collections.namedtuple("Described", "predicted actual arrays gap tol
 
 
 def group(column):
-    """El grup d'una columna a la importància per grups: el dia abans, cada previsió, el
-    calendari i, a la prova de datació, el comptador de dies."""
+    """El grup d'una columna a la importància per grups: el dia abans, cada previsió, cada
+    grup del programa, el calendari i, a la prova de datació, el comptador de dies."""
     if column.startswith("lag1_"):
         return "previous_day"
-    for name in forecasts.INDICATORS:
+    for name in (*forecasts.INDICATORS, *schedule.GROUPS):
         if column == name or column.startswith(f"{name}_"):
             return name
     return "date" if column == matrix.DAY_COUNTER else "calendar"
@@ -151,8 +164,8 @@ def _tree(X, y, parts, explained, seed):
     """L'arbre, aturat quan qualsevol de les quatre parts de la validació deixa de
     millorar, i les interaccions sobre una mostra de les files que s'expliquen."""
     train, _, test, shown = _parts_of(X, parts, explained)
-    validation = [(X[part], y[part]) for part in
-                  (X.index.isin(days) for days in validation_parts(seed, DEVELOPMENT))]
+    weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    validation = [(X[part], y[part]) for part in (X.index.isin(days) for days in weeks)]
     model = boosting.fit_rows(X[train], y[train], boosting_hyperparameters.UNSEARCHED,
                               boosting_hyperparameters.MOST_TREES, validation=validation)
     values, base = boosting.attribute_rows(model, X[shown])
@@ -240,8 +253,8 @@ def _floor(X, y, parts, explained, seed):
                       "actual_training": y[train].to_numpy()}, 0.0, TOLERANCE)
 
 
-# Qui es descriu: amb quina taula, sobre quins conjunts, com, i amb quins números. El sòl
-# només té sentit amb les previsions, i la prova de datació només l'ajusta l'arbre.
+# Qui es descriu: amb quina taula, sobre quins conjunts, com, i amb quins números. La
+# prova de datació només l'ajusta l'arbre.
 Describer = collections.namedtuple("Describer", "table sets describe numbers")
 
 
@@ -251,35 +264,33 @@ def describers():
     net = linear_hyperparameters
     found = {
         tree.NAME: Describer(
-            "hourly", (FORECASTS, PREVIOUS_DAY, DATE_PROBE), _tree,
+            "hourly", (SCHEDULE, DATE_PROBE), _tree,
             {name: value for name, value in tree.UNSEARCHED.items() if name != "trees"}
             | {"most_trees": tree.MOST_TREES, "patience": tree.PATIENCE,
                "unsearched": True}),
         net.NAME: Describer(
-            "hourly", (FORECASTS, PREVIOUS_DAY), _net,
+            "hourly", (SCHEDULE,), _net,
             {"penalty": net.PENALTY, "mixing": net.MIXING, "max_iter": net.MAX_ITER,
              "unsearched": True}),
     }
     for name, distribution in DISTRIBUTIONS.items():
         found[name] = Describer(
-            "daily", (FORECASTS, PREVIOUS_DAY), _network(name, distribution),
+            "daily", (SCHEDULE,), _network(name, distribution),
             ddnn_hyperparameters.COPIED[name] | {
                 "copied_from": ddnn_hyperparameters.COPIED_FROM[name],
                 "copied_trials": ddnn_hyperparameters.COPIED_TRIALS,
                 "batch": ddnn_hyperparameters.BATCH, "epochs": ddnn_hyperparameters.EPOCHS,
                 "patience": ddnn_hyperparameters.PATIENCE, "unsearched": True})
-    found[FLOOR] = Describer("hourly", (FORECASTS,), _floor, {"degree": FLOOR_DEGREE})
+    found[FLOOR] = Describer("hourly", (SCHEDULE,), _floor, {"degree": FLOOR_DEGREE})
     return found
 
 
-def _tables(frame, day_ahead):
+def _tables(frame, day_ahead, scheduled):
     """Les taules de cada conjunt, per nom i per taula."""
-    sets = {FORECASTS: matrix.forecasts(frame, day_ahead),
-            PREVIOUS_DAY: matrix.previous_day(frame)}
-    tables = {name: {"hourly": found.hourly, "daily": found.daily}
-              for name, found in sets.items()}
-    tables[DATE_PROBE] = {"hourly": matrix.date_probe(frame, day_ahead, DEVELOPMENT[0])}
-    return tables
+    found = matrix.schedule(frame, day_ahead, scheduled)
+    return {SCHEDULE: {"hourly": found.hourly, "daily": found.daily},
+            DATE_PROBE: {"hourly": matrix.date_probe(frame, day_ahead, scheduled,
+                                                     DEVELOPMENT[0])}}
 
 
 def scored(predicted, actual):
@@ -333,7 +344,7 @@ def main(arguments):
             for name in table[family].sets:
                 shutil.rmtree(where / name / family, ignore_errors=True)
 
-    tables = _tables(price.load(), forecasts.load())
+    tables = _tables(price.load(), forecasts.load(), schedule.load())
     swept = {name: getattr(parameters, name) for name in dir(parameters)
              if name.isupper() and not name.startswith("_")}
     for family in chosen:
@@ -346,7 +357,7 @@ def main(arguments):
                 path = folder / run_files.SEED.format(seed=seed)
                 if path.exists():
                     continue
-                parts = split(seed, DEVELOPMENT)
+                parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
                 explained = parts.test if explained_days is None else parts.test[:explained_days]
                 start = time.time()
                 described = describer.describe(X, y, parts, explained, seed)

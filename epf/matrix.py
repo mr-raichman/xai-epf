@@ -14,7 +14,7 @@ import pandas as pd
 
 from epf.calendar import HOUR_COLUMNS
 from epf.market import HOURS_PER_DAY
-from epf.parameters import DAYS_PER_WEEK, PREVIOUS_DAY
+from epf.parameters import DAYS_PER_WEEK, FORECAST_LAG, PREVIOUS_DAY, SCHEDULE_LAG
 
 HOUR = "hour"
 PRICE = "price"
@@ -35,13 +35,19 @@ DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK
 Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 
-def build(price, lags, day_ahead=None, day_ahead_lags=(0,)):
+def column(name, lag):
+    """El nom d'una sèrie d'entrada al seu retard: tal qual al dia que es lliura, i amb el
+    retard al darrere a qualsevol altre."""
+    return f"{name}_lag{lag}" if lag else name
+
+
+def build(price, lags, inputs=None):
     """Torna (X, y) alineats per data de lliurament, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les.
-    `day_ahead` són previsions per nom, cada una amb les 24 hores del dia que es
-    lliura, i entren als retards de `day_ahead_lags`: la del retard 0 és la del dia que
-    es lliura, sense desplaçar, perquè es publica el dia abans.
+    `inputs` són sèries per nom, cada una `(taula, retard)` amb les 24 hores de cada dia:
+    una previsió D+1 entra al retard 0, el dia que es lliura, sense desplaçar, perquè es
+    publica el dia abans.
     """
     if list(price.columns) != HOUR_COLUMNS:
         raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}")
@@ -49,8 +55,8 @@ def build(price, lags, day_ahead=None, day_ahead_lags=(0,)):
     blocks = [price.shift(lag, freq="D").reindex(price.index).add_prefix(f"lag{lag}_")
               for lag in lags]
     blocks += [frame.shift(lag, freq="D").reindex(price.index)
-               .add_prefix(f"{name}_lag{lag}_" if lag else f"{name}_")
-               for name, frame in (day_ahead or {}).items() for lag in day_ahead_lags]
+               .add_prefix(f"{column(name, lag)}_")
+               for name, (frame, lag) in (inputs or {}).items()]
     blocks.append(pd.DataFrame(np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
                                index=price.index, columns=DAY_OF_WEEK_COLUMNS))
     features = pd.concat(blocks, axis="columns", sort=False)
@@ -78,30 +84,28 @@ def per_hour(X, y, at_the_hour=()):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
-def previous_day(frame):
-    """Les dues matrius del conjunt de referència: les 24 hores del preu del dia abans
-    i el dia de la setmana."""
-    daily = build(frame, PREVIOUS_DAY)
-    return Matrices(daily, per_hour(*daily), daily[1])
+def schedule(frame, day_ahead, scheduled):
+    """Les dues matrius del conjunt: les 24 hores del preu del dia abans, les previsions
+    D+1 del dia que es lliura i el programa del dia abans, cada sèrie per nom, i el dia
+    de la setmana.
 
-
-def forecasts(frame, day_ahead):
-    """Les dues matrius del conjunt de previsions: el de referència i les previsions
-    D+1 del dia que es lliura, per nom.
-
-    Cada família les pren com la seva font: la diària, que és la de la xarxa, amb les
-    24 hores de cada previsió, i la per hora, que és la de l'arbre i la dels models
-    d'una hora, amb la de l'hora de la fila. Es diu com el conjunt de dades de les
-    previsions i és una altra cosa, un conjunt d'informació.
+    Cada família pren les previsions i el programa com la seva font pren una previsió:
+    la diària, que és la de les xarxes, amb les 24 hores de cada sèrie, i la per hora,
+    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. Es
+    diu com el conjunt de dades del programa, que és el que hi afegeix, i és una altra
+    cosa, un conjunt d'informació.
     """
-    daily = build(frame, PREVIOUS_DAY, day_ahead)
-    return Matrices(daily, per_hour(*daily, at_the_hour=tuple(day_ahead)), daily[1])
+    inputs = ({name: (table, FORECAST_LAG) for name, table in day_ahead.items()}
+              | {name: (table, SCHEDULE_LAG) for name, table in scheduled.items()})
+    daily = build(frame, PREVIOUS_DAY, inputs)
+    at_the_hour = tuple(column(name, lag) for name, (_, lag) in inputs.items())
+    return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
 
 
-def date_probe(frame, day_ahead, start):
-    """El conjunt de previsions amb un comptador de dies, els que han passat des de
-    `start`: la prova de datació de Trebbien et al. (2023), que treu el que un model pot
-    fer amb la data i res més. Només la taula per hora, perquè només l'arbre l'ajusta."""
-    rows, target = forecasts(frame, day_ahead).hourly
+def date_probe(frame, day_ahead, scheduled, start):
+    """El conjunt amb un comptador de dies, els que han passat des de `start`: la prova
+    de datació de Trebbien et al. (2023), que treu el que un model pot fer amb la data i
+    res més. Només la taula per hora, perquè només l'arbre l'ajusta."""
+    rows, target = schedule(frame, day_ahead, scheduled).hourly
     counter = (rows.index - pd.Timestamp(start)).days
     return rows.assign(**{DAY_COUNTER: counter.to_numpy()}), target

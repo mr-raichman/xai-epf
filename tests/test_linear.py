@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.linear_model import ElasticNetCV
 
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import HOUR, forecasts
+from epf.matrix import HOUR, schedule
 from epf.models.linear.linear import (_by_hour, _prepared, attribute_rows, fit_rows,
                                       predict_rows)
 from epf.models.linear.search import penalties
@@ -18,7 +18,7 @@ NIGHT, EVENING = (0, 1, 2, 3, 4, 5, 23), 20
 
 
 def per_hour_table(days=120, seed=0):
-    """La taula per hora del conjunt de previsions, sobre sèries sintètiques."""
+    """La taula per hora del conjunt, sobre sèries sintètiques."""
     rng = np.random.default_rng(seed)
     index = pd.date_range("2021-01-01", periods=days, freq="D", name="day")
 
@@ -31,7 +31,7 @@ def per_hour_table(days=120, seed=0):
     day_ahead = {"demand": frame(rng.uniform(20000, 40000, (days, 24))),
                  "wind": frame(rng.uniform(500, 15000, (days, 24))),
                  "solar": frame(solar)}
-    return forecasts(frame(rng.uniform(-2, 200, (days, 24))), day_ahead).hourly
+    return schedule(frame(rng.uniform(-2, 200, (days, 24))), day_ahead, {}).hourly
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():

@@ -15,7 +15,8 @@ from epf.results import run_files
 
 # Com es diu cada grup de columnes a les figures.
 GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòlica",
-                "solar": "fotovoltaica", "calendar": "calendari",
+                "solar": "fotovoltaica", "nuclear": "nuclear", "coal_gas": "carbó i gas",
+                "hydro": "hidràulica", "calendar": "calendari",
                 "date": "comptador de dies"}
 
 # Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de

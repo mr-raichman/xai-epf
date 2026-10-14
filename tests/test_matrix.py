@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, forecasts, per_hour
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, per_hour, schedule
 from epf.parameters import PREVIOUS_DAY
 
 
@@ -89,7 +89,7 @@ def test_day_d_forecasts_sit_on_day_d_in_both_tables():
     # fila llegiria la previsió d'ahir, que és plausible i equivocada.
     price = frame_of(range(30))
     day_ahead = {"demand": frame_of(range(30)) * 10}
-    matrices = forecasts(price, day_ahead)
+    matrices = schedule(price, day_ahead, {})
     (X, _), (rows, target) = matrices.daily, matrices.hourly
     day = X.index[10]
     for hour, column in enumerate(HOUR_COLUMNS):
@@ -100,3 +100,18 @@ def test_day_d_forecasts_sit_on_day_d_in_both_tables():
         assert row[f"lag1_{column}"] == price.loc[day - pd.Timedelta(days=1), column]
         assert target.loc[day].iloc[hour] == price.loc[day, column]
     assert not any(column.startswith("demand_") for column in rows.columns)
+
+
+def test_d_minus_one_schedule_sits_on_day_d_in_both_tables():
+    # El programa del dia abans és el que es té a l'hora del tancament: el del mateix dia
+    # és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
+    price = frame_of(range(30))
+    scheduled = {"nuclear": frame_of(range(30)) * 7}
+    matrices = schedule(price, {}, scheduled)
+    (X, _), (rows, _) = matrices.daily, matrices.hourly
+    day = X.index[10]
+    before = day - pd.Timedelta(days=1)
+    for hour, column in enumerate(HOUR_COLUMNS):
+        assert X.loc[day, f"nuclear_lag1_{column}"] == scheduled["nuclear"].loc[before, column]
+        assert rows.loc[day].iloc[hour]["nuclear_lag1"] == scheduled["nuclear"].loc[before, column]
+    assert not any(column.startswith("nuclear_lag1_") for column in rows.columns)

@@ -23,9 +23,14 @@ MEASUREMENT, SMOKE = "measurement", "smoke"
 
 # ------------------------------------------------------------ la descripció
 
-# El període que es descriu, del primer dia de les previsions D+1 fins al 2024-09-30.
-# Són 300 setmanes de dimarts a dilluns, i totes les tries s'hi fan.
-DEVELOPMENT = (datetime.date(2019, 1, 1), datetime.date(2024, 9, 30))
+# El període que es descriu, del primer dia de les previsions D+1 a l'últim dilluns de
+# les dades baixades, en setmanes de dimarts a dilluns. Totes les tries s'hi fan.
+DEVELOPMENT = (datetime.date(2019, 1, 1), datetime.date(2026, 9, 28))
+
+# La setmana que surt del període i no és de cap part: ESIOS no publica el programa del
+# 2025-04-28 a les 12:00 al 2025-04-29 a les 23:00, l'apagada, i els dies que el
+# necessiten, el 29 i el 30, són d'aquesta setmana.
+BLACKOUT_WEEK = (datetime.date(2025, 4, 29), datetime.date(2025, 5, 5))
 
 # Percentatge de les setmanes que va a entrenament, a validació i a prova, els de
 # Trebbien et al. (2023).
@@ -39,9 +44,15 @@ GAP = 1
 # Una partició per llavor. La dispersió entre totes és la robustesa que es reporta.
 SEEDS = tuple(range(10))
 
-# Retards de preu dels conjunts: el dia abans, les seves 24 hores, que és d'on ha de
-# venir el nivell.
+# Retards de preu del conjunt: el dia abans, les seves 24 hores, que és d'on ha de venir
+# el nivell.
 PREVIOUS_DAY = (1,)
+
+# El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del
+# mateix dia que es lliura, i el programa del dia abans, tancat dos dies abans i a l'abast
+# de tothom abans del tancament de la subhasta.
+FORECAST_LAG = 0
+SCHEDULE_LAG = 1
 
 # Llavors i dies de prova que s'expliquen, per nivell. `None` vol dir tots. L'assaig és
 # una llavor i 50 dies a propòsit, prou per passar tota la maquinària i prou curt per
