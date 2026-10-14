@@ -19,6 +19,7 @@ import numpy as np
 from epf import evaluation, matrix, parameters, search
 from epf.matrix import DATE_PROBE, SCHEDULE
 from epf.data import forecasts, price, schedule
+from epf.market import HOURS_PER_DAY
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
@@ -61,12 +62,18 @@ TOLERANCE = 1e-3
 # `sinh` és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
 TRANSFORMED_TOLERANCE = 1e-4
 
+# El que es pot moure un nombre, en relatiu, en desar-lo a `float32`, que és com es desen
+# les taules de més d'una dimensió: la meitat de l'èpsilon del format.
+ROUNDING = np.finfo(np.float32).eps / 2
+
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
 # files de prova en el mateix ordre, el que es desa de l'explicació, el pitjor residu de
-# l'explicació contra la predicció que explica, amb el marge que li toca, i, de les que
-# prediuen una distribució, les puntuacions de la distribució.
+# l'explicació contra la predicció que explica, amb el marge que li toca, de les que
+# prediuen una distribució les puntuacions de la distribució, i, de les explicades, les
+# sumes que es tornen a fer sobre el fitxer desat.
 Described = collections.namedtuple(
-    "Described", "predicted actual arrays gap tolerance scores", defaults=(None,))
+    "Described", "predicted actual arrays gap tolerance scores stored",
+    defaults=(None, None))
 
 # Les parts de la llavor d'on la predicció ingènua pren els errors per fer-se
 # probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
@@ -88,6 +95,67 @@ def group(column):
 def _parts_of(X, parts, explained):
     """Les files de cada part i les que s'expliquen, com a màscares."""
     return [X.index.isin(days) for days in (*parts, explained)]
+
+
+def _summed(base, values, axis):
+    """La base més les contribucions sumades sobre `axis`, en `float64`, i la suma dels
+    seus valors absoluts, que fita el que l'arrodoniment a `float32` hi pot haver mogut."""
+    base = np.asarray(base, dtype=np.float64)
+    values = np.asarray(values, dtype=np.float64)
+    return base + values.sum(axis=axis), np.abs(base) + np.abs(values).sum(axis=axis)
+
+
+def _explained_rows(found, per_day):
+    """Les files de les prediccions de prova d'un fitxer que són dels dies explicats.
+
+    Són les primeres, perquè la partició dona els dies de cada part en ordre de data i
+    s'expliquen els primers dies de prova; el fitxer ho ha de confirmar, amb els seus dies
+    explicats al començament dels seus dies de prova.
+    """
+    explained, test = found["days_explained"], found["days_test"]
+    if not np.array_equal(explained, test[:len(explained)]):
+        raise ValueError("els dies explicats del fitxer no són els primers dels seus dies "
+                         "de prova")
+    return slice(0, per_day * len(explained))
+
+
+def _tree_sums(found, best):
+    """Les sumes de l'arbre sobre el seu fitxer: la base més els valors de cada fila
+    contra la seva predicció i, a la millor configuració, cada fila d'interaccions
+    contra el valor de la seva columna."""
+    sums = [(*_summed(found["base"], found["values"], 1),
+             found["predicted"][_explained_rows(found, HOURS_PER_DAY)])]
+    if best:
+        sums.append((*_summed(0.0, found["interactions"], 2),
+                     found["values"][found["interaction_rows"]]))
+    return sums
+
+
+def _net_sums(found):
+    """La suma de la xarxa elàstica sobre el seu fitxer, a l'espai transformat."""
+    return [(*_summed(found["base"], found["values"], 1), found["transformed"])]
+
+
+def _network_sums(found):
+    """La suma d'una xarxa distribucional sobre el seu fitxer, contra els paràmetres de
+    prova dels dies explicats. La de la base contra la mitjana dels dies d'entrenament
+    només es fa a la memòria: el fitxer no en desa els paràmetres."""
+    return [(*_summed(found["base"], found["values"], 1),
+             found["parameters"][_explained_rows(found, 1)])]
+
+
+def _read_back(path, stored, tolerance):
+    """Quant es passen del seu marge les sumes d'un fitxer desat, en el pitjor cas: el
+    marge és el de la comprovació a la memòria més el que l'arrodoniment a `float32`
+    pot haver mogut els termes de cada suma, i zero o menys vol dir que el fitxer torna
+    el que explica."""
+    worst = []
+    with np.load(path) as found:
+        for total, magnitude, target in stored(found):
+            target = np.asarray(target, dtype=np.float64)
+            margin = tolerance + ROUNDING * (magnitude + np.abs(target))
+            worst.append(np.max(np.abs(total - target) - margin))
+    return float(np.max(worst))
 
 
 def _tree(X, y, parts, explained, seed, numbers, best):
@@ -115,7 +183,7 @@ def _tree(X, y, parts, explained, seed, numbers, best):
         gap = max(gap, np.abs(interactions.sum(axis=2) - values[sample]).max())
         arrays |= {"interaction_rows": sample, "interactions": interactions}
     return Described(boosting.predict_rows(model, X[test]), y[test].to_numpy(), arrays,
-                     gap, TOLERANCE)
+                     gap, TOLERANCE, stored=lambda found: _tree_sums(found, best))
 
 
 def _net(X, y, parts, explained, seed, numbers, best):
@@ -134,7 +202,7 @@ def _net(X, y, parts, explained, seed, numbers, best):
                       "values": explanation.values.to_numpy(),
                       "base": explanation.base.to_numpy(),
                       "transformed": explanation.transformed.to_numpy()},
-                     gap, TRANSFORMED_TOLERANCE)
+                     gap, TRANSFORMED_TOLERANCE, stored=_net_sums)
 
 
 def _network(name, distribution):
@@ -170,7 +238,8 @@ def _network(name, distribution):
                           "units": np.array([PRICE_UNITS, PRICE_UNITS, UNITLESS,
                                              UNITLESS][:len(distribution.names)]),
                           "values": explanation.values, "base": explanation.base,
-                          "parameters": found}, gap, TOLERANCE, scores)
+                          "parameters": found}, gap, TOLERANCE, scores,
+                         stored=_network_sums)
     return described
 
 
@@ -332,7 +401,8 @@ def _days(index):
 
 def _save(path, parts, explained, described, scores, rank):
     """Desa un model, primer a un fitxer a part i després al seu nom, de manera que un
-    fitxer amb nom és sempre un model sencer."""
+    fitxer amb nom és sempre un model sencer i, d'un model explicat, un que torna el que
+    explica: les sumes de l'explicació es tornen a fer sobre el que s'ha escrit."""
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
     arrays |= {"rank": rank, "days_explained": _days(explained),
                "predicted": described.predicted,
@@ -344,6 +414,12 @@ def _save(path, parts, explained, described, scores, rank):
     partial = path.with_suffix(".part")
     with open(partial, "wb") as handle:
         np.savez(handle, **arrays)
+    if described.stored is not None:
+        excess = _read_back(partial, described.stored, described.tolerance)
+        # `not ... <= 0` i no `> 0`, perquè un NaN també es refusi.
+        if not excess <= 0:
+            raise ValueError(f"l'explicació desada a {partial} no torna el que explica: "
+                             f"se'n passa del marge en {excess:.3g}")
     partial.replace(path)
 
 
