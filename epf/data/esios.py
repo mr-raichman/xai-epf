@@ -240,8 +240,7 @@ def _stored(indicator, directory):
 def load(indicator, directory=ESIOS):
     """Una sèrie admissible, en dies per hores, i les hores publicades cada dia."""
     if indicator in REVISED_FORECASTS:
-        raise ValueError(f"l'indicador {indicator} és una previsió revisada, no admissible: "
-                         "es llegeix amb load_revised_forecast")
+        raise ValueError(f"l'indicador {indicator} és una previsió revisada, no admissible")
     if indicator not in SERIES:
         raise KeyError(f"l'indicador {indicator} no és a la llista de sèries")
     stored = _stored(indicator, directory)
@@ -250,11 +249,3 @@ def load(indicator, directory=ESIOS):
     anchor = SERIES[indicator]
     return hourly(stored, None if anchor is None else
                   published_instants(_stored(anchor, directory)))
-
-
-def load_revised_forecast(indicator, directory=ESIOS):
-    """Una previsió revisada, que conté informació posterior al tancament de la subhasta,
-    i les hores publicades cada dia."""
-    if indicator not in REVISED_FORECASTS:
-        raise KeyError(f"l'indicador {indicator} no és una previsió revisada")
-    return hourly(single_geography(_stored(indicator, directory), indicator))
