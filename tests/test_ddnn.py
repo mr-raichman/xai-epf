@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
+from epf.matrix import DAY_OF_WEEK_COLUMNS
 from epf.models.ddnn.ddnn import attribute_rows, build, fit_rows, parameters_rows
 from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
 
@@ -25,13 +26,17 @@ def tuned(distribution):
 
 
 def rows(count, seed=0):
+    """Sis columnes i els set indicadors del dia, que la xarxa llegeix en una de sola."""
     rng = np.random.default_rng(seed)
     X = pd.DataFrame(rng.normal(50, 20, size=(count, 6)),
                      columns=[f"x{n}" for n in range(6)])
     weights = rng.normal(size=(6, 24))
     y = pd.DataFrame(X.to_numpy() @ weights / 6 + rng.normal(size=(count, 24)),
                      columns=HOUR_COLUMNS)
-    return X, y
+    week = len(DAY_OF_WEEK_COLUMNS)
+    days = pd.DataFrame(np.eye(week)[np.arange(count) % week],
+                        columns=DAY_OF_WEEK_COLUMNS)
+    return pd.concat([X, days], axis="columns"), y
 
 
 @pytest.mark.parametrize("distribution", [NORMAL, JOHNSON_SU], ids=["normal", "jsu"])
@@ -43,7 +48,7 @@ def test_each_parameters_base_and_contributions_add_up_to_it(distribution):
                       tuned(distribution), batch=16, epochs=5, patience=2)
     explained = attribute_rows(distribution, fitted, X[:5], background=X[:120])
     direct = parameters_rows(distribution, fitted, X[:5])
-    assert explained.values.shape == (5, 6, 24, len(distribution.names))
+    assert explained.values.shape == (5, 7, 24, len(distribution.names))
     rebuilt = explained.base + explained.values.sum(axis=1)
     assert np.allclose(rebuilt, direct, atol=1e-3)
 
