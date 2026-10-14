@@ -1,7 +1,8 @@
 """Les tres prediccions ingènues de Lago et al. (2021), el terra que hi ha sota la referència.
 
 No s'ajusta res: cada una copia les 24 hores d'un dia que ja es coneixia. Es copien de la
-sèrie del preu i no de la matriu, perquè la setmana anterior no és cap entrada.
+sèrie del preu i no de la matriu, perquè la setmana anterior no és cap entrada. La del dia
+similar porta, a més, la distribució amb què Marcjasz et al. (2023) la fan probabilística.
 """
 import numpy as np
 
@@ -34,6 +35,20 @@ def similar_day(price, days):
                     previous_week(price, days))
 
 
+def bootstrapped(copied, errors, probabilities):
+    """Els quantils de la còpia amb els seus errors dins la mostra, com Marcjasz et al.
+    (2023) fan probabilística la predicció ingènua, `(dies, hores, probabilitats)`.
+
+    L'article suma a la còpia els errors d'un dia sencer, trets a l'atzar amb reemplaçament.
+    A cada hora això és la distribució dels errors d'aquella hora, i aquí se'n prenen els
+    quantils exactes, la inversa de la seva distribució empírica, que és on van a parar
+    els de les mostres com més n'hi ha. `copied` és `(dies, hores)` i `errors` `(dies de
+    la mostra, hores)`.
+    """
+    spread = np.quantile(errors, probabilities, axis=0, method="inverted_cdf")
+    return copied[:, :, None] + spread.T
+
+
 # Cada predicció és una família de la passada, amb el nom de la seva carpeta, i els dies
 # que copia, que és el que en diu el registre.
 FORECASTS = {
@@ -43,3 +58,6 @@ FORECASTS = {
                                         "weekdays_from_yesterday": WEEKDAYS_FROM_YESTERDAY,
                                         "lag_otherwise": PREVIOUS_WEEK}),
 }
+
+# La que Marcjasz et al. (2023) fan probabilística, amb els errors de la mostra.
+BOOTSTRAPPED = "naive_similar_day"

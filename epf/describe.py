@@ -7,9 +7,11 @@ d'una setmana retinguda.
 
 `epf describe` ajusta cada família explicada sobre cada conjunt i cada llavor, la puntua
 sobre les setmanes de prova al costat del sòl de l'ordre de mèrit, de les prediccions
-ingènues i de la xarxa de punt, i n'explica les files de prova. Tot es desa per llavor, de manera que les figures surten del que hi ha al disc
-i no d'un ajust nou. Mentre la cerca no s'ha fet, cada família hi entra amb uns números
-que no s'han cercat, i el registre de cada una ho diu.
+ingènues i de la xarxa de punt, i n'explica les files de prova. Una distribució, la de
+cada xarxa distribucional i la de la còpia del dia similar, es puntua també pel CRPS i
+pel test de cobertura de Kupiec. Tot es desa per llavor, de manera que les figures
+surten del que hi ha al disc i no d'un ajust nou. Mentre la cerca no s'ha fet, cada
+família hi entra amb uns números que no s'han cercat, i el registre de cada una ho diu.
 """
 import collections
 import json
@@ -19,7 +21,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from epf import matrix, parameters
+from epf import evaluation, matrix, parameters
 from epf.data import forecasts, price, schedule
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
@@ -141,9 +143,16 @@ TOLERANCE = 1e-3
 TRANSFORMED_TOLERANCE = 1e-4
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
-# files de prova en el mateix ordre, el que es desa de l'explicació, i el pitjor residu
-# de l'explicació contra la predicció que explica, amb el marge que li toca.
-Described = collections.namedtuple("Described", "predicted actual arrays gap tolerance")
+# files de prova en el mateix ordre, el que es desa de l'explicació, el pitjor residu de
+# l'explicació contra la predicció que explica, amb el marge que li toca, i, de les que
+# prediuen una distribució, les puntuacions de la distribució.
+Described = collections.namedtuple(
+    "Described", "predicted actual arrays gap tolerance scores", defaults=(None,))
+
+# Les parts de la llavor d'on la predicció ingènua pren els errors per fer-se
+# probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
+# validació, on la còpia no tria res.
+IN_SAMPLE = ("training", "validation")
 
 
 def group(column):
@@ -230,6 +239,8 @@ def _network(name, distribution):
                   np.abs(explanation.base - ddnn.parameters_rows(
                       distribution, fitted, X[train]).mean(axis=0)).max())
         found = ddnn.parameters_rows(distribution, fitted, X[test])
+        scores = scored_distribution(
+            y[test], lambda probabilities: distribution.quantiles(found, probabilities))
         return Described(distribution.point(found).ravel(), y[test].to_numpy().ravel(),
                          {"names": np.array(distribution.names),
                           "columns": np.array(explanation.columns),
@@ -240,7 +251,7 @@ def _network(name, distribution):
                           "units": np.array([PRICE_UNITS, PRICE_UNITS, UNITLESS,
                                              UNITLESS][:len(distribution.names)]),
                           "values": explanation.values, "base": explanation.base,
-                          "parameters": found}, gap, TOLERANCE)
+                          "parameters": found}, gap, TOLERANCE, scores)
     return described
 
 
@@ -265,13 +276,26 @@ def _floor(X, y, parts, explained, seed):
                       "actual_training": y[train].to_numpy()}, 0.0, TOLERANCE)
 
 
-def _naive(forecast):
+def _naive(forecast, bootstrapped):
     """Una predicció ingènua de Lago et al. (2021), presa de la sèrie del preu als dies de
-    prova que té la taula del conjunt, de manera que es puntua sobre les files de totes."""
+    prova que té la taula del conjunt, de manera que es puntua sobre les files de totes.
+
+    La que Marcjasz et al. (2023) fan probabilística es puntua també com a distribució,
+    amb els seus errors als dies de `IN_SAMPLE`, que es desen.
+    """
     def described(price, y, parts, explained, seed):
         days = y.index[y.index.isin(parts.test)]
-        return Described(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {},
-                         0.0, TOLERANCE)
+        copied = forecast(price, days)
+        actual = y.loc[days]
+        if not bootstrapped:
+            return Described(copied.ravel(), actual.to_numpy().ravel(), {}, 0.0, TOLERANCE)
+        sample = y.index[np.any([y.index.isin(getattr(parts, part)) for part in IN_SAMPLE],
+                                axis=0)]
+        errors = y.loc[sample].to_numpy() - forecast(price, sample)
+        scores = scored_distribution(
+            actual, lambda probabilities: naive.bootstrapped(copied, errors, probabilities))
+        return Described(copied.ravel(), actual.to_numpy().ravel(), {"errors": errors}, 0.0,
+                         TOLERANCE, scores)
     return described
 
 
@@ -312,7 +336,10 @@ def describers():
                                     _copied(POINT_FAMILY))
     found[FLOOR] = Describer("hourly", (SCHEDULE,), _floor, {"degree": FLOOR_DEGREE})
     for name, (forecast, numbers) in naive.FORECASTS.items():
-        found[name] = Describer("price", (SCHEDULE,), _naive(forecast), numbers)
+        bootstrapped = name == naive.BOOTSTRAPPED
+        found[name] = Describer(
+            "price", (SCHEDULE,), _naive(forecast, bootstrapped),
+            numbers | ({"bootstrap_from": IN_SAMPLE} if bootstrapped else {}))
     return found
 
 
@@ -333,6 +360,21 @@ def scored(predicted, actual):
     spread = np.asarray(actual) - np.mean(actual)
     return {"r2": float(1 - np.sum(error ** 2) / np.sum(spread ** 2)),
             "mae": float(np.mean(np.abs(error)))}
+
+
+def scored_distribution(actual, quantiles):
+    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen el
+    test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
+
+    `actual` és la taula del preu real de les files de prova i `quantiles` la funció que
+    en dóna els quantils predits a les probabilitats que se li demanen, `(dies, hores,
+    probabilitats)`.
+    """
+    found = {"crps": evaluation.crps(actual, quantiles(evaluation.PERCENTILES))}
+    for level, bounds in evaluation.INTERVALS.items():
+        values = evaluation.kupiec(actual, quantiles(np.array(bounds)), level / 100)
+        found[f"kupiec_{level}"] = int((values >= evaluation.SIGNIFICANCE).sum())
+    return found
 
 
 def _days(index):
@@ -401,10 +443,15 @@ def main(arguments):
                         f"seva predicció: se n'allunya {described.gap:.3g}, per sobre del "
                         f"marge de {described.tolerance}")
                 scores = scored(described.predicted, described.actual)
+                scores |= described.scores or {}
                 _save(path, parts, explained, described, scores)
                 described_now.append(seed)
+                distribution = "" if described.scores is None else (
+                    f", CRPS {scores['crps']:.2f}, hores que passen el test de Kupiec: "
+                    + " i ".join(f"{scores[f'kupiec_{level}']} al {level}%"
+                                 for level in evaluation.INTERVALS))
                 print(f"{name} {family} llavor {seed}: R² {scores['r2']:.3f}, MAE "
-                      f"{scores['mae']:.2f} EUR/MWh, residu de l'explicació "
+                      f"{scores['mae']:.2f} EUR/MWh{distribution}, residu de l'explicació "
                       f"{described.gap:.1e}, {time.time() - start:.1f} s", flush=True)
             record = {"commit": commit, "tier": arguments.tier, "set": name,
                       "family": family, "seeds": list(seeds),
