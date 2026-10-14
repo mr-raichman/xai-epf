@@ -1,4 +1,4 @@
-"""La part B: el protocol de Trebbien et al. (2023) sobre el període de desenvolupament.
+"""El protocol de Trebbien et al. (2023) sobre el període que es descriu.
 
 Les setmanes es barregen per llavor i es reparteixen en entrenament, validació i
 prova, i la robustesa és la dispersió entre llavors. A diferència del seu article, el
@@ -20,8 +20,6 @@ import numpy as np
 import pandas as pd
 
 from epf import matrix, parameters
-from epf.attribution.stored import (PRICE_UNITS, TOLERANCE, TRANSFORMED_TOLERANCE,
-                                    TRANSFORMED_UNITS)
 from epf.data import forecasts, price
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
@@ -94,25 +92,40 @@ def validation_parts(seed, period, count=VALIDATION_PARTS, shares=SHARES):
     return [_days_of(days, chunk) for chunk in np.split(weeks, count)]
 
 
-# ------------------------------------------------------------------------- el pas
+# -------------------------------------------------------------------- la passada
 
-# Nivell del camí de les execucions on viu la part B, al lloc on un camí endavant té el
-# seu conjunt d'informació: els conjunts de la part B en són carpetes per sota.
+# La carpeta de les passades dins de cada nivell, `runs/<nivell>/describe/<commit>/`,
+# amb els conjunts en carpetes per sota.
 STAGE = "describe"
 
-# Els conjunts, que són carpetes del pas, i el sòl de l'ordre de mèrit, que hi és com
-# una família més perquè es puntua igual. `forecasts` es diu com el conjunt de dades de
-# les previsions i és una altra cosa.
+# Els conjunts, que són carpetes de la passada, i el sòl de l'ordre de mèrit, que hi és
+# com una família més perquè es puntua igual. `forecasts` es diu com el conjunt de dades
+# de les previsions i és una altra cosa.
 FORECASTS, PREVIOUS_DAY, DATE_PROBE = "forecasts", "previous_day", "date_probe"
 FLOOR = "floor"
 
 # Grau del polinomi del sòl, el cúbic de Trebbien et al. (2023).
 FLOOR_DEGREE = 3
 
-
-# Les unitats d'una contribució que no és un preu ni un preu transformat: l'asimetria i
-# el pes de la cua d'una distribució.
+# Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
+# et al. (2021), on la base més les contribucions no són un preu, o cap, que són
+# l'asimetria i el pes de la cua d'una distribució.
+PRICE_UNITS = "EUR/MWh"
+TRANSFORMED_UNITS = "espai transformat"
 UNITLESS = "sense unitats"
+
+# Marge de la comprovació d'additivitat, en EUR/MWh. El residu mesurat d'una atribució
+# desada en `float32` és de l'ordre de 1e-5 EUR/MWh, de manera que això hi deixa dos
+# ordres de magnitud i és molt per sota de qualsevol diferència que vulgui dir res en un
+# preu.
+TOLERANCE = 1e-3
+
+# Marge de l'additivitat a l'espai transformat, a part perquè és en les seves unitats i
+# no en un preu. Sobre valors transformats d'ordre 1 la identitat es compleix a 1,3e-15
+# en memòria, i després del pas a `float32` queda per sota de 2e-6: un factor 50 de
+# marge, que en EUR/MWh val tant com el de dalt, perquè a prop d'1 la derivada de `sinh`
+# és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
+TRANSFORMED_TOLERANCE = 1e-4
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
 # files de prova en el mateix ordre, el que es desa de l'explicació, i el pitjor residu
@@ -184,12 +197,16 @@ def _net(X, y, parts, explained, seed):
 
 def _network(name, distribution):
     """La xarxa distribucional d'una distribució, aturada sobre tota la validació, i
-    explicada paràmetre a paràmetre contra els dies d'entrenament de la llavor."""
+    explicada paràmetre a paràmetre contra els dies d'entrenament de la llavor.
+
+    Una xarxa per distribució i llavor, on Marcjasz et al. (2023) en mitjanen quatre:
+    cada membre seria una cerca més, i el que costa és la cerca.
+    """
     def described(X, y, parts, explained, seed):
         train, validate, test, shown = _parts_of(X, parts, explained)
         fitted = ddnn.fit_rows(distribution, (X[train], y[train]),
                                (X[validate], y[validate]),
-                               ddnn_hyperparameters.searched(name))
+                               ddnn_hyperparameters.COPIED[name])
         explanation = ddnn.attribute_rows(distribution, fitted, X[shown],
                                           background=X[train])
         # Dues sumes: la base més les contribucions torna cada paràmetre, i la base és la
@@ -235,12 +252,12 @@ def describers():
     tree = boosting_hyperparameters
     net = linear_hyperparameters
     found = {
-        boosting.NAME: Describer(
+        tree.NAME: Describer(
             "hourly", (FORECASTS, PREVIOUS_DAY, DATE_PROBE), _tree,
             {name: value for name, value in tree.UNSEARCHED.items() if name != "trees"}
             | {"most_trees": tree.MOST_TREES, "patience": tree.PATIENCE,
                "unsearched": True}),
-        linear.NAME: Describer(
+        net.NAME: Describer(
             "hourly", (FORECASTS, PREVIOUS_DAY), _net,
             {"penalty": net.PENALTY, "mixing": net.MIXING, "max_iter": net.MAX_ITER,
              "unsearched": True}),
@@ -248,7 +265,9 @@ def describers():
     for name, distribution in DISTRIBUTIONS.items():
         found[name] = Describer(
             "daily", (FORECASTS, PREVIOUS_DAY), _network(name, distribution),
-            ddnn_hyperparameters.searched(name) | {
+            ddnn_hyperparameters.COPIED[name] | {
+                "copied_from": ddnn_hyperparameters.COPIED_FROM[name],
+                "copied_trials": ddnn_hyperparameters.COPIED_TRIALS,
                 "batch": ddnn_hyperparameters.BATCH, "epochs": ddnn_hyperparameters.EPOCHS,
                 "patience": ddnn_hyperparameters.PATIENCE, "unsearched": True})
     found[FLOOR] = Describer("hourly", (FORECASTS,), _floor, {"degree": FLOOR_DEGREE})
@@ -309,8 +328,8 @@ def main(arguments):
 
     seeds, explained_days = DESCRIPTIONS[arguments.tier]
     where = run_files.run_folder(arguments.tier, STAGE, commit[:7])
-    # Reprendre és del nivell de mesura i prou, com al camí endavant: el de prova admet
-    # l'arbre brut, i dues còpies diferents del codi en compartirien el directori.
+    # Reprendre és del nivell de mesura i prou: el de prova admet l'arbre brut, i dues
+    # còpies diferents del codi en compartirien el directori.
     if arguments.tier == TEST or arguments.replace:
         for family in chosen:
             for name in table[family].sets:
@@ -353,5 +372,5 @@ def main(arguments):
             (folder / run_files.SEED_RECORD).write_text(
                 json.dumps(run_files.plain(record), indent=2))
     describe_figures.draw(where)
-    print(f"la part B és a {where}, amb les seves figures")
+    print(f"la passada és a {where}, amb les seves figures")
     return 0

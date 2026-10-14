@@ -1,11 +1,10 @@
-"""La matriu diària com la llegeixen les dues xarxes: per blocs, i amb el dia de la
-setmana en una sola columna.
+"""La matriu diària com la llegeixen les xarxes: per blocs, i amb el dia de la setmana
+en una sola columna.
 
-Un bloc és una sèrie a un retard, les seves 24 hores, o el dia de la setmana: el que les
-cerques de Lago et al. (2021) i de Marcjasz et al. (2023) engeguen i apaguen. Totes dues
-donen el dia a la xarxa com un enter, de dilluns 0 a diumenge 6, i no en set indicadors
-com fa la matriu per a la resta de famílies. Viu aquí, a sobre de les dues carpetes,
-perquè les dues xarxes en llegeixen igual.
+Un bloc és una sèrie a un retard, les seves 24 hores, o el dia de la setmana: el que la
+cerca de Marcjasz et al. (2023) engega i apaga. El seu codi dóna el dia a la xarxa com un
+enter i no en set indicadors com fa la matriu per a la resta de famílies, i aquí és el
+dia de la setmana del dia que es prediu, de dilluns 0 a diumenge 6.
 """
 
 from epf.matrix import DAY_OF_WEEK_COLUMNS
@@ -37,11 +36,7 @@ def columns_of(columns, names):
 
 def inputs(X, names):
     """Les entrades dels blocs anomenats, amb el dia de la setmana al davant en una sola
-    columna, `DAY`, de dilluns 0 a diumenge 6, com el codi dels dos articles el dóna a la
-    xarxa.
-
-    Els set indicadors de la matriu no hi entren: escalats per la mediana, cada un es
-    dividiria per una MAD de zero.
+    columna, `DAY`, de dilluns 0 a diumenge 6, en lloc dels set indicadors de la matriu.
     """
     kept = [column for column in columns_of(X.columns, names)
             if column not in DAY_OF_WEEK_COLUMNS]

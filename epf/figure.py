@@ -1,10 +1,9 @@
 """Com es fa i com es veu una figura d'aquest projecte, en un sol lloc.
 
-Ho comparteixen els tres llocs que en dibuixen: `results/` les d'una execució,
-`attribution/` les de SHAP i `data/figures/` les de les dades d'origen. Són germans,
-així que el que dos llegeixen viu al paquet de dalt (`architecture.md` 8.3). Només hi
-ha el que fan servir dues coses o més: el que és d'una figura concreta, com l'escala
-de dos tons d'una correlació o el vermell dels valors marcats, viu amb ella.
+Ho comparteixen els dos llocs que en dibuixen: `results/` les d'una passada i
+`data/figures/` les de les dades d'origen. Són germans, així que el que tots dos llegeixen
+viu al paquet de dalt. Només hi ha el que fan servir dues coses o més: el que és d'una
+figura concreta, com el vermell dels valors marcats, viu amb ella.
 
 El motor és `Agg`, sense finestra, i es tria aquí: qui importa aquest mòdul ja el té
 triat i no ha de recordar-ho abans d'importar `pyplot`.
@@ -27,14 +26,13 @@ SERIES = "#2a78d6"
 DPI = 300
 
 # Escala seqüencial d'un sol to: la magnitud es llegeix igual en color i en escala de
-# grisos impresa. La comparteixen les figures d'atribució i la de covariància.
+# grisos impresa.
 MAGNITUDE = LinearSegmentedColormap.from_list(
     "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"])
 
 # Seqüència de colors de línia, encapçalada pel blau de la sèrie. Una línia per color,
 # perquè dues del mateix color en una llegenda no es distingeixen.
 LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
-FOLLOWED = len(LINES)
 
 
 def colours(names):

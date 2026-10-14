@@ -35,17 +35,11 @@ TAIL_FLOOR = 1
 # i `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
 #
 # `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
-# sortida crua, de manera que és alhora el que llegeix el camí endavant i l'última capa
-# del que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
+# sortida crua, de manera que és alhora el que llegeix `parameters` i l'última capa del
+# que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
 # s'escriu un sol cop i l'explicació no se'n pot separar.
-#
-# `of_day` és `None` aquí i el registre de famílies l'omple: és `(model, X, dia)` cap
-# als paràmetres d'aquell dia, i per tant demana el model, que és de la família i no de
-# la distribució. Va al mateix lloc perquè qui escriu els paràmetres al disc i qui en
-# calcula el CRPS volen les quatre coses alhora i no han de muntar-les.
 Distribution = collections.namedtuple(
-    "Distribution", "names units loss flat point quantiles of_day",
-    defaults=(None,))
+    "Distribution", "names units loss flat point quantiles")
 
 
 def _split(raw, count):

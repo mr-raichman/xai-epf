@@ -25,10 +25,3 @@ PRICE_FIGURES = FIGURES / "price"
 # Fora del paquet, perquè la roda es construeix de `epf/` i s'hi enduria qualsevol
 # cosa que hi pengés, i fora de git.
 RUNS = ROOT / "runs"
-
-# El que ha triat una cerca d'hiperparàmetres, una carpeta per etapa. No és dins de
-# `runs/` perquè no és de cap execució: una cerca es fa un cop per etapa i les
-# execucions la llegeixen, de manera que viu al costat i no a sota. Fora de git, com
-# tota sortida, que és el que fa que el commit no fixi aquests números i que qui els
-# fixi sigui el `run.json` de cada execució.
-SEARCHES = ROOT / "searches"

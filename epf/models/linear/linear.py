@@ -3,13 +3,12 @@ l'atribució exacta d'un model lineal.
 
 Cada hora té el seu model, ajustat només amb les files de la seva hora de la taula per
 hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
-de càrrega. Preus i entrades passen per la transformació de LEAR, que és d'on la pren:
-la logarítmica de l'article no admet preus a zero o per sota. La penalització és una
-per a les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per defecte,
-perquè les tria una cerca.
+de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021): la
+logarítmica de l'article no admet preus a zero o per sota. La penalització és una per a
+les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per defecte, perquè
+les tria una cerca.
 
-Tot és sobre files donades: la part B hi ajusta les files d'entrenament d'una llavor,
-i el camí endavant les d'una finestra, amb les tres funcions del final.
+Tot és sobre files donades, les d'entrenament d'una llavor.
 """
 import collections
 
@@ -17,11 +16,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 
-from epf.attribution.stored import ONE, TRANSFORMED_UNITS, Attribution
 from epf.market import HOURS_PER_DAY
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, calibration
-from epf.models.linear.linear_hyperparameters import MAX_ITER, NAME, WINDOW, searched
-from epf.models.scaling import Scaler
+from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR
+from epf.models.linear.linear_hyperparameters import MAX_ITER, NAME
+from epf.models.linear.scaling import Scaler
 
 # El model d'una hora i el que cal per llegir-lo. `columns` són les de la matriu del
 # model en el seu ordre, les escalades i després els indicadors del dia de la setmana,
@@ -49,7 +47,7 @@ def _prepared(rows, target):
 
     Una columna que no es mou a les files de l'hora no hi entra, que és la previsió solar
     de nit. La que es mou sense MAD s'escala per la seva desviació típica, que és la
-    solar dels vespres d'estiu: la transformació de LEAR la refusaria.
+    solar dels vespres d'estiu: la transformació de Lago et al. (2021) la refusaria.
     """
     moving = [column for column in rows.columns
               if column != HOUR and rows[column].nunique() > 1]
@@ -131,36 +129,3 @@ def attribute_rows(model, X):
         transformed[rows] = fitted.model.predict(design)
     return Explanation(pd.DataFrame(values, index=X.index, columns=columns),
                        pd.Series(base, index=X.index), pd.Series(transformed, index=X.index))
-
-
-def fit(X, y, day, window=WINDOW, numbers=None):
-    """Els 24 models ajustats només amb les hores dels dies anteriors a `day`.
-
-    El càstig i la barreja són els de `searched()` si no se'n passen, els mateixos cada
-    dia, com Uniejewski et al. (2016) mantenen el seu durant tot el període de prova.
-    """
-    numbers = searched() if numbers is None else numbers
-    return fit_rows(*calibration(X, y, day, window), numbers["penalty"],
-                    numbers["mixing"])
-
-
-def predict(model, X, day):
-    """Els 24 preus de `day`, en ordre d'hora, per nom de pronòstic."""
-    return {NAME: predict_rows(model, X.loc[[day]]).to_numpy()}
-
-
-def attribute(model, X, day):
-    """L'atribució de les 24 hores de `day`, del model que les ha predit.
-
-    És a l'espai transformat, i es desa amb el que la deixa comprovar: la predicció de
-    cada hora en EUR/MWh, que és la del CSV, i la mateixa a l'espai transformat, que és
-    la que la base i les contribucions han de tornar. Les files del dia donen
-    `(hores, columnes)`, que es desa transposat, com la resta, en `(columna, hora)`.
-    """
-    rows = X.loc[[day]]
-    explained = attribute_rows(model, rows)
-    return Attribution(ONE, list(explained.values.columns),
-                       explained.values.to_numpy().T[np.newaxis],
-                       explained.base.to_numpy()[np.newaxis],
-                       predict_rows(model, rows).to_numpy()[np.newaxis],
-                       explained.transformed.to_numpy()[np.newaxis], TRANSFORMED_UNITS)

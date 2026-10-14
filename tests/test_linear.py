@@ -1,23 +1,16 @@
-"""La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres,
-l'atribució que torna la predicció, i el camí endavant en ordre d'hora i sense el dia
-que prediu."""
-import datetime
-
+"""La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres, i
+l'atribució que torna la predicció."""
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNetCV
 
-from epf import paths
 from epf.calendar import HOUR_COLUMNS
-from epf.matrix import HOUR, build, forecasts, per_hour
-from epf.models.linear import linear_hyperparameters
-from epf.models.linear.linear import (NAME, _by_hour, _prepared, attribute_rows, fit,
-                                      fit_rows, predict, predict_rows)
+from epf.matrix import HOUR, forecasts
+from epf.models.linear.linear import (_by_hour, _prepared, attribute_rows, fit_rows,
+                                      predict_rows)
 from epf.models.linear.search import penalties
-from epf.parameters import INPUTS, LAGS
 
 PENALTY, MIXING = 0.01, 0.5
-NUMBERS = {"penalty": PENALTY, "mixing": MIXING}
 
 # Hores en què la previsió solar val zero tots els dies, i l'hora del vespre en què val
 # zero més de la meitat dels dies: les dues formes que pren a les dades de debò.
@@ -39,18 +32,6 @@ def per_hour_table(days=120, seed=0):
                  "wind": frame(rng.uniform(500, 15000, (days, 24))),
                  "solar": frame(solar)}
     return forecasts(frame(rng.uniform(-2, 200, (days, 24))), day_ahead).hourly
-
-
-# Preus sintètics amb un patró setmanal exacte, com als altres models.
-WEEKLY_SHAPE = [20.0, 35.0, 50.0, 65.0, 80.0, 95.0, 110.0]
-
-
-def hourly_prices(days, start=datetime.date(2014, 1, 1)):
-    """La taula per hora dels retards de preu, sobre un preu que puja un euro cada hora."""
-    index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in range(days)],
-                             name="day")
-    rows = [[WEEKLY_SHAPE[day.dayofweek] + hour for hour in range(24)] for day in index]
-    return per_hour(*build(pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS), LAGS))
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():
@@ -122,25 +103,6 @@ def test_the_base_and_the_contributions_return_the_rows_own_prediction():
         assert np.allclose(back.ravel(), prices[rows])
 
 
-def test_the_walk_predicts_the_twenty_four_hours_in_order():
-    # Cada hora té el seu model, i amb aquest preu totes resolen el mateix problema
-    # desplaçat un euro: si les hores sortissin barrejades, els salts no serien d'u.
-    X, y = hourly_prices(200)
-    day = X.index[-1]
-    prices = predict(fit(X, y, day, window=100, numbers=NUMBERS), X, day)[NAME]
-    assert prices.shape == (24,)
-    assert np.allclose(np.diff(prices), 1.0)
-
-
-def test_the_day_being_predicted_is_never_read():
-    X, y = hourly_prices(200)
-    day = X.index[-1]
-    corrupted = y.copy()
-    corrupted.loc[day] = 9999.0
-    before = predict(fit(X, y, day, window=100, numbers=NUMBERS), X, day)[NAME]
-    assert np.array_equal(before, predict(fit(X, corrupted, day, window=100, numbers=NUMBERS), X, day)[NAME])
-
-
 def test_each_sequence_starts_at_the_smallest_penalty_that_empties_every_hour():
     # La seqüència de `lasso.m` comença al càstig més petit que deixa a zero tots els
     # coeficients. Una escala equivocada, sense centrar o d'una sola hora, començaria
@@ -157,14 +119,3 @@ def test_each_sequence_starts_at_the_smallest_penalty_that_empties_every_hour():
         assert np.isclose(steps[0], max(theirs), rtol=1e-9)
         top = fit_rows(X, y, steps[0], mixing)
         assert max(np.abs(hour.model.coef_).max() for hour in top) < 1e-12
-
-
-def test_the_walk_takes_a_saved_searchs_penalty_and_mixing(tmp_path, monkeypatch):
-    # Si el camí no llegís la cerca desada, seguiria amb els números de prova sense
-    # que res petés.
-    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
-    linear_hyperparameters.save(INPUTS[0], {"trials": 102, "hyperparameters":
-                                            {"penalty": 0.02, "mixing": 0.25}})
-    X, y = hourly_prices(200)
-    model = fit(X, y, X.index[-1], window=100)
-    assert {(hour.model.alpha, hour.model.l1_ratio) for hour in model} == {(0.02, 0.25)}

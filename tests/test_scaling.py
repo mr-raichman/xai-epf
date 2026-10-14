@@ -1,9 +1,9 @@
-"""La transformació dels models lineals: per columna, d'anada i tornada, i què fa amb una
+"""La transformació de la xarxa elàstica: per columna, d'anada i tornada, i què fa amb una
 columna sense MAD."""
 import numpy as np
 import pytest
 
-from epf.models.scaling import Scaler
+from epf.models.linear.scaling import Scaler
 
 # La previsió solar a les 20 h: zero més de la meitat dels dies, milers de MW la resta,
 # de manera que la seva MAD és zero tot i que es mou.

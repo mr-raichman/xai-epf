@@ -1,9 +1,7 @@
 """Prediccions ingènues de Lago et al. (2021), el terra que hi ha sota la referència.
 
-No s'ajusta res: cada una copia una hora que ja es coneixia. Totes tres tenen la
-forma que espera el camí endavant, `fit` i després `predict`, i per això `fit` torna
-`None` i les prediccions reben un model que no miren. Així el camí endavant no porta
-cap branca que digui quines famílies ajusten alguna cosa.
+No s'ajusta res: cada una copia una hora que ja es coneixia, i per això `fit` torna
+`None` i les prediccions reben un model que no miren.
 """
 from epf.calendar import HOUR_COLUMNS
 
@@ -49,16 +47,3 @@ NAMES = tuple(FORECASTS)
 def predict(model, X, day):
     """Els tres pronòstics ingenus del dia, per nom. El model és `None` i no es mira."""
     return {name: forecast(X, day) for name, forecast in FORECASTS.items()}
-
-
-def weekly_frame(price):
-    """La predicció ingènua setmanal de cada dia d'una sèrie de preus sencera.
-
-    La mateixa que `previous_week`, però sobre una taula de preus i no sobre una
-    matriu de característiques, perquè és el denominador del rMAE de Lago et al.
-    (2021) i aquest s'ha de poder calcular d'una execució ja desada, sense anar a
-    buscar l'execució de la família ingènua. Els dies que no tenen el seu dia de fa
-    una setmana no hi són.
-    """
-    earlier = price.shift(PREVIOUS_WEEK, freq="D").reindex(price.index)
-    return earlier[earlier.notna().all(axis="columns")]

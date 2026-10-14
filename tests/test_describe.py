@@ -1,4 +1,4 @@
-"""La partició de la part B, sobre el període i les llavors de debò."""
+"""La partició, sobre el període i les llavors de debò."""
 import datetime
 
 import pandas as pd

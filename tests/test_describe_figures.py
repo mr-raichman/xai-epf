@@ -1,4 +1,4 @@
-"""Les figures de la part B: la importància per grups i la parella a l'hora."""
+"""Les figures d'una passada: la importància per grups i la parella a l'hora."""
 import numpy as np
 
 from epf.calendar import HOUR_COLUMNS

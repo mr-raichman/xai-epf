@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.13.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -166,7 +166,6 @@ name = "epf"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "joblib" },
     { name = "lightgbm" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -177,7 +176,6 @@ dependencies = [
     { name = "scipy" },
     { name = "shap" },
     { name = "tensorflow" },
-    { name = "threadpoolctl" },
 ]
 
 [package.dev-dependencies]
@@ -188,7 +186,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "joblib", specifier = "==1.6.0" },
     { name = "lightgbm", specifier = "==4.7.0" },
     { name = "matplotlib", specifier = "==3.11.2" },
     { name = "numpy", specifier = "==2.5.3" },
@@ -199,7 +196,6 @@ requires-dist = [
     { name = "scipy", specifier = "==1.18.1" },
     { name = "shap", specifier = "==0.52.0" },
     { name = "tensorflow", specifier = "==2.21.0" },
-    { name = "threadpoolctl", specifier = "==3.6.0" },
 ]
 
 [package.metadata.requires-dev]

@@ -1,9 +1,7 @@
 """Les xarxes distribucionals com les construeix el codi de Marcjasz et al. (2023): la
-seva partició per aturar-se, la seva capa de distribució, i l'atribució de cada paràmetre,
-que ha de sumar.
+seva capa de distribució, i l'atribució de cada paràmetre, que ha de sumar.
 
-Cap d'aquestes coses no peta quan falla. Una partició per setmanes en lloc de dies solts
-seria una altra xarxa que la de l'article, un pes de la cua que baixés d'1 donaria una
+Cap d'aquestes coses no peta quan falla. Un pes de la cua que baixés d'1 donaria una
 distribució que l'article no permet, i una L1 per paràmetre que no quadrés amb la
 distribució faria llegir a la pèrdua menys sortides de les que la xarxa treu.
 """
@@ -12,10 +10,8 @@ import pandas as pd
 import pytest
 
 from epf.calendar import HOUR_COLUMNS
-from epf.models.ddnn.ddnn import (attribute_rows, build, fit_rows, held_out,
-                                  parameters_rows)
+from epf.models.ddnn.ddnn import attribute_rows, build, fit_rows, parameters_rows
 from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
-from epf.parameters import DAYS_PER_WEEK
 
 # Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn
 # de com d'ajustada estigui.
@@ -66,25 +62,3 @@ def test_the_tail_weight_never_drops_below_one():
     tail = parameters(JOHNSON_SU, raw)[..., JOHNSON_SU.names.index("tail_weight")]
     assert (tail >= 1).all()
     assert np.allclose(tail, 1)
-
-
-COUNT = 1449
-
-
-def test_the_held_out_fifth_is_single_days_from_the_whole_window():
-    # El codi de l'article aparta cada dia una cinquena part dels dies, solts i a
-    # l'atzar, i no setmanes senceres ni el tram final.
-    train, validate = held_out(COUNT, np.random.default_rng(0))
-    assert set(train).isdisjoint(validate)
-    assert sorted([*train, *validate]) == list(range(COUNT))
-    assert len(validate) == COUNT - int(0.8 * COUNT)
-    assert min(validate) < COUNT // 4 and max(validate) > 3 * COUNT // 4
-    weeks = {day // DAYS_PER_WEEK for day in validate}
-    assert any(day // DAYS_PER_WEEK in weeks for day in train)
-
-
-def test_the_same_seed_gives_the_same_held_out_days():
-    # Una execució s'ha de poder repetir bit a bit, i la partició hi entra.
-    first = held_out(COUNT, np.random.default_rng(0))[1]
-    assert np.array_equal(first, held_out(COUNT, np.random.default_rng(0))[1])
-    assert not np.array_equal(first, held_out(COUNT, np.random.default_rng(1))[1])

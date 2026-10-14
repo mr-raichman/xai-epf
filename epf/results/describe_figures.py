@@ -1,10 +1,10 @@
-"""Les figures de la part B, les de Trebbien et al. (2023) adaptades, dibuixades del que la
-passada va desar, sense tornar a ajustar res.
+"""Les figures d'una passada, les de Trebbien et al. (2023) adaptades, dibuixades del que
+la passada va desar, sense tornar a ajustar res.
 
 Són un joc de treball: quines es queden per a la memòria es decideix quan tot el codi
-sigui fet. A dalt del pas, el sòl de l'ordre de mèrit i com puntua cada família al costat
-seu; a la carpeta de cada conjunt i família, la importància per columna i per grup, la
-dependència de les tres previsions i, a l'arbre, les seves interaccions.
+sigui fet. A dalt de la passada, el sòl de l'ordre de mèrit i com puntua cada família al
+costat seu; a la carpeta de cada conjunt i família, la importància per columna i per
+grup, la dependència de les tres previsions i, a l'arbre, les seves interaccions.
 """
 import numpy as np
 
@@ -212,7 +212,7 @@ def _floor(where, seeds):
 
 
 def draw(where):
-    """Totes les figures d'un pas de la part B, a partir del que hi ha desat."""
+    """Totes les figures d'una passada, a partir del que hi ha desat."""
     described = {}
     for folder in sorted(path for path in where.glob("*/*") if path.is_dir()):
         seeds = _seeds(folder)
@@ -236,4 +236,4 @@ def draw(where):
 def main(arguments):
     for folder in arguments.folder:
         draw(folder)
-        print(f"figures de la part B a {folder}")
+        print(f"figures de la passada a {folder}")

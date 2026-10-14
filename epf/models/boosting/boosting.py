@@ -9,12 +9,9 @@ import numpy as np
 import shap
 from lightgbm import LGBMRegressor, early_stopping
 
-from epf.matrix import calibration
-from epf.models.boosting.boosting_hyperparameters import (MIN_CHILD_WEIGHT, NAME,
-                                                          PATIENCE, SUBSAMPLE_FREQ, WINDOW,
-                                                          searched)
+from epf.models.boosting.boosting_hyperparameters import (MIN_CHILD_WEIGHT, PATIENCE,
+                                                          SUBSAMPLE_FREQ)
 from epf.parameters import SEED
-from epf.attribution.stored import ONE, PRICE_UNITS, Attribution
 
 
 def lightgbm(point, trees, seed=SEED):
@@ -45,9 +42,9 @@ def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
     Sense `validation` fa `trees` arbres, ni un més ni un menys. Amb `validation`,
     parelles `(X, y)`, `trees` és el sostre, i l'entrenament s'atura quan qualsevol
     d'elles porta `patience` arbres sense millorar, i el model es queda amb el millor
-    arbre d'aquella: amb una sola parella és l'aturada de la cerca, i amb quatre la de
-    Trebbien et al. (2023), que parteix la validació en quatre. Cada crida fa un
-    regressor nou, de manera que cap ajust no hereta res de l'anterior.
+    arbre d'aquella: amb quatre parelles és l'aturada de Trebbien et al. (2023), que
+    parteix la validació en quatre. Cada crida fa un regressor nou, de manera que cap
+    ajust no hereta res de l'anterior.
     """
     model = lightgbm(point, trees)
     if not validation:
@@ -75,32 +72,3 @@ def attribute_rows(model, X):
 def interaction_rows(model, X):
     """Els valors d'interacció de SHAP de cada fila, `(files, columnes, columnes)`."""
     return shap.TreeExplainer(model).shap_interaction_values(X)
-
-
-def fit(X, y, day, point=None, window=WINDOW):
-    """El model ajustat només amb les hores dels dies anteriors a `day`.
-
-    El punt per defecte és el de `searched()`, amb el nombre d'arbres en què es va aturar
-    l'ajust de la cerca, que cada dia es fan sencers i sense aturar-se: és el que fa el
-    codi del grup de Trebbien et al. (2023), que torna a ajustar el punt triat amb el
-    millor nombre d'arbres.
-    """
-    point = searched() if point is None else point
-    return fit_rows(*calibration(X, y, day, window), point, point["trees"])
-
-
-def predict(model, X, day):
-    """Els 24 preus de `day`, en ordre d'hora, per nom de pronòstic."""
-    return {NAME: predict_rows(model, X.loc[[day]])}
-
-
-def attribute(model, X, day):
-    """L'atribució de les 24 hores de `day`, del model que les ha predit.
-
-    Les 24 files del dia donen `(hores, columnes)`, que es desa transposat, com la
-    resta, en `(columna, hora)`.
-    """
-    rows = X.loc[[day]]
-    values, base = attribute_rows(model, rows)
-    return Attribution(ONE, list(X.columns), values.T[np.newaxis],
-                       np.full((1, len(rows)), base), None, None, PRICE_UNITS)

@@ -10,12 +10,10 @@ dependencies = [
     "numpy==2.5.3",
     "requests==2.34.2",
     "scikit-learn==1.9.1",
-    "threadpoolctl==3.6.0",
     "lightgbm==4.7.0",
     "shap==0.52.0",
     "matplotlib==3.11.2",
-    "joblib==1.6.0",
-    # La xarxa de Lago et al. (2021) i la cerca dels seus hiperparàmetres. Sense
+    # Les xarxes de Marcjasz et al. (2023) i la cerca dels seus hiperparàmetres. Sense
     # `[and-cuda]`: aquells paquets són de Linux i d'NVIDIA, i el projecte s'ha
     # d'instal·lar en una màquina qualsevol.
     "tensorflow==2.21.0",
