@@ -2,16 +2,17 @@
 la passada va desar, sense tornar a ajustar res.
 
 Són un joc de treball: quines es queden per a la memòria es decideix quan tot el codi
-sigui fet. A dalt de la passada, el sòl de l'ordre de mèrit i com puntua cada família al
-costat dels bancs de comparació; a la carpeta de cada conjunt i família, la importància per columna i per
+sigui fet. A dalt de la passada, el sòl de l'ordre de mèrit, com puntua cada família al
+costat dels bancs de comparació i els residus de cada família ajustada; a la carpeta de cada conjunt i família, la importància per columna i per
 grup, la dependència de les tres previsions i, a l'arbre, les seves interaccions.
 """
 import numpy as np
 
 from epf import figure
 from epf.calendar import HOUR_COLUMNS
+from epf.data import forecasts, schedule
 from epf.figure import plt
-from epf.results import run_files
+from epf.results import residuals, run_files
 
 # Com es diu cada grup de columnes a les figures.
 GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòlica",
@@ -24,8 +25,9 @@ GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòli
 OUTPUT_LABELS = {"": "contribució", "location": "localització", "scale": "escala",
                  "skewness": "asimetria", "tail_weight": "pes de la cua"}
 
-# Les previsions que tenen gràfic de dependència, les tres de Trebbien et al. (2023).
-DEPENDENCE = ("demand", "wind", "solar")
+# Les sèries del dia que es lliura o del dia abans que tenen gràfic de dependència: les
+# tres previsions, com a Trebbien et al. (2023), i els tres grups del programa, igual.
+DEPENDENCE = (*forecasts.INDICATORS, *schedule.GROUPS)
 
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
 SHOWN = 20
@@ -101,16 +103,27 @@ def _importance(folder, seeds):
         figure.save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
+def _members(seed, name):
+    """Les columnes de la sèrie `name`, pel grup que la passada hi va desar: una a la
+    taula per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""
+    members = np.flatnonzero(seed["groups"] == name)
+    if len(members) == 1:
+        return members
+    hour = {column: number for number, column in enumerate(HOUR_COLUMNS)}
+    return np.array(sorted(members,
+                           key=lambda j: hour[str(seed["columns"][j]).rsplit("_", 1)[1]]))
+
+
 def _pairs(seed, output, values, name):
-    """El valor de la previsió i la seva contribució, a l'hora de cada fila."""
-    columns = list(seed["columns"])
+    """El valor de la sèrie i la seva contribució, a l'hora de cada fila."""
     inputs = seed["inputs"]
-    if name in columns:
-        return inputs[:, columns.index(name)], values[:, columns.index(name)]
+    members = _members(seed, name)
+    if len(members) == 1:
+        return inputs[:, members[0]], values[:, members[0]]
     # La xarxa distribucional: a la fila del dia d i l'hora h, la columna de l'hora h.
-    hours = [columns.index(f"{name}_{hour}") for hour in HOUR_COLUMNS]
-    x = inputs[:, hours]
-    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[:, np.arange(len(hours)), hours]
+    x = inputs[:, members]
+    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[:, np.arange(len(members)),
+                                                           members]
     return x.ravel(), y.ravel()
 
 
@@ -144,9 +157,9 @@ def _dependence(folder, seeds, present):
 
 
 def _interactions(folder, seed, present):
-    """A la llavor 0, per a cada previsió: la dependència sencera, l'efecte sense
-    interaccions i la interacció amb els tres socis més forts, amb el color del valor de
-    cada soci."""
+    """Al millor model de la primera llavor, per a cada sèrie: la dependència sencera,
+    l'efecte sense interaccions i la interacció amb els tres socis més forts, amb el
+    color del valor de cada soci."""
     columns = list(seed["columns"])
     rows = seed["interaction_rows"]
     inputs, interactions = seed["inputs"][rows], seed["interactions"]
@@ -155,7 +168,7 @@ def _interactions(folder, seed, present):
                                 figsize=(4 * (2 + PARTNERS), 3.5 * len(present)),
                                 facecolor=figure.SURFACE, squeeze=False)
     for row, name in zip(axes, present):
-        j = columns.index(name)
+        (j,) = _members(seed, name)
         x = inputs[:, j] / PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
         strength[j] = -np.inf
@@ -246,6 +259,7 @@ def draw(where):
                 _interactions(folder, seeds[0], present)
     if described:
         _performance(where, described)
+        residuals.report(where, described)
 
 
 def main(arguments):

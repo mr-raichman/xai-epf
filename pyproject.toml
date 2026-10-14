@@ -26,7 +26,13 @@ dependencies = [
 epf = "epf.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff==0.16.1"]
+dev = [
+    "pytest>=8.0",
+    "ruff==0.16.1",
+    # Només per a una prova: el Ljung-Box dels residus contra una implementació que no és
+    # la del projecte.
+    "statsmodels==0.15.0",
+]
 
 [build-system]
 requires = ["hatchling"]
