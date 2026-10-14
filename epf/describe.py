@@ -6,8 +6,8 @@ preu del dia abans és una entrada, i per això l'entrenament perd el dia de cad
 d'una setmana retinguda.
 
 `epf describe` ajusta cada família explicada sobre cada conjunt i cada llavor, la puntua
-sobre les setmanes de prova al costat del sòl de l'ordre de mèrit i n'explica les files
-de prova. Tot es desa per llavor, de manera que les figures surten del que hi ha al disc
+sobre les setmanes de prova al costat del sòl de l'ordre de mèrit i de les prediccions
+ingènues, i n'explica les files de prova. Tot es desa per llavor, de manera que les figures surten del que hi ha al disc
 i no d'un ajust nou. Mentre la cerca no s'ha fet, cada família hi entra amb uns números
 que no s'han cercat, i el registre de cada una ho diu.
 """
@@ -25,6 +25,7 @@ from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.linear import linear, linear_hyperparameters
+from epf.models.naive import naive
 from epf.parameters import (BLACKOUT_WEEK, DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
                             INTERACTION_ROWS, MEASUREMENT, SHARES, SMOKE)
 from epf.results import describe_figures, run_files
@@ -253,6 +254,16 @@ def _floor(X, y, parts, explained, seed):
                       "actual_training": y[train].to_numpy()}, 0.0, TOLERANCE)
 
 
+def _naive(forecast):
+    """Una predicció ingènua de Lago et al. (2021), presa de la sèrie del preu als dies de
+    prova que té la taula del conjunt, de manera que es puntua sobre les files de totes."""
+    def described(price, y, parts, explained, seed):
+        days = y.index[y.index.isin(parts.test)]
+        return Described(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {},
+                         0.0, TOLERANCE)
+    return described
+
+
 # Qui es descriu: amb quina taula, sobre quins conjunts, com, i amb quins números. La
 # prova de datació només l'ajusta l'arbre.
 Describer = collections.namedtuple("Describer", "table sets describe numbers")
@@ -282,13 +293,18 @@ def describers():
                 "batch": ddnn_hyperparameters.BATCH, "epochs": ddnn_hyperparameters.EPOCHS,
                 "patience": ddnn_hyperparameters.PATIENCE, "unsearched": True})
     found[FLOOR] = Describer("hourly", (SCHEDULE,), _floor, {"degree": FLOOR_DEGREE})
+    for name, (forecast, numbers) in naive.FORECASTS.items():
+        found[name] = Describer("price", (SCHEDULE,), _naive(forecast), numbers)
     return found
 
 
 def _tables(frame, day_ahead, scheduled):
-    """Les taules de cada conjunt, per nom i per taula."""
+    """Les taules de cada conjunt, per nom i per taula. La del preu és la sèrie sencera
+    amb el preu real del conjunt, per a les prediccions ingènues, que copien dies que el
+    conjunt no porta."""
     found = matrix.schedule(frame, day_ahead, scheduled)
-    return {SCHEDULE: {"hourly": found.hourly, "daily": found.daily},
+    return {SCHEDULE: {"hourly": found.hourly, "daily": found.daily,
+                       "price": (frame, found.actual)},
             DATE_PROBE: {"hourly": matrix.date_probe(frame, day_ahead, scheduled,
                                                      DEVELOPMENT[0])}}
 

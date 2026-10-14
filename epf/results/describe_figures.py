@@ -3,7 +3,7 @@ la passada va desar, sense tornar a ajustar res.
 
 Són un joc de treball: quines es queden per a la memòria es decideix quan tot el codi
 sigui fet. A dalt de la passada, el sòl de l'ordre de mèrit i com puntua cada família al
-costat seu; a la carpeta de cada conjunt i família, la importància per columna i per
+costat dels bancs de comparació; a la carpeta de cada conjunt i família, la importància per columna i per
 grup, la dependència de les tres previsions i, a l'arbre, les seves interaccions.
 """
 import numpy as np
@@ -176,16 +176,22 @@ def _interactions(folder, seed, present):
 
 def _performance(where, described):
     """La R-quadrat i el MAE de cada família i conjunt sobre les setmanes de prova, una
-    marca per llavor, al costat del sòl de l'ordre de mèrit. Dos gràfics i no dos eixos."""
+    marca per llavor, al costat dels bancs de comparació. Dos gràfics i no dos eixos.
+
+    Només les famílies explicades tenen color; els bancs de comparació, que no desen cap
+    contribució, van en gris, i el nom de sota diu quin és cada un.
+    """
     keys = sorted(described)
-    families = list(dict.fromkeys(family for _, family in keys))
-    colour = {name: hue for hue, name in figure.colours(families)}
+    explained = list(dict.fromkeys(key[1] for key in keys
+                                   if "values" in described[key][0].files))
+    colour = {name: hue for hue, name in figure.colours(explained)}
     panels, axes = plt.subplots(1, 2, figsize=(max(8, 1.1 * len(keys)), 5),
                                 facecolor=figure.SURFACE)
     for axis, metric, label in ((axes[0], "r2", "R-quadrat"), (axes[1], "mae", "MAE, EUR/MWh")):
         for position, key in enumerate(keys):
             found = [float(seed[metric]) for seed in described[key]]
-            axis.plot([position] * len(found), found, "o", color=colour[key[1]], markersize=4)
+            axis.plot([position] * len(found), found, "o",
+                      color=colour.get(key[1], figure.MUTED_INK), markersize=4)
         axis.set_xticks(range(len(keys)), [f"{name}\n{family}" for name, family in keys],
                         fontsize=6, rotation=90)
         axis.set_ylabel(label, color=figure.MUTED_INK)
@@ -222,6 +228,8 @@ def draw(where):
         described[(folder.parent.name, folder.name)] = seeds
         if "coefficients" in seeds[0].files:
             _floor(where, seeds)
+        # Els bancs de comparació no s'expliquen.
+        if "values" not in seeds[0].files:
             continue
         _importance(folder, seeds)
         names = set(seeds[0]["groups"])

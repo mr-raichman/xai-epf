@@ -1,35 +1,22 @@
-"""Les tres prediccions ingènues prenen l'hora que toca."""
+"""Cada predicció ingènua copia de la sèrie del preu el dia que li toca."""
 import numpy as np
 import pandas as pd
 
-from epf.matrix import build
-from epf.models.naive.naive import (PREVIOUS_DAY, PREVIOUS_WEEK, previous_day,
-                                    previous_week, similar_day)
+from epf.models.naive.naive import previous_day, previous_week, similar_day
 from tests.test_matrix import frame_of
 
 
-def test_each_one_copies_its_own_lag():
+def test_each_copy_reads_its_own_day_the_weekly_one_seven_back():
     price = frame_of(range(30))
-    X, y = build(price, (PREVIOUS_DAY, PREVIOUS_WEEK))
-    day = X.index[10]
-    assert np.array_equal(previous_day(X, day),
-                          price.loc[day - pd.Timedelta(days=1)].to_numpy())
-    assert np.array_equal(previous_week(X, day),
-                          price.loc[day - pd.Timedelta(days=7)].to_numpy())
+    days = price.index[10:20]
+    for forecast, back in ((previous_day, 1), (previous_week, 7)):
+        expected = price.loc[days - pd.Timedelta(days=back)].to_numpy()
+        assert np.array_equal(forecast(price, days), expected)
 
 
 def test_the_similar_day_takes_yesterday_only_from_tuesday_to_friday():
     price = frame_of(range(30))
-    X, y = build(price, (PREVIOUS_DAY, PREVIOUS_WEEK))
-    for day in X.index[:7]:
-        expected = 1 if day.dayofweek in (1, 2, 3, 4) else 7
-        assert np.array_equal(similar_day(X, day),
-                              price.loc[day - pd.Timedelta(days=expected)].to_numpy())
-
-
-def test_the_weekend_and_monday_reach_a_week_back():
-    price = frame_of(range(30))
-    X, y = build(price, (PREVIOUS_DAY, PREVIOUS_WEEK))
-    weekend = [day for day in X.index if day.dayofweek in (5, 6, 0)]
-    for day in weekend:
-        assert np.array_equal(similar_day(X, day), previous_week(X, day))
+    days = price.index[10:24]
+    for row, day in zip(similar_day(price, days), days):
+        back = 1 if day.dayofweek in (1, 2, 3, 4) else 7
+        assert np.array_equal(row, price.loc[day - pd.Timedelta(days=back)].to_numpy())
