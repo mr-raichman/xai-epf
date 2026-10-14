@@ -1,15 +1,16 @@
 """Què hi ha dins del directori d'una passada, i on és.
 
 El commit nomena la passada, perquè és el que fixa tots els seus números, i a dins hi
-ha una llavor per fitxer i el registre de cada família al costat.
+ha un model per fitxer i el registre de cada família al costat.
 """
 import datetime
 import subprocess
 
 from epf import paths
 
-# Els fitxers d'una passada: una llavor per fitxer i el registre de la família al costat.
-SEED = "seed_{seed}.npz"
+# Els fitxers d'una passada: un model per fitxer, la llavor i el lloc de la seva
+# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al costat.
+SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 
 

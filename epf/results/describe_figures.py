@@ -39,9 +39,10 @@ PER_GW = 1000
 
 
 def _seeds(folder):
-    """Les llavors desades d'una família, en ordre de llavor."""
-    paths = sorted(folder.glob(run_files.SEED.format(seed="*")),
-                   key=lambda path: int(path.stem.split("_")[1]))
+    """Els models desats d'una família, un per fitxer, en ordre de llavor i de
+    configuració: el primer és la millor configuració de la primera llavor."""
+    paths = sorted(folder.glob(run_files.SEED.format(seed="*", rank="*")),
+                   key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]))
     return [np.load(path) for path in paths]
 
 
@@ -96,7 +97,7 @@ def _importance(folder, seeds):
                 axis.plot(row, positions, "o", color=figure.INK, markersize=2)
             axis.set_yticks(positions, names, fontsize=7)
             axis.set_xlabel("part de la importància", color=figure.MUTED_INK)
-            figure.style(axis, f"{OUTPUT_LABELS[output]}, llavors: {len(seeds)}")
+            figure.style(axis, f"{OUTPUT_LABELS[output]}, models: {len(seeds)}")
         figure.save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
@@ -114,9 +115,9 @@ def _pairs(seed, output, values, name):
 
 
 def _dependence(folder, seeds, present):
-    """La contribució de cada previsió contra el seu valor, a la llavor 0, amb la recta
-    ajustada i el pendent de totes les llavors, que és el que Trebbien et al. (2023)
-    llegeixen."""
+    """La contribució de cada previsió contra el seu valor, al millor model de la primera
+    llavor, amb la recta ajustada i el pendent de tots els models, que és el que
+    Trebbien et al. (2023) llegeixen."""
     outputs = list(_outputs(seeds[0]))
     units = dict(zip(outputs, seeds[0]["units"]))
     panels, axes = plt.subplots(len(present), len(outputs),
@@ -175,8 +176,10 @@ def _interactions(folder, seed, present):
 
 
 def _performance(where, described):
-    """La R-quadrat i el MAE de cada família i conjunt sobre les setmanes de prova, una
-    marca per llavor, al costat dels bancs de comparació. Dos gràfics i no dos eixos.
+    """La R-quadrat i el MAE de cada família i conjunt sobre les setmanes de prova, la
+    millor configuració de cada llavor amb una marca, i la resta de les seves deu millors
+    amb una de petita i grisa al darrere, al costat dels bancs de comparació. Dos gràfics
+    i no dos eixos.
 
     Només les famílies explicades tenen color; els bancs de comparació, que no desen cap
     contribució, van en gris, i el nom de sota diu quin és cada un.
@@ -189,13 +192,16 @@ def _performance(where, described):
                                 facecolor=figure.SURFACE)
     for axis, metric, label in ((axes[0], "r2", "R-quadrat"), (axes[1], "mae", "MAE, EUR/MWh")):
         for position, key in enumerate(keys):
-            found = [float(seed[metric]) for seed in described[key]]
-            axis.plot([position] * len(found), found, "o",
-                      color=colour.get(key[1], figure.MUTED_INK), markersize=4)
+            for best, size in ((False, 2), (True, 4)):
+                found = [float(seed[metric]) for seed in described[key]
+                         if (int(seed["rank"]) == 0) == best]
+                axis.plot([position] * len(found), found, "o", markersize=size,
+                          color=colour.get(key[1], figure.MUTED_INK) if best
+                          else figure.MUTED_INK)
         axis.set_xticks(range(len(keys)), [f"{name}\n{family}" for name, family in keys],
                         fontsize=6, rotation=90)
         axis.set_ylabel(label, color=figure.MUTED_INK)
-        figure.style(axis, f"{label} a les setmanes de prova, una marca per llavor")
+        figure.style(axis, f"{label} a les setmanes de prova, la millor de cada llavor")
     figure.save(panels, where, "performance")
 
 
