@@ -26,7 +26,7 @@ from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.linear import linear, linear_hyperparameters
 from epf.parameters import (DAYS_PER_WEEK, DESCRIPTIONS, DEVELOPMENT, GAP,
-                            INTERACTION_ROWS, MEASUREMENT, SHARES, TEST)
+                            INTERACTION_ROWS, MEASUREMENT, SHARES, SMOKE)
 from epf.results import describe_figures, run_files
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
@@ -317,7 +317,7 @@ def main(arguments):
     if arguments.tier == MEASUREMENT and run_files.git("status", "--porcelain"):
         print("l'arbre té canvis sense desar. El directori d'una mesura es diu pel "
               "commit, i amb canvis sense desar el nom no diria quin codi l'ha fet. "
-              f"Fes un commit, o fes servir --tier {TEST}.")
+              f"Fes un commit, o fes servir --tier {SMOKE}.")
         return 1
     table = describers()
     chosen = arguments.family or list(table)
@@ -328,9 +328,9 @@ def main(arguments):
 
     seeds, explained_days = DESCRIPTIONS[arguments.tier]
     where = run_files.run_folder(arguments.tier, STAGE, commit[:7])
-    # Reprendre és del nivell de mesura i prou: el de prova admet l'arbre brut, i dues
-    # còpies diferents del codi en compartirien el directori.
-    if arguments.tier == TEST or arguments.replace:
+    # Reprendre és de la mesura i prou: l'assaig admet l'arbre brut, i dues còpies
+    # diferents del codi en compartirien el directori.
+    if arguments.tier == SMOKE or arguments.replace:
         for family in chosen:
             for name in table[family].sets:
                 shutil.rmtree(where / name / family, ignore_errors=True)

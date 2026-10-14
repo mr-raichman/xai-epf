@@ -15,11 +15,11 @@ import datetime
 
 DAYS_PER_WEEK = 7
 
-# Els dos nivells d'una passada. Una de prova és petita i ràpida a propòsit i el seu
-# error no es desa, ni es cita, ni es compara enlloc; només una de mesura dóna un
-# resultat. El nivell és al camí de la passada, de manera que una xifra de prova no
-# es pugui llegir mai com una mesura.
-MEASUREMENT, TEST = "measurement", "test"
+# Els dos nivells d'una passada. Un assaig és petit i ràpid a propòsit i el seu error no
+# es desa, ni es cita, ni es compara enlloc; només una mesura dóna un resultat. El nivell
+# és al camí de la passada, de manera que una xifra d'assaig no es pugui llegir mai com
+# una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
+MEASUREMENT, SMOKE = "measurement", "smoke"
 
 # ------------------------------------------------------------ la descripció
 
@@ -43,12 +43,12 @@ SEEDS = tuple(range(10))
 # venir el nivell.
 PREVIOUS_DAY = (1,)
 
-# Llavors i dies de prova que s'expliquen, per nivell. `None` vol dir tots. El de prova
-# és una llavor i 50 dies a propòsit, prou per passar tota la maquinària i prou curt per
-# esperar-s'hi; el de mesura és el protocol sencer.
+# Llavors i dies de prova que s'expliquen, per nivell. `None` vol dir tots. L'assaig és
+# una llavor i 50 dies a propòsit, prou per passar tota la maquinària i prou curt per
+# esperar-s'hi; la mesura és el protocol sencer.
 DESCRIPTIONS = {
     MEASUREMENT: (SEEDS, None),
-    TEST: ((0,), 50),
+    SMOKE: ((0,), 50),
 }
 
 # Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,

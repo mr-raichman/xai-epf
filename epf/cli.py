@@ -26,9 +26,9 @@ Command = collections.namedtuple("Command", "module help arguments")
 
 def pass_arguments(parser):
     """Els arguments d'una passada: el nivell, quines famílies i si es comença de zero."""
-    parser.add_argument("--tier", choices=(parameters.TEST, parameters.MEASUREMENT),
+    parser.add_argument("--tier", choices=(parameters.SMOKE, parameters.MEASUREMENT),
                         required=True,
-                        help="de prova, que no dóna cap xifra, o de mesura, que sí")
+                        help="assaig, que no dóna cap xifra, o mesura, que sí")
     parser.add_argument("--family", action="append",
                         help="només aquesta família; es pot repetir")
     parser.add_argument("--replace", action="store_true",
