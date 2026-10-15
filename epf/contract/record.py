@@ -1,8 +1,9 @@
 """El que porta cada registre, com s'escriu, i com es desa el fitxer de cada model.
 
 Cada registre, el d'una cerca i el d'una passada, porta les empremtes del codi que el va
-fer i del conjunt de dades sobre el qual es va fer, de manera que qualsevol pot tornar a
-calcular la del codi d'una còpia i comprovar quin codi va donar una xifra. `plain` escriu
+fer, del conjunt de dades sobre el qual es va fer i de les biblioteques amb què es va fer,
+de manera que qualsevol pot tornar a calcular la del codi d'una còpia i comprovar quin
+codi va donar una xifra. `plain` escriu
 un valor a JSON sense perdre què era: converteix les dates, les tuples i les claus, i
 deixa que qualsevol altra cosa faci petar l'escriptura, en lloc d'escriure-la com a text
 sense dir-ho. `save_model` desa un model primer a un fitxer a part, en torna a fer les
@@ -42,11 +43,18 @@ def code(package):
     return digest.hexdigest()
 
 
+def environment(lock):
+    """L'empremta de les biblioteques: la SHA-256 de `uv.lock`, que en fixa la versió
+    exacta, amb els finals de línia de Windows com els de Linux."""
+    return hashlib.sha256(lock.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def fingerprints():
-    """Les empremtes que porta cada registre: la del codi del paquet i la del conjunt de
-    dades, que `data/dataset.json` desa."""
+    """Les empremtes que porta cada registre: la del codi del paquet, la del conjunt de
+    dades, que `data/dataset.json` desa, i la de les biblioteques."""
     dataset = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))["dataset"]
-    return {"code": code(paths.PACKAGE), "dataset": dataset}
+    return {"code": code(paths.PACKAGE), "dataset": dataset,
+            "environment": environment(paths.LOCK)}
 
 
 def plain(value):

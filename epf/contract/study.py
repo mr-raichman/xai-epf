@@ -7,9 +7,10 @@ reprèn on era. Quan una llavor té totes les seves proves, el seu registre en d
 millors en la forma en què les pren l'ajust, i sobre quines files es van fer: les
 columnes del conjunt i la partició. Una passada no llegeix un registre fet sobre unes
 altres files, i una cerca no es reprèn sobre unes altres files. Cada prova desa les
-empremtes del codi i del conjunt de dades amb què es va fer, i el registre les de cada
-una de les millors; una cerca es reprèn igualment sobre un altre codi o un altre conjunt
-de dades, i només unes altres files la refusen.
+empremtes del codi, del conjunt de dades i de les biblioteques amb què es va fer, i el
+registre les de cada una de les millors; una cerca es reprèn igualment sobre un altre
+codi, un altre conjunt de dades o unes altres biblioteques, i només unes altres files la
+refusen.
 """
 import json
 import os
@@ -77,8 +78,8 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
     prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua
     sobre les de validació, i la taula no n'hi dóna cap altra. Els números que en surten es
     desen a la prova, en la forma en què els pren l'ajust, amb les empremtes,
-    `fingerprints`, del codi i del conjunt de dades que la fan. Un estudi fet sobre unes
-    altres files es refusa en lloc de reprendre's.
+    `fingerprints`, del codi, del conjunt de dades i de les biblioteques que la fan. Un
+    estudi fet sobre unes altres files es refusa en lloc de reprendre's.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(study_name=f"{family}_seed_{seed}", direction="minimize",
@@ -123,7 +124,9 @@ def record(study, family, seed, smoke):
             "seed": seed, "trials": len(done), "made_on": study.user_attrs["made_on"],
             "best": [{"numbers": one.user_attrs["numbers"], "score": one.value,
                       "trial": one.number, "code": one.user_attrs["code"],
-                      "dataset": one.user_attrs["dataset"]} for one in done[:BEST]]}
+                      "dataset": one.user_attrs["dataset"],
+                      "environment": one.user_attrs["environment"]}
+                     for one in done[:BEST]]}
 
 
 def save(found, smoke):

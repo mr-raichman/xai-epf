@@ -24,7 +24,7 @@ PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
 DELETED = (datetime.date(2019, 4, 30), datetime.date(2019, 5, 6))
 
 # Les empremtes que desa cada prova.
-FINGERPRINTS = {"code": "codi", "dataset": "conjunt"}
+FINGERPRINTS = {"code": "codi", "dataset": "conjunt", "environment": "biblioteques"}
 
 
 def _table():

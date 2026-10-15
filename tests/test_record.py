@@ -24,3 +24,16 @@ def test_the_code_fingerprint_ignores_line_endings_and_sees_any_other_edit(tmp_p
     assert record.code(package) == linux
     (package / "contract" / "record.py").write_bytes(b"# un altre comentari\nx = 1\n")
     assert record.code(package) != linux
+
+
+def test_the_environment_fingerprint_ignores_line_endings_and_sees_a_version_change(tmp_path):
+    # L'entrada de LightGBM del `uv.lock` del projecte, llegida d'una còpia de Windows, i la
+    # mateixa amb una altra versió.
+    entry = '[[package]]\nname = "lightgbm"\nversion = "{}"\n'
+    lock = tmp_path / "uv.lock"
+    lock.write_bytes(entry.format("4.7.0").encode())
+    linux = record.environment(lock)
+    lock.write_bytes(entry.format("4.7.0").replace("\n", "\r\n").encode())
+    assert record.environment(lock) == linux
+    lock.write_bytes(entry.format("4.6.0").encode())
+    assert record.environment(lock) != linux

@@ -8,6 +8,9 @@ PACKAGE = pathlib.Path(__file__).resolve().parent
 ROOT = PACKAGE.parent
 KEYS = ROOT / "api-keys"
 
+# La versió exacta de cada biblioteca, que `uv run` instal·la abans de cada ordre.
+LOCK = ROOT / "uv.lock"
+
 # Els fitxers tal com els serveix la font, una carpeta per indicador amb el seu nom,
 # `downloads/<indicador>/<any>.json`, perquè un fitxer d'ESIOS només porta l'any al nom; a
 # la del preu, també els d'OMIE, `marginalpdbc_<dia>.<versió>`, que no xoquen. Només hi

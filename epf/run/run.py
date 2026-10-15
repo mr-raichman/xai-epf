@@ -63,17 +63,19 @@ def finished(where):
 
 def _where(smoke, fingerprints):
     """La passada on s'escriu: l'última del tipus si no és acabada, i si no la següent
-    d'avui. Continuar-ne una que han fet un altre codi o un altre conjunt de dades es
-    refusa, perquè les seves famílies no es podrien comparar."""
+    d'avui. Continuar-ne una que han fet un altre codi, un altre conjunt de dades o unes
+    altres biblioteques es refusa, perquè les seves famílies no es podrien comparar. Un
+    registre sense una de les empremtes d'ara és d'un altre codi."""
     found = paths.runs(smoke)
     if not found or finished(found[-1]):
         return paths.next_run(smoke, datetime.date.today())
     latest = found[-1]
     for path in sorted(latest.glob(f"*/{paths.SEED_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
-        if any(made[name] != value for name, value in fingerprints.items()):
-            raise ValueError(f"la passada {latest.name} es va fer amb un altre codi o un "
-                             f"altre conjunt de dades: acaba-la amb aquells, o esborra-la")
+        if any(made.get(name) != value for name, value in fingerprints.items()):
+            raise ValueError(f"la passada {latest.name} es va fer amb un altre codi, un altre "
+                             f"conjunt de dades o unes altres biblioteques: acaba-la amb "
+                             f"aquells, o esborra-la")
     return latest
 
 
