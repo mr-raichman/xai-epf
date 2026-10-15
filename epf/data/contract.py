@@ -7,7 +7,7 @@ hi ha res d'OMIE ni d'ESIOS, que això és de cada font i es comprova a `audit.p
 import numpy as np
 import pandas as pd
 
-from epf.market import HOURS_PER_DAY
+from epf.parameters import HOURS_PER_DAY
 
 
 def refuse_incoherent(name, frame, gaps=()):

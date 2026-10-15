@@ -10,7 +10,7 @@ import json
 import pandas as pd
 
 from epf.data import esios, schedule
-from epf.market import MARKET_TIMEZONE
+from epf.data.esios import MARKET_TIMEZONE
 
 DAYS = pd.date_range("2024-03-04", periods=3, freq="D")
 

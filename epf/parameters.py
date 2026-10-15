@@ -1,7 +1,8 @@
 """Tot el que s'ha triat per a una passada, un sol valor de cada.
 
-El que és un fet del mercat o de la font no és aquí: això viu a `market.py`, a
-`esios.py` i a `omie.py`, i canvia quan canvia el món, no quan es prova un número.
+El que és un fet del mercat o de la font no és aquí, llevat de les hores del dia: això
+viu a `data/esios.py` i a `data/omie.py`, i canvia quan canvia el món, no quan es prova
+un número.
 Els números d'un model tampoc: viuen amb el model, a
 `models/<nom>/<nom>_hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.
@@ -14,6 +15,11 @@ diu què s'hi provava.
 import datetime
 
 DAYS_PER_WEEK = 7
+
+# Les hores d'un dia local i el nom de la columna de cada una. Són un fet i no una tria, i
+# són aquí perquè les llegeix tot el paquet.
+HOURS_PER_DAY = 24
+HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
 # Els dos nivells d'una passada. Un assaig és petit i ràpid a propòsit i el seu error no
 # es desa, ni es cita, ni es compara enlloc; només una mesura dóna un resultat. El nivell

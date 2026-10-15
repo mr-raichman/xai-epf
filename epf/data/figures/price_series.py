@@ -3,7 +3,7 @@ import pandas as pd
 
 from epf import paths
 from epf.data.price import OMIE_FROM, load
-from epf.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.contract.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 
 OUTPUT = paths.PRICE_FIGURES / "price.png"
 

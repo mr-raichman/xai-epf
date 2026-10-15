@@ -16,10 +16,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 
-from epf.market import HOURS_PER_DAY
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR
+from epf.contract.features import DAY_OF_WEEK_COLUMNS, HOUR
 from epf.models.linear.linear_hyperparameters import MAX_ITER, NAME
 from epf.models.linear.scaling import Scaler
+from epf.parameters import HOURS_PER_DAY
 
 # El model d'una hora i el que cal per llegir-lo. `columns` són les de la matriu del
 # model en el seu ordre, les escalades i després els indicadors del dia de la setmana,

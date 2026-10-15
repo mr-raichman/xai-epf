@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from numpy.lib.stride_tricks import sliding_window_view
 
-from epf.market import HOURS_PER_DAY
+from epf.parameters import HOURS_PER_DAY
 
 # Veïns d'un preu: les hores adjacents de la sèrie cronològica, i la mateixa hora en
 # els dies del voltant.

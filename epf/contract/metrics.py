@@ -1,5 +1,6 @@
-"""El CRPS d'una predicció distribucional, el test de cobertura dels seus intervals, i la
-guarda que ha de passar el preu real.
+"""Les puntuacions de tots els models: la R-quadrat i el MAE, el CRPS d'una predicció
+distribucional, el test de cobertura dels seus intervals, i la guarda que ha de passar el
+preu real.
 
 Res d'aquí tria cap paràmetre: escollir es fa sobre la validació, no sobre la prova.
 """
@@ -87,3 +88,30 @@ def kupiec(actual, bounds, coverage):
     statistic = -2 * (xlogy(outside, 1 - coverage) + xlogy(inside, coverage)
                       - xlogy(outside, 1 - observed) - xlogy(inside, observed))
     return stats.chi2.sf(statistic, 1)
+
+
+def mae(predicted, actual):
+    return float(np.mean(np.abs(np.asarray(predicted) - np.asarray(actual))))
+
+
+def scored(predicted, actual):
+    """La R-quadrat i el MAE sobre totes les files de prova juntes."""
+    error = np.asarray(predicted) - np.asarray(actual)
+    spread = np.asarray(actual) - np.mean(actual)
+    return {"r2": float(1 - np.sum(error ** 2) / np.sum(spread ** 2)),
+            "mae": float(np.mean(np.abs(error)))}
+
+
+def scored_distribution(actual, quantiles):
+    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen el
+    test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
+
+    `actual` és la taula del preu real de les files de prova i `quantiles` la funció que
+    en dóna els quantils predits a les probabilitats que se li demanen, `(dies, hores,
+    probabilitats)`.
+    """
+    found = {"crps": crps(actual, quantiles(PERCENTILES))}
+    for level, bounds in INTERVALS.items():
+        values = kupiec(actual, quantiles(np.array(bounds)), level / 100)
+        found[f"kupiec_{level}"] = int((values >= SIGNIFICANCE).sum())
+    return found

@@ -27,6 +27,18 @@ PRICE_FIGURES = FIGURES / "price"
 # cosa que hi pengés, i fora de git.
 RUNS = ROOT / "runs"
 
+# Els fitxers d'una passada: un model per fitxer, la llavor i el lloc de la seva
+# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al costat.
+SEED = "seed_{seed}_{rank}.npz"
+SEED_RECORD = "record.json"
+
+
+def run_folder(tier, stage, commit):
+    """On viu una passada sencera: hi pengen els conjunts, les famílies i les figures
+    que les comparen."""
+    return RUNS / tier / stage / commit
+
+
 # Les cerques, al costat de les passades i no a dins: una cerca és d'un conjunt i d'una
 # partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles files.
 SEARCHES = ROOT / "searches"

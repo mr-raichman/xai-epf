@@ -24,7 +24,7 @@ import numpy as np
 from keras import ops
 from scipy import stats
 
-from epf.market import HOURS_PER_DAY
+from epf.parameters import HOURS_PER_DAY
 
 # Com surten l'escala i el pes de la cua de la sortida crua, al codi de Marcjasz et al.
 # (2023): `FLOOR + STRETCH * softplus` l'escala, que no pot ser zero perquè un zero hi fa

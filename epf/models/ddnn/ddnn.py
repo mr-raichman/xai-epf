@@ -24,11 +24,10 @@ import keras
 import numpy as np
 import shap
 
-from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS
+from epf.contract.features import DAY_OF_WEEK_COLUMNS
 from epf.models.ddnn.ddnn_hyperparameters import BATCH, EPOCHS, PATIENCE
 from epf.models.ddnn.distributions import parameters as raw_parameters
-from epf.parameters import SEED
+from epf.parameters import HOUR_COLUMNS, SEED
 
 # La columna del dia de la setmana que llegeix la xarxa, de dilluns 0 a diumenge 6, en
 # lloc dels set indicadors de la matriu: és el dia que es prediu, on el codi de l'article

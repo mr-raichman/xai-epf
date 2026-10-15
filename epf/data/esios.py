@@ -10,17 +10,32 @@ que hi viu a `ESIOS`, que és la resta d'indicadors.
 Aquí hi ha el client, amb la clau que llegeix del fitxer `api-keys` de l'arrel, i els
 fets de com ESIOS serveix cada sèrie. Quins indicadors formen un conjunt de dades és del
 conjunt, i es declara al seu mòdul.
+
+Hi ha també el rellotge del mercat, que el lector és el primer a fer servir: la zona
+horària, les hores que té de debò cada dia local, la reparació dels dies de canvi d'hora i
+el dia que el mercat va passar a quarts d'hora.
 """
 import datetime
 import json
 import pathlib
+import statistics
+import zoneinfo
 
 import pandas as pd
 import requests
 
-from epf.market import MARKET_TIMEZONE
+from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY
 from epf.paths import ESIOS, KEYS
-from epf.calendar import HOUR_COLUMNS, repair_dst
+
+# La zona horària del mercat diari espanyol, en la qual es compten els dies i les hores.
+MARKET_TIMEZONE = zoneinfo.ZoneInfo("Europe/Madrid")
+
+# Primer dia de lliurament amb 96 productes quart-horaris en lloc de 24 horaris.
+QUARTER_HOURLY_FROM = datetime.date(2025, 10, 1)
+QUARTERS_PER_HOUR = 4
+
+# Hora local que falta l'últim diumenge de març i es repeteix l'últim d'octubre.
+DST_HOUR = 2
 
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
@@ -178,6 +193,31 @@ def published_instants(values):
     """Els instants, en UTC, en què hi ha algun valor."""
     return set(pd.to_datetime([value["datetime"] for value in values], format="ISO8601",
                               utc=True))
+
+
+def local_hours(days):
+    """Hores que té realment cada dia local: 23 el del canvi de març, 25 el d'octubre."""
+    starts = pd.DatetimeIndex(days).tz_localize(MARKET_TIMEZONE)
+    return pd.Series((starts + pd.DateOffset(days=1) - starts) // pd.Timedelta(hours=1),
+                     index=days)
+
+
+def repair_dst(hours):
+    """Torna sempre 24 hores, corregint els dies de canvi d'hora amb mitjanes.
+
+    El dia de 23 hores rep la mitjana de les dues veïnes a l'hora que falta, i el
+    de 25 fusiona les dues hores repetides en la seva mitjana.
+    """
+    if len(hours) == HOURS_PER_DAY:
+        return hours
+    if len(hours) == HOURS_PER_DAY - 1:
+        inserted = statistics.mean(hours[DST_HOUR - 1:DST_HOUR + 1])
+        return hours[:DST_HOUR] + [inserted] + hours[DST_HOUR:]
+    if len(hours) == HOURS_PER_DAY + 1:
+        merged = statistics.mean(hours[DST_HOUR:DST_HOUR + 2])
+        return hours[:DST_HOUR] + [merged] + hours[DST_HOUR + 2:]
+    raise ValueError(f"un dia de {len(hours)} hores, s'esperaven "
+                     f"{HOURS_PER_DAY - 1}, {HOURS_PER_DAY} o {HOURS_PER_DAY + 1}")
 
 
 def hourly(values, anchor=None, past_last_day=False):

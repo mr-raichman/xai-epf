@@ -10,11 +10,10 @@ s'ajusten, i la pregunta del test no és seva.
 import numpy as np
 from scipy import stats
 
-from epf import figure
-from epf.calendar import HOUR_COLUMNS
-from epf.figure import plt
+from epf.contract import figure
+from epf.contract.figure import plt
 from epf.models.naive.naive import FORECASTS as COPIES
-from epf.parameters import DAYS_PER_WEEK, GAP
+from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
 
 # Retards del test, dues vegades el període setmanal, com aconsellen Hyndman i
 # Athanasopoulos per a una sèrie estacional.

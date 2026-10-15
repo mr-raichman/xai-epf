@@ -15,12 +15,11 @@ import datetime
 
 import pandas as pd
 
-from epf.calendar import local_hours
 from epf.data import esios, forecasts, omie, schedule
+from epf.data.esios import QUARTER_HOURLY_FROM, local_hours
 from epf.data.outliers import report
 from epf.data.price import ESIOS_FIRST_DAY, NAME, OMIE_FROM, from_esios, load
-from epf.market import HOURS_PER_DAY, QUARTER_HOURLY_FROM
-from epf.parameters import DAYS_PER_WEEK
+from epf.parameters import DAYS_PER_WEEK, HOURS_PER_DAY
 
 
 failures = []

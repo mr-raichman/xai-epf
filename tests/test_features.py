@@ -4,9 +4,8 @@ import datetime
 import pandas as pd
 import pytest
 
-from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS, HOUR, build, per_hour, schedule
-from epf.parameters import PREVIOUS_DAY
+from epf.contract.features import DAY_OF_WEEK_COLUMNS, HOUR, build, per_hour, tables
+from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
@@ -89,7 +88,7 @@ def test_day_d_forecasts_sit_on_day_d_in_both_tables():
     # fila llegiria la previsió d'ahir, que és plausible i equivocada.
     price = frame_of(range(30))
     day_ahead = {"demand": frame_of(range(30)) * 10}
-    matrices = schedule(price, day_ahead, {})
+    matrices = tables(price, day_ahead, {})
     (X, _), (rows, target) = matrices.daily, matrices.hourly
     day = X.index[10]
     for hour, column in enumerate(HOUR_COLUMNS):
@@ -107,7 +106,7 @@ def test_d_minus_one_schedule_sits_on_day_d_in_both_tables():
     # és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
     price = frame_of(range(30))
     scheduled = {"nuclear": frame_of(range(30)) * 7}
-    matrices = schedule(price, {}, scheduled)
+    matrices = tables(price, {}, scheduled)
     (X, _), (rows, _) = matrices.daily, matrices.hourly
     day = X.index[10]
     before = day - pd.Timedelta(days=1)

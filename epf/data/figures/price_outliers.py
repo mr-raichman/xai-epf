@@ -6,8 +6,8 @@ from epf import paths
 from epf.data.price import load
 from epf.data.outliers import (DAY_HALF_WIDTH, HIGHEST, HOUR_HALF_WIDTH, highest,
                                report)
-from epf.market import HOURS_PER_DAY
-from epf.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.parameters import HOURS_PER_DAY
+from epf.contract.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 
 from matplotlib.collections import LineCollection
 

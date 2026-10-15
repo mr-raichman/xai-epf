@@ -1,5 +1,5 @@
 """El protocol de Trebbien et al. (2023) sobre el període que es descriu, amb la
-partició de `split.py`: la robustesa és la dispersió entre llavors.
+partició de `contract/split.py`: la robustesa és la dispersió entre llavors.
 
 `epf describe` ajusta cada família explicada sobre cada conjunt i cada llavor, la puntua
 sobre les setmanes de prova al costat del sòl de l'ordre de mèrit, de les prediccions
@@ -16,20 +16,26 @@ import time
 
 import numpy as np
 
-from epf import evaluation, matrix, parameters, search
-from epf.matrix import DATE_PROBE, SCHEDULE
+from epf import parameters, paths
+from epf.contract import features
+from epf.contract.explanation import (PRICE_UNITS, TOLERANCE, TRANSFORMED_TOLERANCE,
+                                      TRANSFORMED_UNITS, UNITLESS, explained_rows, group,
+                                      summed)
+from epf.contract.features import DATE_PROBE, SCHEDULE
+from epf.contract.metrics import INTERVALS, scored, scored_distribution
+from epf.contract.record import plain, save_model
+from epf.contract.split import split, validation_parts
+from epf.contract.study import configurations
 from epf.data import forecasts, price, schedule
-from epf.market import HOURS_PER_DAY
 from epf.models.boosting import boosting, boosting_hyperparameters
 from epf.models.ddnn import ddnn, ddnn_hyperparameters
 from epf.models.ddnn.distributions import FAMILIES as DISTRIBUTIONS
 from epf.models.ddnn.distributions import POINT, POINT_FAMILY
 from epf.models.linear import linear, linear_hyperparameters
 from epf.models.naive import naive
-from epf.parameters import (BEST, BLACKOUT_WEEK, DESCRIPTIONS, DEVELOPMENT,
+from epf.parameters import (BEST, BLACKOUT_WEEK, DESCRIPTIONS, DEVELOPMENT, HOURS_PER_DAY,
                             INTERACTION_ROWS, MEASUREMENT, SMOKE)
 from epf.results import describe_figures, run_files
-from epf.split import split, validation_parts
 
 # -------------------------------------------------------------------- la passada
 
@@ -43,28 +49,6 @@ FLOOR = "floor"
 
 # Grau del polinomi del sòl, el cúbic de Trebbien et al. (2023).
 FLOOR_DEGREE = 3
-
-# Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
-# et al. (2021), on la base més les contribucions no són un preu, o cap, que són
-# l'asimetria i el pes de la cua d'una distribució.
-PRICE_UNITS = "EUR/MWh"
-TRANSFORMED_UNITS = "espai transformat"
-UNITLESS = "sense unitats"
-
-# Marge de la comprovació d'additivitat, en EUR/MWh: molt per sota de qualsevol
-# diferència que vulgui dir res en un preu. Es comprova sobre el que hi ha a la memòria,
-# abans de desar, i el residu de cada llavor s'imprimeix al costat de les seves
-# puntuacions.
-TOLERANCE = 1e-3
-
-# Marge de l'additivitat a l'espai transformat, a part perquè és en les seves unitats i
-# no en un preu: en EUR/MWh val tant com el de dalt, perquè a prop d'1 la derivada de
-# `sinh` és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
-TRANSFORMED_TOLERANCE = 1e-4
-
-# El que es pot moure un nombre, en relatiu, en desar-lo a `float32`, que és com es desen
-# les taules de més d'una dimensió: la meitat de l'èpsilon del format.
-ROUNDING = np.finfo(np.float32).eps / 2
 
 # El que surt de descriure una família en una llavor: la predicció i el preu de les
 # files de prova en el mateix ordre, el que es desa de l'explicació, el pitjor residu de
@@ -81,81 +65,34 @@ Described = collections.namedtuple(
 IN_SAMPLE = ("training", "validation")
 
 
-def group(column):
-    """El grup d'una columna a la importància per grups: el dia abans, cada previsió, cada
-    grup del programa, el calendari i, a la prova de datació, el comptador de dies."""
-    if column.startswith("lag1_"):
-        return "previous_day"
-    for name in (*forecasts.INDICATORS, *schedule.GROUPS):
-        if column == name or column.startswith(f"{name}_"):
-            return name
-    return "date" if column == matrix.DAY_COUNTER else "calendar"
-
-
 def _parts_of(X, parts, explained):
     """Les files de cada part i les que s'expliquen, com a màscares."""
     return [X.index.isin(days) for days in (*parts, explained)]
-
-
-def _summed(base, values, axis):
-    """La base més les contribucions sumades sobre `axis`, en `float64`, i la suma dels
-    seus valors absoluts, que fita el que l'arrodoniment a `float32` hi pot haver mogut."""
-    base = np.asarray(base, dtype=np.float64)
-    values = np.asarray(values, dtype=np.float64)
-    return base + values.sum(axis=axis), np.abs(base) + np.abs(values).sum(axis=axis)
-
-
-def _explained_rows(found, per_day):
-    """Les files de les prediccions de prova d'un fitxer que són dels dies explicats.
-
-    Són les primeres, perquè la partició dona els dies de cada part en ordre de data i
-    s'expliquen els primers dies de prova; el fitxer ho ha de confirmar, amb els seus dies
-    explicats al començament dels seus dies de prova.
-    """
-    explained, test = found["days_explained"], found["days_test"]
-    if not np.array_equal(explained, test[:len(explained)]):
-        raise ValueError("els dies explicats del fitxer no són els primers dels seus dies "
-                         "de prova")
-    return slice(0, per_day * len(explained))
 
 
 def _tree_sums(found, best):
     """Les sumes de l'arbre sobre el seu fitxer: la base més els valors de cada fila
     contra la seva predicció i, a la millor configuració, cada fila d'interaccions
     contra el valor de la seva columna."""
-    sums = [(*_summed(found["base"], found["values"], 1),
-             found["predicted"][_explained_rows(found, HOURS_PER_DAY)])]
+    sums = [(*summed(found["base"], found["values"], 1),
+             found["predicted"][explained_rows(found, HOURS_PER_DAY)])]
     if best:
-        sums.append((*_summed(0.0, found["interactions"], 2),
+        sums.append((*summed(0.0, found["interactions"], 2),
                      found["values"][found["interaction_rows"]]))
     return sums
 
 
 def _net_sums(found):
     """La suma de la xarxa elàstica sobre el seu fitxer, a l'espai transformat."""
-    return [(*_summed(found["base"], found["values"], 1), found["transformed"])]
+    return [(*summed(found["base"], found["values"], 1), found["transformed"])]
 
 
 def _network_sums(found):
     """La suma d'una xarxa distribucional sobre el seu fitxer, contra els paràmetres de
     prova dels dies explicats. La de la base contra la mitjana dels dies d'entrenament
     només es fa a la memòria: el fitxer no en desa els paràmetres."""
-    return [(*_summed(found["base"], found["values"], 1),
-             found["parameters"][_explained_rows(found, 1)])]
-
-
-def _read_back(path, stored, tolerance):
-    """Quant es passen del seu marge les sumes d'un fitxer desat, en el pitjor cas: el
-    marge és el de la comprovació a la memòria més el que l'arrodoniment a `float32`
-    pot haver mogut els termes de cada suma, i zero o menys vol dir que el fitxer torna
-    el que explica."""
-    worst = []
-    with np.load(path) as found:
-        for total, magnitude, target in stored(found):
-            target = np.asarray(target, dtype=np.float64)
-            margin = tolerance + ROUNDING * (magnitude + np.abs(target))
-            worst.append(np.max(np.abs(total - target) - margin))
-    return float(np.max(worst))
+    return [(*summed(found["base"], found["values"], 1),
+             found["parameters"][explained_rows(found, 1)])]
 
 
 def _tree(X, y, parts, explained, seed, numbers, best):
@@ -333,94 +270,15 @@ def describers():
     return found
 
 
-def configurations(tier, family, describer, columns, seeds, best_only):
-    """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada una
-    amb el seu lloc a la cerca.
-
-    Les de la cerca de la família al nivell, si totes les llavors en tenen, `kept` de
-    cada una, o la millor sola amb `best_only`; els números de lloc, marcats, si no en té
-    cap cap llavor; i una sola sense números per a una família que no es cerca. Una cerca
-    que només té algunes llavors es refusa: la dispersió barrejaria llavors cercades i
-    sense cercar, i res no ho diria. `columns` són les de la taula sobre la qual es cerca
-    la família, que la cerca compara amb les seves.
-    """
-    if not describer.kept:
-        return {seed: [{"rank": 0}] for seed in seeds}
-    found = {seed: search.searched(tier, family, seed, columns) for seed in seeds}
-    missing = [seed for seed, record in found.items() if record is None]
-    if len(missing) == len(seeds):
-        return {seed: [{"rank": 0, "numbers": describer.placeholder, "unsearched": True}]
-                for seed in seeds}
-    if missing:
-        raise ValueError(f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
-                         f"epf search abans de descriure-la")
-    kept = 1 if best_only else describer.kept
-    return {seed: [{"rank": rank, "numbers": one["numbers"], "score": one["score"],
-                    "trial": one["trial"], "trials": record["trials"]}
-                   for rank, one in enumerate(record["best"][:kept])]
-            for seed, record in found.items()}
-
-
 def _tables(frame, day_ahead, scheduled):
     """Les taules de cada conjunt, per nom i per taula. La del preu és la sèrie sencera
     amb el preu real del conjunt, per a les prediccions ingènues, que copien dies que el
     conjunt no porta."""
-    found = matrix.schedule(frame, day_ahead, scheduled)
+    found = features.tables(frame, day_ahead, scheduled)
     return {SCHEDULE: {"hourly": found.hourly, "daily": found.daily,
                        "price": (frame, found.actual)},
-            DATE_PROBE: {"hourly": matrix.date_probe(frame, day_ahead, scheduled,
+            DATE_PROBE: {"hourly": features.date_probe(frame, day_ahead, scheduled,
                                                      DEVELOPMENT[0])}}
-
-
-def scored(predicted, actual):
-    """La R-quadrat i el MAE sobre totes les files de prova juntes."""
-    error = np.asarray(predicted) - np.asarray(actual)
-    spread = np.asarray(actual) - np.mean(actual)
-    return {"r2": float(1 - np.sum(error ** 2) / np.sum(spread ** 2)),
-            "mae": float(np.mean(np.abs(error)))}
-
-
-def scored_distribution(actual, quantiles):
-    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen el
-    test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
-
-    `actual` és la taula del preu real de les files de prova i `quantiles` la funció que
-    en dóna els quantils predits a les probabilitats que se li demanen, `(dies, hores,
-    probabilitats)`.
-    """
-    found = {"crps": evaluation.crps(actual, quantiles(evaluation.PERCENTILES))}
-    for level, bounds in evaluation.INTERVALS.items():
-        values = evaluation.kupiec(actual, quantiles(np.array(bounds)), level / 100)
-        found[f"kupiec_{level}"] = int((values >= evaluation.SIGNIFICANCE).sum())
-    return found
-
-
-def _days(index):
-    return index.to_numpy().astype("datetime64[D]")
-
-
-def _save(path, parts, explained, described, scores, rank):
-    """Desa un model, primer a un fitxer a part i després al seu nom, de manera que un
-    fitxer amb nom és sempre un model sencer i, d'un model explicat, un que torna el que
-    explica: les sumes de l'explicació es tornen a fer sobre el que s'ha escrit."""
-    arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
-    arrays |= {"rank": rank, "days_explained": _days(explained),
-               "predicted": described.predicted,
-               "actual": described.actual, "gap": described.gap, **scores}
-    for name, value in described.arrays.items():
-        value = np.asarray(value)
-        arrays[name] = value.astype(np.float32) if value.dtype.kind == "f" and value.ndim > 1 else value
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_suffix(".part")
-    with open(partial, "wb") as handle:
-        np.savez(handle, **arrays)
-    if described.stored is not None:
-        excess = _read_back(partial, described.stored, described.tolerance)
-        # `not ... <= 0` i no `> 0`, perquè un NaN també es refusi.
-        if not excess <= 0:
-            raise ValueError(f"l'explicació desada a {partial} no torna el que explica: "
-                             f"se'n passa del marge en {excess:.3g}")
-    partial.replace(path)
 
 
 def main(arguments):
@@ -438,7 +296,7 @@ def main(arguments):
         return 1
 
     seeds, explained_days = DESCRIPTIONS[arguments.tier]
-    where = run_files.run_folder(arguments.tier, STAGE, commit[:7])
+    where = paths.run_folder(arguments.tier, STAGE, commit[:7])
     # Reprendre és de la mesura i prou: l'assaig admet l'arbre brut, i dues còpies
     # diferents del codi en compartirien el directori.
     if arguments.tier == SMOKE or arguments.replace:
@@ -472,7 +330,7 @@ def main(arguments):
                 explained = parts.test if explained_days is None else parts.test[:explained_days]
                 for configuration in plans[family, name][seed]:
                     rank = configuration["rank"]
-                    path = folder / run_files.SEED.format(seed=seed, rank=rank)
+                    path = folder / paths.SEED.format(seed=seed, rank=rank)
                     if path.exists():
                         continue
                     start = time.time()
@@ -486,12 +344,12 @@ def main(arguments):
                             f"{described.tolerance}")
                     scores = scored(described.predicted, described.actual)
                     scores |= described.scores or {}
-                    _save(path, parts, explained, described, scores, rank)
+                    save_model(path, parts, explained, described, scores, rank)
                     described_now.append([seed, rank])
                     distribution = "" if described.scores is None else (
                         f", CRPS {scores['crps']:.2f}, hores que passen el test de Kupiec: "
                         + " i ".join(f"{scores[f'kupiec_{level}']} al {level}%"
-                                     for level in evaluation.INTERVALS))
+                                     for level in INTERVALS))
                     print(f"{name} {family} llavor {seed} configuració {rank}: R² "
                           f"{scores['r2']:.3f}, MAE {scores['mae']:.2f} EUR/MWh"
                           f"{distribution}, residu de l'explicació {described.gap:.1e}, "
@@ -503,8 +361,8 @@ def main(arguments):
                       "described_now": described_now,
                       "seconds_now": round(time.time() - started, 1),
                       "parameters": swept}
-            (folder / run_files.SEED_RECORD).write_text(
-                json.dumps(run_files.plain(record), indent=2))
+            (folder / paths.SEED_RECORD).write_text(
+                json.dumps(plain(record), indent=2))
     describe_figures.draw(where)
     print(f"la passada és a {where}, amb les seves figures")
     return 0

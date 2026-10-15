@@ -16,9 +16,9 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from epf.calendar import HOUR_COLUMNS
-from epf.evaluation import PERCENTILES, crps
+from epf.contract.metrics import PERCENTILES, crps
 from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
+from epf.parameters import HOUR_COLUMNS
 
 DAYS = 40
 

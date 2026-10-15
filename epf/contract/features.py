@@ -12,9 +12,8 @@ import collections
 import numpy as np
 import pandas as pd
 
-from epf.calendar import HOUR_COLUMNS
-from epf.market import HOURS_PER_DAY
-from epf.parameters import DAYS_PER_WEEK, FORECAST_LAG, PREVIOUS_DAY, SCHEDULE_LAG
+from epf.parameters import (DAYS_PER_WEEK, FORECAST_LAG, HOUR_COLUMNS, HOURS_PER_DAY,
+                            PREVIOUS_DAY, SCHEDULE_LAG)
 
 HOUR = "hour"
 PRICE = "price"
@@ -89,16 +88,14 @@ def per_hour(X, y, at_the_hour=()):
 SCHEDULE, DATE_PROBE = "schedule", "date_probe"
 
 
-def schedule(frame, day_ahead, scheduled):
+def tables(frame, day_ahead, scheduled):
     """Les dues matrius del conjunt: les 24 hores del preu del dia abans, les previsions
     D+1 del dia que es lliura i el programa del dia abans, cada sèrie per nom, i el dia
     de la setmana.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
     la diària, que és la de les xarxes, amb les 24 hores de cada sèrie, i la per hora,
-    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. Es
-    diu com el conjunt de dades del programa, que és el que hi afegeix, i és una altra
-    cosa, un conjunt d'informació.
+    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila.
     """
     inputs = ({name: (table, FORECAST_LAG) for name, table in day_ahead.items()}
               | {name: (table, SCHEDULE_LAG) for name, table in scheduled.items()})
@@ -111,6 +108,6 @@ def date_probe(frame, day_ahead, scheduled, start):
     """El conjunt amb un comptador de dies, els que han passat des de `start`: la prova
     de datació de Trebbien et al. (2023), que treu el que un model pot fer amb la data i
     res més. Només la taula per hora, perquè només l'arbre l'ajusta."""
-    rows, target = schedule(frame, day_ahead, scheduled).hourly
+    rows, target = tables(frame, day_ahead, scheduled).hourly
     counter = (rows.index - pd.Timestamp(start)).days
     return rows.assign(**{DAY_COUNTER: counter.to_numpy()}), target

@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNetCV
 
-from epf.calendar import HOUR_COLUMNS
-from epf.matrix import HOUR, schedule
+from epf.parameters import HOUR_COLUMNS
+from epf.contract.features import HOUR, tables
 from epf.models.linear.linear import (_by_hour, _prepared, attribute_rows, fit_rows,
                                       predict_rows)
 from epf.models.linear.search import penalties
@@ -31,7 +31,7 @@ def per_hour_table(days=120, seed=0):
     day_ahead = {"demand": frame(rng.uniform(20000, 40000, (days, 24))),
                  "wind": frame(rng.uniform(500, 15000, (days, 24))),
                  "solar": frame(solar)}
-    return schedule(frame(rng.uniform(-2, 200, (days, 24))), day_ahead, {}).hourly
+    return tables(frame(rng.uniform(-2, 200, (days, 24))), day_ahead, {}).hourly
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():

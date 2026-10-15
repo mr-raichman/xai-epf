@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from epf.results import run_files
+from epf.contract import record
 
 
 def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
     with pytest.raises(TypeError):
-        json.dumps(run_files.plain({"bad": object()}))
+        json.dumps(record.plain({"bad": object()}))

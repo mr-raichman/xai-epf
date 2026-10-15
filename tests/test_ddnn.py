@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf.calendar import HOUR_COLUMNS
-from epf.matrix import DAY_OF_WEEK_COLUMNS
+from epf.contract.features import DAY_OF_WEEK_COLUMNS
 from epf.models.ddnn.ddnn import attribute_rows, build, fit_rows, parameters_rows
 from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
+from epf.parameters import HOUR_COLUMNS
 
 # Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn
 # de com d'ajustada estigui.

@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from epf.calendar import HOUR_COLUMNS
-from epf.evaluation import SIGNIFICANCE, kupiec, refuse_missing
+from epf.contract.metrics import SIGNIFICANCE, kupiec, refuse_missing
+from epf.parameters import HOUR_COLUMNS
 
 
 def frame_of(days, start=datetime.date(2024, 1, 1), offset=0.0):

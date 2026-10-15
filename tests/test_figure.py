@@ -1,8 +1,8 @@
-"""Les figures d'una passada: la importància per grups i la parella a l'hora."""
+"""Les figures dels models explicats: la importància per grups i la parella a l'hora."""
 import numpy as np
 
-from epf.calendar import HOUR_COLUMNS
-from epf.results.describe_figures import _outputs, _pairs, shares
+from epf.contract.figure import outputs, pairs, shares
+from epf.parameters import HOUR_COLUMNS
 
 
 def test_a_group_sums_its_columns_before_the_absolute_value():
@@ -27,7 +27,7 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
     seed = {"values": values, "names": np.array(["location"]),
             "columns": np.array(columns), "inputs": inputs,
             "groups": np.array(["other"] + ["demand"] * len(HOUR_COLUMNS))}
-    x, y = _pairs(seed, "location", _outputs(seed)["location"], "demand")
+    x, y = pairs(seed, "location", outputs(seed)["location"], "demand")
     expected_y = [101 * h + 1000 * d for d in range(days) for h in range(24)]
     expected_x = [inputs[d, h + 1] for d in range(days) for h in range(24)]
     assert np.array_equal(y, expected_y)

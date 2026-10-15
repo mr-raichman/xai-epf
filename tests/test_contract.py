@@ -8,7 +8,7 @@ forat desplacen els retards cap a un dia que no és el que toca, una graella que
 import pandas as pd
 import pytest
 
-from epf.calendar import HOUR_COLUMNS
+from epf.parameters import HOUR_COLUMNS
 from epf.data.contract import refuse_incoherent
 
 DAYS = 10

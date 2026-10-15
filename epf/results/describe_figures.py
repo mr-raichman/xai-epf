@@ -8,152 +8,13 @@ grup, la dependència de les tres previsions i, a l'arbre, les seves interaccion
 """
 import numpy as np
 
-from epf import figure
-from epf.calendar import HOUR_COLUMNS
-from epf.data import forecasts, schedule
-from epf.figure import plt
-from epf.results import residuals, run_files
-
-# Com es diu cada grup de columnes a les figures.
-GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòlica",
-                "solar": "fotovoltaica", "nuclear": "nuclear", "coal_gas": "carbó i gas",
-                "hydro": "hidràulica", "calendar": "calendari",
-                "date": "comptador de dies"}
-
-# Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de
-# les famílies que n'expliquen un de sol.
-OUTPUT_LABELS = {"": "contribució", "location": "localització", "scale": "escala",
-                 "skewness": "asimetria", "tail_weight": "pes de la cua"}
-
-# Les sèries del dia que es lliura o del dia abans que tenen gràfic de dependència: les
-# tres previsions, com a Trebbien et al. (2023), i els tres grups del programa, igual.
-DEPENDENCE = (*forecasts.INDICATORS, *schedule.GROUPS)
-
-# Columnes que mostra la importància per columna; la resta compten al seu grup.
-SHOWN = 20
+from epf.contract import figure
+from epf.contract.figure import plt
+from epf.results import residuals
 
 # Socis de cada previsió a les interaccions: els tres que més hi interactuen, la regla
 # que fa de les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
-
-# MW per GW, perquè els pendents es llegeixen per GW com a l'article.
-PER_GW = 1000
-
-
-def _seeds(folder):
-    """Els models desats d'una família, un per fitxer, en ordre de llavor i de
-    configuració: el primer és la millor configuració de la primera llavor."""
-    paths = sorted(folder.glob(run_files.SEED.format(seed="*", rank="*")),
-                   key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]))
-    return [np.load(path) for path in paths]
-
-
-def _outputs(seed):
-    """Les contribucions de cada sortida explicada, `(files, columnes)`, i les entrades
-    que hi corresponen, per nom de sortida.
-
-    L'arbre i la xarxa elàstica en tenen una per fila. La xarxa distribucional en té una
-    per paràmetre, amb una fila per dia i hora, on la columna d'una previsió a l'hora de
-    la fila és la que la parella a l'hora.
-    """
-    values = seed["values"]
-    if values.ndim == 2:
-        return {"": values}
-    return {str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
-            for number, name in enumerate(seed["names"])}
-
-
-def shares(values, groups):
-    """La importància normalitzada a u de cada columna i de cada grup, la de Trebbien et al.
-    (2023): la mitjana del valor absolut, i la d'un grup suma les contribucions de les
-    seves columnes abans de prendre'l."""
-    by_column = np.abs(values).mean(axis=0)
-    names = list(dict.fromkeys(groups))
-    by_group = np.array([np.abs(values[:, groups == name].sum(axis=1)).mean()
-                         for name in names])
-    return by_column / by_column.sum(), dict(zip(names, by_group / by_group.sum()))
-
-
-def _importance(folder, seeds):
-    """La importància de les columnes que més pesen i la dels grups, amb cada llavor."""
-    outputs = list(_outputs(seeds[0]))
-    groups = seeds[0]["groups"]
-    columns = seeds[0]["columns"]
-    for kind in ("columns", "groups"):
-        panels, axes = plt.subplots(1, len(outputs), figsize=(5 * len(outputs), 6),
-                                    facecolor=figure.SURFACE, squeeze=False)
-        for axis, output in zip(axes[0], outputs):
-            found = [shares(_outputs(seed)[output], groups) for seed in seeds]
-            if kind == "columns":
-                table = np.array([by_column for by_column, _ in found])
-                order = np.argsort(table.mean(axis=0))[-SHOWN:]
-                names = columns[order]
-            else:
-                labels = list(found[0][1])
-                table = np.array([[by_group[name] for name in labels] for _, by_group in found])
-                order = np.arange(len(labels))
-                names = [GROUP_LABELS[name] for name in labels]
-            positions = np.arange(len(order))
-            axis.barh(positions, table[:, order].mean(axis=0), color=figure.SERIES, height=0.6)
-            for row in table[:, order]:
-                axis.plot(row, positions, "o", color=figure.INK, markersize=2)
-            axis.set_yticks(positions, names, fontsize=7)
-            axis.set_xlabel("part de la importància", color=figure.MUTED_INK)
-            figure.style(axis, f"{OUTPUT_LABELS[output]}, models: {len(seeds)}")
-        figure.save(panels, folder, "importance" if kind == "columns" else "groups")
-
-
-def _members(seed, name):
-    """Les columnes de la sèrie `name`, pel grup que la passada hi va desar: una a la
-    taula per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""
-    members = np.flatnonzero(seed["groups"] == name)
-    if len(members) == 1:
-        return members
-    hour = {column: number for number, column in enumerate(HOUR_COLUMNS)}
-    return np.array(sorted(members,
-                           key=lambda j: hour[str(seed["columns"][j]).rsplit("_", 1)[1]]))
-
-
-def _pairs(seed, output, values, name):
-    """El valor de la sèrie i la seva contribució, a l'hora de cada fila."""
-    inputs = seed["inputs"]
-    members = _members(seed, name)
-    if len(members) == 1:
-        return inputs[:, members[0]], values[:, members[0]]
-    # La xarxa distribucional: a la fila del dia d i l'hora h, la columna de l'hora h.
-    x = inputs[:, members]
-    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[:, np.arange(len(members)),
-                                                           members]
-    return x.ravel(), y.ravel()
-
-
-def _dependence(folder, seeds, present):
-    """La contribució de cada previsió contra el seu valor, al millor model de la primera
-    llavor, amb la recta ajustada i el pendent de tots els models, que és el que
-    Trebbien et al. (2023) llegeixen."""
-    outputs = list(_outputs(seeds[0]))
-    units = dict(zip(outputs, seeds[0]["units"]))
-    panels, axes = plt.subplots(len(present), len(outputs),
-                                figsize=(4.5 * len(outputs), 3.5 * len(present)),
-                                facecolor=figure.SURFACE, squeeze=False)
-    for row, name in zip(axes, present):
-        for axis, output in zip(row, outputs):
-            slopes = []
-            for number, seed in enumerate(seeds):
-                x, y = _pairs(seed, output, _outputs(seed)[output], name)
-                slope, intercept = np.polyfit(x / PER_GW, y, 1)
-                slopes.append(slope)
-                if number == 0:
-                    axis.plot(x / PER_GW, y, ".", color=figure.SERIES, markersize=1,
-                              alpha=0.3)
-                    span = np.array([x.min(), x.max()]) / PER_GW
-                    axis.plot(span, slope * span + intercept, color=figure.INK, linewidth=1)
-            axis.set_xlabel(f"{GROUP_LABELS[name]}, GW", color=figure.MUTED_INK)
-            axis.set_ylabel(f"{OUTPUT_LABELS[output]}, {units[output]}",
-                            color=figure.MUTED_INK)
-            figure.style(axis, f"pendent {np.mean(slopes):.3g} (±{np.std(slopes):.2g}), "
-                               f"{units[output]} per GW")
-    figure.save(panels, folder, "dependence")
 
 
 def _interactions(folder, seed, present):
@@ -168,8 +29,8 @@ def _interactions(folder, seed, present):
                                 figsize=(4 * (2 + PARTNERS), 3.5 * len(present)),
                                 facecolor=figure.SURFACE, squeeze=False)
     for row, name in zip(axes, present):
-        (j,) = _members(seed, name)
-        x = inputs[:, j] / PER_GW
+        (j,) = figure.members(seed, name)
+        x = inputs[:, j] / figure.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
         strength[j] = -np.inf
         partners = np.argsort(strength)[-PARTNERS:][::-1]
@@ -183,7 +44,7 @@ def _interactions(folder, seed, present):
             else:
                 image = axis.scatter(x, y, c=colour, cmap=figure.MAGNITUDE, s=3)
                 figure.colorbar(panels, image, axis, "valor del soci")
-            axis.set_xlabel(f"{GROUP_LABELS[name]}, GW", color=figure.MUTED_INK)
+            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW", color=figure.MUTED_INK)
             figure.style(axis, title)
     figure.save(panels, folder, "interactions")
 
@@ -222,13 +83,13 @@ def _floor(where, seeds):
     """El preu contra la càrrega residual a les files d'entrenament de la llavor 0, en
     densitat, i el polinomi cúbic de cada llavor, la figura del sòl de l'article."""
     first = seeds[0]
-    load = first["load_training"] / PER_GW
+    load = first["load_training"] / figure.PER_GW
     panels, axis = plt.subplots(figsize=(8, 5), facecolor=figure.SURFACE)
     image = axis.hist2d(load, first["actual_training"], bins=80, cmap=figure.MAGNITUDE)[3]
     figure.colorbar(panels, image, axis, "hores")
     span = np.linspace(load.min(), load.max(), 200)
     for seed in seeds:
-        axis.plot(span, np.polyval(seed["coefficients"], span * PER_GW),
+        axis.plot(span, np.polyval(seed["coefficients"], span * figure.PER_GW),
                   color=figure.INK, linewidth=0.6)
     axis.set_xlabel("càrrega residual prevista, GW", color=figure.MUTED_INK)
     axis.set_ylabel("preu, EUR/MWh", color=figure.MUTED_INK)
@@ -241,7 +102,7 @@ def draw(where):
     """Totes les figures d'una passada, a partir del que hi ha desat."""
     described = {}
     for folder in sorted(path for path in where.glob("*/*") if path.is_dir()):
-        seeds = _seeds(folder)
+        seeds = figure.seeds(folder)
         if not seeds:
             continue
         described[(folder.parent.name, folder.name)] = seeds
@@ -250,11 +111,11 @@ def draw(where):
         # Els bancs de comparació no s'expliquen.
         if "values" not in seeds[0].files:
             continue
-        _importance(folder, seeds)
+        figure.importance(folder, seeds)
         names = set(seeds[0]["groups"])
-        present = [name for name in DEPENDENCE if name in names]
+        present = [name for name in figure.DEPENDENCE if name in names]
         if present:
-            _dependence(folder, seeds, present)
+            figure.dependence(folder, seeds, present)
             if "interactions" in seeds[0].files:
                 _interactions(folder, seeds[0], present)
     if described:

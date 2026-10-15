@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from epf.models.naive.naive import bootstrapped, previous_day, previous_week, similar_day
-from test_matrix import frame_of
+from test_features import frame_of
 
 
 def test_each_copy_reads_its_own_day_the_weekly_one_seven_back():
