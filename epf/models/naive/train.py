@@ -2,7 +2,7 @@
 
 No s'ajusta res: cada una copia les 24 hores d'un dia que ja es coneixia. Es copien de la
 sèrie del preu i no de la matriu, perquè la setmana anterior no és cap entrada, i als dies
-de prova que té la taula diària, de manera que es puntuen sobre les files de totes les
+de prova que té la matriu diària, de manera que es puntuen sobre les files de totes les
 famílies. La del dia similar porta, a més, la distribució amb què Marcjasz et al. (2023) la
 fan probabilística. Es puntuen i no s'expliquen.
 """
@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.metrics import INTERVALS, scored, scored_distribution
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
@@ -87,7 +87,7 @@ FAMILIES = {name: {"fixed": numbers | ({"bootstrap_from": IN_SAMPLE}
 
 
 def _fitted(family, price, y, parts):
-    """La còpia de la família als dies de prova de la taula, i, de la del dia similar, la
+    """La còpia de la família als dies de prova de la matriu, i, de la del dia similar, la
     seva distribució puntuada, amb els errors dels dies de `IN_SAMPLE`, que es desen."""
     forecast, _ = FORECASTS[family]
     days = y.index[y.index.isin(parts.test)]
@@ -107,8 +107,8 @@ def _fitted(family, price, y, parts):
 def train(family, folder, configurations, explained_days):
     """La passada d'una família: per a cada llavor, la còpia puntuada i desada. Torna les
     parelles `[llavor, configuració]` que ha desat ara."""
-    series = features.series()
-    price, y = series[features.PRICE], features.tables(series).actual
+    series = matrix.series()
+    price, y = series[matrix.PRICE], matrix.matrices(series).actual
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

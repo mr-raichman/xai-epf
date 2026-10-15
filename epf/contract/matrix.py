@@ -82,7 +82,7 @@ def build(series, information):
 def per_hour(X, y, at_the_hour=()):
     """Les mateixes files repartides en una per dia i hora, amb l'hora com a columna.
 
-    El gradient boosting comparteix un sol model per a totes les hores i és la taula
+    El gradient boosting comparteix un sol model per a totes les hores i és la matriu
     que li cal. L'índex continua sent el dia de lliurament, repetit 24 vegades,
     perquè la partició hi segueixi triant per dia.
 
@@ -144,7 +144,7 @@ def series():
     return found
 
 
-def tables(series):
+def matrices(series):
     """Les dues matrius del conjunt d'informació, `INFORMATION`, i el preu que prediuen: les
     24 hores del preu del dia abans, les previsions D+1 del dia que es lliura i el programa
     del dia abans, cada sèrie pel seu nom, i el dia de la setmana.

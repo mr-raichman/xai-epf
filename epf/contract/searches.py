@@ -76,7 +76,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
 
     `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i la
     prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua
-    sobre les de validació, i la taula no n'hi dóna cap altra. Els números que en surten es
+    sobre les de validació, i la matriu no n'hi dóna cap altra. Els números que en surten es
     desen a la prova, en la forma en què els pren l'ajust, amb les empremtes,
     `fingerprints`, del codi, del conjunt de dades i de les biblioteques que la fan. Un
     estudi fet sobre unes altres files es refusa en lloc de reprendre's.
@@ -162,7 +162,7 @@ def configurations(smoke, plan, columns, seeds):
     números de lloc, `placeholder`, marcats, si no en té cap cap llavor; i una sola sense
     números per a una família que no es cerca, `kept` zero. Una cerca que només té algunes
     llavors es refusa: la dispersió barrejaria llavors cercades i sense cercar, i res no ho
-    diria. `columns` són les de la taula sobre la qual es cerca, que la cerca compara amb
+    diria. `columns` són les de la matriu sobre la qual es cerca, que la cerca compara amb
     les seves.
     """
     if not plan["kept"]:

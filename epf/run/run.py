@@ -5,7 +5,7 @@ partició de `contract/split.py`: la robustesa és la dispersió entre llavors.
 l'ajusta a cada llavor, la puntua sobre les setmanes de prova i n'explica les files de
 prova si el model s'explica. Continua l'última passada del seu tipus mentre no és
 acabada, amb totes les famílies, i si ho és en comença una altra; en diu el nom primer.
-Abans d'ajustar-ne cap, planifica amb `contract/study.py` les famílies triades que encara
+Abans d'ajustar-ne cap, planifica amb `contract/searches.py` les famílies triades que encara
 no hi tenen pla: les millors configuracions de la cerca de cada llavor o, mentre la cerca
 no s'ha fet, uns números que no s'han cercat. El pla queda al registre de la família i ja
 no canvia, i cada ajust, el primer també, el llegeix d'allà. Tot es desa per llavor, de
@@ -17,8 +17,8 @@ import json
 import time
 
 from epf import parameters, paths
-from epf.contract import features, record
-from epf.contract.study import configurations
+from epf.contract import matrix, record
+from epf.contract.searches import configurations
 from epf.run import families, figures, search
 
 # Cada família, en l'ordre en què una passada les ajusta, amb el mòdul del seu model que
@@ -84,11 +84,11 @@ def main(arguments):
     # Tot el que es pot refusar, abans d'escriure res: les famílies, el conjunt de dades, la
     # passada, i el pla de cada família que encara no en té, de manera que una cerca a
     # mitges o feta sobre unes altres files es refusa abans de gastar-hi res. Una cerca es
-    # compara amb les columnes de la taula que llegeix la seva. El nom de la passada surt
+    # compara amb les columnes de la matriu que llegeix la seva. El nom de la passada surt
     # tan bon punt se sap, abans que els mòduls de les xarxes, en importar-se, escriguin.
     try:
         chosen = families.named(arguments.family, TRAINERS)
-        tables = features.tables(features.series())
+        matrices = matrix.matrices(matrix.series())
         fingerprints = record.fingerprints()
         where = _where(arguments.smoke, fingerprints)
         print(f"passada {where.name}", flush=True)
@@ -100,7 +100,7 @@ def main(arguments):
             plan = trainers[family].FAMILIES[family]
             columns = None
             if plan["kept"]:
-                X, _ = getattr(tables, search.searcher(plan["searched_as"]).TABLE)
+                X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
                 columns = X.columns
             plans[family] = configurations(arguments.smoke, plan, columns, values["SEEDS"])
     except ValueError as refused:

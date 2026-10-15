@@ -1,4 +1,4 @@
-"""La passada de la xarxa elàstica d'Uniejewski et al. (2016), de la taula per hora als
+"""La passada de la xarxa elàstica d'Uniejewski et al. (2016), de la matriu per hora als
 seus fitxers.
 
 Per a cada llavor i configuració: els 24 models ajustats amb les files d'entrenament, el
@@ -10,7 +10,7 @@ import time
 import numpy as np
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.explanation import TRANSFORMED_TOLERANCE, TRANSFORMED_UNITS, check, group
 from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
@@ -52,7 +52,7 @@ def _fitted(X, y, parts, explained, numbers):
 def train(family, folder, configurations, explained_days):
     """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
     puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(features.series()).hourly
+    X, y = matrix.matrices(matrix.series()).hourly
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

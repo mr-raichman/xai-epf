@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from epf.contract.explanation import summed
-from epf.contract.features import HOUR
+from epf.contract.matrix import HOUR
 from epf.models.elastic_net.regression import by_hour, design
 
 # L'atribució de cada fila, a l'espai transformat: les contribucions per columna, la

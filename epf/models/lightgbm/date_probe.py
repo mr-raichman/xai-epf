@@ -1,5 +1,5 @@
 """La prova de datació de Trebbien et al. (2023), una família pròpia: l'arbre ajustat de nou
-sobre la mateixa taula per hora amb un comptador de dies, que treu el que el model pot fer
+sobre la mateixa matriu per hora amb un comptador de dies, que treu el que el model pot fer
 amb la data i res més.
 
 Amb una partició barrejada, una setmana retinguda queda entre setmanes d'entrenament, i un
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.explanation import check, group
 from epf.contract.metrics import scored
 from epf.contract.record import save_model
@@ -35,10 +35,10 @@ FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la prova: la taula per hora amb el comptador, i a cada llavor l'arbre
+    """La passada de la prova: la matriu per hora amb el comptador, i a cada llavor l'arbre
     de la configuració ajustat, comprovat, puntuat i desat. Torna les parelles `[llavor,
     configuració]` que ha desat ara."""
-    rows, y = features.tables(features.series()).hourly
+    rows, y = matrix.matrices(matrix.series()).hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
     groups = np.array([DATE if column == DAY_COUNTER else group(column)

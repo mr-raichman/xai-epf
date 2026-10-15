@@ -11,7 +11,7 @@ import optuna
 import pandas as pd
 import pytest
 
-from epf.contract.features import DAY_OF_WEEK_COLUMNS
+from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.models.nn import search
 from epf.models.nn.ddnn.attribution import attribute_rows
 from epf.models.nn.ddnn.distributions import JOHNSON_SU, NORMAL

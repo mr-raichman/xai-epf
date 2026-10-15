@@ -7,7 +7,7 @@ import time
 import keras
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
@@ -44,7 +44,7 @@ def _fitted(X, y, parts, numbers):
 def train(family, folder, configurations, explained_days):
     """La passada de la família: cada llavor ajustada, puntuada i desada. Torna les
     parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(features.series()).daily
+    X, y = matrix.matrices(matrix.series()).daily
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

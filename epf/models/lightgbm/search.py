@@ -10,8 +10,8 @@ from epf.models.lightgbm.hyperparameters import MOST_TREES
 from epf.models.lightgbm.train import fit_rows, predict_rows
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-# La taula de la cerca, la per hora, com la de la passada.
-TABLE = "hourly"
+# La matriu de la cerca, la per hora, com la de la passada.
+MATRIX = "hourly"
 
 # La graella del codi de Kruse, Schäfer i Witthaut per a l'activació de la reserva
 # secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`: 288 punts.

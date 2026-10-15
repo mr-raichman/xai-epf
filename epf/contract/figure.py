@@ -13,7 +13,7 @@ triat i no ha de recordar-ho abans d'importar `pyplot`.
 import matplotlib
 import numpy as np
 
-from epf.contract.features import INFORMATION, PRICE
+from epf.contract.matrix import INFORMATION, PRICE
 from epf.parameters import HOUR_COLUMNS
 from epf.paths import SEED
 
@@ -175,7 +175,7 @@ def present(seed):
 
 def members(seed, name):
     """Les columnes de la sèrie `name`, pel grup que la passada hi va desar: una a la
-    taula per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""
+    matriu per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""
     members = np.flatnonzero(seed["groups"] == name)
     if len(members) == 1:
         return members

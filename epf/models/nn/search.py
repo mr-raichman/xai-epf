@@ -5,8 +5,8 @@ from epf.models.nn import network
 from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
 from epf.models.nn.dnn.train import POINT, POINT_FAMILY
 
-# La taula de la cerca, la diària, com la de la passada.
-TABLE = "daily"
+# La matriu de la cerca, la diària, com la de la passada.
+MATRIX = "daily"
 
 # Un espai continu, que es mostreja a l'atzar, i no cap graella.
 GRID = None

@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
@@ -36,7 +36,7 @@ def _fitted(X, y, parts):
 def train(family, folder, configurations, explained_days):
     """La passada del sòl: per a cada llavor, el cúbic ajustat, puntuat i desat. Torna les
     parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(features.series()).hourly
+    X, y = matrix.matrices(matrix.series()).hourly
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

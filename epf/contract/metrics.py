@@ -22,7 +22,7 @@ SIGNIFICANCE = 0.05
 
 
 def refuse_missing(frame, what):
-    """Falla si la taula porta cap valor absent, anomenant on és el primer.
+    """Falla si la matriu porta cap valor absent, anomenant on és el primer.
 
     Un NaN faria tornar NaN la mesura sencera, o la faria saltar l'hora i informar-la
     com si fos neta, segons com es mitjanés: es refusa abans, dient on és.
@@ -59,7 +59,7 @@ def crps(actual, quantiles, probabilities=PERCENTILES):
     quantils alts i llarg als baixos, que és el que fa que una distribució massa
     estreta surti pitjor que una massa ampla amb el mateix centre.
 
-    `quantiles` és `(dies, hores, percentils)` i `actual` la taula de preus dels
+    `quantiles` és `(dies, hores, percentils)` i `actual` la matriu de preus dels
     mateixos dies, en el mateix ordre.
     """
     difference = _checked(actual, quantiles) - quantiles
@@ -106,7 +106,7 @@ def scored_distribution(actual, quantiles):
     """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen el
     test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
 
-    `actual` és la taula del preu real de les files de prova i `quantiles` la funció que
+    `actual` és la matriu del preu real de les files de prova i `quantiles` la funció que
     en dóna els quantils predits a les probabilitats que se li demanen, `(dies, hores,
     probabilitats)`.
     """

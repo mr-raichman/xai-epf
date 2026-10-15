@@ -19,7 +19,7 @@ import time
 import numpy as np
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, UNITLESS, check, group
 from epf.contract.metrics import INTERVALS, scored, scored_distribution
 from epf.contract.record import Fitted, save_model
@@ -72,7 +72,7 @@ def _fitted(distribution, X, y, parts, explained, numbers):
 def train(family, folder, configurations, explained_days):
     """La passada d'una distribució: cada llavor ajustada, comprovada, puntuada i desada.
     Torna les parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(features.series()).daily
+    X, y = matrix.matrices(matrix.series()).daily
     distribution = DISTRIBUTIONS[family]
     done = []
     for seed, planned in configurations.items():

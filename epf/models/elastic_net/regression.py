@@ -1,6 +1,6 @@
 """Els models de la xarxa elàstica d'Uniejewski et al. (2016): un model lineal per hora.
 
-Cada hora té el seu model, ajustat només amb les files de la seva hora de la taula per
+Cada hora té el seu model, ajustat només amb les files de la seva hora de la matriu per
 hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
 de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021): la
 logarítmica de l'article no admet preus a zero o per sota. La penalització és una per a
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 
-from epf.contract.features import DAY_OF_WEEK_COLUMNS, HOUR
+from epf.contract.matrix import DAY_OF_WEEK_COLUMNS, HOUR
 from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
 from epf.models.elastic_net.scaling import Scaler
 from epf.parameters import HOURS_PER_DAY

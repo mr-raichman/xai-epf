@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from epf import paths
-from epf.contract import features, record
+from epf.contract import matrix, record
 from epf.run import figures, run, search
 
 
@@ -42,11 +42,11 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "TRAINERS", {"first": "fake_trainer", "second": "fake_trainer"})
     monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
     monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")
-    tables = types.SimpleNamespace(daily=(pd.DataFrame({"x": [0.0]}), None))
-    monkeypatch.setattr(features, "series", lambda: None)
-    monkeypatch.setattr(features, "tables", lambda series: tables)
+    built = types.SimpleNamespace(daily=(pd.DataFrame({"x": [0.0]}), None))
+    monkeypatch.setattr(matrix, "series", lambda: None)
+    monkeypatch.setattr(matrix, "matrices", lambda series: built)
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
-    monkeypatch.setattr(search, "searcher", lambda family: types.SimpleNamespace(TABLE="daily"))
+    monkeypatch.setattr(search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily"))
     monkeypatch.setattr(figures, "draw", lambda where: None)
     state.module = module
     state.main = lambda: run.main(types.SimpleNamespace(smoke=True, family=None))

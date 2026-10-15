@@ -13,8 +13,8 @@ import numpy as np
 from epf.contract.metrics import mae
 from epf.models.elastic_net import regression
 
-# La taula de la cerca, la per hora, com la de la passada.
-TABLE = "hourly"
+# La matriu de la cerca, la per hora, com la de la passada.
+MATRIX = "hourly"
 
 # Les barreges d'Uniejewski et al. (2016), els càstigs de cada una, i la raó entre el més
 # petit i el més gran, el `LambdaRatio` per defecte de `lasso.m`.

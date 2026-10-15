@@ -7,7 +7,7 @@ import pytest
 from sklearn.linear_model import ElasticNetCV
 
 from epf.parameters import HOUR_COLUMNS
-from epf.contract.features import HOUR, PRICE, tables
+from epf.contract.matrix import HOUR, PRICE, matrices
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler
@@ -21,7 +21,7 @@ NIGHT, EVENING = (0, 1, 2, 3, 4, 5, 23), 20
 
 
 def per_hour_table(days=120, seed=0):
-    """La taula per hora del conjunt, sobre sèries sintètiques."""
+    """La matriu per hora del conjunt, sobre sèries sintètiques."""
     rng = np.random.default_rng(seed)
     index = pd.date_range("2021-01-01", periods=days, freq="D", name="day")
 
@@ -38,7 +38,7 @@ def per_hour_table(days=120, seed=0):
               "nuclear_sched": frame(rng.uniform(4000, 7000, (days, 24))),
               "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
               "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24)))}
-    return tables(series).hourly
+    return matrices(series).hourly
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():
@@ -81,7 +81,7 @@ def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
 
 def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
     # L'ordre de la matriu del model, les escalades i després els indicadors, no és el de
-    # la taula: una contribució escrita a la columna que no toca sumaria igual i tindria
+    # la matriu per hora: una contribució escrita a la columna que no toca sumaria igual i tindria
     # la mateixa mitjana.
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)

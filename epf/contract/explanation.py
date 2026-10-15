@@ -9,7 +9,7 @@ família.
 """
 import numpy as np
 
-from epf.contract.features import INFORMATION
+from epf.contract.matrix import INFORMATION
 
 # Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
 # et al. (2021), on la base més les contribucions no són un preu, o cap, que són

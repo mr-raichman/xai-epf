@@ -1,5 +1,5 @@
-"""Gradient boosting sobre la taula per hora: un sol model per a totes les hores, i la seva
-passada, de la taula als seus fitxers.
+"""Gradient boosting sobre la matriu per hora: un sol model per a totes les hores, i la seva
+passada, de la matriu als seus fitxers.
 
 LightGBM no fa sortida múltiple i TreeSHAP tampoc no l'admetria, així que la
 família comparteix un model entre les 24 hores i rep l'hora com a columna. A
@@ -17,7 +17,7 @@ import numpy as np
 from lightgbm import LGBMRegressor, early_stopping
 
 from epf import paths
-from epf.contract import features
+from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, check, group
 from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
@@ -112,7 +112,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
 def train(family, folder, configurations, explained_days):
     """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
     puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(features.series()).hourly
+    X, y = matrix.matrices(matrix.series()).hourly
     groups = np.array([group(column) for column in X.columns])
     done = []
     for seed, planned in configurations.items():

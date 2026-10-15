@@ -17,7 +17,7 @@ import keras
 import numpy as np
 from keras import ops
 
-from epf.contract.features import DAY_OF_WEEK_COLUMNS
+from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.models.nn.hyperparameters import BATCH, EPOCHS, PATIENCE
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY, SEED
 

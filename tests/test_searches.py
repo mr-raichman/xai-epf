@@ -17,7 +17,7 @@ import pytest
 
 from epf import paths
 from epf.contract.split import split
-from epf.contract.study import completed, configurations, folder, record, run, save, searched
+from epf.contract.searches import completed, configurations, folder, record, run, save, searched
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
@@ -43,7 +43,7 @@ def _searcher(grid, seen):
         else:
             value = optuna_trial.suggest_categorical("value", grid["value"])
         return {"value": value}, float(value)
-    return types.SimpleNamespace(TABLE="daily", GRID=grid, trial=trial)
+    return types.SimpleNamespace(MATRIX="daily", GRID=grid, trial=trial)
 
 
 def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path):

@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from epf import paths
-from epf.contract import features
-from epf.contract.features import (DAY_OF_WEEK_COLUMNS, HOUR, INFORMATION, PRICE, build,
-                                   per_hour, tables)
+from epf.contract import matrix
+from epf.contract.matrix import (DAY_OF_WEEK_COLUMNS, HOUR, INFORMATION, PRICE, build,
+                                 matrices, per_hour)
 from epf.dataset import build as dataset
 from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
 
@@ -93,13 +93,13 @@ def test_the_per_hour_row_carries_its_day_and_its_own_hour():
         assert target.loc[day].iloc[hour] == y.loc[day, HOUR_COLUMNS[hour]]
 
 
-def test_day_d_forecasts_sit_on_day_d_in_both_tables():
+def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
     # Es publiquen el dia abans i són del dia que es lliura: desplaçades un dia, cada
     # fila llegiria la previsió d'ahir, que és plausible i equivocada.
     series = every_series()
     price, demand = series[PRICE], series["demand_fcst"]
-    matrices = tables(series)
-    (X, _), (rows, target) = matrices.daily, matrices.hourly
+    found = matrices(series)
+    (X, _), (rows, target) = found.daily, found.hourly
     day = X.index[10]
     for hour, column in enumerate(HOUR_COLUMNS):
         assert X.loc[day, f"demand_fcst_{column}"] == demand.loc[day, column]
@@ -111,13 +111,13 @@ def test_day_d_forecasts_sit_on_day_d_in_both_tables():
     assert not any(column.startswith("demand_fcst_") for column in rows.columns)
 
 
-def test_d_minus_one_schedule_sits_on_day_d_in_both_tables():
+def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
     # El programa del dia abans és el que es té a l'hora del tancament: el del mateix dia
     # és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
     series = every_series()
     nuclear = series["nuclear_sched"]
-    matrices = tables(series)
-    (X, _), (rows, _) = matrices.daily, matrices.hourly
+    found = matrices(series)
+    (X, _), (rows, _) = found.daily, found.hourly
     day = X.index[10]
     before = day - pd.Timedelta(days=1)
     for hour, column in enumerate(HOUR_COLUMNS):
@@ -146,18 +146,18 @@ def downloaded(tmp_path, monkeypatch):
 def test_the_dataset_reads_back_exactly_what_was_written(downloaded):
     # El lector de pandas per defecte torna 0.3, que és plausible i no és el que es va
     # escriure.
-    assert features.series()[PRICE].iloc[0, 0] == 0.1 + 0.2
+    assert matrix.series()[PRICE].iloc[0, 0] == 0.1 + 0.2
 
 
 def test_a_dataset_whose_downloaded_files_changed_is_refused(downloaded):
-    features.series()
+    matrix.series()
     downloaded.write_text('{"indicator": {"values": [{}]}}')
     with pytest.raises(ValueError, match="desfasat"):
-        features.series()
+        matrix.series()
 
 
 def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
     with paths.DATASET.open("a", encoding="utf-8") as handle:
         handle.write("\n")
     with pytest.raises(ValueError, match="no és el que es va escriure"):
-        features.series()
+        matrix.series()
