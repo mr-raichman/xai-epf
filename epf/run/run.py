@@ -82,6 +82,8 @@ def main(arguments):
     except ValueError as refused:
         print(refused)
         return 1
+    where.mkdir(parents=True, exist_ok=True)
+    matrix.write(matrices, where)
     for family, planned in plans.items():
         record.write_record(where / family / paths.SEED_RECORD, {
             "family": family, "smoke": arguments.smoke, **fingerprints,

@@ -1,12 +1,14 @@
-"""Alineació dels retards per data de lliurament, i la lectura del conjunt de dades."""
+"""Alineació dels retards per data de lliurament, la lectura del conjunt de dades, i les
+matrius que una passada desa."""
 import datetime
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.matrix import (DAY_OF_WEEK_COLUMNS, HOUR, INFORMATION, PRICE, build,
+from epf.contract.matrix import (DAY, DAY_OF_WEEK_COLUMNS, HOUR, INFORMATION, PRICE, build,
                                  matrices, per_hour)
 from epf.dataset import build as dataset
 from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
@@ -161,3 +163,18 @@ def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
         handle.write("\n")
     with pytest.raises(ValueError, match="no és el que es va escriure"):
         matrix.series()
+
+
+def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
+    # Valors amb tots els decimals d'un float, com els del conjunt de dades: una matriu
+    # desada que no tornés exactament el que van llegir els models no ho diria.
+    found = matrices({name: frame / 7 for name, frame in every_series().items()})
+    matrix.write(found, tmp_path)
+    for name, (X, y), target in (("daily", found.daily, [f"price_{hour}" for hour in HOUR_COLUMNS]),
+                                 ("hourly", found.hourly, [PRICE])):
+        stored = pd.read_csv(tmp_path / paths.MATRIX.format(name=name), index_col=DAY,
+                             parse_dates=[DAY], float_precision="round_trip")
+        assert list(stored.columns) == list(X.columns) + target
+        assert (stored.index == X.index).all()
+        assert np.array_equal(stored[X.columns].to_numpy(), X.to_numpy())
+        assert np.array_equal(stored[target].to_numpy(), np.asarray(y).reshape(len(X), -1))

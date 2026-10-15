@@ -30,9 +30,11 @@ DATA_FIGURES = DATA / "figures"
 RUNS = ROOT / "runs"
 
 # Els fitxers d'una passada: un model per fitxer, la llavor i el lloc de la seva
-# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al costat.
+# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al costat;
+# i, a dalt de la passada, cada matriu que hi van llegir els models, la diària i la per hora.
 SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
+MATRIX = "matrix_{name}.csv"
 
 # Una passada es diu pel dia local en què va començar i pel seu número de dues xifres dins
 # del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La d'un assaig

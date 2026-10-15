@@ -158,3 +158,16 @@ def matrices(series):
     at_the_hour = tuple(column(name, lag) for name, lags in INFORMATION.items()
                         if name != PRICE for lag in lags)
     return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
+
+
+def write(found, folder):
+    """Desa a `folder` les dues matrius, `found`, cada fila amb les seves entrades i el preu
+    que se'n prediu: el del dia, `price_h00` a `price_h23`, a la diària, i el de l'hora,
+    `price`, a la per hora. Una que ja hi és no es torna a escriure: una passada que es
+    continua és del mateix codi i del mateix conjunt de dades que la van començar."""
+    (X, y), (rows, target) = found.daily, found.hourly
+    for name, frame in (("daily", X.join(y.add_prefix(f"{PRICE}_"))),
+                        ("hourly", rows.assign(**{PRICE: target}))):
+        path = folder / paths.MATRIX.format(name=name)
+        if not path.exists():
+            paths.write_whole(path, frame.to_csv(index_label=DAY, lineterminator="\n"))

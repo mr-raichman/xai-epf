@@ -46,6 +46,7 @@ def fake(tmp_path, monkeypatch):
     built = types.SimpleNamespace(daily=(pd.DataFrame({"x": [0.0]}), None))
     monkeypatch.setattr(matrix, "series", lambda: None)
     monkeypatch.setattr(matrix, "matrices", lambda series: built)
+    monkeypatch.setattr(matrix, "write", lambda found, folder: None)
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
     monkeypatch.setattr(search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily"))
     monkeypatch.setattr(figures, "draw", lambda where: None)
