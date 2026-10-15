@@ -3,7 +3,6 @@ api-keys
 .venv/
 __pycache__/
 /downloads/
-/figures/
 /runs/
 /searches/
 /data/
