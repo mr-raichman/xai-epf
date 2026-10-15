@@ -7,10 +7,10 @@ Els números d'un model tampoc: viuen amb el model, a
 `models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.
 
-Una passada és aquest fitxer en un commit, i el directori que en surt es diu pel
-commit. Canviar qualsevol número d'aquí vol dir un commit nou, i per això el commit
-identifica el resultat: un escombrat és un commit per punt i el missatge de cada un
-diu què s'hi provava.
+Són els valors d'una mesura; `--smoke` posa els de `SMOKE`, al final, en lloc dels seus, i
+no en canvia cap altre. Una passada els desa tots al registre de cada família, amb
+l'empremta del codi i la del conjunt de dades que la van fer, de manera que cada punt
+d'un escombrat es llegeix del seu registre.
 """
 import datetime
 
@@ -20,12 +20,6 @@ DAYS_PER_WEEK = 7
 # són aquí perquè les llegeix tot el paquet.
 HOURS_PER_DAY = 24
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
-
-# Els dos nivells d'una passada. Un assaig és petit i ràpid a propòsit i el seu error no
-# es desa, ni es cita, ni es compara enlloc; només una mesura dóna un resultat. El nivell
-# és al camí de la passada, de manera que una xifra d'assaig no es pugui llegir mai com
-# una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
-MEASUREMENT, SMOKE = "measurement", "smoke"
 
 # ------------------------------------------------------------ la descripció
 
@@ -60,22 +54,14 @@ PREVIOUS_DAY = (1,)
 FORECAST_LAG = 0
 SCHEDULE_LAG = 1
 
-# Llavors i dies de prova que s'expliquen, per nivell. `None` vol dir tots. L'assaig és
-# una llavor i 50 dies a propòsit, prou per passar tota la maquinària i prou curt per
-# esperar-s'hi; la mesura és el protocol sencer.
-DESCRIPTIONS = {
-    MEASUREMENT: (SEEDS, None),
-    SMOKE: ((0,), 50),
-}
+# Dies de prova que s'expliquen de cada llavor, comptats des del primer. `None` vol dir
+# tots, el protocol sencer.
+EXPLAINED_DAYS = None
 
-# Llavors i proves de la cerca de cada família, per nivell, i quantes de les millors se
+# Proves de la cerca de cada família a cada llavor, i quantes de les millors se
 # n'expliquen: Trebbien et al. (2023) en guarden les deu millors i no diuen quantes en
-# proven, i cinquanta és el nombre del projecte. L'assaig és una llavor i dues proves,
-# prou per passar tota la maquinària.
-SEARCH_TRIALS = {
-    MEASUREMENT: (SEEDS, 50),
-    SMOKE: ((0,), 2),
-}
+# proven, i cinquanta és el nombre del projecte.
+TRIALS = 50
 BEST = 10
 
 # Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,
@@ -85,3 +71,21 @@ INTERACTION_ROWS = 1000
 # Llavor de tota família que en faci servir. És de la passada i no d'un model, de
 # manera que totes les que en prenen una prenen la mateixa.
 SEED = 0
+
+# ------------------------------------------------------------ l'assaig
+
+# El que `--smoke` posa en lloc dels valors de la mesura, i res més. Un assaig és petit i
+# ràpid a propòsit, una llavor, 50 dies explicats i dues proves per cerca, prou per passar
+# tota la maquinària i prou curt per esperar-s'hi. El seu error no es desa, ni es cita,
+# ni es compara enlloc; només una mesura dóna un resultat, i el nom d'una passada o d'una
+# cerca d'assaig comença amb `smoke_`, de manera que una xifra d'assaig no es pugui llegir
+# mai com una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
+SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
+
+
+def chosen(smoke):
+    """Cada valor d'aquest fitxer pel seu nom, amb els de `SMOKE` en lloc dels de la mesura
+    si és un assaig. `SMOKE` mateix no hi és: són els valors que fa servir una passada."""
+    found = {name: value for name, value in globals().items()
+             if name.isupper() and name != "SMOKE"}
+    return (found | SMOKE) if smoke else found

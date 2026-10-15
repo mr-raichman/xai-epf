@@ -14,10 +14,8 @@ importar tots.
 import argparse
 import collections
 import importlib
-import pathlib
 
 import epf
-from epf import parameters
 
 # Una subordre: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
 # declara els arguments. `arguments` és `None` quan no en pren cap, i és també el que diu
@@ -25,31 +23,29 @@ from epf import parameters
 Command = collections.namedtuple("Command", "module function help arguments")
 
 
-def pass_arguments(parser):
-    """Els arguments d'una passada o d'una cerca: el nivell, quines famílies i si es
-    comença de zero."""
-    parser.add_argument("--tier", choices=(parameters.SMOKE, parameters.MEASUREMENT),
-                        required=True,
-                        help="assaig, que no dóna cap xifra, o mesura, que sí")
-    parser.add_argument("--family", action="append",
-                        help="només aquesta família; es pot repetir")
-    parser.add_argument("--replace", action="store_true",
-                        help="comença de zero, encara que n'hi hagi una a mig fer")
+def run_arguments(parser):
+    """Els arguments d'una passada o d'una cerca: si és un assaig, i quines famílies.
+    `extend` perquè repetir l'opció n'afegeixi els valors en lloc de canviar-los."""
+    parser.add_argument("--smoke", action="store_true",
+                        help="un assaig, que no dóna cap xifra: els valors de SMOKE de "
+                             "parameters.py en lloc dels de la mesura")
+    parser.add_argument("--family", nargs="+", action="extend", metavar="NOM",
+                        help="només aquestes famílies, o les famílies d'aquests models")
     return parser
 
 
 def search_arguments(parser):
     """Els arguments d'una cerca: els d'una passada, i quines llavors."""
-    pass_arguments(parser)
-    parser.add_argument("--seed", type=int, action="append",
-                        help="només aquesta llavor del nivell; es pot repetir")
+    run_arguments(parser)
+    parser.add_argument("--seed", type=int, nargs="+", action="extend", metavar="N",
+                        help="només aquestes llavors, d'entre les del seu tipus")
     return parser
 
 
-def folder_arguments(parser):
-    """El directori d'una passada, que és el que pren qui en llegeix una."""
-    parser.add_argument("folder", type=pathlib.Path, nargs="+",
-                        help="directori d'una passada")
+def figures_arguments(parser):
+    """La passada de la qual es tornen a dibuixar les figures."""
+    parser.add_argument("run", metavar="PASSADA",
+                        help="el nom d'una passada, com 2026-10-14_01 o smoke_2026-10-14_01")
     return parser
 
 
@@ -60,15 +56,15 @@ COMMANDS = {
         "epf.dataset.build", "main", "fa el conjunt de dades dels fitxers baixats, el "
         "comprova, en dibuixa les figures i informa dels valors allunyats dels seus veïns",
         None),
-    "describe": Command(
-        "epf.run.run", "main", "descriu el preu amb el protocol de Trebbien et al. (2023)",
-        pass_arguments),
     "search": Command(
         "epf.run.search", "main", "cerca els números de cada família amb la cerca a l'atzar "
-        "de Trebbien et al. (2023)", search_arguments),
-    "describe-figures": Command(
+        "de Trebbien et al. (2023), reprenent la que hi hagi", search_arguments),
+    "run": Command(
+        "epf.run.run", "main", "descriu el preu amb el protocol de Trebbien et al. (2023), "
+        "continuant l'última passada si no és acabada", run_arguments),
+    "figures": Command(
         "epf.run.figures", "main", "torna a dibuixar les figures d'una passada",
-        folder_arguments),
+        figures_arguments),
 }
 
 

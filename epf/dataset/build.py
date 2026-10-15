@@ -154,9 +154,7 @@ def write(rows, read):
     record = {"files": {path.relative_to(paths.DOWNLOADS).as_posix(): _digest(path)
                         for path in sorted(read)},
               "dataset": _digest(paths.DATASET)}
-    partial = paths.DATASET_RECORD.with_name(paths.DATASET_RECORD.name + ".part")
-    partial.write_text(json.dumps(record, indent=2), encoding="utf-8")
-    partial.replace(paths.DATASET_RECORD)
+    paths.write_whole(paths.DATASET_RECORD, json.dumps(record, indent=2))
 
 
 def main():

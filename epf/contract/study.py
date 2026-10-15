@@ -6,7 +6,10 @@ Optuna desa cada prova en un estudi SQLite, de manera que una cerca interrompuda
 reprèn on era. Quan una llavor té totes les seves proves, el seu registre en desa les
 millors en la forma en què les pren l'ajust, i sobre quines files es van fer: les
 columnes del conjunt i la partició. Una passada no llegeix un registre fet sobre unes
-altres files, i una cerca no es reprèn sobre unes altres files.
+altres files, i una cerca no es reprèn sobre unes altres files. Cada prova desa les
+empremtes del codi i del conjunt de dades amb què es va fer, i el registre les de cada
+una de les millors; una cerca es reprèn igualment sobre un altre codi o un altre conjunt
+de dades, i només unes altres files la refusen.
 """
 import json
 import os
@@ -16,7 +19,7 @@ import numpy as np
 import optuna
 
 from epf import paths
-from epf.contract.record import plain
+from epf.contract.record import plain, write_record
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
 
 # Els fitxers d'una cerca, per llavor: l'estudi d'Optuna i el registre del que ha triat.
@@ -24,9 +27,10 @@ STUDY = "seed_{seed}.db"
 RECORD = "seed_{seed}.json"
 
 
-def folder(tier, family):
-    """On viu la cerca d'una família en un nivell."""
-    return paths.SEARCHES / tier / family
+def folder(smoke, family):
+    """On viu la cerca d'una família: `searches/<família>/`, o `searches/smoke_<família>/`
+    la d'assaig."""
+    return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
 
 
 def made_on(columns):
@@ -66,23 +70,26 @@ def _sampler(searcher, family, seed, study):
     return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
 
 
-def run(store, family, searcher, X, y, parts, seed, trials):
+def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
     """L'estudi d'una família en una llavor, amb les proves que li falten fins a `trials`.
 
     `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i la
     prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua
-    sobre les de validació, i la taula no n'hi dóna cap altra. Els números que en surten es desen a la
-    prova, en la forma en què els pren l'ajust. Un estudi fet sobre unes altres files es
-    refusa en lloc de reprendre's.
+    sobre les de validació, i la taula no n'hi dóna cap altra. Els números que en surten es
+    desen a la prova, en la forma en què els pren l'ajust, amb les empremtes,
+    `fingerprints`, del codi i del conjunt de dades que la fan. Un estudi fet sobre unes
+    altres files es refusa en lloc de reprendre's.
     """
+    # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(study_name=f"{family}_seed_{seed}", direction="minimize",
-                                storage=f"sqlite:///{store}", load_if_exists=True)
+                                storage=f"sqlite:///{store.as_posix()}",
+                                load_if_exists=True)
     now = made_on(X.columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
     elif study.user_attrs.get("made_on") != now:
-        raise ValueError(f"l'estudi de {family}, llavor {seed}, es va fer sobre unes altres "
-                         f"files que les d'ara: torna'l a començar amb --replace")
+        raise ValueError(f"l'estudi {store} es va fer sobre unes altres files que les "
+                         f"d'ara: esborra'l per tornar-lo a començar")
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
 
@@ -92,8 +99,11 @@ def run(store, family, searcher, X, y, parts, seed, trials):
                                         (X[validate], y[validate]), seed)
         optuna_trial.set_user_attr("numbers", plain(numbers))
         # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna desa,
-        # porti les condicions en què es va prendre.
-        optuna_trial.set_user_attr("load", os.getloadavg())
+        # porti les condicions en què es va prendre. Windows no la dóna, i hi queda buida.
+        optuna_trial.set_user_attr(
+            "load", os.getloadavg() if hasattr(os, "getloadavg") else None)
+        for name, value in fingerprints.items():
+            optuna_trial.set_user_attr(name, value)
         print(f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
               f"{score:.4g}, {time.time() - start:.1f} s", flush=True)
         return score
@@ -104,66 +114,65 @@ def run(store, family, searcher, X, y, parts, seed, trials):
     return study
 
 
-def record(study, family, seed, tier, commit):
+def record(study, family, seed, smoke):
     """El registre d'una cerca acabada: les `BEST` millors proves, de la millor a la
-    pitjor, amb els seus números i la seva puntuació, quantes proves les van triar i sobre
-    quines files."""
+    pitjor, amb els seus números, la seva puntuació i les empremtes amb què es van fer,
+    quantes proves les van triar i sobre quines files."""
     done = sorted(completed(study), key=lambda one: one.value)
-    return {"commit": commit, "tier": tier, "family": family,
+    return {"family": family, "smoke": smoke,
             "seed": seed, "trials": len(done), "made_on": study.user_attrs["made_on"],
             "best": [{"numbers": one.user_attrs["numbers"], "score": one.value,
-                      "trial": one.number} for one in done[:BEST]]}
+                      "trial": one.number, "code": one.user_attrs["code"],
+                      "dataset": one.user_attrs["dataset"]} for one in done[:BEST]]}
 
 
-def save(found, tier):
-    """Desa un registre, primer a un fitxer a part i després al seu nom, de manera que un
-    registre amb nom és sempre una cerca acabada."""
-    path = folder(tier, found["family"]) / RECORD.format(seed=found["seed"])
-    partial = path.with_suffix(".part")
-    partial.write_text(json.dumps(found, indent=2) + "\n")
-    partial.replace(path)
+def save(found, smoke):
+    """Desa un registre sencer, de manera que un registre amb nom és sempre una cerca
+    acabada."""
+    write_record(folder(smoke, found["family"]) / RECORD.format(seed=found["seed"]), found)
 
 
-def searched(tier, family, seed, columns):
+def searched(smoke, family, seed, columns):
     """El registre de la cerca d'una família en una llavor, o `None` si no n'hi ha cap
     d'acabada.
 
     Un registre fet sobre unes altres columnes o una altra partició es refusa: els seus
     números s'haurien triat per unes altres files, i res no ho diria.
     """
-    path = folder(tier, family) / RECORD.format(seed=seed)
+    path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
         return None
-    found = json.loads(path.read_text())
+    found = json.loads(path.read_text(encoding="utf-8"))
     if found["made_on"] != made_on(columns):
         raise ValueError(f"la cerca de {family}, llavor {seed}, es va fer sobre unes altres "
-                         f"files que les d'ara: torna-la a fer amb epf search --replace")
+                         f"files que les d'ara: esborra {path} i el seu estudi, i torna-la "
+                         f"a fer amb epf search")
     return found
 
 
-def configurations(tier, plan, columns, seeds):
+def configurations(smoke, plan, columns, seeds):
     """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada una
     amb el seu lloc a la cerca.
 
     `plan` és l'entrada de la família a `FAMILIES` del seu model: les `kept` millors de la
-    cerca de la família `searched_as` al nivell, si totes les llavors en tenen; els números
-    de lloc, `placeholder`, marcats, si no en té cap cap llavor; i una sola sense números
-    per a una família que no es cerca, `kept` zero. Una cerca que només té algunes llavors
-    es refusa: la dispersió barrejaria llavors cercades i sense cercar, i res no ho diria.
-    `columns` són les de la taula sobre la qual es cerca, que la cerca compara amb les
-    seves.
+    cerca de la família `searched_as` del mateix tipus, si totes les llavors en tenen; els
+    números de lloc, `placeholder`, marcats, si no en té cap cap llavor; i una sola sense
+    números per a una família que no es cerca, `kept` zero. Una cerca que només té algunes
+    llavors es refusa: la dispersió barrejaria llavors cercades i sense cercar, i res no ho
+    diria. `columns` són les de la taula sobre la qual es cerca, que la cerca compara amb
+    les seves.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
     family = plan["searched_as"]
-    found = {seed: searched(tier, family, seed, columns) for seed in seeds}
+    found = {seed: searched(smoke, family, seed, columns) for seed in seeds}
     missing = [seed for seed, record in found.items() if record is None]
     if len(missing) == len(seeds):
         return {seed: [{"rank": 0, "numbers": plan["placeholder"], "unsearched": True}]
                 for seed in seeds}
     if missing:
         raise ValueError(f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
-                         f"epf search abans de descriure-la")
+                         f"epf search abans de fer-la servir")
     return {seed: [{"rank": rank, "numbers": one["numbers"], "score": one["score"],
                     "trial": one["trial"], "trials": record["trials"]}
                    for rank, one in enumerate(record["best"][:plan["kept"]])]

@@ -60,7 +60,7 @@ def latest_version_per_day(directory):
 
 def read_periods(path):
     """Preus espanyols del fitxer, un per període, en l'ordre del fitxer."""
-    with open(path, errors="ignore") as handle:
+    with open(path, encoding="utf-8", errors="ignore") as handle:
         return [float(line.split(";")[SPAIN_FIELD]) for line in handle if line[:1].isdigit()]
 
 

@@ -1,7 +1,11 @@
-"""Rutes on viuen els fitxers baixats, les claus i les sortides."""
+"""Rutes on viuen els fitxers baixats, les claus i les sortides, com es diu cada passada, i
+com s'escriu sencer un fitxer de text."""
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+# El paquet, de tots els fitxers `.py` del qual es fa l'empremta del codi, i l'arrel del
+# projecte, on és.
+PACKAGE = pathlib.Path(__file__).resolve().parent
+ROOT = PACKAGE.parent
 KEYS = ROOT / "api-keys"
 
 # Els fitxers tal com els serveix la font, una carpeta per indicador amb el seu nom,
@@ -28,13 +32,37 @@ RUNS = ROOT / "runs"
 SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 
+# Una passada es diu pel dia local en què va començar i pel seu número de dues xifres dins
+# del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La d'un assaig
+# porta davant `SMOKE_PREFIX` i es compta a part, i la cerca d'assaig d'una família també.
+SMOKE_PREFIX = "smoke_"
 
-def run_folder(tier, stage, commit):
-    """On viu una passada sencera: hi pengen les famílies i les figures que les
-    comparen."""
-    return RUNS / tier / stage / commit
+
+def runs(smoke):
+    """Les passades d'un tipus, de la més antiga a la més nova."""
+    return sorted(RUNS.glob(f"{SMOKE_PREFIX if smoke else ''}????-??-??_??"))
+
+
+def next_run(smoke, day):
+    """La carpeta de la passada següent d'un tipus el dia `day`: el número més alt del dia
+    més u, o 01 si encara no n'hi ha cap."""
+    # shortcut: dues xifres, 99 passades d'un tipus per dia; la 100a tindria un nom fora
+    # del patró de `runs` i la següent hi tornaria a escriure. Una tercera xifra, si mai un
+    # dia en necessita més.
+    prefix = f"{SMOKE_PREFIX if smoke else ''}{day.isoformat()}_"
+    numbers = [int(path.name.removeprefix(prefix)) for path in runs(smoke)
+               if path.name.startswith(prefix)]
+    return RUNS / f"{prefix}{max(numbers, default=0) + 1:02d}"
 
 
 # Les cerques, al costat de les passades i no a dins: una cerca és d'una entrada i d'una
 # partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles files.
 SEARCHES = ROOT / "searches"
+
+
+def write_whole(path, text):
+    """Escriu un text en UTF-8 primer a un fitxer a part i després al seu nom, de manera que
+    un fitxer amb nom és sempre sencer."""
+    partial = path.with_name(path.name + ".part")
+    partial.write_text(text, encoding="utf-8")
+    partial.replace(path)

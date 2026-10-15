@@ -1,15 +1,21 @@
-"""El que porta cada registre i com es desa el fitxer de cada model.
+"""El que porta cada registre, com s'escriu, i com es desa el fitxer de cada model.
 
-`plain` escriu un valor a JSON sense perdre què era: converteix les dates, les tuples i
-les claus, i deixa que qualsevol altra cosa faci petar l'escriptura, en lloc d'escriure-la
-com a text sense dir-ho. `save_model` desa un model primer a un fitxer a part, en torna a
-fer les sumes de l'explicació sobre el que s'ha escrit, i només llavors li dona el seu nom.
+Cada registre, el d'una cerca i el d'una passada, porta les empremtes del codi que el va
+fer i del conjunt de dades sobre el qual es va fer, de manera que qualsevol pot tornar a
+calcular la del codi d'una còpia i comprovar quin codi va donar una xifra. `plain` escriu
+un valor a JSON sense perdre què era: converteix les dates, les tuples i les claus, i
+deixa que qualsevol altra cosa faci petar l'escriptura, en lloc d'escriure-la com a text
+sense dir-ho. `save_model` desa un model primer a un fitxer a part, en torna a fer les
+sumes de l'explicació sobre el que s'ha escrit, i només llavors li dona el seu nom.
 """
 import collections
 import datetime
+import hashlib
+import json
 
 import numpy as np
 
+from epf import paths
 from epf.contract.explanation import read_back
 
 # El que surt d'ajustar una família en una llavor i una configuració: la predicció i el
@@ -23,6 +29,26 @@ Fitted = collections.namedtuple(
     defaults=(0.0, None, None, None))
 
 
+def code(package):
+    """L'empremta d'un paquet: la SHA-256 de tots els seus fitxers `.py`, en l'ordre del seu
+    camí dins del paquet escrit amb `/`, cada un amb aquest camí al davant. Els finals de
+    línia de Windows hi entren com els de Linux, perquè una mateixa còpia doni la mateixa
+    empremta als dos sistemes; qualsevol altre canvi, en un comentari també, la canvia."""
+    digest = hashlib.sha256()
+    found = {path.relative_to(package).as_posix(): path for path in package.rglob("*.py")}
+    for name in sorted(found):
+        digest.update(name.encode() + b"\n")
+        digest.update(found[name].read_bytes().replace(b"\r\n", b"\n") + b"\n")
+    return digest.hexdigest()
+
+
+def fingerprints():
+    """Les empremtes que porta cada registre: la del codi del paquet i la del conjunt de
+    dades, que `data/dataset.json` desa."""
+    dataset = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))["dataset"]
+    return {"code": code(paths.PACKAGE), "dataset": dataset}
+
+
 def plain(value):
     """El valor tal com es pot escriure a JSON, sense perdre què era."""
     if isinstance(value, dict):
@@ -32,6 +58,12 @@ def plain(value):
     if isinstance(value, datetime.date):
         return str(value)
     return value
+
+
+def write_record(path, content):
+    """Escriu un registre a JSON, sencer."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    paths.write_whole(path, json.dumps(plain(content), indent=2) + "\n")
 
 
 def _days(index):

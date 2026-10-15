@@ -9,16 +9,14 @@ repetir cap punt; un espai continu es mostreja a l'atzar. Quina taula llegeix, q
 graella té i com es prova cada punt ho diu el `search.py` del model de la família.
 """
 import importlib
-import shutil
 
 import optuna
 
-from epf import paths
-from epf.contract import features
+from epf import parameters, paths
+from epf.contract import features, record, study
 from epf.contract.split import split
-from epf.contract.study import STUDY, folder, record, run, save
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, MEASUREMENT, SEARCH_TRIALS, SMOKE
-from epf.results import run_files
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.run import families
 
 # Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
 # model, que s'importa quan la família es cerca o es planifica.
@@ -37,50 +35,37 @@ def searcher(family):
 
 
 def main(arguments):
-    commit = run_files.git("rev-parse", "HEAD")
-    if arguments.tier == MEASUREMENT and run_files.git("status", "--porcelain"):
-        print("l'arbre té canvis sense desar. Una cerca de mesura desa el commit que la fa, "
-              "i amb canvis sense desar no diria quin codi l'ha feta. Fes un commit, o fes "
-              f"servir --tier {SMOKE}.")
-        return 1
-    chosen = arguments.family or list(SEARCHERS)
-    unknown = sorted(set(chosen) - set(SEARCHERS))
-    if unknown:
-        print(f"no es cerca cap família {unknown}; n'hi ha {sorted(SEARCHERS)}")
-        return 1
-
-    seeds, trials = SEARCH_TRIALS[arguments.tier]
-    if arguments.seed:
-        outside = sorted(set(arguments.seed) - set(seeds))
-        if outside:
-            print(f"les llavors {outside} no són del nivell {arguments.tier}, que en té "
-                  f"{list(seeds)}")
-            return 1
-        seeds = [seed for seed in seeds if seed in arguments.seed]
-    # El conjunt de dades abans d'esborrar res, perquè un de desfasat es refusi amb el disc
-    # tal com era.
+    values = parameters.chosen(arguments.smoke)
+    seeds = values["SEEDS"]
+    # Tot el que es pot refusar, abans de cercar res.
     try:
+        chosen = families.named(arguments.family, SEARCHERS)
+        if arguments.seed:
+            outside = sorted(set(arguments.seed) - set(seeds))
+            if outside:
+                raise ValueError(f"les llavors {outside} no hi són: "
+                                 f"{'un assaig' if arguments.smoke else 'una mesura'} en "
+                                 f"té {list(seeds)}")
+            seeds = [seed for seed in seeds if seed in arguments.seed]
         tables = features.tables(features.series())
+        fingerprints = record.fingerprints()
     except ValueError as refused:
         print(refused)
         return 1
-    # Reprendre és de la mesura i prou, com a la passada.
-    if arguments.tier == SMOKE or arguments.replace:
-        for family in chosen:
-            shutil.rmtree(folder(arguments.tier, family), ignore_errors=True)
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     for family in chosen:
         module = searcher(family)
         X, y = getattr(tables, module.TABLE)
-        where = folder(arguments.tier, family)
+        where = study.folder(arguments.smoke, family)
         where.mkdir(parents=True, exist_ok=True)
         for seed in seeds:
-            study = run(where / STUDY.format(seed=seed), family, module, X, y,
-                        split(seed, DEVELOPMENT, BLACKOUT_WEEK), seed, trials)
-            found = record(study, family, seed, arguments.tier, commit)
-            save(found, arguments.tier)
+            made = study.run(where / study.STUDY.format(seed=seed), family, module, X, y,
+                             split(seed, DEVELOPMENT, BLACKOUT_WEEK), seed,
+                             values["TRIALS"], fingerprints)
+            found = study.record(made, family, seed, arguments.smoke)
+            study.save(found, arguments.smoke)
             print(f"{family} llavor {seed}: {found['trials']} proves, la millor "
                   f"{found['best'][0]['score']:.4g}", flush=True)
-    print(f"les cerques són a {paths.SEARCHES / arguments.tier}")
+    print(f"les cerques són a {paths.SEARCHES}")
     return 0

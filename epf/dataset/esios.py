@@ -21,7 +21,7 @@ import pandas as pd
 import requests
 
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY
-from epf.paths import KEYS
+from epf.paths import KEYS, write_whole
 
 # La zona horària del mercat diari espanyol, en la qual es compten els dies i les hores.
 MARKET_TIMEZONE = zoneinfo.ZoneInfo("Europe/Madrid")
@@ -83,7 +83,7 @@ def _json_or_empty(response):
 def api_key(name, path=KEYS):
     """Valor de la línia `name=valor` del fitxer de claus de l'arrel."""
     try:
-        lines = path.read_text().splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
         raise FileNotFoundError(f"no existeix {path}; ha de contenir la línia {name}=...") from None
     for line in lines:
@@ -122,9 +122,7 @@ def download(indicator, folder, session=None):
                   f"HTTP {response.status_code}", flush=True)
             continue
         folder.mkdir(parents=True, exist_ok=True)
-        partial = path.with_suffix(".part")
-        partial.write_text(response.text)
-        partial.replace(path)
+        write_whole(path, response.text)
         written += 1
     print(f"{folder.name}: {written} fitxers baixats", flush=True)
 
@@ -143,7 +141,7 @@ def files(folder):
 
 def values(paths):
     """Tots els valors desats d'un indicador, de tots els seus fitxers."""
-    return [value for path in paths for value in json.loads(path.read_text())["indicator"]["values"]]
+    return [value for path in paths for value in json.loads(path.read_text(encoding="utf-8"))["indicator"]["values"]]
 
 
 def admissible(values, indicator):

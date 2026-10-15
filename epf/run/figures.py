@@ -8,6 +8,7 @@ dels bancs de comparació, i els residus de cada família ajustada.
 """
 import importlib
 
+from epf import paths
 from epf.contract import figure
 from epf.contract.figure import plt
 from epf.run import residuals
@@ -73,6 +74,11 @@ def draw(where):
 
 
 def main(arguments):
-    for folder in arguments.folder:
-        draw(folder)
-        print(f"figures de la passada a {folder}")
+    # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
+    found = {path.name: path for smoke in (False, True) for path in paths.runs(smoke)}
+    if arguments.run not in found:
+        print(f"no hi ha cap passada {arguments.run} a {paths.RUNS}")
+        return 1
+    draw(found[arguments.run])
+    print(f"figures de la passada a {found[arguments.run]}")
+    return 0
