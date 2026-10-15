@@ -93,7 +93,7 @@ def indicators(directory):
         if name in anchors:
             published[name] = esios.published_instants(values)
         anchor = published[indicator.anchor] if indicator.anchor else None
-        frames[name], _ = esios.hourly(values, anchor)
+        frames[name] = esios.hourly(values, anchor)
         read += found
     return frames, read
 

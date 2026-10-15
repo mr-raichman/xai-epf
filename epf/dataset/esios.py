@@ -4,11 +4,12 @@ Es desa la resposta de l'API tal com arriba, un fitxer per any, amb el que el se
 agrega de cada hora: la mitjana o, d'una energia servida per quarts d'hora, la suma. Quins
 indicadors es baixen i es llegeixen, i com els serveix ESIOS, ho diu la taula de
 `build.py`, un `Indicator` per fila; aquí hi ha el client, amb la clau que llegeix del
-fitxer `api-keys` de l'arrel, i el lector: la geografia, la graella d'hores, la regla del
-zero amb la seva àncora i la reparació dels canvis d'hora.
+fitxer `api-keys` de l'arrel, i el lector: la geografia, la graella d'hores, que refusa
+qualsevol valor fora de l'hora en punt, la regla del zero amb la seva àncora i la
+reparació dels canvis d'hora.
 
 Hi ha també el rellotge del mercat, que el lector és el primer a fer servir: la zona
-horària, les hores que té de debò cada dia local i la reparació dels dies de canvi d'hora.
+horària i la reparació dels dies de canvi d'hora.
 """
 import collections
 import datetime
@@ -165,13 +166,6 @@ def published_instants(values):
                               utc=True))
 
 
-def local_hours(days):
-    """Hores que té realment cada dia local: 23 el del canvi de març, 25 el d'octubre."""
-    starts = pd.DatetimeIndex(days).tz_localize(MARKET_TIMEZONE)
-    return pd.Series((starts + pd.DateOffset(days=1) - starts) // pd.Timedelta(hours=1),
-                     index=days)
-
-
 def repair_dst(hours):
     """Torna sempre 24 hores, corregint els dies de canvi d'hora amb mitjanes.
 
@@ -191,24 +185,24 @@ def repair_dst(hours):
 
 
 def hourly(values, anchor=None):
-    """Valors d'ESIOS com a dies per hores, i quantes hores va publicar la resposta cada dia
-    local.
+    """Valors d'ESIOS com a dies per hores.
 
     La clau és `datetime`, que porta el desplaçament horari: `datetime_utc` etiqueta
-    malament la primera 02:00 del canvi d'hora d'octubre. Dos valors al mateix instant es
-    refusen: d'una sola geografia, són una hora repetida, i sumats la doblarien sense
-    dir-ho. Amb `anchor`, els instants que va publicar l'àncora, una hora absent val zero
-    si l'àncora la va publicar, del primer dia publicat de l'indicador a l'últim de
-    l'àncora, també passat l'últim de l'indicador.
-
-    Comparat amb `local_hours`, el recompte diu si la resposta té la forma del calendari
-    local o si alguna hora ha caigut fora de la graella.
+    malament la primera 02:00 del canvi d'hora d'octubre. Un valor fora de l'hora en punt
+    es refusa: la graella només té hores, i el deixaria fora sense dir-ho, com en deixaria
+    tres de cada quatre d'un indicador servit per quarts d'hora. Dos valors al mateix
+    instant es refusen: d'una sola geografia, són una hora repetida, i sumats la doblarien
+    sense dir-ho. Amb tots dos refusats, cap dia local no porta més valors que hores té.
+    Amb `anchor`, els instants que va publicar l'àncora, una hora absent val zero si
+    l'àncora la va publicar, del primer dia publicat de l'indicador a l'últim de l'àncora,
+    també passat l'últim de l'indicador.
     """
     if not values:
-        empty = pd.DatetimeIndex([], name="day")
-        return (pd.DataFrame(columns=HOUR_COLUMNS, index=empty),
-                pd.Series(dtype=int, index=empty))
+        return pd.DataFrame(columns=HOUR_COLUMNS, index=pd.DatetimeIndex([], name="day"))
     instants = pd.to_datetime([value["datetime"] for value in values], format="ISO8601", utc=True)
+    off = instants[instants != instants.floor("h")]
+    if len(off):
+        raise ValueError(f"{len(off)} valors fora de l'hora en punt, el primer {off[0]}")
     repeated = instants[instants.duplicated()]
     if len(repeated):
         raise ValueError(f"{len(repeated)} instants amb més d'un valor, el primer {repeated[0]}")
@@ -232,6 +226,4 @@ def hourly(values, anchor=None):
 
     rows = {day: repair_dst(hours.tolist()) for day, hours in frame.groupby("day")["value"]}
     index = pd.DatetimeIndex(list(rows), name="day")
-    days = series.index.tz_convert(MARKET_TIMEZONE).normalize().tz_localize(None)
-    return (pd.DataFrame(list(rows.values()), index=index, columns=HOUR_COLUMNS),
-            days.value_counts().reindex(index, fill_value=0))
+    return pd.DataFrame(list(rows.values()), index=index, columns=HOUR_COLUMNS)

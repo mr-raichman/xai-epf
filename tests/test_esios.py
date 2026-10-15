@@ -1,4 +1,5 @@
-"""Valors d'ESIOS: canvis d'hora i la seva reparació, un instant repetit, hores absents i previsions revisades."""
+"""Valors d'ESIOS: canvis d'hora i la seva reparació, un valor fora de l'hora, un instant
+repetit, hores absents i previsions revisades."""
 import datetime
 
 import pandas as pd
@@ -24,6 +25,16 @@ SPRING = [
     {"datetime": "2025-03-30T03:00:00.000+02:00", "value": 20130.58},
 ]
 
+# 2025-10-01, preu espanyol (600) demanat sense `time_trunc`: ESIOS el serveix per quarts
+# d'hora, i la graella d'hores en deixaria tres de cada quatre fora sense dir-ho. La seva
+# mitjana, 103.405, és el que es desa de l'hora.
+QUARTERS = [
+    {"datetime": "2025-10-01T00:00:00.000+02:00", "value": 105.1},
+    {"datetime": "2025-10-01T00:15:00.000+02:00", "value": 104.24},
+    {"datetime": "2025-10-01T00:30:00.000+02:00", "value": 102.28},
+    {"datetime": "2025-10-01T00:45:00.000+02:00", "value": 102.0},
+]
+
 # 2024-03-09, potència nuclear disponible a València (474): l'últim valor és el de la
 # 01:00, i a les 02:00 deixa de publicar-se, com en una parada de recàrrega.
 NUCLEAR = [{"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}]
@@ -47,13 +58,18 @@ def rest_of_day(day, known, value=0.0):
 
 
 def test_autumn_keys_on_the_offset_and_merges_the_repeated_hour():
-    day = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN))[0].iloc[0]
+    day = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN)).iloc[0]
     assert list(day[:4]) == [21063.17, 19838.75, pytest.approx((18956.5 + 18397.92) / 2), 18044.67]
 
 
 def test_spring_inserts_the_missing_hour():
-    day = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING))[0].iloc[0]
+    day = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING)).iloc[0]
     assert list(day[:4]) == [22541.08, 21072.33, pytest.approx((21072.33 + 20130.58) / 2), 20130.58]
+
+
+def test_a_value_off_the_hour_is_refused_rather_than_dropped():
+    with pytest.raises(ValueError, match="fora de l'hora"):
+        hourly(QUARTERS)
 
 
 def test_two_values_at_one_instant_are_refused_rather_than_summed():
@@ -68,28 +84,21 @@ def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
     # El 2025-04-28 l'àncora del PBF va publicar fins a les 11:00 i prou, l'apagada: per
     # dies, la tarda de cada sèrie del programa hi valia zero.
     anchor = hours_of("2024-03-09")
-    assert hourly(NUCLEAR, anchor)[0].iloc[0]["h05"] == 0.0
+    assert hourly(NUCLEAR, anchor).iloc[0]["h05"] == 0.0
     morning = {instant for instant in anchor
                if instant.tz_convert(MARKET_TIMEZONE).hour < 4}
-    assert pd.isna(hourly(NUCLEAR, morning)[0].iloc[0]["h05"])
-    assert pd.isna(hourly(NUCLEAR, set())[0].iloc[0]["h05"])
-    assert pd.isna(hourly(NUCLEAR)[0].iloc[0]["h05"])
+    assert pd.isna(hourly(NUCLEAR, morning).iloc[0]["h05"])
+    assert pd.isna(hourly(NUCLEAR, set()).iloc[0]["h05"])
+    assert pd.isna(hourly(NUCLEAR).iloc[0]["h05"])
 
 
 def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_before():
     # El carbó del programa va deixar de publicar-se mentre l'àncora seguia: després del
     # seu últim dia val zero, i abans del primer no es toca.
     anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
-    frame = hourly(NUCLEAR, anchor)[0]
+    frame = hourly(NUCLEAR, anchor)
     assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
     assert (frame.loc["2024-03-10"] == 0.0).all()
-
-
-def test_the_published_count_is_of_local_hours_and_not_of_repaired_ones():
-    autumn, autumn_hours = hourly(rest_of_day(datetime.date(2024, 10, 27), AUTUMN))
-    spring, spring_hours = hourly(rest_of_day(datetime.date(2025, 3, 30), SPRING))
-    assert autumn_hours.iloc[0] == 25 and len(autumn.columns) == 24
-    assert spring_hours.iloc[0] == 23 and len(spring.columns) == 24
 
 
 def test_revised_forecasts_are_refused_by_the_reader():
