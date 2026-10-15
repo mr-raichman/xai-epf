@@ -26,9 +26,6 @@ from epf.paths import KEYS, write_whole
 # La zona horària del mercat diari espanyol, en la qual es compten els dies i les hores.
 MARKET_TIMEZONE = zoneinfo.ZoneInfo("Europe/Madrid")
 
-# Els quarts d'una hora: el mercat diari es casa per quarts d'hora des del 2025-10-01.
-QUARTERS_PER_HOUR = 4
-
 # Hora local que falta l'últim diumenge de març i es repeteix l'últim d'octubre.
 DST_HOUR = 2
 
@@ -130,8 +127,8 @@ def download(indicator, folder, session=None):
 def files(folder):
     """Els fitxers desats d'un indicador, un per any, en ordre.
 
-    Només els del seu format, `<any>.json`: a la carpeta del preu hi ha també els d'OMIE, i
-    el patró és el que els deixa fora.
+    Només els del seu format, `<any>.json`, i no el `.part` que hi hagi deixat una baixada
+    interrompuda.
     """
     paths = sorted(pathlib.Path(folder).glob("????.json"))
     if not paths:

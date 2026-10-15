@@ -8,9 +8,6 @@ dataset` els llegeix tots, en fa les sèries, les escriu a `data/dataset.part`, 
 comprovacions de `check/checks.py` i, només si passen totes, li dona el seu nom i escriu
 `data/dataset.json`, l'empremta de cada fitxer llegit i la del conjunt; després dibuixa
 les figures de les dades i imprimeix l'informe de veïnatge de cada sèrie.
-
-El preu és el d'ESIOS fins al 2018 i el d'OMIE des d'aleshores, que llegeix i uneix
-`omie.py`.
 """
 import hashlib
 import json
@@ -19,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from epf import paths
-from epf.dataset import esios, figures, omie
+from epf.dataset import esios, figures
 from epf.dataset.check import checks, outliers
 from epf.dataset.esios import Indicator
 from epf.parameters import HOURS_PER_DAY
@@ -76,10 +73,8 @@ SERIES = {
 
 
 def download():
-    """`epf download`: el que encara falta de cada indicador, a la seva carpeta, i el preu
-    d'OMIE."""
+    """`epf download`: el que encara falta de cada indicador, a la seva carpeta."""
     session = esios.session_for()
-    omie.download(paths.DOWNLOADS / "price")
     for name, indicator in INDICATORS.items():
         esios.download(indicator, paths.DOWNLOADS / name, session)
 
@@ -100,8 +95,7 @@ def indicators(directory):
         anchor = published[indicator.anchor] if indicator.anchor else None
         frames[name], _ = esios.hourly(values, anchor)
         read += found
-    frames["price"], spliced = omie.spliced(frames["price"], directory / "price")
-    return frames, read + spliced
+    return frames, read
 
 
 def series(frames):

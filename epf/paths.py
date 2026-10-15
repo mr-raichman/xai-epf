@@ -12,10 +12,9 @@ KEYS = ROOT / "api-keys"
 LOCK = ROOT / "uv.lock"
 
 # Els fitxers tal com els serveix la font, una carpeta per indicador amb el seu nom,
-# `downloads/<indicador>/<any>.json`, perquè un fitxer d'ESIOS només porta l'any al nom; a
-# la del preu, també els d'OMIE, `marginalpdbc_<dia>.<versió>`, que no xoquen. Només hi
-# escriu la baixada i res no s'hi desa processat, de manera que el nom diu com hi han
-# arribat i no cap contrast amb una còpia transformada que no existeix.
+# `downloads/<indicador>/<any>.json`, perquè un fitxer d'ESIOS només porta l'any al nom.
+# Només hi escriu la baixada i res no s'hi desa processat, de manera que el nom diu com
+# hi han arribat i no cap contrast amb una còpia transformada que no existeix.
 DOWNLOADS = ROOT / "downloads"
 
 # El conjunt de dades fet dels fitxers baixats, el registre dels fitxers d'on es va fer i
