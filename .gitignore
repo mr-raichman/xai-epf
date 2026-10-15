@@ -1,5 +1,4 @@
 api-keys
-.stfolder/
 .venv/
 __pycache__/
 /downloads/
