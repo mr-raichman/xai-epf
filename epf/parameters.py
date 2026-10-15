@@ -77,7 +77,7 @@ SEED = 0
 # ràpid a propòsit, una llavor, 50 dies explicats i dues proves per cerca, prou per passar
 # tota la maquinària i prou curt per esperar-s'hi. El seu error no es desa, ni es cita,
 # ni es compara enlloc; només una mesura dóna un resultat, i el nom d'una passada o d'una
-# cerca d'assaig comença amb `smoke_`, de manera que una xifra d'assaig no es pugui llegir
+# cerca d'assaig comença amb `assaig_`, de manera que una xifra d'assaig no es pugui llegir
 # mai com una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 

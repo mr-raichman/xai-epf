@@ -29,7 +29,7 @@ RECORD = "seed_{seed}.json"
 
 
 def folder(smoke, family):
-    """On viu la cerca d'una família: `searches/<família>/`, o `searches/smoke_<família>/`
+    """On viu la cerca d'una família: `searches/<família>/`, o `searches/assaig_<família>/`
     la d'assaig."""
     return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
 

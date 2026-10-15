@@ -54,7 +54,7 @@ def fake(tmp_path, monkeypatch):
 
 
 def _name(number):
-    return f"smoke_{datetime.date.today().isoformat()}_{number:02d}"
+    return f"{paths.SMOKE_PREFIX}{datetime.date.today().isoformat()}_{number:02d}"
 
 
 def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, capsys):
