@@ -37,7 +37,7 @@ SEED_RECORD = "record.json"
 # Una passada es diu pel dia local en què va començar i pel seu número de dues xifres dins
 # del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La d'un assaig
 # porta davant `SMOKE_PREFIX` i es compta a part, i la cerca d'assaig d'una família també.
-SMOKE_PREFIX = "smoke_"
+SMOKE_PREFIX = "prova_"
 
 
 def runs(smoke):
