@@ -3,7 +3,7 @@ similar porta la distribució dels seus errors hora a hora."""
 import numpy as np
 import pandas as pd
 
-from epf.models.naive.naive import bootstrapped, previous_day, previous_week, similar_day
+from epf.models.naive.train import bootstrapped, previous_day, previous_week, similar_day
 from test_features import frame_of
 
 

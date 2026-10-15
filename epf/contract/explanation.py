@@ -9,7 +9,6 @@ família.
 """
 import numpy as np
 
-from epf.contract.features import DAY_COUNTER
 from epf.data import forecasts, schedule
 
 # Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
@@ -37,13 +36,23 @@ ROUNDING = np.finfo(np.float32).eps / 2
 
 def group(column):
     """El grup d'una columna a la importància per grups: el dia abans, cada previsió, cada
-    grup del programa, el calendari i, a la prova de datació, el comptador de dies."""
+    grup del programa o, la resta, el calendari. Una columna que només afegeix un model en
+    dona el grup ell mateix."""
     if column.startswith("lag1_"):
         return "previous_day"
     for name in (*forecasts.INDICATORS, *schedule.GROUPS):
         if column == name or column.startswith(f"{name}_"):
             return name
-    return "date" if column == DAY_COUNTER else "calendar"
+    return "calendar"
+
+
+def check(fitted, family, seed, rank):
+    """Falla si la base més les contribucions d'un model ajustat se separen de la predicció
+    que expliquen més que el marge del seu espai."""
+    if fitted.gap > fitted.tolerance:
+        raise ValueError(f"l'explicació de {family}, llavor {seed}, configuració {rank}, no "
+                         f"torna la seva predicció: se n'allunya {fitted.gap:.3g}, per sobre "
+                         f"del marge de {fitted.tolerance}")
 
 
 def summed(base, values, axis):

@@ -1,5 +1,4 @@
-"""La xarxa elàstica d'Uniejewski et al. (2016): un model lineal per hora, explicat per
-l'atribució exacta d'un model lineal.
+"""Els models de la xarxa elàstica d'Uniejewski et al. (2016): un model lineal per hora.
 
 Cada hora té el seu model, ajustat només amb les files de la seva hora de la taula per
 hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
@@ -17,8 +16,8 @@ import pandas as pd
 from sklearn.linear_model import ElasticNet
 
 from epf.contract.features import DAY_OF_WEEK_COLUMNS, HOUR
-from epf.models.linear.linear_hyperparameters import MAX_ITER, NAME
-from epf.models.linear.scaling import Scaler
+from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
+from epf.models.elastic_net.scaling import Scaler
 from epf.parameters import HOURS_PER_DAY
 
 # El model d'una hora i el que cal per llegir-lo. `columns` són les de la matriu del
@@ -28,13 +27,8 @@ from epf.parameters import HOURS_PER_DAY
 # columna de la matriu, d'on surten les contribucions.
 Hour = collections.namedtuple("Hour", "model columns inputs target background")
 
-# L'atribució de cada fila, a l'espai transformat: les contribucions per columna, la
-# base de l'hora de la fila i la predicció de la fila al mateix espai, que és la que
-# base més contribucions ha de tornar.
-Explanation = collections.namedtuple("Explanation", "values base transformed")
 
-
-def _design(rows, fitted):
+def design(rows, fitted):
     """Les files com la matriu del model d'una hora: entrades transformades i indicadors."""
     scaled = len(fitted.inputs.median)
     values = rows[fitted.columns].to_numpy(dtype=float)
@@ -57,18 +51,18 @@ def _prepared(rows, target):
     output = Scaler(target.to_numpy(dtype=float)[:, np.newaxis])
     fitted = Hour(None, scaled + dummies, inputs, output, None)
     scaled_target = output.forward(target.to_numpy(dtype=float)[:, np.newaxis]).ravel()
-    return fitted, _design(rows, fitted), scaled_target
+    return fitted, design(rows, fitted), scaled_target
 
 
 def _fit_hour(rows, target, penalty, mixing, max_iter):
     """El model d'una hora, amb les seves files i prou."""
-    fitted, design, scaled_target = _prepared(rows, target)
+    fitted, matrix, scaled_target = _prepared(rows, target)
     model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=max_iter)
-    return fitted._replace(model=model.fit(design, scaled_target),
-                           background=design.mean(axis=0))
+    return fitted._replace(model=model.fit(matrix, scaled_target),
+                           background=matrix.mean(axis=0))
 
 
-def _by_hour(X):
+def by_hour(X):
     """La posició de les files de cada hora."""
     hours = X[HOUR].to_numpy()
     return [np.flatnonzero(hours == hour) for hour in range(HOURS_PER_DAY)]
@@ -77,7 +71,7 @@ def _by_hour(X):
 def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
     """Els 24 models, cada un ajustat amb les files de la seva hora i cap més."""
     return tuple(_fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
-                 for rows in _by_hour(X))
+                 for rows in by_hour(X))
 
 
 def largest_penalty(X, y, mixing):
@@ -90,9 +84,9 @@ def largest_penalty(X, y, mixing):
     hores, i per deixar-les totes a zero ha de ser el més gran dels 24.
     """
     found = []
-    for rows in _by_hour(X):
-        _, design, target = _prepared(X.iloc[rows], y.iloc[rows])
-        product = (design - design.mean(axis=0)).T @ (target - target.mean())
+    for rows in by_hour(X):
+        _, matrix, target = _prepared(X.iloc[rows], y.iloc[rows])
+        product = (matrix - matrix.mean(axis=0)).T @ (target - target.mean())
         found.append(np.abs(product).max() / (len(target) * mixing))
     return max(found)
 
@@ -100,32 +94,9 @@ def largest_penalty(X, y, mixing):
 def predict_rows(model, X):
     """El preu de cada fila en EUR/MWh, cada una amb el model de la seva hora."""
     prices = np.empty(len(X))
-    for fitted, rows in zip(model, _by_hour(X)):
+    for fitted, rows in zip(model, by_hour(X)):
         if len(rows):
-            transformed = fitted.model.predict(_design(X.iloc[rows], fitted))
+            transformed = fitted.model.predict(design(X.iloc[rows], fitted))
             prices[rows] = fitted.target.back(transformed[:, np.newaxis]).ravel()
     return pd.Series(prices, index=X.index, name=NAME)
 
-
-def attribute_rows(model, X):
-    """Les contribucions de cada fila, el valor de SHAP exacte d'un model lineal.
-
-    La d'una columna és el seu coeficient per la distància a la mitjana de les files
-    d'ajust de la seva hora. Són a l'espai transformat i no en EUR/MWh: `sinh` no és
-    lineal i no en surt cap versió exacta. Una columna que el model d'una hora no porta
-    hi té zero.
-    """
-    columns = [column for column in X.columns if column != HOUR]
-    values = np.zeros((len(X), len(columns)))
-    base, transformed = np.empty(len(X)), np.empty(len(X))
-    for fitted, rows in zip(model, _by_hour(X)):
-        if not len(rows):
-            continue
-        design = _design(X.iloc[rows], fitted)
-        coefficients = fitted.model.coef_
-        positions = [columns.index(column) for column in fitted.columns]
-        values[np.ix_(rows, positions)] = coefficients * (design - fitted.background)
-        base[rows] = fitted.model.intercept_ + coefficients @ fitted.background
-        transformed[rows] = fitted.model.predict(design)
-    return Explanation(pd.DataFrame(values, index=X.index, columns=columns),
-                       pd.Series(base, index=X.index), pd.Series(transformed, index=X.index))

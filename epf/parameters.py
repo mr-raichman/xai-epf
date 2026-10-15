@@ -4,7 +4,7 @@ El que és un fet del mercat o de la font no és aquí, llevat de les hores del 
 viu a `data/esios.py` i a `data/omie.py`, i canvia quan canvia el món, no quan es prova
 un número.
 Els números d'un model tampoc: viuen amb el model, a
-`models/<nom>/<nom>_hyperparameters.py`. Aquí només hi ha el que val per a la
+`models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.
 
 Una passada és aquest fitxer en un commit, i el directori que en surt es diu pel

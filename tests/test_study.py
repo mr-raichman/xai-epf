@@ -9,12 +9,13 @@ dispersió; i la prova de datació amb totes les configuracions en lloc de la mi
 seria la prova que diu.
 """
 import datetime
+import types
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from epf import describe, paths, search
+from epf import paths
 from epf.contract.split import split
 from epf.contract.study import completed, configurations, folder, record, run, save, searched
 
@@ -30,16 +31,16 @@ def _table():
 
 
 def _searcher(grid, seen):
-    """Un cercador que no ajusta res: desa els dies que veu cada prova, i la puntuació és
-    la configuració mateixa."""
-    def trial_of(trial, train, validate, seed):
+    """Un cercador, com el `search.py` d'un model, que no ajusta res: desa els dies que veu
+    cada prova, i la puntuació és la configuració mateixa."""
+    def trial(family, optuna_trial, train, validate, seed):
         seen.append((train[0].index, validate[0].index))
         if grid is None:
-            value = trial.suggest_float("value", 0.0, 1.0)
+            value = optuna_trial.suggest_float("value", 0.0, 1.0)
         else:
-            value = trial.suggest_categorical("value", grid["value"])
+            value = optuna_trial.suggest_categorical("value", grid["value"])
         return {"value": value}, float(value)
-    return search.Searcher("daily", grid, trial_of)
+    return types.SimpleNamespace(TABLE="daily", GRID=grid, trial=trial)
 
 
 def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path):
@@ -104,7 +105,7 @@ def test_a_search_made_on_other_columns_is_neither_read_nor_resumed(tmp_path, mo
 
 
 # Una família que es cerca i se n'ajusten les tres millors configuracions de cada llavor.
-FAKE = describe.Describer("daily", (), None, {}, {"value": 0}, 3)
+FAKE = {"fixed": {}, "placeholder": {"value": 0}, "kept": 3, "searched_as": "fake"}
 
 
 def _searched(tmp_path, monkeypatch, seeds):
@@ -124,7 +125,7 @@ def _searched(tmp_path, monkeypatch, seeds):
 
 def test_with_no_seed_searched_each_seed_fits_the_placeholders_marked(tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, [])
-    found = configurations("smoke", "fake", FAKE, columns, (0, 1), False)
+    found = configurations("smoke", FAKE, columns, (0, 1))
     assert found == {seed: [{"rank": 0, "numbers": {"value": 0}, "unsearched": True}]
                      for seed in (0, 1)}
 
@@ -132,12 +133,14 @@ def test_with_no_seed_searched_each_seed_fits_the_placeholders_marked(tmp_path, 
 def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_first(
         tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, (0, 1))
-    found = configurations("smoke", "fake", FAKE, columns, (0, 1), False)
+    found = configurations("smoke", FAKE, columns, (0, 1))
     for seed in (0, 1):
         assert [one["rank"] for one in found[seed]] == [0, 1, 2]
         assert [one["numbers"]["value"] for one in found[seed]] == [1, 2, 3]
         assert all(one["trials"] == 4 for one in found[seed])
-    alone = configurations("smoke", "fake", FAKE, columns, (0, 1), True)
+    # La prova de datació en guarda una, de la cerca d'una altra família.
+    probe = {"fixed": {}, "placeholder": None, "kept": 1, "searched_as": "fake"}
+    alone = configurations("smoke", probe, columns, (0, 1))
     assert {seed: [one["numbers"]["value"] for one in ones]
             for seed, ones in alone.items()} == {0: [1], 1: [1]}
 
@@ -145,11 +148,11 @@ def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_firs
 def test_a_search_of_some_seeds_only_is_refused(tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, (0,))
     with pytest.raises(ValueError):
-        configurations("smoke", "fake", FAKE, columns, (0, 1), False)
+        configurations("smoke", FAKE, columns, (0, 1))
 
 
 def test_a_family_never_searched_fits_once_with_no_numbers(tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, (0,))
-    never = FAKE._replace(placeholder=None, kept=0)
-    assert configurations("smoke", "fake", never, columns, (0, 1), False) == {
+    never = FAKE | {"placeholder": None, "kept": 0}
+    assert configurations("smoke", never, columns, (0, 1)) == {
         0: [{"rank": 0}], 1: [{"rank": 0}]}

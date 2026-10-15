@@ -6,8 +6,7 @@ que hi fixa a cada punt. El punt de la graella encara no s'ha cercat, i el que h
 `UNSEARCHED`, marcat com a tal al registre de cada passada.
 """
 
-# Nom de la família i del seu únic pronòstic. El mòdul es diu `boosting` perquè és la
-# tècnica; la família es diu per la implementació, que és el que es compara.
+# Nom del model i de la seva família, el de la implementació, que és el que es compara.
 NAME = "lightgbm"
 
 # Arbres com a molt d'un ajust que s'atura, i rondes sense millorar abans d'aturar-lo:

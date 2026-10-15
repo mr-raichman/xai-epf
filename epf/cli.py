@@ -4,7 +4,7 @@
 subordres hi ha, com es diuen, quins arguments prenen i quin mòdul n'executa cada una,
 de manera que afegir-ne una és una fila de `COMMANDS` i res més.
 
-Els mòduls s'importen quan es tria la subordre i no abans. `models/boosting/boosting.py`
+Els mòduls s'importen quan es tria la subordre i no abans. `models/lightgbm/attribution.py`
 porta `shap`, que costa un segon llarg, i amb els imports a dalt el pagarien `epf
 audit-data` i fins i tot `epf --help`. Per això a la taula hi ha el nom del mòdul i no el
 mòdul, i per això els arguments es declaren aquí: `argparse` construeix totes les
@@ -68,13 +68,13 @@ COMMANDS = {
     "figure-outliers": Command(
         "epf.data.figures.price_outliers", "la distància de cada preu als seus veïns", None),
     "describe": Command(
-        "epf.describe", "descriu el preu amb el protocol de Trebbien et al. (2023)",
+        "epf.run.run", "descriu el preu amb el protocol de Trebbien et al. (2023)",
         pass_arguments),
     "search": Command(
-        "epf.search", "cerca els números de cada família amb la cerca a l'atzar de "
+        "epf.run.search", "cerca els números de cada família amb la cerca a l'atzar de "
         "Trebbien et al. (2023)", search_arguments),
     "describe-figures": Command(
-        "epf.results.describe_figures", "torna a dibuixar les figures d'una passada",
+        "epf.run.figures", "torna a dibuixar les figures d'una passada",
         folder_arguments),
 }
 

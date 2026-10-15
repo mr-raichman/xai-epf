@@ -39,3 +39,11 @@ COPIED_FROM = {"ddnn_jsu": "FINAL_DE_selection_prob_jsu3",
                "ddnn_normal": "FINAL_DE_selection_prob_normal4",
                "dnn": "FINAL_DE_selection_prob_point3"}
 COPIED_TRIALS = 2048
+
+# Els números que cap cerca no toca, els mateixos per a les tres xarxes.
+FIXED = {"batch": BATCH, "epochs": EPOCHS, "patience": PATIENCE}
+
+
+def copied(name):
+    """Els números d'una xarxa mentre no s'ha cercat, i d'on es van copiar."""
+    return COPIED[name] | {"copied_from": COPIED_FROM[name], "copied_trials": COPIED_TRIALS}

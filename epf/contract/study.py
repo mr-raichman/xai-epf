@@ -16,7 +16,6 @@ import numpy as np
 import optuna
 
 from epf import paths
-from epf.contract.features import SCHEDULE
 from epf.contract.record import plain
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
 
@@ -26,8 +25,8 @@ RECORD = "seed_{seed}.json"
 
 
 def folder(tier, family):
-    """On viu la cerca d'una família en un nivell, sobre l'únic conjunt que es cerca."""
-    return paths.SEARCHES / tier / SCHEDULE / family
+    """On viu la cerca d'una família en un nivell."""
+    return paths.SEARCHES / tier / family
 
 
 def made_on(columns):
@@ -51,7 +50,8 @@ def _seed(*parts):
 
 
 def _sampler(searcher, family, seed, study):
-    """Com tria cada prova la seva configuració.
+    """Com tria cada prova la seva configuració, de la graella del cercador, `GRID`, o del
+    seu espai continu si no en té.
 
     Una graella es barreja amb una llavor de la família i de la partició, i la prova `k`
     en pren el punt `k`: una cerca represa continua per on anava, i cap punt no es repeteix.
@@ -59,9 +59,9 @@ def _sampler(searcher, family, seed, study):
     ja porta, perquè una cerca represa no torni a proposar les primeres. El nom de la
     família hi entra perquè dues famílies del mateix espai no proposin les mateixes.
     """
-    if searcher.grid is not None:
+    if searcher.GRID is not None:
         return optuna.samplers.GridSampler(
-            {name: list(values) for name, values in searcher.grid.items()},
+            {name: list(values) for name, values in searcher.GRID.items()},
             seed=_seed(family, seed))
     return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
 
@@ -69,8 +69,9 @@ def _sampler(searcher, family, seed, study):
 def run(store, family, searcher, X, y, parts, seed, trials):
     """L'estudi d'una família en una llavor, amb les proves que li falten fins a `trials`.
 
-    Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de
-    validació, i la taula no n'hi dóna cap altra. Els números que en surten es desen a la
+    `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i la
+    prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua
+    sobre les de validació, i la taula no n'hi dóna cap altra. Els números que en surten es desen a la
     prova, en la forma en què els pren l'ajust. Un estudi fet sobre unes altres files es
     refusa en lloc de reprendre's.
     """
@@ -85,14 +86,14 @@ def run(store, family, searcher, X, y, parts, seed, trials):
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
 
-    def objective(trial):
+    def objective(optuna_trial):
         start = time.time()
-        numbers, score = searcher.trial(trial, (X[train], y[train]),
+        numbers, score = searcher.trial(family, optuna_trial, (X[train], y[train]),
                                         (X[validate], y[validate]), seed)
-        trial.set_user_attr("numbers", plain(numbers))
+        optuna_trial.set_user_attr("numbers", plain(numbers))
         # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna desa,
         # porti les condicions en què es va prendre.
-        trial.set_user_attr("load", os.getloadavg())
+        optuna_trial.set_user_attr("load", os.getloadavg())
         print(f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
               f"{score:.4g}, {time.time() - start:.1f} s", flush=True)
         return score
@@ -108,7 +109,7 @@ def record(study, family, seed, tier, commit):
     pitjor, amb els seus números i la seva puntuació, quantes proves les van triar i sobre
     quines files."""
     done = sorted(completed(study), key=lambda one: one.value)
-    return {"commit": commit, "tier": tier, "set": SCHEDULE, "family": family,
+    return {"commit": commit, "tier": tier, "family": family,
             "seed": seed, "trials": len(done), "made_on": study.user_attrs["made_on"],
             "best": [{"numbers": one.user_attrs["numbers"], "score": one.value,
                       "trial": one.number} for one in done[:BEST]]}
@@ -140,29 +141,30 @@ def searched(tier, family, seed, columns):
     return found
 
 
-def configurations(tier, family, describer, columns, seeds, best_only):
+def configurations(tier, plan, columns, seeds):
     """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada una
     amb el seu lloc a la cerca.
 
-    Les de la cerca de la família al nivell, si totes les llavors en tenen, `kept` de
-    cada una, o la millor sola amb `best_only`; els números de lloc, marcats, si no en té
-    cap cap llavor; i una sola sense números per a una família que no es cerca. Una cerca
-    que només té algunes llavors es refusa: la dispersió barrejaria llavors cercades i
-    sense cercar, i res no ho diria. `columns` són les de la taula sobre la qual es cerca
-    la família, que la cerca compara amb les seves.
+    `plan` és l'entrada de la família a `FAMILIES` del seu model: les `kept` millors de la
+    cerca de la família `searched_as` al nivell, si totes les llavors en tenen; els números
+    de lloc, `placeholder`, marcats, si no en té cap cap llavor; i una sola sense números
+    per a una família que no es cerca, `kept` zero. Una cerca que només té algunes llavors
+    es refusa: la dispersió barrejaria llavors cercades i sense cercar, i res no ho diria.
+    `columns` són les de la taula sobre la qual es cerca, que la cerca compara amb les
+    seves.
     """
-    if not describer.kept:
+    if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
+    family = plan["searched_as"]
     found = {seed: searched(tier, family, seed, columns) for seed in seeds}
     missing = [seed for seed, record in found.items() if record is None]
     if len(missing) == len(seeds):
-        return {seed: [{"rank": 0, "numbers": describer.placeholder, "unsearched": True}]
+        return {seed: [{"rank": 0, "numbers": plan["placeholder"], "unsearched": True}]
                 for seed in seeds}
     if missing:
         raise ValueError(f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
                          f"epf search abans de descriure-la")
-    kept = 1 if best_only else describer.kept
     return {seed: [{"rank": rank, "numbers": one["numbers"], "score": one["score"],
                     "trial": one["trial"], "trials": record["trials"]}
-                   for rank, one in enumerate(record["best"][:kept])]
+                   for rank, one in enumerate(record["best"][:plan["kept"]])]
             for seed, record in found.items()}

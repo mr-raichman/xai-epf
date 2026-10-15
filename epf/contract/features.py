@@ -6,20 +6,21 @@ a l'hora.
 
 Tota columna d'entrada ha de ser calculable abans del tancament de la subhasta
 del dia anterior al lliurament.
+
+Les sèries d'on surten, `series`, es llegeixen dels fitxers baixats a cada crida, de
+manera que cada model les llegeix ell mateix.
 """
 import collections
 
 import numpy as np
 import pandas as pd
 
+from epf.data import forecasts, price, schedule
 from epf.parameters import (DAYS_PER_WEEK, FORECAST_LAG, HOUR_COLUMNS, HOURS_PER_DAY,
                             PREVIOUS_DAY, SCHEDULE_LAG)
 
 HOUR = "hour"
 PRICE = "price"
-
-# La columna del conjunt de la prova de datació: els dies des del primer del període.
-DAY_COUNTER = "day_counter"
 
 # El dia de la setmana, en set indicadors i no en un enter. Els escriu la matriu i no
 # cap família, perquè és l'única manera que totes vegin el mateix i que una diferència
@@ -83,9 +84,10 @@ def per_hour(X, y, at_the_hour=()):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
-# Els noms dels conjunts, que són carpetes de les passades i de les cerques. `schedule` es
-# diu com el conjunt de dades del programa, que és el que hi afegeix, i és una altra cosa.
-SCHEDULE, DATE_PROBE = "schedule", "date_probe"
+def series():
+    """El preu, les previsions D+1 per nom i el programa per grup, tal com els pren
+    `tables`."""
+    return price.load(), forecasts.load(), schedule.load()
 
 
 def tables(frame, day_ahead, scheduled):
@@ -102,12 +104,3 @@ def tables(frame, day_ahead, scheduled):
     daily = build(frame, PREVIOUS_DAY, inputs)
     at_the_hour = tuple(column(name, lag) for name, (_, lag) in inputs.items())
     return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
-
-
-def date_probe(frame, day_ahead, scheduled, start):
-    """El conjunt amb un comptador de dies, els que han passat des de `start`: la prova
-    de datació de Trebbien et al. (2023), que treu el que un model pot fer amb la data i
-    res més. Només la taula per hora, perquè només l'arbre l'ajusta."""
-    rows, target = tables(frame, day_ahead, scheduled).hourly
-    counter = (rows.index - pd.Timestamp(start)).days
-    return rows.assign(**{DAY_COUNTER: counter.to_numpy()}), target

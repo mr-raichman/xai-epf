@@ -34,11 +34,11 @@ SEED_RECORD = "record.json"
 
 
 def run_folder(tier, stage, commit):
-    """On viu una passada sencera: hi pengen els conjunts, les famílies i les figures
-    que les comparen."""
+    """On viu una passada sencera: hi pengen les famílies i les figures que les
+    comparen."""
     return RUNS / tier / stage / commit
 
 
-# Les cerques, al costat de les passades i no a dins: una cerca és d'un conjunt i d'una
+# Les cerques, al costat de les passades i no a dins: una cerca és d'una entrada i d'una
 # partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles files.
 SEARCHES = ROOT / "searches"

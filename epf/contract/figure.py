@@ -164,6 +164,13 @@ def importance(folder, seeds):
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
+def present(seed):
+    """Les sèries amb gràfic de dependència que porta el fitxer d'un model, en l'ordre de
+    `DEPENDENCE`."""
+    names = set(seed["groups"])
+    return [name for name in DEPENDENCE if name in names]
+
+
 def members(seed, name):
     """Les columnes de la sèrie `name`, pel grup que la passada hi va desar: una a la
     taula per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""

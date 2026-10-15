@@ -12,7 +12,7 @@ from scipy import stats
 
 from epf.contract import figure
 from epf.contract.figure import plt
-from epf.models.naive.naive import FORECASTS as COPIES
+from epf.models.naive.train import FAMILIES as COPIES
 from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
 
 # Retards del test, dues vegades el període setmanal, com aconsellen Hyndman i
@@ -68,24 +68,24 @@ def ljung_box(series, lags=LAGS):
 def report(where, described):
     """El correlograma de cada família ajustada, amb la distància de la partició i la
     setmana marcades, i una línia per família amb el test."""
-    fitted = [key for key in sorted(described) if key[1] not in COPIES]
+    fitted = [family for family in sorted(described) if family not in COPIES]
     if not fitted:
         return
     rows = -(-len(fitted) // PANELS_PER_ROW)
     panels, axes = plt.subplots(rows, PANELS_PER_ROW, figsize=(4 * PANELS_PER_ROW, 3 * rows),
                                 facecolor=figure.SURFACE, squeeze=False)
-    for axis, key in zip(axes.flat, fitted):
-        series = daily_errors(described[key])
+    for axis, family in zip(axes.flat, fitted):
+        series = daily_errors(described[family])
         statistic, value, correlations = ljung_box(series)
         days = int((~np.isnan(series)).sum())
-        print(f"residus de {key[0]} {key[1]}: Q de Ljung-Box a {LAGS} retards "
+        print(f"residus de {family}: Q de Ljung-Box a {LAGS} retards "
               f"{statistic:.1f}, valor p {value:.3g}, sobre {days} dies")
         axis.bar(np.arange(1, LAGS + 1), correlations, color=figure.SERIES, width=0.6)
         for lag in (GAP, DAYS_PER_WEEK):
             axis.axvline(lag, color=figure.MUTED_INK, linestyle="--", linewidth=0.8)
         axis.axhline(0, color=figure.INK, linewidth=0.6)
         axis.set_xlabel("retard, dies", color=figure.MUTED_INK)
-        figure.style(axis, f"{key[0]} {key[1]}, p {value:.2g}")
+        figure.style(axis, f"{family}, p {value:.2g}")
     for axis in axes.flat[len(fitted):]:
         axis.set_visible(False)
     figure.save(panels, where, "residuals")

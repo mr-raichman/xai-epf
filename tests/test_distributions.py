@@ -17,7 +17,8 @@ import pytest
 from scipy import stats
 
 from epf.contract.metrics import PERCENTILES, crps
-from epf.models.ddnn.distributions import JOHNSON_SU, NORMAL, parameters
+from epf.models.nn.ddnn.distributions import JOHNSON_SU, NORMAL
+from epf.models.nn.network import parameters
 from epf.parameters import HOUR_COLUMNS
 
 DAYS = 40

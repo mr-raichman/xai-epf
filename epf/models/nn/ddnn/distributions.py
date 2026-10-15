@@ -12,19 +12,11 @@ seria tenir la definició en dos llocs.
 
 La pèrdua és la log-versemblança negativa, que és el que l'article minimitza allà on la
 xarxa de punt minimitza el MAE, i és tota la diferència entre les dues.
-
-La sortida de la xarxa de punt també és aquí, com una tercera, encara que no sigui cap
-distribució: la xarxa la construeix i l'ajusta igual que les altres dues, i no té
-quantils.
 """
-import collections
-
-import keras
-import numpy as np
 from keras import ops
 from scipy import stats
 
-from epf.parameters import HOURS_PER_DAY
+from epf.models.nn.network import Distribution, heads
 
 # Com surten l'escala i el pes de la cua de la sortida crua, al codi de Marcjasz et al.
 # (2023): `FLOOR + STRETCH * softplus` l'escala, que no pot ser zero perquè un zero hi fa
@@ -33,25 +25,6 @@ from epf.parameters import HOURS_PER_DAY
 FLOOR = 1e-3
 STRETCH = 3
 TAIL_FLOOR = 1
-
-# Una distribució de sortida. `loss` és la pèrdua que minimitza, `flat` porta la sortida
-# crua a les unitats en què es desen els paràmetres, `point` el preu puntual que se'n
-# deriva, `quantiles` els quantils predits i `names` com es diuen els seus paràmetres, en
-# l'ordre en què surten de la xarxa.
-#
-# `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
-# sortida crua, de manera que és alhora el que llegeix `parameters` i l'última capa del
-# que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
-# s'escriu un sol cop i l'explicació no se'n pot separar.
-Distribution = collections.namedtuple(
-    "Distribution", "names loss flat point quantiles")
-
-
-def _split(raw, count):
-    """Les `count` columnes de paràmetres que la xarxa ha tret, cada una (files, 24)."""
-    return [raw[..., number * HOURS_PER_DAY:(number + 1) * HOURS_PER_DAY]
-            for number in range(count)]
-
 
 def _scale(raw):
     return FLOOR + STRETCH * ops.softplus(raw)
@@ -62,19 +35,13 @@ def _tail(raw):
 
 
 def _normal_loss(target, raw):
-    location, scale = _split(raw, 2)
+    location, scale = heads(raw, 2)
     scale = _scale(scale)
     return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
 
 
-def parameters(distribution, raw):
-    """Els paràmetres en les unitats en què es desen i es llegeixen, `(files, 24, P)`."""
-    flat = ops.convert_to_numpy(distribution.flat(raw))
-    return np.stack(_split(flat, len(distribution.names)), axis=-1)
-
-
 def _normal_flat(raw):
-    location, scale = _split(raw, 2)
+    location, scale = heads(raw, 2)
     return ops.concatenate([location, _scale(scale)], axis=-1)
 
 
@@ -91,7 +58,7 @@ def _johnson_loss(target, raw):
     - log(tail)`, amb `z = (y - location) / scale`, llevat de constants que no depenen
     de cap paràmetre i que per tant no mouen cap gradient.
     """
-    location, scale, skew, tail = _split(raw, 4)
+    location, scale, skew, tail = heads(raw, 4)
     scale, tail = _scale(scale), _tail(tail)
     z = (target - location) / scale
     # `arcsinh` i no `log(z + sqrt(1 + z^2))`, que en float32 es cancel·la per a z
@@ -101,7 +68,7 @@ def _johnson_loss(target, raw):
 
 
 def _johnson_flat(raw):
-    location, scale, skew, tail = _split(raw, 4)
+    location, scale, skew, tail = heads(raw, 4)
     return ops.concatenate([location, _scale(scale), skew, _tail(tail)], axis=-1)
 
 
@@ -130,13 +97,4 @@ JOHNSON_SU = Distribution(
     quantiles=_johnson_quantiles)
 
 # Com es diu cada família i quina distribució treu.
-FAMILIES = {"ddnn_normal": NORMAL, "ddnn_jsu": JOHNSON_SU}
-
-# La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
-# absolut, la pèrdua `'mae'` del seu codi.
-POINT = Distribution(
-    names=("price",), loss=keras.losses.mean_absolute_error,
-    flat=lambda raw: raw, point=lambda parameters: parameters[..., 0], quantiles=None)
-
-# Com es diu la família de la xarxa de punt, que es puntua i no s'explica.
-POINT_FAMILY = "dnn"
+DISTRIBUTIONS = {"ddnn_normal": NORMAL, "ddnn_jsu": JOHNSON_SU}

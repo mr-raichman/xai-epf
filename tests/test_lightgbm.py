@@ -7,8 +7,8 @@ va veure, 1085 dies de 24 hores i 98 columnes.
 """
 import numpy as np
 
-from epf.models.boosting.boosting import fit_rows, predict_rows
-from epf.models.boosting.boosting_hyperparameters import UNSEARCHED
+from epf.models.lightgbm.hyperparameters import UNSEARCHED
+from epf.models.lightgbm.train import fit_rows, predict_rows
 
 ROWS, COLUMNS, TREES = 1085 * 24, 98, 200
 
