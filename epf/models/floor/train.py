@@ -26,7 +26,7 @@ FAMILIES = {FLOOR: {"fixed": {"degree": FLOOR_DEGREE}, "placeholder": None, "kep
 def _fitted(X, y, parts):
     """El cúbic de les files d'entrenament, i el que se'n desa per dibuixar-lo."""
     training, test = X.index.isin(parts.training), X.index.isin(parts.test)
-    load = (X["demand"] - X["wind"] - X["solar"]).to_numpy()
+    load = (X["demand_fcst"] - X["wind_fcst"] - X["solar_fcst"]).to_numpy()
     coefficients = np.polyfit(load[training], y[training].to_numpy(), FLOOR_DEGREE)
     return Fitted(np.polyval(coefficients, load[test]), y[test].to_numpy(),
                   {"coefficients": coefficients, "load_training": load[training],
@@ -36,7 +36,7 @@ def _fitted(X, y, parts):
 def train(family, folder, configurations, explained_days):
     """La passada del sòl: per a cada llavor, el cúbic ajustat, puntuat i desat. Torna les
     parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(*features.series()).hourly
+    X, y = features.tables(features.series()).hourly
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

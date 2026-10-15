@@ -13,7 +13,7 @@ triat i no ha de recordar-ho abans d'importar `pyplot`.
 import matplotlib
 import numpy as np
 
-from epf.data import forecasts, schedule
+from epf.contract.features import INFORMATION, PRICE
 from epf.parameters import HOUR_COLUMNS
 from epf.paths import SEED
 
@@ -80,9 +80,11 @@ def save(figure, folder, name):
 
 
 # Com es diu cada grup de columnes a les figures.
-GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòlica",
-                "solar": "fotovoltaica", "nuclear": "nuclear", "coal_gas": "carbó i gas",
-                "hydro": "hidràulica", "calendar": "calendari",
+GROUP_LABELS = {"price": "preu del dia abans", "demand_fcst": "demanda prevista",
+                "wind_fcst": "eòlica prevista", "solar_fcst": "fotovoltaica prevista",
+                "nuclear_sched": "nuclear programada",
+                "coal_gas_sched": "carbó i gas programats",
+                "hydro_sched": "hidràulica programada", "calendar": "calendari",
                 "date": "comptador de dies"}
 
 # Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de
@@ -90,9 +92,9 @@ GROUP_LABELS = {"previous_day": "dia abans", "demand": "demanda", "wind": "eòli
 OUTPUT_LABELS = {"": "contribució", "location": "localització", "scale": "escala",
                  "skewness": "asimetria", "tail_weight": "pes de la cua"}
 
-# Les sèries del dia que es lliura o del dia abans que tenen gràfic de dependència: les
-# tres previsions, com a Trebbien et al. (2023), i els tres grups del programa, igual.
-DEPENDENCE = (*forecasts.INDICATORS, *schedule.GROUPS)
+# Les sèries que tenen gràfic de dependència: totes les del conjunt d'informació menys el
+# preu, les previsions com a Trebbien et al. (2023) i el programa igual.
+DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
 
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
 SHOWN = 20

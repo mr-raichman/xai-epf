@@ -38,7 +38,7 @@ def train(family, folder, configurations, explained_days):
     """La passada de la prova: la taula per hora amb el comptador, i a cada llavor l'arbre
     de la configuració ajustat, comprovat, puntuat i desat. Torna les parelles `[llavor,
     configuració]` que ha desat ara."""
-    rows, y = features.tables(*features.series()).hourly
+    rows, y = features.tables(features.series()).hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
     groups = np.array([DATE if column == DAY_COUNTER else group(column)

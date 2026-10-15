@@ -107,8 +107,8 @@ def _fitted(family, price, y, parts):
 def train(family, folder, configurations, explained_days):
     """La passada d'una família: per a cada llavor, la còpia puntuada i desada. Torna les
     parelles `[llavor, configuració]` que ha desat ara."""
-    price, day_ahead, scheduled = features.series()
-    y = features.tables(price, day_ahead, scheduled).actual
+    series = features.series()
+    price, y = series[features.PRICE], features.tables(series).actual
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

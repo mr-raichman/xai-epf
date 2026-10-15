@@ -1,6 +1,8 @@
+"""La puntuació de veïnatge: una finestra sense dispersió puntua zero, i cada puntuació és la
+del centre de la seva finestra."""
 import numpy as np
 
-from epf.data.outliers import hampel_score
+from epf.dataset.check.outliers import hampel_score
 
 
 def test_a_window_without_spread_scores_zero():

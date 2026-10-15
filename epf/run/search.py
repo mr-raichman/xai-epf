@@ -57,12 +57,18 @@ def main(arguments):
                   f"{list(seeds)}")
             return 1
         seeds = [seed for seed in seeds if seed in arguments.seed]
+    # El conjunt de dades abans d'esborrar res, perquè un de desfasat es refusi amb el disc
+    # tal com era.
+    try:
+        tables = features.tables(features.series())
+    except ValueError as refused:
+        print(refused)
+        return 1
     # Reprendre és de la mesura i prou, com a la passada.
     if arguments.tier == SMOKE or arguments.replace:
         for family in chosen:
             shutil.rmtree(folder(arguments.tier, family), ignore_errors=True)
 
-    tables = features.tables(*features.series())
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     for family in chosen:
         module = searcher(family)

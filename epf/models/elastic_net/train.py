@@ -52,7 +52,7 @@ def _fitted(X, y, parts, explained, numbers):
 def train(family, folder, configurations, explained_days):
     """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
     puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(*features.series()).hourly
+    X, y = features.tables(features.series()).hourly
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)

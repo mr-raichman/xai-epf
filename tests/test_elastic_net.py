@@ -7,7 +7,7 @@ import pytest
 from sklearn.linear_model import ElasticNetCV
 
 from epf.parameters import HOUR_COLUMNS
-from epf.contract.features import HOUR, tables
+from epf.contract.features import HOUR, PRICE, tables
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler
@@ -31,10 +31,14 @@ def per_hour_table(days=120, seed=0):
     solar = rng.uniform(0, 8000, (days, 24))
     solar[:, NIGHT] = 0.0
     solar[:, EVENING] = np.where(rng.random(days) < 0.6, 0.0, solar[:, EVENING])
-    day_ahead = {"demand": frame(rng.uniform(20000, 40000, (days, 24))),
-                 "wind": frame(rng.uniform(500, 15000, (days, 24))),
-                 "solar": frame(solar)}
-    return tables(frame(rng.uniform(-2, 200, (days, 24))), day_ahead, {}).hourly
+    series = {"demand_fcst": frame(rng.uniform(20000, 40000, (days, 24))),
+              "wind_fcst": frame(rng.uniform(500, 15000, (days, 24))),
+              "solar_fcst": frame(solar),
+              PRICE: frame(rng.uniform(-2, 200, (days, 24))),
+              "nuclear_sched": frame(rng.uniform(4000, 7000, (days, 24))),
+              "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
+              "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24)))}
+    return tables(series).hourly
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():
@@ -52,14 +56,14 @@ def test_solar_leaves_the_night_hours_and_keeps_its_evening_without_mad():
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)
     for hour in NIGHT:
-        assert "solar" not in model[hour].columns
+        assert "solar_fcst" not in model[hour].columns
     evening = model[EVENING]
-    assert "solar" in evening.columns
-    solar = X.loc[(X[HOUR] == EVENING).to_numpy(), "solar"].to_numpy()
-    assert evening.inputs.scale[evening.columns.index("solar")] == np.std(solar)
+    assert "solar_fcst" in evening.columns
+    solar = X.loc[(X[HOUR] == EVENING).to_numpy(), "solar_fcst"].to_numpy()
+    assert evening.inputs.scale[evening.columns.index("solar_fcst")] == np.std(solar)
     explained = attribute_rows(model, X)
     night = X[HOUR].isin(NIGHT).to_numpy()
-    assert (explained.values.loc[night, "solar"] == 0).all()
+    assert (explained.values.loc[night, "solar_fcst"] == 0).all()
 
 
 def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
@@ -84,10 +88,10 @@ def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
     before = attribute_rows(model, X).values
     shifted = X.copy()
     rows = (shifted[HOUR] == 13).to_numpy()
-    shifted.loc[rows, "wind"] += 1000.0
+    shifted.loc[rows, "wind_fcst"] += 1000.0
     moved = attribute_rows(model, shifted).values - before
-    assert (moved.loc[rows, "wind"] != 0).all()
-    assert (moved.drop(columns="wind") == 0).all().all()
+    assert (moved.loc[rows, "wind_fcst"] != 0).all()
+    assert (moved.drop(columns="wind_fcst") == 0).all().all()
     assert (moved.loc[~rows] == 0).all().all()
 
 

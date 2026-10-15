@@ -57,19 +57,15 @@ def main(arguments):
 
     seeds, explained_days = DESCRIPTIONS[arguments.tier]
     where = paths.run_folder(arguments.tier, STAGE, commit[:7])
-    # Reprendre és de la mesura i prou: l'assaig admet l'arbre brut, i dues còpies
-    # diferents del codi en compartirien el directori.
-    if arguments.tier == SMOKE or arguments.replace:
-        for family in chosen:
-            shutil.rmtree(where / family, ignore_errors=True)
 
-    # Les configuracions de totes les famílies abans d'ajustar-ne cap, de manera que una
-    # cerca a mitges o feta sobre unes altres files es refusa abans de gastar-hi res. Una
-    # cerca es compara amb les columnes de la taula que llegeix la seva.
+    # Les configuracions de totes les famílies abans d'ajustar-ne cap, i abans d'esborrar
+    # res, de manera que un conjunt de dades desfasat o una cerca a mitges o feta sobre unes
+    # altres files es refusen abans de gastar-hi res. Una cerca es compara amb les columnes
+    # de la taula que llegeix la seva.
     trainers = {family: importlib.import_module(TRAINERS[family]) for family in chosen}
-    tables = features.tables(*features.series())
     plans = {}
     try:
+        tables = features.tables(features.series())
         for family in chosen:
             plan = trainers[family].FAMILIES[family]
             columns = None
@@ -80,6 +76,11 @@ def main(arguments):
     except ValueError as refused:
         print(refused)
         return 1
+    # Reprendre és de la mesura i prou: l'assaig admet l'arbre brut, i dues còpies
+    # diferents del codi en compartirien el directori.
+    if arguments.tier == SMOKE or arguments.replace:
+        for family in chosen:
+            shutil.rmtree(where / family, ignore_errors=True)
     swept = {name: getattr(parameters, name) for name in dir(parameters)
              if name.isupper() and not name.startswith("_")}
     for family in chosen:

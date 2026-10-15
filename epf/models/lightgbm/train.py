@@ -112,7 +112,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
 def train(family, folder, configurations, explained_days):
     """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
     puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
-    X, y = features.tables(*features.series()).hourly
+    X, y = features.tables(features.series()).hourly
     groups = np.array([group(column) for column in X.columns])
     done = []
     for seed, planned in configurations.items():

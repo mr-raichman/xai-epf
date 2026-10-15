@@ -1,12 +1,12 @@
 """Tot el que es tecleja a mà, en una sola ordre amb subordres.
 
 `epf --help` és la llista de què es pot teclejar. Aquest és l'únic lloc que sap quines
-subordres hi ha, com es diuen, quins arguments prenen i quin mòdul n'executa cada una,
-de manera que afegir-ne una és una fila de `COMMANDS` i res més.
+subordres hi ha, com es diuen, quins arguments prenen i quina funció de quin mòdul
+n'executa cada una, de manera que afegir-ne una és una fila de `COMMANDS` i res més.
 
 Els mòduls s'importen quan es tria la subordre i no abans. `models/lightgbm/attribution.py`
 porta `shap`, que costa un segon llarg, i amb els imports a dalt el pagarien `epf
-audit-data` i fins i tot `epf --help`. Per això a la taula hi ha el nom del mòdul i no el
+dataset` i fins i tot `epf --help`. Per això a la taula hi ha el nom del mòdul i no el
 mòdul, i per això els arguments es declaren aquí: `argparse` construeix totes les
 subordres abans de llegir-ne cap, així que demanar-los a cada mòdul els tornaria a
 importar tots.
@@ -19,10 +19,10 @@ import pathlib
 import epf
 from epf import parameters
 
-# Una subordre: quin mòdul l'executa, què en diu `epf --help` i qui li declara els
-# arguments. `arguments` és `None` quan no en pren cap, i és també el que diu que el
-# seu `main` es crida sense res.
-Command = collections.namedtuple("Command", "module help arguments")
+# Una subordre: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
+# declara els arguments. `arguments` és `None` quan no en pren cap, i és també el que diu
+# que la seva funció es crida sense res.
+Command = collections.namedtuple("Command", "module function help arguments")
 
 
 def pass_arguments(parser):
@@ -54,27 +54,20 @@ def folder_arguments(parser):
 
 
 COMMANDS = {
-    "download-price": Command(
-        "epf.data.price", "baixa el preu de les dues fonts i diu què hi ha al disc", None),
-    "download-forecasts": Command(
-        "epf.data.forecasts", "baixa les previsions D+1 i diu què hi ha al disc", None),
-    "download-schedule": Command(
-        "epf.data.schedule", "baixa el programa base per tecnologies i diu què hi ha al disc",
+    "download": Command(
+        "epf.dataset.build", "download", "baixa el que encara falta de cada indicador", None),
+    "dataset": Command(
+        "epf.dataset.build", "main", "fa el conjunt de dades dels fitxers baixats, el "
+        "comprova, en dibuixa les figures i informa dels valors allunyats dels seus veïns",
         None),
-    "audit-data": Command(
-        "epf.data.audit", "el que només es pot preguntar a OMIE i a ESIOS", None),
-    "figure-price": Command(
-        "epf.data.figures.price_series", "tots els preus horaris, del 2014 endavant", None),
-    "figure-outliers": Command(
-        "epf.data.figures.price_outliers", "la distància de cada preu als seus veïns", None),
     "describe": Command(
-        "epf.run.run", "descriu el preu amb el protocol de Trebbien et al. (2023)",
+        "epf.run.run", "main", "descriu el preu amb el protocol de Trebbien et al. (2023)",
         pass_arguments),
     "search": Command(
-        "epf.run.search", "cerca els números de cada família amb la cerca a l'atzar de "
-        "Trebbien et al. (2023)", search_arguments),
+        "epf.run.search", "main", "cerca els números de cada família amb la cerca a l'atzar "
+        "de Trebbien et al. (2023)", search_arguments),
     "describe-figures": Command(
-        "epf.run.figures", "torna a dibuixar les figures d'una passada",
+        "epf.run.figures", "main", "torna a dibuixar les figures d'una passada",
         folder_arguments),
 }
 
@@ -90,5 +83,5 @@ def main():
 
     arguments = parser.parse_args()
     command = COMMANDS[arguments.command]
-    module = importlib.import_module(command.module)
-    return module.main() if command.arguments is None else module.main(arguments)
+    function = getattr(importlib.import_module(command.module), command.function)
+    return function() if command.arguments is None else function(arguments)

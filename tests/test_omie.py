@@ -2,8 +2,8 @@
 import pytest
 import requests
 
-from epf.data import omie
-from epf.data.omie import to_hourly
+from epf.dataset import omie
+from epf.dataset.omie import to_hourly
 
 
 def test_an_hourly_day_passes_through():

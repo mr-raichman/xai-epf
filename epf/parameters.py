@@ -1,8 +1,8 @@
 """Tot el que s'ha triat per a una passada, un sol valor de cada.
 
 El que és un fet del mercat o de la font no és aquí, llevat de les hores del dia: això
-viu a `data/esios.py` i a `data/omie.py`, i canvia quan canvia el món, no quan es prova
-un número.
+viu a `dataset/esios.py` i a `dataset/omie.py`, i canvia quan canvia el món, no quan es
+prova un número.
 Els números d'un model tampoc: viuen amb el model, a
 `models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.

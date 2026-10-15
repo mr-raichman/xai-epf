@@ -1,11 +1,11 @@
-"""Valors d'ESIOS: períodes demanats, canvis d'hora i la seva reparació, províncies, hores absents i previsions revisades."""
+"""Valors d'ESIOS: canvis d'hora i la seva reparació, un instant repetit, hores absents i previsions revisades."""
 import datetime
 
 import pandas as pd
 import pytest
 
-from epf.data.esios import (MARKET_TIMEZONE, MONTHLY, REVISED_FORECASTS, SERIES, hourly, load,
-                            periods, repair_dst)
+from epf.dataset.esios import (MARKET_TIMEZONE, REVISED_FORECASTS, Indicator, admissible,
+                               hourly, repair_dst)
 
 # 2024-10-27, demanda real (1293): la primera 02:00 porta `datetime_utc` 01:00Z,
 # que és la de la segona.
@@ -24,16 +24,9 @@ SPRING = [
     {"datetime": "2025-03-30T03:00:00.000+02:00", "value": 20130.58},
 ]
 
-# 2024-03-09, potència nuclear disponible (474): València deixa de publicar-se a les 02:00.
-NUCLEAR = [
-    {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9, "geo_name": "Valencia"},
-    {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1005.8, "geo_name": "Cáceres"},
-    {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 3032.8, "geo_name": "Tarragona"},
-    {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1003.4, "geo_name": "Guadalajara"},
-    {"datetime": "2024-03-09T02:00:00.000+01:00", "value": 1005.8, "geo_name": "Cáceres"},
-    {"datetime": "2024-03-09T02:00:00.000+01:00", "value": 3032.8, "geo_name": "Tarragona"},
-    {"datetime": "2024-03-09T02:00:00.000+01:00", "value": 1003.4, "geo_name": "Guadalajara"},
-]
+# 2024-03-09, potència nuclear disponible a València (474): l'últim valor és el de la
+# 01:00, i a les 02:00 deixa de publicar-se, com en una parada de recàrrega.
+NUCLEAR = [{"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}]
 
 
 def hours_of(*days):
@@ -63,10 +56,12 @@ def test_spring_inserts_the_missing_hour():
     assert list(day[:4]) == [22541.08, 21072.33, pytest.approx((21072.33 + 20130.58) / 2), 20130.58]
 
 
-def test_provinces_are_summed_and_an_absent_province_adds_nothing():
-    day = hourly(NUCLEAR, hours_of("2024-03-09"))[0].iloc[0]
-    assert day["h01"] == pytest.approx(1063.9 + 1005.8 + 3032.8 + 1003.4)
-    assert day["h02"] == pytest.approx(1005.8 + 3032.8 + 1003.4)
+def test_two_values_at_one_instant_are_refused_rather_than_summed():
+    # Mentre es llegien les províncies, `hourly` sumava els valors d'un instant. D'una sola
+    # geografia, dos valors són una hora repetida, i sumats la doblarien sense dir-ho.
+    repeated = NUCLEAR + [{"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}]
+    with pytest.raises(ValueError, match="més d'un valor"):
+        hourly(repeated)
 
 
 def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
@@ -81,17 +76,11 @@ def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
     assert pd.isna(hourly(NUCLEAR)[0].iloc[0]["h05"])
 
 
-def test_zeros_never_extend_beyond_the_published_days():
-    anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
-    days = hourly(NUCLEAR, anchor)[0].index
-    assert list(days) == [pd.Timestamp("2024-03-09")]
-
-
 def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_before():
     # El carbó del programa va deixar de publicar-se mentre l'àncora seguia: després del
     # seu últim dia val zero, i abans del primer no es toca.
     anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
-    frame = hourly(NUCLEAR, anchor, past_last_day=True)[0]
+    frame = hourly(NUCLEAR, anchor)[0]
     assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
     assert (frame.loc["2024-03-10"] == 0.0).all()
 
@@ -103,28 +92,10 @@ def test_the_published_count_is_of_local_hours_and_not_of_repaired_ones():
     assert spring_hours.iloc[0] == 23 and len(spring.columns) == 24
 
 
-def test_revised_forecasts_are_refused_by_the_normal_loader():
-    for indicator in REVISED_FORECASTS:
-        with pytest.raises(ValueError):
-            load(indicator, directory="/nonexistent")
-
-
-def test_every_anchor_is_a_series_that_cannot_be_zero():
-    for anchor in {a for a in SERIES.values() if a is not None}:
-        assert SERIES[anchor] is None
-
-
-def test_revised_forecasts_are_not_admissible_series():
-    assert not REVISED_FORECASTS & set(SERIES)
-
-
-def test_monthly_periods_cover_every_day_once_to_the_end_of_this_year():
-    today = datetime.date(2024, 3, 9)
-    days = [(first, last) for _, first, last in periods(min(MONTHLY), today)]
-    assert days[0][0] == datetime.date(2010, 1, 1)
-    assert days[-1] == (datetime.date(2024, 12, 1), datetime.date(2024, 12, 31))
-    assert all(last + datetime.timedelta(days=1) == following
-               for (_, last), (following, _) in zip(days, days[1:]))
+def test_revised_forecasts_are_refused_by_the_reader():
+    for number in REVISED_FORECASTS:
+        with pytest.raises(ValueError, match="revisada"):
+            admissible([], Indicator(number, "average", "Península", True, None, ()))
 
 
 # 2025-03-30: 23 períodes, sense l'hora local 02. Primers cinc preus espanyols.

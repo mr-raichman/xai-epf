@@ -17,7 +17,7 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
     # La contribució de la columna de l'hora k a la sortida de l'hora h val 100 k + h:
     # la parella a l'hora només ha de prendre les de k igual a h. Una altra columna al
     # davant, perquè la posició d'una columna no coincideixi amb la seva hora.
-    columns = ["other"] + [f"demand_{hour}" for hour in HOUR_COLUMNS]
+    columns = ["other"] + [f"demand_fcst_{hour}" for hour in HOUR_COLUMNS]
     days = 2
     values = np.zeros((days, len(columns), 24, 1))
     for k in range(24):
@@ -26,8 +26,8 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
     inputs = np.arange(days * len(columns), dtype=float).reshape(days, len(columns))
     seed = {"values": values, "names": np.array(["location"]),
             "columns": np.array(columns), "inputs": inputs,
-            "groups": np.array(["other"] + ["demand"] * len(HOUR_COLUMNS))}
-    x, y = pairs(seed, "location", outputs(seed)["location"], "demand")
+            "groups": np.array(["other"] + ["demand_fcst"] * len(HOUR_COLUMNS))}
+    x, y = pairs(seed, "location", outputs(seed)["location"], "demand_fcst")
     expected_y = [101 * h + 1000 * d for d in range(days) for h in range(24)]
     expected_x = [inputs[d, h + 1] for d in range(days) for h in range(24)]
     assert np.array_equal(y, expected_y)

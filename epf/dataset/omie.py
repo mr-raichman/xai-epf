@@ -1,4 +1,9 @@
-"""Descàrrega i lectura dels preus del mercat diari d'OMIE.
+"""Descàrrega i lectura dels preus del mercat diari d'OMIE, i el seu tall amb els d'ESIOS.
+
+ESIOS serveix el preu des del 2014 i OMIE publica el seu arxiu des del 2018, idèntic al
+d'ESIOS a tots els dies en què coincideixen: el preu és l'un abans del tall i l'altre a
+partir. Els fitxers d'OMIE viuen a la carpeta del preu al costat dels d'ESIOS, i els seus
+noms no xoquen.
 
 Segons l'especificació `formato_ficheros_inf_pub` d'OMIE, cada línia de dades és
 `Any;Mes;Dia;Període;MarginalPT;MarginalES`, i el nom del fitxer acaba en `.v`,
@@ -14,9 +19,15 @@ import zipfile
 import pandas as pd
 import requests
 
-from epf.data.esios import QUARTERS_PER_HOUR, repair_dst
+from epf.dataset.esios import QUARTERS_PER_HOUR, repair_dst
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY
-from epf.paths import PRICE
+
+# Primer dia que ESIOS serveix el preu, mesurat: una sol·licitud directa a l'API no
+# en torna cap abans.
+ESIOS_FIRST_DAY = datetime.date(2014, 1, 1)
+
+# Primer dia de l'arxiu públic d'OMIE, i del preu que se'n pren.
+OMIE_FROM = datetime.date(2018, 1, 1)
 
 # Índex de MarginalES, el preu espanyol. L'índex 4 és el portuguès.
 SPAIN_FIELD = 5
@@ -34,7 +45,7 @@ def _day_of(stem):
     return datetime.date(int(stem[:4]), int(stem[4:6]), int(stem[6:8]))
 
 
-def latest_version_per_day(directory=PRICE):
+def latest_version_per_day(directory):
     """Fitxer de cada dia, en la seva versió més alta."""
     chosen = {}
     for path in pathlib.Path(directory).glob("marginalpdbc_*"):
@@ -69,8 +80,9 @@ def to_hourly(periods):
             for i in range(len(periods) // QUARTERS_PER_HOUR)]
 
 
-def load(directory=PRICE):
-    """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna."""
+def load(directory):
+    """Preus en EUR/MWh, un dia de lliurament per fila i una hora per columna, i els fitxers
+    que s'han llegit, el de la versió més alta de cada dia."""
     chosen = latest_version_per_day(directory)
     if not chosen:
         raise FileNotFoundError(f"no hi ha cap fitxer de preus a {directory}")
@@ -81,7 +93,14 @@ def load(directory=PRICE):
         except ValueError as error:
             raise ValueError(f"{path.name}: {error}") from None
     index = pd.DatetimeIndex(list(chosen), name="day")
-    return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
+    return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS), list(chosen.values())
+
+
+def spliced(early, directory):
+    """El preu d'ESIOS, `early`, fins al dia abans d'`OMIE_FROM`, i el d'OMIE des d'aquell
+    dia, en EUR/MWh, i els fitxers d'OMIE que s'han llegit."""
+    late, read = load(directory)
+    return pd.concat([early[early.index < pd.Timestamp(OMIE_FROM)], late]), read
 
 
 def _save(target, content):
@@ -105,7 +124,7 @@ def _fetch(filename, directory):
     return True
 
 
-def download(directory=PRICE):
+def download(directory):
     """Actualitza el directori de preus amb tot el que llista OMIE."""
     directory = pathlib.Path(directory)
     directory.mkdir(parents=True, exist_ok=True)

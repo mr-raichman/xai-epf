@@ -1,20 +1,19 @@
-"""Gràfic de tots els preus horaris del mercat diari espanyol."""
+"""La figura de tots els preus horaris del mercat diari espanyol, a `data/figures/price.png`."""
 import pandas as pd
 
 from epf import paths
-from epf.data.price import OMIE_FROM, load
-from epf.contract.figure import DPI, GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.contract import figure
+from epf.contract.figure import GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.dataset.omie import OMIE_FROM
 
-OUTPUT = paths.PRICE_FIGURES / "price.png"
 
-
-def main():
-    price = load()
+def draw(price):
+    """Cada preu horari de `price`, en dies per hores, amb el tall entre ESIOS i OMIE."""
     hourly = price.stack()
     instants = hourly.index.get_level_values(0) + pd.to_timedelta(
         [int(hour[1:]) for hour in hourly.index.get_level_values(1)], unit="h")
 
-    figure, axis = plt.subplots(figsize=(20, 6), facecolor=SURFACE)
+    panels, axis = plt.subplots(figsize=(20, 6), facecolor=SURFACE)
     axis.set_facecolor(SURFACE)
     axis.plot(instants, hourly.to_numpy(), color=SERIES, linewidth=0.3)
 
@@ -35,7 +34,4 @@ def main():
         axis.spines[side].set_visible(False)
     for side in ("left", "bottom"):
         axis.spines[side].set_color(GRID)
-
-    figure.tight_layout()
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(OUTPUT, dpi=DPI)
+    figure.save(panels, paths.DATA_FIGURES, "price")

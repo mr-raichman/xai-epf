@@ -9,7 +9,7 @@ família.
 """
 import numpy as np
 
-from epf.data import forecasts, schedule
+from epf.contract.features import INFORMATION
 
 # Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
 # et al. (2021), on la base més les contribucions no són un preu, o cap, que són
@@ -35,12 +35,10 @@ ROUNDING = np.finfo(np.float32).eps / 2
 
 
 def group(column):
-    """El grup d'una columna a la importància per grups: el dia abans, cada previsió, cada
-    grup del programa o, la resta, el calendari. Una columna que només afegeix un model en
-    dona el grup ell mateix."""
-    if column.startswith("lag1_"):
-        return "previous_day"
-    for name in (*forecasts.INDICATORS, *schedule.GROUPS):
+    """El grup d'una columna a la importància per grups: la sèrie del conjunt d'informació
+    d'on surt o, la resta, el calendari. Una columna que només afegeix un model en dona el
+    grup ell mateix."""
+    for name in INFORMATION:
         if column == name or column.startswith(f"{name}_"):
             return name
     return "calendar"
