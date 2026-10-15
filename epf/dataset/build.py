@@ -165,10 +165,10 @@ def main():
     for name, frame in found.items():
         print(f"  {name}: {len(frame)} dies, de {frame.index[0].date()} "
               f"a {frame.index[-1].date()}")
-    paths.DATA_FIGURES.mkdir(exist_ok=True)
-    figures.draw(found["price"])
     for name, frame in found.items():
         print()
+        (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
+        figures.draw(name, frame)
         outliers.draw(name, frame, *outliers.report(name, frame))
     print(f"\nles figures són a {paths.DATA_FIGURES}")
     return 0

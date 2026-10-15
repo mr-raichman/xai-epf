@@ -113,8 +113,8 @@ def _style(axis, title, ylabel):
 
 
 def draw(name, frame, by_hours, by_days):
-    """La figura de les puntuacions de veïnatge d'una sèrie, les que `report` ha imprès, a
-    `outliers_<sèrie>.png`: les de les hores adjacents, un dia per línia, i les de la
+    """La figura de les puntuacions de veïnatge d'una sèrie, les que `report` ha imprès, a la
+    carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores adjacents, un dia per línia, i les de la
     mateixa hora dels dies del voltant, en el temps, amb les més altes en vermell."""
     panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
@@ -147,4 +147,4 @@ def draw(name, frame, by_hours, by_days):
     panels.suptitle(f"Distància de cada valor horari de {name} als seus veïns, "
                     f"{frame.index[0].year} a {frame.index[-1].year}", color=INK, x=0.01,
                     ha="left")
-    figure.save(panels, paths.DATA_FIGURES, f"outliers_{name}")
+    figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")

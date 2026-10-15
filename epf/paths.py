@@ -17,9 +17,9 @@ LOCK = ROOT / "uv.lock"
 # hi han arribat i no cap contrast amb una còpia transformada que no existeix.
 DOWNLOADS = ROOT / "downloads"
 
-# El conjunt de dades fet dels fitxers baixats, el registre dels fitxers d'on es va fer i
-# les figures que el descriuen. Fora de l'arbre que es baixa, perquè una entrada i una
-# sortida no comparteixen directori.
+# El conjunt de dades fet dels fitxers baixats, el registre dels fitxers d'on es va fer
+# i les figures que el descriuen, una carpeta per sèrie. Fora de l'arbre que es baixa,
+# perquè una entrada i una sortida no comparteixen directori.
 DATA = ROOT / "data"
 DATASET = DATA / "dataset.csv"
 DATASET_RECORD = DATA / "dataset.json"
