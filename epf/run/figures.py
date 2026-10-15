@@ -11,7 +11,7 @@ import importlib
 from epf import paths
 from epf.contract import figure
 from epf.contract.figure import plt
-from epf.run import residuals
+from epf.run import families, residuals
 
 # Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són totes,
 # de manera que una carpeta d'una família que no hi és fa petar el dibuix en lloc de
@@ -74,11 +74,22 @@ def draw(where):
 
 
 def main(arguments):
-    # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
-    found = {path.name: path for smoke in (False, True) for path in paths.runs(smoke)}
-    if arguments.run not in found:
-        print(f"no hi ha cap passada {arguments.run} a {paths.RUNS}")
-        return 1
-    draw(found[arguments.run])
-    print(f"figures de la passada a {found[arguments.run]}")
+    """Les figures de la passada que es nomeni o, sense nom, de l'última acabada del seu
+    tipus, de mesura si no és `--smoke`."""
+    if arguments.run is None:
+        found = [where for where in paths.runs(arguments.smoke) if families.finished(where)]
+        if not found:
+            kind = "d'assaig" if arguments.smoke else "de mesura"
+            print(f"no hi ha cap passada {kind} acabada a {paths.RUNS}")
+            return 1
+        where = found[-1]
+    else:
+        # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
+        found = {path.name: path for smoke in (False, True) for path in paths.runs(smoke)}
+        if arguments.run not in found:
+            print(f"no hi ha cap passada {arguments.run} a {paths.RUNS}")
+            return 1
+        where = found[arguments.run]
+    draw(where)
+    print(f"figures de la passada a {where}")
     return 0

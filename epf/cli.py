@@ -43,9 +43,14 @@ def search_arguments(parser):
 
 
 def figures_arguments(parser):
-    """La passada de la qual es tornen a dibuixar les figures."""
-    parser.add_argument("run", metavar="PASSADA",
-                        help="el nom d'una passada, com 2026-10-14_01 o smoke_2026-10-14_01")
+    """La passada de la qual es tornen a dibuixar les figures: la que es nomeni o, sense
+    nom, l'última acabada del seu tipus."""
+    parser.add_argument("--smoke", action="store_true",
+                        help="sense nom, l'última passada d'assaig acabada en lloc de la de "
+                             "mesura")
+    parser.add_argument("run", metavar="PASSADA", nargs="?",
+                        help="el nom d'una passada, com 2026-10-14_01 o assaig_2026-10-14_01; "
+                             "sense, l'última acabada")
     return parser
 
 

@@ -37,37 +37,13 @@ TRAINERS = {
 }
 
 
-def recorded(folder):
-    """Les configuracions de cada llavor que desa el registre d'una família d'una passada,
-    el seu pla, o `None` si encara no en té."""
-    path = folder / paths.SEED_RECORD
-    if not path.exists():
-        return None
-    found = json.loads(path.read_text(encoding="utf-8"))["configurations"]
-    # JSON escriu les claus com a text.
-    return {int(seed): planned for seed, planned in found.items()}
-
-
-def complete(folder):
-    """Si una família té pla i hi té tots els fitxers que diu."""
-    found = recorded(folder)
-    return found is not None and all(
-        (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
-        for seed, planned in found.items() for one in planned)
-
-
-def finished(where):
-    """Si una passada és acabada: si cada família hi té tots els fitxers del seu pla."""
-    return all(complete(where / family) for family in TRAINERS)
-
-
 def _where(smoke, fingerprints):
     """La passada on s'escriu: l'última del tipus si no és acabada, i si no la següent
     d'avui. Continuar-ne una que han fet un altre codi, un altre conjunt de dades o unes
     altres biblioteques es refusa, perquè les seves famílies no es podrien comparar. Un
     registre sense una de les empremtes d'ara és d'un altre codi."""
     found = paths.runs(smoke)
-    if not found or finished(found[-1]):
+    if not found or families.finished(found[-1]):
         return paths.next_run(smoke, datetime.date.today())
     latest = found[-1]
     for path in sorted(latest.glob(f"*/{paths.SEED_RECORD}")):
@@ -95,7 +71,7 @@ def main(arguments):
         trainers = {family: importlib.import_module(TRAINERS[family]) for family in chosen}
         plans = {}
         for family in chosen:
-            if recorded(where / family) is not None:
+            if families.recorded(where / family) is not None:
                 continue
             plan = trainers[family].FAMILIES[family]
             columns = None
@@ -117,10 +93,10 @@ def main(arguments):
     # temps de l'ajust que la va fer.
     for family in chosen:
         folder = where / family
-        if complete(folder):
+        if families.complete(folder):
             continue
         started = time.time()
-        described_now = trainers[family].train(family, folder, recorded(folder),
+        described_now = trainers[family].train(family, folder, families.recorded(folder),
                                                values["EXPLAINED_DAYS"])
         path = folder / paths.SEED_RECORD
         record.write_record(path, json.loads(path.read_text(encoding="utf-8")) | {

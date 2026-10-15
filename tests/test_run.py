@@ -14,7 +14,7 @@ import pytest
 
 from epf import paths
 from epf.contract import matrix, record
-from epf.run import figures, run, search
+from epf.run import families, figures, run, search
 
 
 @pytest.fixture
@@ -40,6 +40,7 @@ def fake(tmp_path, monkeypatch):
     module.train = train
     monkeypatch.setitem(sys.modules, "fake_trainer", module)
     monkeypatch.setattr(run, "TRAINERS", {"first": "fake_trainer", "second": "fake_trainer"})
+    monkeypatch.setattr(families, "EVERY", frozenset({"first", "second"}))
     monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
     monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")
     built = types.SimpleNamespace(daily=(pd.DataFrame({"x": [0.0]}), None))
