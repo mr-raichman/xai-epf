@@ -16,6 +16,7 @@ import collections
 import importlib
 import pathlib
 
+import epf
 from epf import parameters
 
 # Una subordre: quin mòdul l'executa, què en diu `epf --help` i qui li declara els
@@ -79,8 +80,7 @@ COMMANDS = {
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        prog="epf", description="Pronòstic de preu del mercat diari espanyol.")
+    parser = argparse.ArgumentParser(prog="epf", description=epf.__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True, metavar="ordre")
     for name, command in COMMANDS.items():
         subcommand = subcommands.add_parser(name, help=command.help,

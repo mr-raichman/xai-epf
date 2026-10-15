@@ -1,7 +1,9 @@
 [project]
 name = "epf"
 version = "0.1.0"
-description = "Day-ahead electricity price forecasting for the Spanish market, and what the models learn about how the price forms."
+# La frase del docstring del paquet, `epf/__init__.py`, copiada a propòsit: s'han de
+# mantenir iguals.
+description = "Predicció del preu diari del mercat elèctric espanyol i estudi de la seva formació."
 requires-python = "==3.13.*"
 license = "MIT"
 license-files = ["LICENSE"]

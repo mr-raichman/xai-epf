@@ -13,7 +13,7 @@ import pytest
 from epf import describe, paths, search
 from epf.market import HOURS_PER_DAY
 from epf.split import Split, split
-from tests.test_search import DELETED, PERIOD, _searcher, _table
+from test_search import DELETED, PERIOD, _searcher, _table
 
 # Una família que es cerca i se n'ajusten les tres millors configuracions de cada llavor.
 FAKE = describe.Describer("daily", (), None, {}, {"value": 0}, 3)
