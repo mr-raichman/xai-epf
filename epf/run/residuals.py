@@ -16,7 +16,7 @@ from epf.models.naive.train import FAMILIES as COPIES
 from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
 
 # Retards del test, dues vegades el període setmanal, com aconsellen Hyndman i
-# Athanasopoulos per a una sèrie estacional.
+# Athanasopoulos (2021) per a una sèrie estacional.
 LAGS = 2 * DAYS_PER_WEEK
 
 # Columnes de la figura, una família per quadre.
