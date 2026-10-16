@@ -8,6 +8,7 @@ defecte de l'eina, que l'article no canvia. Un sol càstig serveix les 24 hores,
 l'article, de manera que el més gran de cada seqüència és el més gran de les 24. La
 seqüència es calcula sobre les files d'entrenament.
 """
+
 import numpy as np
 
 from epf.contract.metrics import mae
@@ -16,8 +17,8 @@ from epf.models.elastic_net import regression
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
 
-# Les barreges d'Uniejewski et al. (2016), els càstigs de cada una, i la raó entre el més
-# petit i el més gran, el `LambdaRatio` per defecte de `lasso.m`.
+# Les barreges d'Uniejewski et al. (2016), els càstigs de cada una, i la raó entre el
+# més petit i el més gran, el `LambdaRatio` per defecte de `lasso.m`.
 MIXINGS = (0.25, 0.5, 0.75)
 STEPS = 34
 RATIO = 1e-4
@@ -38,8 +39,9 @@ def penalties(X, y):
 
 def space(optuna_trial):
     """El punt de la graella d'una prova: la barreja i el pas de la seva seqüència."""
-    return tuple(optuna_trial.suggest_categorical(name, values)
-                 for name, values in GRID.items())
+    return tuple(
+        optuna_trial.suggest_categorical(name, values) for name, values in GRID.items()
+    )
 
 
 def trial(family, optuna_trial, train, validate, seed):
@@ -49,5 +51,7 @@ def trial(family, optuna_trial, train, validate, seed):
     mixing, step = space(optuna_trial)
     penalty = float(penalties(X, y)[mixing][step])
     model = regression.fit_rows(X, y, penalty, mixing)
-    return ({"penalty": penalty, "mixing": mixing},
-            mae(regression.predict_rows(model, X_validate), y_validate))
+    return (
+        {"penalty": penalty, "mixing": mixing},
+        mae(regression.predict_rows(model, X_validate), y_validate),
+    )

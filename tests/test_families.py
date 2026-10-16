@@ -1,8 +1,9 @@
 """Les famílies: totes les que una passada ajusta, cerca o dibuixa són d'un model.
 
-Res no peta si no ho són: una família que una passada ajusta i cap model no té no es podria
-nomenar, i una passada es donaria per acabada sense ella.
+Res no peta si no ho són: una família que una passada ajusta i cap model no té no es
+podria nomenar, i una passada es donaria per acabada sense ella.
 """
+
 from epf.run import families, figures, run, search
 
 

@@ -1,5 +1,6 @@
 """Alineació dels retards per data de lliurament, la lectura del conjunt de dades, i les
 matrius que una passada desa."""
+
 import datetime
 
 import numpy as np
@@ -8,8 +9,16 @@ import pytest
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.matrix import (DAY, DAY_OF_WEEK_COLUMNS, HOUR, INFORMATION, PRICE, build,
-                                 matrices, per_hour)
+from epf.contract.matrix import (
+    DAY,
+    DAY_OF_WEEK_COLUMNS,
+    HOUR,
+    INFORMATION,
+    PRICE,
+    build,
+    matrices,
+    per_hour,
+)
 from epf.dataset import build as dataset
 from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
 
@@ -19,7 +28,9 @@ PRICE_ONLY = {PRICE: PREVIOUS_DAY}
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
     """Preus sintètics on cada valor és dia * 100 + hora."""
-    index = pd.DatetimeIndex([start + datetime.timedelta(days=d) for d in days], name="day")
+    index = pd.DatetimeIndex(
+        [start + datetime.timedelta(days=d) for d in days], name="day"
+    )
     rows = [[d * 100 + hour for hour in range(24)] for d in days]
     return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
 
@@ -27,7 +38,9 @@ def frame_of(days, start=datetime.date(2020, 1, 1)):
 def every_series(days=range(30)):
     """Cada sèrie del conjunt d'informació: el preu, i cada altra el preu per un nombre
     diferent."""
-    return {name: frame_of(days) * (number + 1) for number, name in enumerate(INFORMATION)}
+    return {
+        name: frame_of(days) * (number + 1) for number, name in enumerate(INFORMATION)
+    }
 
 
 def test_each_lag_carries_the_right_day():
@@ -54,7 +67,9 @@ def test_the_first_complete_row_is_the_longest_lag_away():
 
 def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
     complete = build({PRICE: frame_of(range(30))}, PRICE_ONLY)[0]
-    with_gap = build({PRICE: frame_of([d for d in range(30) if d != 15])}, PRICE_ONLY)[0]
+    with_gap = build({PRICE: frame_of([d for d in range(30) if d != 15])}, PRICE_ONLY)[
+        0
+    ]
 
     gap = pd.Timestamp("2020-01-16")
     missing = set(complete.index) - set(with_gap.index)
@@ -72,8 +87,10 @@ def test_the_day_of_week_is_seven_indicators_on_the_delivery_day():
     X, _ = build({PRICE: frame_of(range(30))}, PRICE_ONLY)
     day = X.index[5]
     row = X.loc[day, DAY_OF_WEEK_COLUMNS]
-    assert list(row) == [1.0 if number == day.dayofweek else 0.0
-                         for number in range(len(DAY_OF_WEEK_COLUMNS))]
+    assert list(row) == [
+        1.0 if number == day.dayofweek else 0.0
+        for number in range(len(DAY_OF_WEEK_COLUMNS))
+    ]
     assert X[DAY_OF_WEEK_COLUMNS].to_numpy().sum(axis=1).tolist() == [1.0] * len(X)
 
 
@@ -108,14 +125,16 @@ def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
         row = rows.loc[day].iloc[hour]
         assert row[HOUR] == hour
         assert row["demand_fcst"] == demand.loc[day, column]
-        assert row[f"price_lag1_{column}"] == price.loc[day - pd.Timedelta(days=1), column]
+        assert (
+            row[f"price_lag1_{column}"] == price.loc[day - pd.Timedelta(days=1), column]
+        )
         assert target.loc[day].iloc[hour] == price.loc[day, column]
     assert not any(column.startswith("demand_fcst_") for column in rows.columns)
 
 
 def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
-    # El programa del dia abans és el que es té a l'hora del tancament: el del mateix dia
-    # és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
+    # El programa del dia abans és el que es té a l'hora del tancament: el del mateix
+    # dia és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
     series = every_series()
     nuclear = series["nuclear_sched"]
     found = matrices(series)
@@ -124,7 +143,10 @@ def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
     before = day - pd.Timedelta(days=1)
     for hour, column in enumerate(HOUR_COLUMNS):
         assert X.loc[day, f"nuclear_sched_lag1_{column}"] == nuclear.loc[before, column]
-        assert rows.loc[day].iloc[hour]["nuclear_sched_lag1"] == nuclear.loc[before, column]
+        assert (
+            rows.loc[day].iloc[hour]["nuclear_sched_lag1"]
+            == nuclear.loc[before, column]
+        )
     assert not any(column.startswith("nuclear_sched_lag1_") for column in rows.columns)
 
 
@@ -170,11 +192,19 @@ def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
     # desada que no tornés exactament el que van llegir els models no ho diria.
     found = matrices({name: frame / 7 for name, frame in every_series().items()})
     matrix.write(found, tmp_path)
-    for name, (X, y), target in (("daily", found.daily, [f"price_{hour}" for hour in HOUR_COLUMNS]),
-                                 ("hourly", found.hourly, [PRICE])):
-        stored = pd.read_csv(tmp_path / paths.MATRIX.format(name=name), index_col=DAY,
-                             parse_dates=[DAY], float_precision="round_trip")
+    for name, (X, y), target in (
+        ("daily", found.daily, [f"price_{hour}" for hour in HOUR_COLUMNS]),
+        ("hourly", found.hourly, [PRICE]),
+    ):
+        stored = pd.read_csv(
+            tmp_path / paths.MATRIX.format(name=name),
+            index_col=DAY,
+            parse_dates=[DAY],
+            float_precision="round_trip",
+        )
         assert list(stored.columns) == list(X.columns) + target
         assert (stored.index == X.index).all()
         assert np.array_equal(stored[X.columns].to_numpy(), X.to_numpy())
-        assert np.array_equal(stored[target].to_numpy(), np.asarray(y).reshape(len(X), -1))
+        assert np.array_equal(
+            stored[target].to_numpy(), np.asarray(y).reshape(len(X), -1)
+        )

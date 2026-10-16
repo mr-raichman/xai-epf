@@ -1,9 +1,10 @@
-"""La cerca de LightGBM: la graella del grup de Trebbien et al. (2023) i com s'hi prova cada
-punt.
+"""La cerca de LightGBM: la graella del grup de Trebbien et al. (2023) i com s'hi prova
+cada punt.
 
-L'article no publica la seva cerca, i el seu codi, que la porta, no és enlloc. La graella
-és la del codi de dos dels seus autors per a un altre problema, amb LightGBM.
+L'article no publica la seva cerca, i el seu codi, que la porta, no és enlloc. La
+graella és la del codi de dos dels seus autors per a un altre problema, amb LightGBM.
 """
+
 from epf.contract.metrics import mae
 from epf.contract.split import validation_parts
 from epf.models.lightgbm.hyperparameters import MOST_TREES
@@ -26,8 +27,10 @@ GRID = {
 
 def space(optuna_trial):
     """El punt de la graella d'una prova."""
-    return {name: optuna_trial.suggest_categorical(name, values)
-            for name, values in GRID.items()}
+    return {
+        name: optuna_trial.suggest_categorical(name, values)
+        for name, values in GRID.items()
+    }
 
 
 def trial(family, optuna_trial, train, validate, seed):
@@ -38,6 +41,11 @@ def trial(family, optuna_trial, train, validate, seed):
     point = space(optuna_trial)
     weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
     parts = [X_validate.index.isin(days) for days in weeks]
-    model = fit_rows(X, y, point, MOST_TREES,
-                     validation=[(X_validate[part], y_validate[part]) for part in parts])
+    model = fit_rows(
+        X,
+        y,
+        point,
+        MOST_TREES,
+        validation=[(X_validate[part], y_validate[part]) for part in parts],
+    )
     return point, mae(predict_rows(model, X_validate), y_validate)

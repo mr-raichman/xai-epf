@@ -1,6 +1,7 @@
 """La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres,
-l'atribució que torna la predicció, i la transformació, per columna, d'anada i tornada, i
-què fa amb una columna sense MAD."""
+l'atribució que torna la predicció, i la transformació, per columna, d'anada i tornada,
+i què fa amb una columna sense MAD."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -31,13 +32,15 @@ def per_hour_table(days=120, seed=0):
     solar = rng.uniform(0, 8000, (days, 24))
     solar[:, NIGHT] = 0.0
     solar[:, EVENING] = np.where(rng.random(days) < 0.6, 0.0, solar[:, EVENING])
-    series = {"demand_fcst": frame(rng.uniform(20000, 40000, (days, 24))),
-              "wind_fcst": frame(rng.uniform(500, 15000, (days, 24))),
-              "solar_fcst": frame(solar),
-              PRICE: frame(rng.uniform(-2, 200, (days, 24))),
-              "nuclear_sched": frame(rng.uniform(4000, 7000, (days, 24))),
-              "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
-              "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24)))}
+    series = {
+        "demand_fcst": frame(rng.uniform(20000, 40000, (days, 24))),
+        "wind_fcst": frame(rng.uniform(500, 15000, (days, 24))),
+        "solar_fcst": frame(solar),
+        PRICE: frame(rng.uniform(-2, 200, (days, 24))),
+        "nuclear_sched": frame(rng.uniform(4000, 7000, (days, 24))),
+        "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
+        "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24))),
+    }
     return matrices(series).hourly
 
 
@@ -67,22 +70,24 @@ def test_solar_leaves_the_night_hours_and_keeps_its_evening_without_mad():
 
 
 def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
-    # La propietat que en fa valors de SHAP: el centre és la mitjana de les files d'ajust
-    # de l'hora, i per això la base és la predicció mitjana d'aquelles files. La suma de
-    # sota es compleix amb qualsevol centre i no ho podria veure.
+    # La propietat que en fa valors de SHAP: el centre és la mitjana de les files
+    # d'ajust de l'hora, i per això la base és la predicció mitjana d'aquelles files. La
+    # suma de sota es compleix amb qualsevol centre i no ho podria veure.
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)
     explained = attribute_rows(model, X)
     for hour in range(24):
         rows = (X[HOUR] == hour).to_numpy()
         assert np.allclose(explained.values[rows].mean(), 0, atol=1e-9)
-        assert np.isclose(explained.base[rows].iloc[0], explained.transformed[rows].mean())
+        assert np.isclose(
+            explained.base[rows].iloc[0], explained.transformed[rows].mean()
+        )
 
 
 def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
-    # L'ordre de la matriu del model, les escalades i després els indicadors, no és el de
-    # la matriu per hora: una contribució escrita a la columna que no toca sumaria igual i tindria
-    # la mateixa mitjana.
+    # L'ordre de la matriu del model, les escalades i després els indicadors, no és el
+    # de la matriu per hora: una contribució escrita a la columna que no toca sumaria
+    # igual i tindria la mateixa mitjana.
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)
     before = attribute_rows(model, X).values
@@ -113,16 +118,19 @@ def test_the_base_and_the_contributions_return_the_rows_own_prediction():
 def test_each_sequence_starts_at_the_smallest_penalty_that_empties_every_hour():
     # La seqüència de `lasso.m` comença al càstig més petit que deixa a zero tots els
     # coeficients. Una escala equivocada, sense centrar o d'una sola hora, començaria
-    # lluny del model buit o ja a dins seu, i la graella semblaria igual de bona. Que una
-    # mica per sota el model ja no sigui buit no es pot comprovar ajustant: el
-    # solucionador torna el model buit mentre la diferència li cap a la tolerància. El que
-    # es compara és el valor de scikit-learn mateix, el primer de la seqüència de
+    # lluny del model buit o ja a dins seu, i la graella semblaria igual de bona. Que
+    # una mica per sota el model ja no sigui buit no es pot comprovar ajustant: el
+    # solucionador torna el model buit mentre la diferència li cap a la tolerància. El
+    # que es compara és el valor de scikit-learn mateix, el primer de la seqüència de
     # `ElasticNetCV`, hora per hora.
     X, y = per_hour_table()
     for mixing, steps in penalties(X, y).items():
-        theirs = [ElasticNetCV(l1_ratio=mixing, alphas=2, cv=2).fit(design, target).alphas_[0]
-                  for design, target in (_prepared(X.iloc[rows], y.iloc[rows])[1:]
-                                         for rows in by_hour(X))]
+        theirs = [
+            ElasticNetCV(l1_ratio=mixing, alphas=2, cv=2).fit(design, target).alphas_[0]
+            for design, target in (
+                _prepared(X.iloc[rows], y.iloc[rows])[1:] for rows in by_hour(X)
+            )
+        ]
         assert np.isclose(steps[0], max(theirs), rtol=1e-9)
         top = fit_rows(X, y, steps[0], mixing)
         assert max(np.abs(hour.model.coef_).max() for hour in top) < 1e-12

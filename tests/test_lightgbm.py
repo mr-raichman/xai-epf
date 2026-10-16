@@ -5,6 +5,7 @@ diferents, i la predicció no ho deixava veure: l'atribució es movia i prou. Un
 petita no ho destapa mai, de manera que la de la prova té la forma de la finestra on es
 va veure, 1085 dies de 24 hores i 98 columnes.
 """
+
 import numpy as np
 
 from epf.models.lightgbm.hyperparameters import UNSEARCHED

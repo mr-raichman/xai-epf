@@ -9,6 +9,7 @@ les tria una cerca.
 
 Tot és sobre files donades, les d'entrenament d'una llavor.
 """
+
 import collections
 
 import numpy as np
@@ -29,7 +30,8 @@ Hour = collections.namedtuple("Hour", "model columns inputs target background")
 
 
 def design(rows, fitted):
-    """Les files com la matriu del model d'una hora: entrades transformades i indicadors."""
+    """Les files com la matriu del model d'una hora: entrades transformades i
+    indicadors."""
     scaled = len(fitted.inputs.median)
     values = rows[fitted.columns].to_numpy(dtype=float)
     return np.hstack([fitted.inputs.forward(values[:, :scaled]), values[:, scaled:]])
@@ -39,12 +41,15 @@ def _prepared(rows, target):
     """Les files d'una hora com les veu el seu model: el que cal per llegir-lo, encara
     sense model, la matriu i l'objectiu transformat.
 
-    Una columna que no es mou a les files de l'hora no hi entra, que és la previsió solar
-    de nit. La que es mou sense MAD s'escala per la seva desviació típica, que és la
-    solar dels vespres d'estiu: la transformació de Lago et al. (2021) la refusaria.
+    Una columna que no es mou a les files de l'hora no hi entra, que és la previsió
+    solar de nit. La que es mou sense MAD s'escala per la seva desviació típica, que és
+    la solar dels vespres d'estiu: la transformació de Lago et al. (2021) la refusaria.
     """
-    moving = [column for column in rows.columns
-              if column != HOUR and rows[column].nunique() > 1]
+    moving = [
+        column
+        for column in rows.columns
+        if column != HOUR and rows[column].nunique() > 1
+    ]
     scaled = [column for column in moving if column not in DAY_OF_WEEK_COLUMNS]
     dummies = [column for column in moving if column in DAY_OF_WEEK_COLUMNS]
     inputs = Scaler(rows[scaled].to_numpy(dtype=float), std_where_flat=True)
@@ -58,8 +63,9 @@ def _fit_hour(rows, target, penalty, mixing, max_iter):
     """El model d'una hora, amb les seves files i prou."""
     fitted, matrix, scaled_target = _prepared(rows, target)
     model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=max_iter)
-    return fitted._replace(model=model.fit(matrix, scaled_target),
-                           background=matrix.mean(axis=0))
+    return fitted._replace(
+        model=model.fit(matrix, scaled_target), background=matrix.mean(axis=0)
+    )
 
 
 def by_hour(X):
@@ -70,18 +76,20 @@ def by_hour(X):
 
 def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
     """Els 24 models, cada un ajustat amb les files de la seva hora i cap més."""
-    return tuple(_fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
-                 for rows in by_hour(X))
+    return tuple(
+        _fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
+        for rows in by_hour(X)
+    )
 
 
 def largest_penalty(X, y, mixing):
     """El càstig més petit que deixa a zero tots els coeficients de les 24 hores, amb
     aquesta barreja.
 
-    El de cada hora és el de scikit-learn, el màxim sobre les columnes de `|X'y|` dividit
-    per les files i per la barreja, sobre la matriu i l'objectiu del model de l'hora
-    centrats, perquè el model ajusta un terme constant. Un sol càstig serveix les 24
-    hores, i per deixar-les totes a zero ha de ser el més gran dels 24.
+    El de cada hora és el de scikit-learn, el màxim sobre les columnes de `|X'y|`
+    dividit per les files i per la barreja, sobre la matriu i l'objectiu del model de
+    l'hora centrats, perquè el model ajusta un terme constant. Un sol càstig serveix les
+    24 hores, i per deixar-les totes a zero ha de ser el més gran dels 24.
     """
     found = []
     for rows in by_hour(X):
@@ -99,4 +107,3 @@ def predict_rows(model, X):
             transformed = fitted.model.predict(design(X.iloc[rows], fitted))
             prices[rows] = fitted.target.back(transformed[:, np.newaxis]).ravel()
     return pd.Series(prices, index=X.index, name=NAME)
-

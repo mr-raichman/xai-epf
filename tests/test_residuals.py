@@ -3,6 +3,7 @@
 Res d'això no peta quan falla: un estadístic mal calculat, o un dia pres d'una llavor
 que no tocava, donaria un valor p plausible sobre una altra sèrie.
 """
+
 import numpy as np
 import pytest
 from statsmodels.stats.diagnostic import acorr_ljungbox
@@ -27,7 +28,9 @@ def test_a_missing_day_is_left_out_of_its_pairs_as_r_does():
     # Feta a mà amb l'`acf0` de R: la mitjana dels presents és 3, la covariància a 0 és
     # 10/4, la del retard 1 són dos parells que sumen 4 dividits per 2 + 1, r = 8/15, i
     # amb n = 4, Q = 4 · 6 · r^2 / 3.
-    statistic, _, correlations = ljung_box(np.array([1.0, 2.0, np.nan, 4.0, 5.0]), lags=1)
+    statistic, _, correlations = ljung_box(
+        np.array([1.0, 2.0, np.nan, 4.0, 5.0]), lags=1
+    )
     assert correlations[0] == pytest.approx(8 / 15)
     assert statistic == pytest.approx(4 * 6 * (8 / 15) ** 2 / 3)
 
@@ -35,8 +38,12 @@ def test_a_missing_day_is_left_out_of_its_pairs_as_r_does():
 def _model(seed_days, offset, rank=0):
     days = np.array(seed_days, dtype="datetime64[D]")
     actual = np.zeros(len(days) * 24)
-    return {"rank": rank, "days_test": days, "actual": actual,
-            "predicted": actual + offset}
+    return {
+        "rank": rank,
+        "days_test": days,
+        "actual": actual,
+        "predicted": actual + offset,
+    }
 
 
 def test_each_day_comes_from_the_first_seed_that_tests_it_and_its_best_model():

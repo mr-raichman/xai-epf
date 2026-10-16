@@ -12,6 +12,7 @@ registre les de cada una de les millors; una cerca es reprèn igualment sobre un
 codi, un altre conjunt de dades o unes altres biblioteques, i només unes altres files la
 refusen.
 """
+
 import json
 import os
 import time
@@ -29,25 +30,34 @@ RECORD = "seed_{seed}.json"
 
 
 def folder(smoke, family):
-    """On viu la cerca d'una família: `searches/<família>/`, o `searches/assaig_<família>/`
-    la d'assaig."""
+    """On viu la cerca d'una família: `searches/<família>/`, o
+    `searches/assaig_<família>/` la d'assaig."""
     return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
 
 
 def made_on(columns):
     """Les files sobre què es fa una cerca: les columnes del conjunt i la partició."""
-    return plain({"columns": list(columns), "period": DEVELOPMENT,
-                  "deleted": BLACKOUT_WEEK, "shares": SHARES, "gap": GAP})
+    return plain(
+        {
+            "columns": list(columns),
+            "period": DEVELOPMENT,
+            "deleted": BLACKOUT_WEEK,
+            "shares": SHARES,
+            "gap": GAP,
+        }
+    )
 
 
 def completed(study):
     """Les proves acabades d'un estudi."""
-    return [one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE]
+    return [
+        one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE
+    ]
 
 
 def _seed(*parts):
-    """Una llavor d'Optuna de la del projecte i de `parts`, enters o textos, que no canvia
-    d'un procés a un altre com el `hash` d'un text."""
+    """Una llavor d'Optuna de la del projecte i de `parts`, enters o textos, que no
+    canvia d'un procés a un altre com el `hash` d'un text."""
     entropy = [SEED]
     for part in parts:
         entropy += list(part.encode()) if isinstance(part, str) else [part]
@@ -55,58 +65,72 @@ def _seed(*parts):
 
 
 def _sampler(searcher, family, seed, study):
-    """Com tria cada prova la seva configuració, de la graella del cercador, `GRID`, o del
-    seu espai continu si no en té.
+    """Com tria cada prova la seva configuració, de la graella del cercador, `GRID`, o
+    del seu espai continu si no en té.
 
     Una graella es barreja amb una llavor de la família i de la partició, i la prova `k`
-    en pren el punt `k`: una cerca represa continua per on anava, i cap punt no es repeteix.
-    Un espai continu es mostreja amb una llavor que compta també les proves que l'estudi
-    ja porta, perquè una cerca represa no torni a proposar les primeres. El nom de la
-    família hi entra perquè dues famílies del mateix espai no proposin les mateixes.
+    en pren el punt `k`: una cerca represa continua per on anava, i cap punt no es
+    repeteix. Un espai continu es mostreja amb una llavor que compta també les proves
+    que l'estudi ja porta, perquè una cerca represa no torni a proposar les primeres. El
+    nom de la família hi entra perquè dues famílies del mateix espai no proposin les
+    mateixes.
     """
     if searcher.GRID is not None:
         return optuna.samplers.GridSampler(
             {name: list(values) for name, values in searcher.GRID.items()},
-            seed=_seed(family, seed))
+            seed=_seed(family, seed),
+        )
     return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
 
 
 def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
-    """L'estudi d'una família en una llavor, amb les proves que li falten fins a `trials`.
+    """L'estudi d'una família en una llavor, amb les proves que li falten fins a
+    `trials`.
 
     `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i la
-    prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es puntua
-    sobre les de validació, i la matriu no n'hi dóna cap altra. Els números que en surten es
-    desen a la prova, en la forma en què els pren l'ajust, amb les empremtes,
-    `fingerprints`, del codi, del conjunt de dades i de les biblioteques que la fan. Un
-    estudi fet sobre unes altres files es refusa en lloc de reprendre's.
+    prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es
+    puntua sobre les de validació, i la matriu no n'hi dóna cap altra. Els números que
+    en surten es desen a la prova, en la forma en què els pren l'ajust, amb les
+    empremtes, `fingerprints`, del codi, del conjunt de dades i de les biblioteques que
+    la fan. Un estudi fet sobre unes altres files es refusa en lloc de reprendre's.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
-    study = optuna.create_study(study_name=f"{family}_seed_{seed}", direction="minimize",
-                                storage=f"sqlite:///{store.as_posix()}",
-                                load_if_exists=True)
+    study = optuna.create_study(
+        study_name=f"{family}_seed_{seed}",
+        direction="minimize",
+        storage=f"sqlite:///{store.as_posix()}",
+        load_if_exists=True,
+    )
     now = made_on(X.columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
     elif study.user_attrs.get("made_on") != now:
-        raise ValueError(f"l'estudi {store} es va fer sobre unes altres files que les "
-                         f"d'ara: esborra'l per tornar-lo a començar")
+        raise ValueError(
+            f"l'estudi {store} es va fer sobre unes altres files que les "
+            f"d'ara: esborra'l per tornar-lo a començar"
+        )
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
 
     def objective(optuna_trial):
         start = time.time()
-        numbers, score = searcher.trial(family, optuna_trial, (X[train], y[train]),
-                                        (X[validate], y[validate]), seed)
+        numbers, score = searcher.trial(
+            family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
+        )
         optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna desa,
-        # porti les condicions en què es va prendre. Windows no la dóna, i hi queda buida.
+        # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna
+        # desa, porti les condicions en què es va prendre. Windows no la dóna, i hi
+        # queda buida.
         optuna_trial.set_user_attr(
-            "load", os.getloadavg() if hasattr(os, "getloadavg") else None)
+            "load", os.getloadavg() if hasattr(os, "getloadavg") else None
+        )
         for name, value in fingerprints.items():
             optuna_trial.set_user_attr(name, value)
-        print(f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
-              f"{score:.4g}, {time.time() - start:.1f} s", flush=True)
+        print(
+            f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
+            f"{score:.4g}, {time.time() - start:.1f} s",
+            flush=True,
+        )
         return score
 
     remaining = trials - len(completed(study))
@@ -120,19 +144,32 @@ def record(study, family, seed, smoke):
     pitjor, amb els seus números, la seva puntuació i les empremtes amb què es van fer,
     quantes proves les van triar i sobre quines files."""
     done = sorted(completed(study), key=lambda one: one.value)
-    return {"family": family, "smoke": smoke,
-            "seed": seed, "trials": len(done), "made_on": study.user_attrs["made_on"],
-            "best": [{"numbers": one.user_attrs["numbers"], "score": one.value,
-                      "trial": one.number, "code": one.user_attrs["code"],
-                      "dataset": one.user_attrs["dataset"],
-                      "environment": one.user_attrs["environment"]}
-                     for one in done[:BEST]]}
+    return {
+        "family": family,
+        "smoke": smoke,
+        "seed": seed,
+        "trials": len(done),
+        "made_on": study.user_attrs["made_on"],
+        "best": [
+            {
+                "numbers": one.user_attrs["numbers"],
+                "score": one.value,
+                "trial": one.number,
+                "code": one.user_attrs["code"],
+                "dataset": one.user_attrs["dataset"],
+                "environment": one.user_attrs["environment"],
+            }
+            for one in done[:BEST]
+        ],
+    }
 
 
 def save(found, smoke):
     """Desa un registre sencer, de manera que un registre amb nom és sempre una cerca
     acabada."""
-    write_record(folder(smoke, found["family"]) / RECORD.format(seed=found["seed"]), found)
+    write_record(
+        folder(smoke, found["family"]) / RECORD.format(seed=found["seed"]), found
+    )
 
 
 def searched(smoke, family, seed, columns):
@@ -147,23 +184,25 @@ def searched(smoke, family, seed, columns):
         return None
     found = json.loads(path.read_text(encoding="utf-8"))
     if found["made_on"] != made_on(columns):
-        raise ValueError(f"la cerca de {family}, llavor {seed}, es va fer sobre unes altres "
-                         f"files que les d'ara: esborra {path} i el seu estudi, i torna-la "
-                         f"a fer amb epf search")
+        raise ValueError(
+            f"la cerca de {family}, llavor {seed}, es va fer sobre unes altres "
+            f"files que les d'ara: esborra {path} i el seu estudi, i torna-la "
+            f"a fer amb epf search"
+        )
     return found
 
 
 def configurations(smoke, plan, columns, seeds):
-    """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada una
-    amb el seu lloc a la cerca.
+    """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada
+    una amb el seu lloc a la cerca.
 
-    `plan` és l'entrada de la família a `FAMILIES` del seu model: les `kept` millors de la
-    cerca de la família `searched_as` del mateix tipus, si totes les llavors en tenen; els
-    números de lloc, `placeholder`, marcats, si no en té cap cap llavor; i una sola sense
-    números per a una família que no es cerca, `kept` zero. Una cerca que només té algunes
-    llavors es refusa: la dispersió barrejaria llavors cercades i sense cercar, i res no ho
-    diria. `columns` són les de la matriu sobre la qual es cerca, que la cerca compara amb
-    les seves.
+    `plan` és l'entrada de la família a `FAMILIES` del seu model: les `kept` millors de
+    la cerca de la família `searched_as` del mateix tipus, si totes les llavors en
+    tenen; els números de lloc, `placeholder`, marcats, si no en té cap cap llavor; i
+    una sola sense números per a una família que no es cerca, `kept` zero. Una cerca que
+    només té algunes llavors es refusa: la dispersió barrejaria llavors cercades i sense
+    cercar, i res no ho diria. `columns` són les de la matriu sobre la qual es cerca,
+    que la cerca compara amb les seves.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
@@ -171,12 +210,25 @@ def configurations(smoke, plan, columns, seeds):
     found = {seed: searched(smoke, family, seed, columns) for seed in seeds}
     missing = [seed for seed, record in found.items() if record is None]
     if len(missing) == len(seeds):
-        return {seed: [{"rank": 0, "numbers": plan["placeholder"], "unsearched": True}]
-                for seed in seeds}
+        return {
+            seed: [{"rank": 0, "numbers": plan["placeholder"], "unsearched": True}]
+            for seed in seeds
+        }
     if missing:
-        raise ValueError(f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
-                         f"epf search abans de fer-la servir")
-    return {seed: [{"rank": rank, "numbers": one["numbers"], "score": one["score"],
-                    "trial": one["trial"], "trials": record["trials"]}
-                   for rank, one in enumerate(record["best"][:plan["kept"]])]
-            for seed, record in found.items()}
+        raise ValueError(
+            f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
+            f"epf search abans de fer-la servir"
+        )
+    return {
+        seed: [
+            {
+                "rank": rank,
+                "numbers": one["numbers"],
+                "score": one["score"],
+                "trial": one["trial"],
+                "trials": record["trials"],
+            }
+            for rank, one in enumerate(record["best"][: plan["kept"]])
+        ]
+        for seed, record in found.items()
+    }

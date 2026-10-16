@@ -3,9 +3,10 @@ distribució, l'atribució de cada paràmetre, que ha de sumar, i el seu espai d
 
 Cap d'aquestes coses no peta quan falla. Un pes de la cua que baixés d'1 donaria una
 distribució que l'article no permet, una L1 per paràmetre que no quadrés amb la
-distribució faria llegir a la pèrdua menys sortides de les que la xarxa treu, i una L1 de
-paràmetre llegida per posició penalitzaria el paràmetre equivocat.
+distribució faria llegir a la pèrdua menys sortides de les que la xarxa treu, i una L1
+de paràmetre llegida per posició penalitzaria el paràmetre equivocat.
 """
+
 import numpy as np
 import optuna
 import pandas as pd
@@ -21,8 +22,14 @@ from epf.parameters import HOUR_COLUMNS
 
 # Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn
 # de com d'ajustada estigui.
-TUNED = {"hidden": [8, 8], "activation": ["relu", "softplus"], "dropout": 0.1,
-         "l1": [0.0, 1e-4], "activity_l1": [1e-4, 0.0], "learning_rate": 0.01}
+TUNED = {
+    "hidden": [8, 8],
+    "activation": ["relu", "softplus"],
+    "dropout": 0.1,
+    "l1": [0.0, 1e-4],
+    "activity_l1": [1e-4, 0.0],
+    "learning_rate": 0.01,
+}
 
 
 def tuned(distribution):
@@ -31,16 +38,20 @@ def tuned(distribution):
 
 
 def rows(count, seed=0):
-    """Sis columnes i els set indicadors del dia, que la xarxa llegeix en una de sola."""
+    """Sis columnes i els set indicadors del dia, que la xarxa llegeix en una de
+    sola."""
     rng = np.random.default_rng(seed)
-    X = pd.DataFrame(rng.normal(50, 20, size=(count, 6)),
-                     columns=[f"x{n}" for n in range(6)])
+    X = pd.DataFrame(
+        rng.normal(50, 20, size=(count, 6)), columns=[f"x{n}" for n in range(6)]
+    )
     weights = rng.normal(size=(6, 24))
-    y = pd.DataFrame(X.to_numpy() @ weights / 6 + rng.normal(size=(count, 24)),
-                     columns=HOUR_COLUMNS)
+    y = pd.DataFrame(
+        X.to_numpy() @ weights / 6 + rng.normal(size=(count, 24)), columns=HOUR_COLUMNS
+    )
     week = len(DAY_OF_WEEK_COLUMNS)
-    days = pd.DataFrame(np.eye(week)[np.arange(count) % week],
-                        columns=DAY_OF_WEEK_COLUMNS)
+    days = pd.DataFrame(
+        np.eye(week)[np.arange(count) % week], columns=DAY_OF_WEEK_COLUMNS
+    )
     return pd.concat([X, days], axis="columns"), y
 
 
@@ -49,8 +60,15 @@ def test_each_parameters_base_and_contributions_add_up_to_it(distribution):
     # La base i les contribucions de DeepExplainer contra la predicció de la xarxa, a
     # través de la normalització per lots de l'entrada i de les L1 de la sortida.
     X, y = rows(150)
-    fitted = fit_rows(distribution, (X[:120], y[:120]), (X[120:], y[120:]),
-                      tuned(distribution), batch=16, epochs=5, patience=2)
+    fitted = fit_rows(
+        distribution,
+        (X[:120], y[:120]),
+        (X[120:], y[120:]),
+        tuned(distribution),
+        batch=16,
+        epochs=5,
+        patience=2,
+    )
     explained = attribute_rows(distribution, fitted, X[:5], background=X[:120])
     direct = parameters_rows(distribution, fitted, X[:5])
     assert explained.values.shape == (5, 7, 24, len(distribution.names))
@@ -75,10 +93,18 @@ def test_the_tail_weight_never_drops_below_one():
 
 
 # Una xarxa de l'espai, sense cap L1 als pesos ni a les sortides de les capes amagades.
-FIXED = {"neurons_1": 32, "neurons_2": 16, "activation_1": "relu", "activation_2": "elu",
-         "dropout": False, "regularize_h1_kernel": False, "regularize_h2_kernel": False,
-         "regularize_h1_activation": False, "regularize_h2_activation": False,
-         "learning_rate": 1e-3}
+FIXED = {
+    "neurons_1": 32,
+    "neurons_2": 16,
+    "activation_1": "relu",
+    "activation_2": "elu",
+    "dropout": False,
+    "regularize_h1_kernel": False,
+    "regularize_h2_kernel": False,
+    "regularize_h1_activation": False,
+    "regularize_h2_activation": False,
+    "learning_rate": 1e-3,
+}
 
 
 def test_each_parameters_l1_is_the_one_named_after_it():

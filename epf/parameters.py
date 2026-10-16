@@ -8,15 +8,16 @@ passada sencera.
 
 Són els valors d'una mesura; `--smoke` posa en lloc dels seus els d'una de les variants
 d'assaig del final, la que tria `chosen`, i no en canvia cap altre. Una passada els desa
-tots al registre de cada família, amb l'empremta del codi i la del conjunt de dades que la
-van fer, de manera que cada punt d'un escombrat es llegeix del seu registre.
+tots al registre de cada família, amb l'empremta del codi i la del conjunt de dades que
+la van fer, de manera que cada punt d'un escombrat es llegeix del seu registre.
 """
+
 import datetime
 
 DAYS_PER_WEEK = 7
 
-# Les hores d'un dia local i el nom de la columna de cada una. Són un fet i no una tria, i
-# són aquí perquè les llegeix tot el paquet.
+# Les hores d'un dia local i el nom de la columna de cada una. Són un fet i no una tria,
+# i són aquí perquè les llegeix tot el paquet.
 HOURS_PER_DAY = 24
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
@@ -48,8 +49,8 @@ SEEDS = tuple(range(10))
 PREVIOUS_DAY = (1,)
 
 # El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del
-# mateix dia que es lliura, i el programa del dia abans, tancat dos dies abans i a l'abast
-# de tothom abans del tancament de la subhasta.
+# mateix dia que es lliura, i el programa del dia abans, tancat dos dies abans i a
+# l'abast de tothom abans del tancament de la subhasta.
 FORECAST_LAG = 0
 SCHEDULE_LAG = 1
 
@@ -75,20 +76,24 @@ SEED = 0
 
 # El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants.
 # `SMOKE` és petita i ràpida a propòsit, una llavor, 50 dies explicats i dues proves per
-# cerca, prou per passar tota la maquinària i prou curta per esperar-s'hi; `SMOKE_1`, cinc
-# llavors i deu proves per cerca, no fixa els dies explicats i n'explica tots els de prova.
-# La que fa servir un assaig la tria `chosen`, i es canvia editant-la. L'error d'un assaig
-# no es desa, ni es cita, ni es compara enlloc; només una mesura dóna un resultat, i el nom
-# d'una passada o d'una cerca d'assaig comença amb `assaig_`, de manera que una xifra
-# d'assaig no es pugui llegir mai com una mesura. "Prova" no hi va: és el nom de les
-# setmanes retingudes.
+# cerca, prou per passar tota la maquinària i prou curta per esperar-s'hi; `SMOKE_1`,
+# cinc llavors i deu proves per cerca, no fixa els dies explicats i n'explica tots els
+# de prova. La que fa servir un assaig la tria `chosen`, i es canvia editant-la. L'error
+# d'un assaig no es desa, ni es cita, ni es compara enlloc; només una mesura dóna un
+# resultat, i el nom d'una passada o d'una cerca d'assaig comença amb `assaig_`, de
+# manera que una xifra d'assaig no es pugui llegir mai com una mesura. "Prova" no hi va:
+# és el nom de les setmanes retingudes.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
 
+
 def chosen(smoke):
-    """Cada valor d'aquest fitxer pel seu nom, amb els d'una variant d'assaig en lloc dels
-    de la mesura si és un assaig. Les variants mateixes no hi són: són els valors que fa
-    servir una passada, que es desen al seu registre."""
-    found = {name: value for name, value in globals().items()
-             if name.isupper() and not name.startswith("SMOKE")}
+    """Cada valor d'aquest fitxer pel seu nom, amb els d'una variant d'assaig en lloc
+    dels de la mesura si és un assaig. Les variants mateixes no hi són: són els valors
+    que fa servir una passada, que es desen al seu registre."""
+    found = {
+        name: value
+        for name, value in globals().items()
+        if name.isupper() and not name.startswith("SMOKE")
+    }
     return (found | SMOKE_1) if smoke else found

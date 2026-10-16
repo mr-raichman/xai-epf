@@ -8,6 +8,7 @@ referència per a aquest mercat, no hi hauria res que ho delatés. I una pèrdua
 precisió lluny de la localització faria aprendre la xarxa d'una densitat que no és la de
 l'article, sense cap error fins que es tornés infinita.
 """
+
 import datetime
 
 import keras
@@ -25,14 +26,24 @@ DAYS = 40
 
 
 def frame_of(values):
-    index = pd.DatetimeIndex([datetime.date(2024, 1, 1) + datetime.timedelta(days=day)
-                              for day in range(DAYS)], name="day")
+    index = pd.DatetimeIndex(
+        [
+            datetime.date(2024, 1, 1) + datetime.timedelta(days=day)
+            for day in range(DAYS)
+        ],
+        name="day",
+    )
     return pd.DataFrame(values, index=index, columns=HOUR_COLUMNS)
 
 
 def normal_parameters(location, scale):
-    return np.stack([np.full((DAYS, len(HOUR_COLUMNS)), location),
-                     np.full((DAYS, len(HOUR_COLUMNS)), scale)], axis=-1)
+    return np.stack(
+        [
+            np.full((DAYS, len(HOUR_COLUMNS)), location),
+            np.full((DAYS, len(HOUR_COLUMNS)), scale),
+        ],
+        axis=-1,
+    )
 
 
 def test_the_normals_median_is_its_location():
@@ -44,17 +55,31 @@ def test_a_symmetric_johnson_su_has_its_location_as_median():
     # Amb asimetria zero la de Johnson SU és simètrica al voltant de la localització,
     # de manera que la mediana hi cau. Si l'asimetria i el pes de la cua estiguessin
     # canviats de lloc, això fallaria i res més no se n'adonaria.
-    parameters = np.stack([np.full((DAYS, 24), 60.0), np.full((DAYS, 24), 5.0),
-                           np.zeros((DAYS, 24)), np.full((DAYS, 24), 2.0)], axis=-1)
+    parameters = np.stack(
+        [
+            np.full((DAYS, 24), 60.0),
+            np.full((DAYS, 24), 5.0),
+            np.zeros((DAYS, 24)),
+            np.full((DAYS, 24), 2.0),
+        ],
+        axis=-1,
+    )
     assert np.allclose(JOHNSON_SU.point(parameters), 60.0, atol=1e-9)
 
 
 def test_a_positive_skew_moves_the_median_one_way_and_a_negative_the_other():
     def median(skew):
-        parameters = np.stack([np.full((DAYS, 24), 60.0), np.full((DAYS, 24), 5.0),
-                               np.full((DAYS, 24), skew), np.full((DAYS, 24), 2.0)],
-                              axis=-1)
+        parameters = np.stack(
+            [
+                np.full((DAYS, 24), 60.0),
+                np.full((DAYS, 24), 5.0),
+                np.full((DAYS, 24), skew),
+                np.full((DAYS, 24), 2.0),
+            ],
+            axis=-1,
+        )
         return JOHNSON_SU.point(parameters)[0, 0]
+
     assert median(1.0) < 60.0 < median(-1.0)
 
 
@@ -88,9 +113,12 @@ def test_the_best_scale_is_the_one_the_prices_really_have():
     # desviació i no a zero ni a l'infinit.
     rng = np.random.default_rng(0)
     actual = frame_of(rng.normal(60.0, 8.0, size=(DAYS, len(HOUR_COLUMNS))))
-    scores = {scale: crps(actual, NORMAL.quantiles(normal_parameters(60.0, scale),
-                                                   PERCENTILES))
-              for scale in (1.0, 4.0, 8.0, 16.0, 40.0)}
+    scores = {
+        scale: crps(
+            actual, NORMAL.quantiles(normal_parameters(60.0, scale), PERCENTILES)
+        )
+        for scale in (1.0, 4.0, 8.0, 16.0, 40.0)
+    }
     assert min(scores, key=scores.get) == 8.0
 
 
@@ -108,12 +136,13 @@ def test_the_johnson_su_loss_is_its_density_far_below_the_location():
     # d'asinh, i a z = -10000 era infinita. La de l'article és la densitat de TFP.
     z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
     raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")
-    raw[:, len(HOUR_COLUMNS):2 * len(HOUR_COLUMNS)] = -5.0
+    raw[:, len(HOUR_COLUMNS) : 2 * len(HOUR_COLUMNS)] = -5.0
     location, scale, skew, tail = np.moveaxis(parameters(JOHNSON_SU, raw), -1, 0)
     target = (location + z * scale).astype("float32")
     loss = keras.ops.convert_to_numpy(JOHNSON_SU.loss(target, raw))
     # La pèrdua deixa fora la constant de la normal, que no mou cap gradient.
-    density = stats.johnsonsu.logpdf(target.astype(float), skew, tail, loc=location,
-                                     scale=scale)
+    density = stats.johnsonsu.logpdf(
+        target.astype(float), skew, tail, loc=location, scale=scale
+    )
     expected = (-density - 0.5 * np.log(2 * np.pi)).mean(axis=1)
     np.testing.assert_allclose(loss, expected, rtol=1e-5)

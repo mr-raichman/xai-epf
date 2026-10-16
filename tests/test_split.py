@@ -1,4 +1,5 @@
 """La partició, sobre el període i les llavors de debò."""
+
 import datetime
 
 import pandas as pd
@@ -27,8 +28,11 @@ def test_the_held_out_parts_are_whole_weeks_in_their_shares():
             # sis dies següents a la mateixa part.
             tuesdays = days[days.dayofweek == 1]
             assert len(days) == 7 * len(tuesdays)
-            assert all(day + offset * ONE_DAY in days
-                       for day in tuesdays for offset in range(7))
+            assert all(
+                day + offset * ONE_DAY in days
+                for day in tuesdays
+                for offset in range(7)
+            )
 
 
 def test_no_day_is_in_two_parts_and_only_a_day_beside_a_held_out_week_is_in_none():
@@ -39,11 +43,13 @@ def test_no_day_is_in_two_parts_and_only_a_day_beside_a_held_out_week_is_in_none
         held_out = parts.validation.union(parts.test)
         assert parts.validation.intersection(parts.test).empty
         assert parts.training.intersection(held_out).empty
-        for day in every_day.difference(parts.training.union(held_out)).difference(deleted):
+        for day in every_day.difference(parts.training.union(held_out)).difference(
+            deleted
+        ):
             assert day - ONE_DAY in held_out or day + ONE_DAY in held_out
 
 
-def test_the_deleted_week_is_in_no_part_and_the_days_beside_it_are_dealt_like_any_other():
+def test_the_deleted_week_is_in_no_part_and_the_days_beside_it_are_dealt_as_any_other():
     # El dilluns abans i el dimarts després comparteixen setmana amb els seus altres
     # veïns, de manera que són d'alguna part: si la setmana suprimida comptés com a
     # retinguda, sortirien de l'entrenament sense cap setmana retinguda al costat.
@@ -64,7 +70,9 @@ def test_no_training_day_is_next_to_a_held_out_day():
 
 
 def test_the_same_seed_gives_the_same_split_and_another_seed_another():
-    first, again, other = (split(seed, DEVELOPMENT, BLACKOUT_WEEK) for seed in (0, 0, 1))
+    first, again, other = (
+        split(seed, DEVELOPMENT, BLACKOUT_WEEK) for seed in (0, 0, 1)
+    )
     assert all(a.equals(b) for a, b in zip(first, again))
     assert not first.test.equals(other.test)
 

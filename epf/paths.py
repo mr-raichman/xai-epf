@@ -1,5 +1,6 @@
-"""Rutes on viuen els fitxers baixats, les claus i les sortides, com es diu cada passada, i
-com s'escriu sencer un fitxer de text."""
+"""Rutes on viuen els fitxers baixats, les claus i les sortides, com es diu cada
+passada, i com s'escriu sencer un fitxer de text."""
+
 import pathlib
 
 # El paquet, de tots els fitxers `.py` del qual es fa l'empremta del codi, i l'arrel del
@@ -30,15 +31,17 @@ DATA_FIGURES = DATA / "figures"
 RUNS = ROOT / "runs"
 
 # Els fitxers d'una passada: un model per fitxer, la llavor i el lloc de la seva
-# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al costat;
-# i, a dalt de la passada, cada matriu que hi van llegir els models, la diària i la per hora.
+# configuració a la cerca de la llavor, 0 la millor, i el registre de la família al
+# costat; i, a dalt de la passada, cada matriu que hi van llegir els models, la diària i
+# la per hora.
 SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
 
-# Una passada es diu pel dia local en què va començar i pel seu número de dues xifres dins
-# del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La d'un assaig
-# porta davant `SMOKE_PREFIX` i es compta a part, i la cerca d'assaig d'una família també.
+# Una passada es diu pel dia local en què va començar i pel seu número de dues xifres
+# dins del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La
+# d'un assaig porta davant `SMOKE_PREFIX` i es compta a part, i la cerca d'assaig d'una
+# família també.
 SMOKE_PREFIX = "assaig_"
 
 
@@ -48,25 +51,29 @@ def runs(smoke):
 
 
 def next_run(smoke, day):
-    """La carpeta de la passada següent d'un tipus el dia `day`: el número més alt del dia
-    més u, o 01 si encara no n'hi ha cap."""
+    """La carpeta de la passada següent d'un tipus el dia `day`: el número més alt del
+    dia més u, o 01 si encara no n'hi ha cap."""
     # shortcut: dues xifres, 99 passades d'un tipus per dia; la 100a tindria un nom fora
-    # del patró de `runs` i la següent hi tornaria a escriure. Una tercera xifra, si mai un
-    # dia en necessita més.
+    # del patró de `runs` i la següent hi tornaria a escriure. Una tercera xifra, si mai
+    # un dia en necessita més.
     prefix = f"{SMOKE_PREFIX if smoke else ''}{day.isoformat()}_"
-    numbers = [int(path.name.removeprefix(prefix)) for path in runs(smoke)
-               if path.name.startswith(prefix)]
+    numbers = [
+        int(path.name.removeprefix(prefix))
+        for path in runs(smoke)
+        if path.name.startswith(prefix)
+    ]
     return RUNS / f"{prefix}{max(numbers, default=0) + 1:02d}"
 
 
 # Les cerques, al costat de les passades i no a dins: una cerca és d'una entrada i d'una
-# partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles files.
+# partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles
+# files.
 SEARCHES = ROOT / "searches"
 
 
 def write_whole(path, text):
-    """Escriu un text en UTF-8 primer a un fitxer a part i després al seu nom, de manera que
-    un fitxer amb nom és sempre sencer."""
+    """Escriu un text en UTF-8 primer a un fitxer a part i després al seu nom, de manera
+    que un fitxer amb nom és sempre sencer."""
     partial = path.with_name(path.name + ".part")
     partial.write_text(text, encoding="utf-8")
     partial.replace(path)

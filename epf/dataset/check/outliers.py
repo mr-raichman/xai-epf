@@ -2,10 +2,11 @@
 
 La puntuació, l'informe que la llegeix i la figura que la dibuixa viuen junts: la taula
 que s'imprimeix i la figura han de ser dels mateixos números. L'informe no refusa res i
-no porta cap llindar, i no n'hi pot haver: la puntuació és distància partit per MAD, i al
-preu els seus extrems són moviments ordinaris dins de finestres de preu gairebé pla, no
-moviments grans.
+no porta cap llindar, i no n'hi pot haver: la puntuació és distància partit per MAD, i
+al preu els seus extrems són moviments ordinaris dins de finestres de preu gairebé pla,
+no moviments grans.
 """
+
 import numpy as np
 import pandas as pd
 from matplotlib.collections import LineCollection
@@ -66,13 +67,19 @@ def highest(scores):
 def _describe(days, values, label, scores, median, mad):
     """Resum de les puntuacions més altes: com és la finestra i on cauen."""
     marks = highest(scores)
-    years = pd.Series(days.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
+    years = (
+        pd.Series(days.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
+    )
     print(f"{label}, les {HIGHEST} puntuacions més altes:")
-    print(f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f}, "
-          f"màxim {mad[marks].max():.2f}")
+    print(
+        f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f}, "
+        f"màxim {mad[marks].max():.2f}"
+    )
     print(f"  mediana de la finestra, mediana {np.median(median[marks]):.2f}")
-    print(f"  distància del valor a la mediana, mediana "
-          f"{np.median(np.abs(values - median)[marks]):.2f}")
+    print(
+        f"  distància del valor a la mediana, mediana "
+        f"{np.median(np.abs(values - median)[marks]):.2f}"
+    )
     print("  per any: " + ", ".join(f"{year} {count}" for year, count in years.items()))
 
 
@@ -84,18 +91,35 @@ def report(name, frame):
     """
     values = frame.to_numpy().ravel()
     by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
-    by_days = np.column_stack([hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                               for column in frame.columns])
+    by_days = np.column_stack(
+        [
+            hampel_score(frame[column].to_numpy(), DAY_HALF_WIDTH)
+            for column in frame.columns
+        ]
+    )
 
     hour_median, hour_mad = window_median_mad(values, HOUR_HALF_WIDTH)
-    day_parts = [window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
-                 for column in frame.columns]
+    day_parts = [
+        window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
+        for column in frame.columns
+    ]
     print(f"veïnatge de {name}:")
-    _describe(frame.index, values, f"hores adjacents (±{HOUR_HALF_WIDTH} h)", by_hours,
-              hour_median, hour_mad)
-    _describe(frame.index, values, f"mateixa hora (±{DAY_HALF_WIDTH} dies)", by_days,
-              np.column_stack([part[0] for part in day_parts]).ravel(),
-              np.column_stack([part[1] for part in day_parts]).ravel())
+    _describe(
+        frame.index,
+        values,
+        f"hores adjacents (±{HOUR_HALF_WIDTH} h)",
+        by_hours,
+        hour_median,
+        hour_mad,
+    )
+    _describe(
+        frame.index,
+        values,
+        f"mateixa hora (±{DAY_HALF_WIDTH} dies)",
+        by_days,
+        np.column_stack([part[0] for part in day_parts]).ravel(),
+        np.column_stack([part[1] for part in day_parts]).ravel(),
+    )
     return by_hours, by_days
 
 
@@ -113,38 +137,66 @@ def _style(axis, title, ylabel):
 
 
 def draw(name, frame, by_hours, by_days):
-    """La figura de les puntuacions de veïnatge d'una sèrie, les que `report` ha imprès, a la
-    carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores adjacents, un dia per línia, i les de la
-    mateixa hora dels dies del voltant, en el temps, amb les més altes en vermell."""
+    """La figura de les puntuacions de veïnatge d'una sèrie, les que `report` ha imprès,
+    a la carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores adjacents, un dia
+    per línia, i les de la mateixa hora dels dies del voltant, en el temps, amb les més
+    altes en vermell."""
     panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
     hours = np.arange(HOURS_PER_DAY)
-    top.add_collection(LineCollection([np.column_stack([hours, day]) for day in by_hours],
-                                      colors=SERIES, linewidths=0.3, alpha=0.3))
+    top.add_collection(
+        LineCollection(
+            [np.column_stack([hours, day]) for day in by_hours],
+            colors=SERIES,
+            linewidths=0.3,
+            alpha=0.3,
+        )
+    )
     top_marks = highest(by_hours)
-    top.scatter(top_marks % HOURS_PER_DAY, by_hours.ravel()[top_marks], s=12,
-                color=HIGHLIGHT_COLOR, zorder=3)
+    top.scatter(
+        top_marks % HOURS_PER_DAY,
+        by_hours.ravel()[top_marks],
+        s=12,
+        color=HIGHLIGHT_COLOR,
+        zorder=3,
+    )
     top.set_xlim(0, HOURS_PER_DAY - 1)
     top.set_ylim(0, np.nanmax(by_hours) * 1.5)
     top.set_xticks(hours)
     top.set_xlabel("hora del dia", color=MUTED_INK)
-    _style(top, f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
-           f"en vermell les {HIGHEST} més altes",
-           "distància a la mediana, en MAD")
+    _style(
+        top,
+        f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
+        f"en vermell les {HIGHEST} més altes",
+        "distància a la mediana, en MAD",
+    )
 
     instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
-        np.tile(hours, len(frame)), unit="h")
+        np.tile(hours, len(frame)), unit="h"
+    )
     bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES, linewidths=0)
     bottom_marks = highest(by_days)
-    bottom.scatter(instants[bottom_marks], by_days.ravel()[bottom_marks], s=12,
-                   color=HIGHLIGHT_COLOR, zorder=3)
+    bottom.scatter(
+        instants[bottom_marks],
+        by_days.ravel()[bottom_marks],
+        s=12,
+        color=HIGHLIGHT_COLOR,
+        zorder=3,
+    )
     bottom.set_xlim(instants[0], instants[-1])
     bottom.set_ylim(0, np.nanmax(by_days) * 1.5)
-    _style(bottom, f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} "
-           f"dies), en vermell les {HIGHEST} més altes",
-           "distància a la mediana, en MAD")
+    _style(
+        bottom,
+        f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} "
+        f"dies), en vermell les {HIGHEST} més altes",
+        "distància a la mediana, en MAD",
+    )
 
-    panels.suptitle(f"Distància de cada valor horari de {name} als seus veïns, "
-                    f"{frame.index[0].year} a {frame.index[-1].year}", color=INK, x=0.01,
-                    ha="left")
+    panels.suptitle(
+        f"Distància de cada valor horari de {name} als seus veïns, "
+        f"{frame.index[0].year} a {frame.index[-1].year}",
+        color=INK,
+        x=0.01,
+        ha="left",
+    )
     figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")

@@ -1,15 +1,16 @@
 """Com es fa i com es veu una figura d'aquest projecte, en un sol lloc, i el que
 comparteixen les figures dels models explicats.
 
-El llegeix tot el que dibuixa: les figures de les dades d'origen, les de cada model i les
-que comparen les famílies. Només hi ha el que fan servir dues coses o més: el que és d'una
-figura concreta, com el vermell dels valors marcats, viu amb ella. Les dels models
-explicats es dibuixen del que la passada va desar, un fitxer per model: la importància de
-cada columna i de cada grup, i la dependència de cada sèrie.
+El llegeix tot el que dibuixa: les figures de les dades d'origen, les de cada model i
+les que comparen les famílies. Només hi ha el que fan servir dues coses o més: el que és
+d'una figura concreta, com el vermell dels valors marcats, viu amb ella. Les dels models
+explicats es dibuixen del que la passada va desar, un fitxer per model: la importància
+de cada columna i de cada grup, i la dependència de cada sèrie.
 
 El motor és `Agg`, sense finestra, i es tria aquí: qui importa aquest mòdul ja el té
 triat i no ha de recordar-ho abans d'importar `pyplot`.
 """
+
 import matplotlib
 import numpy as np
 
@@ -35,7 +36,8 @@ DPI = 300
 # Escala seqüencial d'un sol to: la magnitud es llegeix igual en color i en escala de
 # grisos impresa.
 MAGNITUDE = LinearSegmentedColormap.from_list(
-    "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"])
+    "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"]
+)
 
 # Seqüència de colors de línia, encapçalada pel blau de la sèrie. Una línia per color,
 # perquè dues del mateix color en una llegenda no es distingeixen.
@@ -52,8 +54,9 @@ def colours(names):
     """
     names = list(names)
     if len(names) > len(LINES):
-        raise ValueError(f"{len(names)} sèries i només {len(LINES)} colors de línia: "
-                         f"{names}")
+        raise ValueError(
+            f"{len(names)} sèries i només {len(LINES)} colors de línia: {names}"
+        )
     return list(zip(LINES, names))
 
 
@@ -80,20 +83,30 @@ def save(figure, folder, name):
 
 
 # Com es diu cada grup de columnes a les figures.
-GROUP_LABELS = {"price": "preu del dia abans", "demand_fcst": "demanda prevista",
-                "wind_fcst": "eòlica prevista", "solar_fcst": "fotovoltaica prevista",
-                "nuclear_sched": "nuclear programada",
-                "coal_gas_sched": "carbó i gas programats",
-                "hydro_sched": "hidràulica programada", "calendar": "calendari",
-                "date": "comptador de dies"}
+GROUP_LABELS = {
+    "price": "preu del dia abans",
+    "demand_fcst": "demanda prevista",
+    "wind_fcst": "eòlica prevista",
+    "solar_fcst": "fotovoltaica prevista",
+    "nuclear_sched": "nuclear programada",
+    "coal_gas_sched": "carbó i gas programats",
+    "hydro_sched": "hidràulica programada",
+    "calendar": "calendari",
+    "date": "comptador de dies",
+}
 
 # Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de
 # les famílies que n'expliquen un de sol.
-OUTPUT_LABELS = {"": "contribució", "location": "localització", "scale": "escala",
-                 "skewness": "asimetria", "tail_weight": "pes de la cua"}
+OUTPUT_LABELS = {
+    "": "contribució",
+    "location": "localització",
+    "scale": "escala",
+    "skewness": "asimetria",
+    "tail_weight": "pes de la cua",
+}
 
-# Les sèries que tenen gràfic de dependència: totes les del conjunt d'informació menys el
-# preu, les previsions com a Trebbien et al. (2023) i el programa igual.
+# Les sèries que tenen gràfic de dependència: totes les del conjunt d'informació menys
+# el preu, les previsions com a Trebbien et al. (2023) i el programa igual.
 DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
 
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
@@ -106,8 +119,10 @@ PER_GW = 1000
 def seeds(folder):
     """Els models desats d'una família, un per fitxer, en ordre de llavor i de
     configuració: el primer és la millor configuració de la primera llavor."""
-    paths = sorted(folder.glob(SEED.format(seed="*", rank="*")),
-                   key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]))
+    paths = sorted(
+        folder.glob(SEED.format(seed="*", rank="*")),
+        key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]),
+    )
     return [np.load(path) for path in paths]
 
 
@@ -122,18 +137,21 @@ def outputs(seed):
     values = seed["values"]
     if values.ndim == 2:
         return {"": values}
-    return {str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
-            for number, name in enumerate(seed["names"])}
+    return {
+        str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
+        for number, name in enumerate(seed["names"])
+    }
 
 
 def shares(values, groups):
-    """La importància normalitzada a u de cada columna i de cada grup, la de Trebbien et al.
-    (2023): la mitjana del valor absolut, i la d'un grup suma les contribucions de les
-    seves columnes abans de prendre'l."""
+    """La importància normalitzada a u de cada columna i de cada grup, la de Trebbien et
+    al. (2023): la mitjana del valor absolut, i la d'un grup suma les contribucions de
+    les seves columnes abans de prendre'l."""
     by_column = np.abs(values).mean(axis=0)
     names = list(dict.fromkeys(groups))
-    by_group = np.array([np.abs(values[:, groups == name].sum(axis=1)).mean()
-                         for name in names])
+    by_group = np.array(
+        [np.abs(values[:, groups == name].sum(axis=1)).mean() for name in names]
+    )
     return by_column / by_column.sum(), dict(zip(names, by_group / by_group.sum()))
 
 
@@ -143,8 +161,13 @@ def importance(folder, seeds):
     groups = seeds[0]["groups"]
     columns = seeds[0]["columns"]
     for kind in ("columns", "groups"):
-        panels, axes = plt.subplots(1, len(explained), figsize=(5 * len(explained), 6),
-                                    facecolor=SURFACE, squeeze=False)
+        panels, axes = plt.subplots(
+            1,
+            len(explained),
+            figsize=(5 * len(explained), 6),
+            facecolor=SURFACE,
+            squeeze=False,
+        )
         for axis, output in zip(axes[0], explained):
             found = [shares(outputs(seed)[output], groups) for seed in seeds]
             if kind == "columns":
@@ -153,7 +176,9 @@ def importance(folder, seeds):
                 names = columns[order]
             else:
                 labels = list(found[0][1])
-                table = np.array([[by_group[name] for name in labels] for _, by_group in found])
+                table = np.array(
+                    [[by_group[name] for name in labels] for _, by_group in found]
+                )
                 order = np.arange(len(labels))
                 names = [GROUP_LABELS[name] for name in labels]
             positions = np.arange(len(order))
@@ -167,8 +192,8 @@ def importance(folder, seeds):
 
 
 def present(seed):
-    """Les sèries amb gràfic de dependència que porta el fitxer d'un model, en l'ordre de
-    `DEPENDENCE`."""
+    """Les sèries amb gràfic de dependència que porta el fitxer d'un model, en l'ordre
+    de `DEPENDENCE`."""
     names = set(seed["groups"])
     return [name for name in DEPENDENCE if name in names]
 
@@ -180,8 +205,9 @@ def members(seed, name):
     if len(members) == 1:
         return members
     hour = {column: number for number, column in enumerate(HOUR_COLUMNS)}
-    return np.array(sorted(members,
-                           key=lambda j: hour[str(seed["columns"][j]).rsplit("_", 1)[1]]))
+    return np.array(
+        sorted(members, key=lambda j: hour[str(seed["columns"][j]).rsplit("_", 1)[1]])
+    )
 
 
 def pairs(seed, output, values, name):
@@ -192,20 +218,25 @@ def pairs(seed, output, values, name):
         return inputs[:, found[0]], values[:, found[0]]
     # La xarxa distribucional: a la fila del dia d i l'hora h, la columna de l'hora h.
     x = inputs[:, found]
-    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[:, np.arange(len(found)),
-                                                           found]
+    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[
+        :, np.arange(len(found)), found
+    ]
     return x.ravel(), y.ravel()
 
 
 def dependence(folder, seeds, present):
-    """La contribució de cada previsió contra el seu valor, al millor model de la primera
-    llavor, amb la recta ajustada i el pendent de tots els models, que és el que
+    """La contribució de cada previsió contra el seu valor, al millor model de la
+    primera llavor, amb la recta ajustada i el pendent de tots els models, que és el que
     Trebbien et al. (2023) llegeixen."""
     explained = list(outputs(seeds[0]))
     units = dict(zip(explained, seeds[0]["units"]))
-    panels, axes = plt.subplots(len(present), len(explained),
-                                figsize=(4.5 * len(explained), 3.5 * len(present)),
-                                facecolor=SURFACE, squeeze=False)
+    panels, axes = plt.subplots(
+        len(present),
+        len(explained),
+        figsize=(4.5 * len(explained), 3.5 * len(present)),
+        facecolor=SURFACE,
+        squeeze=False,
+    )
     for row, name in zip(axes, present):
         for axis, output in zip(row, explained):
             slopes = []
@@ -214,13 +245,16 @@ def dependence(folder, seeds, present):
                 slope, intercept = np.polyfit(x / PER_GW, y, 1)
                 slopes.append(slope)
                 if number == 0:
-                    axis.plot(x / PER_GW, y, ".", color=SERIES, markersize=1,
-                              alpha=0.3)
+                    axis.plot(x / PER_GW, y, ".", color=SERIES, markersize=1, alpha=0.3)
                     span = np.array([x.min(), x.max()]) / PER_GW
                     axis.plot(span, slope * span + intercept, color=INK, linewidth=1)
             axis.set_xlabel(f"{GROUP_LABELS[name]}, GW", color=MUTED_INK)
-            axis.set_ylabel(f"{OUTPUT_LABELS[output]}, {units[output]}",
-                            color=MUTED_INK)
-            style(axis, f"pendent {np.mean(slopes):.3g} (±{np.std(slopes):.2g}), "
-                        f"{units[output]} per GW")
+            axis.set_ylabel(
+                f"{OUTPUT_LABELS[output]}, {units[output]}", color=MUTED_INK
+            )
+            style(
+                axis,
+                f"pendent {np.mean(slopes):.3g} (±{np.std(slopes):.2g}), "
+                f"{units[output]} per GW",
+            )
     save(panels, folder, "dependence")

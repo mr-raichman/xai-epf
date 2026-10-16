@@ -44,9 +44,10 @@ build-backend = "hatchling.build"
 packages = ["epf"]
 
 [tool.ruff.lint]
-# Regles fixades, no les per defecte de ruff, que canvien entre versions. Només
-# pyflakes i les regles E de correcció, no d'estil.
-select = ["E4", "E7", "E9", "F"]
+# Regles fixades, no les per defecte de ruff, que canvien entre versions: pyflakes, les
+# regles E de correcció i E501, la llargada de línia, l'única d'estil, perquè `ruff
+# format` no parteix els comentaris ni els docstrings.
+select = ["E4", "E7", "E9", "E501", "F"]
 
 [tool.pytest.ini_options]
 # Només les proves de tests/.

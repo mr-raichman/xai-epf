@@ -1,6 +1,8 @@
-"""L'atribució de la xarxa elàstica: el valor de SHAP exacte d'un model lineal, a l'espai
-transformat de Lago et al. (2021), i les sumes que se'n tornen a fer sobre el fitxer desat.
+"""L'atribució de la xarxa elàstica: el valor de SHAP exacte d'un model lineal, a
+l'espai transformat de Lago et al. (2021), i les sumes que se'n tornen a fer sobre el
+fitxer desat.
 """
+
 import collections
 
 import numpy as np
@@ -36,8 +38,11 @@ def attribute_rows(model, X):
         values[np.ix_(rows, positions)] = coefficients * (matrix - fitted.background)
         base[rows] = fitted.model.intercept_ + coefficients @ fitted.background
         transformed[rows] = fitted.model.predict(matrix)
-    return Explanation(pd.DataFrame(values, index=X.index, columns=columns),
-                       pd.Series(base, index=X.index), pd.Series(transformed, index=X.index))
+    return Explanation(
+        pd.DataFrame(values, index=X.index, columns=columns),
+        pd.Series(base, index=X.index),
+        pd.Series(transformed, index=X.index),
+    )
 
 
 def sums(found):

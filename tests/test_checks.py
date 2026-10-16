@@ -5,6 +5,7 @@ un dia i una hora repetits doblen el seu pes al calibratge, unes files fora d'or
 dia que falta desplacen els retards cap a un dia que no és el que toca, un dia sense les
 seves 24 hores desalinea les hores, i un valor absent es propaga al model.
 """
+
 import pandas as pd
 import pytest
 
@@ -17,9 +18,13 @@ NONE = pd.DatetimeIndex([])
 def table_of(days=DAYS, names=("price",)):
     """Un conjunt de dades coherent, de `days` dies des del 2024-01-01."""
     index = pd.MultiIndex.from_tuples(
-        [(day.strftime("%Y-%m-%d"), hour)
-         for day in pd.date_range("2024-01-01", periods=days, freq="D") for hour in range(24)],
-        names=["day", "hour"])
+        [
+            (day.strftime("%Y-%m-%d"), hour)
+            for day in pd.date_range("2024-01-01", periods=days, freq="D")
+            for hour in range(24)
+        ],
+        names=["day", "hour"],
+    )
     return pd.DataFrame({name: 50.0 for name in names}, index=index)
 
 
@@ -60,8 +65,9 @@ def test_one_absent_value_is_refused_and_its_series_named():
 
 
 def test_only_the_declared_gap_may_be_absent():
-    # Les hores de l'apagada, que ESIOS no publica al programa, s'admeten perquè la sèrie
-    # les declara; una hora absent a qualsevol altre lloc segueix refusada, també al costat.
+    # Les hores de l'apagada, que ESIOS no publica al programa, s'admeten perquè la
+    # sèrie les declara; una hora absent a qualsevol altre lloc segueix refusada, també
+    # al costat.
     table = table_of()
     gap = pd.date_range("2024-01-03 12:00", "2024-01-04 23:00", freq="h")
     table.loc[("2024-01-03", slice(12, 23)), "price"] = None

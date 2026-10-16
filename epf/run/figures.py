@@ -1,11 +1,12 @@
-"""Les figures d'una passada, les de Trebbien et al. (2023) adaptades, dibuixades del que
-la passada va desar, sense tornar a ajustar res.
+"""Les figures d'una passada, les de Trebbien et al. (2023) adaptades, dibuixades del
+que la passada va desar, sense tornar a ajustar res.
 
 Són un joc de treball: quines es queden per a la memòria es decideix quan tot el codi
 sigui fet. A la carpeta de cada família, les seves, que dibuixa el `figures.py` del seu
-model; a dalt de la passada, les que comparen les famílies: com puntua cada una al costat
-dels bancs de comparació, i els residus de cada família ajustada.
+model; a dalt de la passada, les que comparen les famílies: com puntua cada una al
+costat dels bancs de comparació, i els residus de cada família ajustada.
 """
+
 import importlib
 
 from epf import paths
@@ -13,9 +14,9 @@ from epf.contract import figure
 from epf.contract.figure import plt
 from epf.run import families, residuals
 
-# Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són totes,
-# de manera que una carpeta d'una família que no hi és fa petar el dibuix en lloc de
-# quedar-se sense figures sense dir-ho.
+# Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són
+# totes, de manera que una carpeta d'una família que no hi és fa petar el dibuix en lloc
+# de quedar-se sense figures sense dir-ho.
 FIGURES = {
     "lightgbm": "epf.models.lightgbm.figures",
     "date_probe": "epf.models.lightgbm.figures",
@@ -32,26 +33,41 @@ FIGURES = {
 
 def _performance(where, described):
     """La R-quadrat i el MAE de cada família sobre les setmanes de prova, la millor
-    configuració de cada llavor amb una marca, i la resta de les seves deu millors amb una
-    de petita i grisa al darrere, al costat dels bancs de comparació. Dos gràfics i no dos
-    eixos.
+    configuració de cada llavor amb una marca, i la resta de les seves deu millors amb
+    una de petita i grisa al darrere, al costat dels bancs de comparació. Dos gràfics i
+    no dos eixos.
 
     Només les famílies explicades tenen color; els bancs de comparació, que no desen cap
     contribució, van en gris, i el nom de sota diu quin és cada un.
     """
     families = sorted(described)
-    explained = [family for family in families if "values" in described[family][0].files]
+    explained = [
+        family for family in families if "values" in described[family][0].files
+    ]
     colour = {name: hue for hue, name in figure.colours(explained)}
-    panels, axes = plt.subplots(1, 2, figsize=(max(8, 1.1 * len(families)), 5),
-                                facecolor=figure.SURFACE)
-    for axis, metric, label in ((axes[0], "r2", "R-quadrat"), (axes[1], "mae", "MAE, EUR/MWh")):
+    panels, axes = plt.subplots(
+        1, 2, figsize=(max(8, 1.1 * len(families)), 5), facecolor=figure.SURFACE
+    )
+    for axis, metric, label in (
+        (axes[0], "r2", "R-quadrat"),
+        (axes[1], "mae", "MAE, EUR/MWh"),
+    ):
         for position, family in enumerate(families):
             for best, size in ((False, 2), (True, 4)):
-                found = [float(seed[metric]) for seed in described[family]
-                         if (int(seed["rank"]) == 0) == best]
-                axis.plot([position] * len(found), found, "o", markersize=size,
-                          color=colour.get(family, figure.MUTED_INK) if best
-                          else figure.MUTED_INK)
+                found = [
+                    float(seed[metric])
+                    for seed in described[family]
+                    if (int(seed["rank"]) == 0) == best
+                ]
+                axis.plot(
+                    [position] * len(found),
+                    found,
+                    "o",
+                    markersize=size,
+                    color=colour.get(family, figure.MUTED_INK)
+                    if best
+                    else figure.MUTED_INK,
+                )
         axis.set_xticks(range(len(families)), families, fontsize=6, rotation=90)
         axis.set_ylabel(label, color=figure.MUTED_INK)
         figure.style(axis, f"{label} a les setmanes de prova, la millor de cada llavor")
@@ -77,7 +93,9 @@ def main(arguments):
     """Les figures de la passada que es nomeni o, sense nom, de l'última acabada del seu
     tipus, de mesura si no és `--smoke`."""
     if arguments.run is None:
-        found = [where for where in paths.runs(arguments.smoke) if families.finished(where)]
+        found = [
+            where for where in paths.runs(arguments.smoke) if families.finished(where)
+        ]
         if not found:
             kind = "d'assaig" if arguments.smoke else "de mesura"
             print(f"no hi ha cap passada {kind} acabada a {paths.RUNS}")
@@ -85,7 +103,9 @@ def main(arguments):
         where = found[-1]
     else:
         # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
-        found = {path.name: path for smoke in (False, True) for path in paths.runs(smoke)}
+        found = {
+            path.name: path for smoke in (False, True) for path in paths.runs(smoke)
+        }
         if arguments.run not in found:
             print(f"no hi ha cap passada {arguments.run} a {paths.RUNS}")
             return 1

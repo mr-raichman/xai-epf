@@ -20,8 +20,14 @@ PATIENCE = 20
 SUBSAMPLE_FREQ = 1
 MIN_CHILD_WEIGHT = 0
 
-# El punt mentre no s'ha cercat, inventat: els arbres, la taxa i les fulles d'abans de la
-# graella, i els valors per defecte de LightGBM per a la resta, cap límit de profunditat,
-# totes les files i 20 per fulla.
-UNSEARCHED = {"learning_rate": 0.05, "num_leaves": 31, "max_depth": -1, "subsample": 1.0,
-              "min_child_samples": 20, "trees": 500}
+# El punt mentre no s'ha cercat, inventat: els arbres, la taxa i les fulles d'abans de
+# la graella, i els valors per defecte de LightGBM per a la resta, cap límit de
+# profunditat, totes les files i 20 per fulla.
+UNSEARCHED = {
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "max_depth": -1,
+    "subsample": 1.0,
+    "min_child_samples": 20,
+    "trees": 500,
+}

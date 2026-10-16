@@ -4,6 +4,7 @@ estabilitza la variància, que és el de la xarxa elàstica.
 El valor centrat en la mediana de cada columna i dividit per la seva escala, presos de
 les files d'ajust i mai de les que es prediuen; el segon en pren a més l'asinh.
 """
+
 import numpy as np
 
 # La mediana de les desviacions absolutes dividida per aquesta constant estima la

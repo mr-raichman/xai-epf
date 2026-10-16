@@ -1,10 +1,11 @@
 """Una passada: quina es continua, quin pla ajusta cada família, i quina es refusa.
 
-Res d'això no peta quan falla. Una passada acabada que es continués en barrejaria dues; un
-pla fet de nou a mitja passada ajustaria unes famílies amb uns números i, en tornar-hi,
-les altres amb uns altres; i una passada continuada amb un altre codi tindria famílies
-que no ha fet el mateix codi.
+Res d'això no peta quan falla. Una passada acabada que es continués en barrejaria dues;
+un pla fet de nou a mitja passada ajustaria unes famílies amb uns números i, en
+tornar-hi, les altres amb uns altres; i una passada continuada amb un altre codi tindria
+famílies que no ha fet el mateix codi.
 """
+
 import datetime
 import sys
 import types
@@ -21,8 +22,9 @@ from epf.run import families, figures, run, search
 def fake(tmp_path, monkeypatch):
     """Passades d'assaig de dues famílies d'un model que no ajusta res: cada una desa un
     fitxer buit per cada configuració del pla que rep, i peta si és a `failing`."""
-    state = types.SimpleNamespace(calls=[], failing=set(),
-                                  fingerprints={"code": "codi", "dataset": "conjunt"})
+    state = types.SimpleNamespace(
+        calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
+    )
 
     def train(family, folder, configurations, explained_days):
         state.calls.append((family, configurations))
@@ -31,15 +33,22 @@ def fake(tmp_path, monkeypatch):
         for seed, planned in configurations.items():
             for one in planned:
                 (folder / paths.SEED.format(seed=seed, rank=one["rank"])).touch()
-        return [[seed, one["rank"]] for seed, planned in configurations.items()
-                for one in planned]
+        return [
+            [seed, one["rank"]]
+            for seed, planned in configurations.items()
+            for one in planned
+        ]
 
     module = types.ModuleType("fake_trainer")
-    module.FAMILIES = {name: {"fixed": {}, "placeholder": {"value": 1}, "kept": 1,
-                              "searched_as": name} for name in ("first", "second")}
+    module.FAMILIES = {
+        name: {"fixed": {}, "placeholder": {"value": 1}, "kept": 1, "searched_as": name}
+        for name in ("first", "second")
+    }
     module.train = train
     monkeypatch.setitem(sys.modules, "fake_trainer", module)
-    monkeypatch.setattr(run, "TRAINERS", {"first": "fake_trainer", "second": "fake_trainer"})
+    monkeypatch.setattr(
+        run, "TRAINERS", {"first": "fake_trainer", "second": "fake_trainer"}
+    )
     monkeypatch.setattr(families, "EVERY", frozenset({"first", "second"}))
     monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
     monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")
@@ -48,11 +57,15 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(matrix, "matrices", lambda series: built)
     monkeypatch.setattr(matrix, "write", lambda found, folder: None)
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
-    monkeypatch.setattr(search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily"))
+    monkeypatch.setattr(
+        search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily")
+    )
     monkeypatch.setattr(figures, "draw", lambda where: None)
     # Una sola llavor, sigui quina sigui la variant d'assaig que tria `chosen`.
     real = parameters.chosen
-    monkeypatch.setattr(parameters, "chosen", lambda smoke: real(smoke) | {"SEEDS": (0,)})
+    monkeypatch.setattr(
+        parameters, "chosen", lambda smoke: real(smoke) | {"SEEDS": (0,)}
+    )
     state.module = module
     state.main = lambda: run.main(types.SimpleNamespace(smoke=True, family=None))
     return state
@@ -63,9 +76,9 @@ def _name(number):
 
 
 def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, capsys):
-    # La segona família peta la primera vegada, i mentrestant el seu número de lloc canvia:
-    # la passada que la continua ha d'ajustar el que diu el seu registre, i no tornar a
-    # ajustar la primera, que ja hi és sencera.
+    # La segona família peta la primera vegada, i mentrestant el seu número de lloc
+    # canvia: la passada que la continua ha d'ajustar el que diu el seu registre, i no
+    # tornar a ajustar la primera, que ja hi és sencera.
     fake.failing = {"second"}
     with pytest.raises(RuntimeError):
         fake.main()
@@ -73,8 +86,9 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     fake.module.FAMILIES["second"]["placeholder"] = {"value": 2}
     assert fake.main() == 0
     assert [family for family, _ in fake.calls] == ["first", "second", "second"]
-    assert fake.calls[-1][1] == {0: [{"rank": 0, "numbers": {"value": 1},
-                                      "unsearched": True}]}
+    assert fake.calls[-1][1] == {
+        0: [{"rank": 0, "numbers": {"value": 1}, "unsearched": True}]
+    }
     assert capsys.readouterr().out.count(f"passada {_name(1)}\n") == 2
 
 

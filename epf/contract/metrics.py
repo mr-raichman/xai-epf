@@ -1,9 +1,10 @@
 """Les puntuacions de tots els models: la R-quadrat i el MAE, el CRPS d'una predicció
-distribucional, el test de cobertura dels seus intervals, i la guarda que ha de passar el
-preu real.
+distribucional, el test de cobertura dels seus intervals, i la guarda que ha de passar
+el preu real.
 
 Res d'aquí tria cap paràmetre: escollir es fa sobre la validació, no sobre la prova.
 """
+
 import numpy as np
 from scipy import stats
 from scipy.special import xlogy
@@ -32,8 +33,10 @@ def refuse_missing(frame, what):
         return
     flat = missing.stack()
     row, column = next(iter(flat[flat].index))
-    raise ValueError(f"{int(missing.to_numpy().sum())} valors absents a {what}, "
-                     f"el primer a {row} hora {column}")
+    raise ValueError(
+        f"{int(missing.to_numpy().sum())} valors absents a {what}, "
+        f"el primer a {row} hora {column}"
+    )
 
 
 def _checked(actual, quantiles):
@@ -63,8 +66,9 @@ def crps(actual, quantiles, probabilities=PERCENTILES):
     mateixos dies, en el mateix ordre.
     """
     difference = _checked(actual, quantiles) - quantiles
-    return float(np.maximum(probabilities * difference,
-                            (probabilities - 1) * difference).mean())
+    return float(
+        np.maximum(probabilities * difference, (probabilities - 1) * difference).mean()
+    )
 
 
 def kupiec(actual, bounds, coverage):
@@ -77,16 +81,21 @@ def kupiec(actual, bounds, coverage):
     les fallades, `n1` els encerts i `p` la fracció d'encerts (Nowotarski i Weron,
     2018). Es fa hora a hora perquè les 24 d'un dia surten de la mateixa informació.
 
-    `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una hora
-    que no falla mai donaria un NaN, i un NaN no passa mai el test sense dir per què.
+    `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
+    hora que no falla mai donaria un NaN, i un NaN no passa mai el test sense dir per
+    què.
     """
     price = _checked(actual, bounds)[..., 0]
     hits = (bounds[..., 0] <= price) & (price <= bounds[..., 1])
     inside = hits.sum(axis=0)
     outside = len(hits) - inside
     observed = inside / len(hits)
-    statistic = -2 * (xlogy(outside, 1 - coverage) + xlogy(inside, coverage)
-                      - xlogy(outside, 1 - observed) - xlogy(inside, observed))
+    statistic = -2 * (
+        xlogy(outside, 1 - coverage)
+        + xlogy(inside, coverage)
+        - xlogy(outside, 1 - observed)
+        - xlogy(inside, observed)
+    )
     return stats.chi2.sf(statistic, 1)
 
 
@@ -98,17 +107,19 @@ def scored(predicted, actual):
     """La R-quadrat i el MAE sobre totes les files de prova juntes."""
     error = np.asarray(predicted) - np.asarray(actual)
     spread = np.asarray(actual) - np.mean(actual)
-    return {"r2": float(1 - np.sum(error ** 2) / np.sum(spread ** 2)),
-            "mae": float(np.mean(np.abs(error)))}
+    return {
+        "r2": float(1 - np.sum(error**2) / np.sum(spread**2)),
+        "mae": float(np.mean(np.abs(error))),
+    }
 
 
 def scored_distribution(actual, quantiles):
-    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen el
-    test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
+    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen
+    el test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
 
-    `actual` és la matriu del preu real de les files de prova i `quantiles` la funció que
-    en dóna els quantils predits a les probabilitats que se li demanen, `(dies, hores,
-    probabilitats)`.
+    `actual` és la matriu del preu real de les files de prova i `quantiles` la funció
+    que en dóna els quantils predits a les probabilitats que se li demanen, `(dies,
+    hores, probabilitats)`.
     """
     found = {"crps": crps(actual, quantiles(PERCENTILES))}
     for level, bounds in INTERVALS.items():

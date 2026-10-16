@@ -1,5 +1,5 @@
-"""El que comparteixen totes les xarxes de Marcjasz et al. (2023), les distribucionals i la
-de punt, sobre la matriu diària: les entrades, les capes, la sortida i l'ajust.
+"""El que comparteixen totes les xarxes de Marcjasz et al. (2023), les distribucionals i
+la de punt, sobre la matriu diària: les entrades, les capes, la sortida i l'ajust.
 
 Com les construeix el codi de l'article, que és el que va produir les seves xifres: les
 entrades normalitzades per lots com a primera capa, sense cap escalador i amb els preus
@@ -11,6 +11,7 @@ log-versemblança, i la de punt l'error absolut.
 Cada xarxa llegeix totes les columnes de la matriu, com les altres famílies, i el dia de
 la setmana en una sola columna, com el seu codi el dóna a la xarxa.
 """
+
 import collections
 
 import keras
@@ -22,31 +23,33 @@ from epf.models.nn.hyperparameters import BATCH, EPOCHS, PATIENCE
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY, SEED
 
 # La columna del dia de la setmana que llegeix la xarxa, de dilluns 0 a diumenge 6, en
-# lloc dels set indicadors de la matriu: és el dia que es prediu, on el codi de l'article
-# en posa un altre.
+# lloc dels set indicadors de la matriu: és el dia que es prediu, on el codi de
+# l'article en posa un altre.
 DAY = "day_of_week"
 
 # La sortida d'una xarxa, una distribució o els 24 preus de la de punt. `loss` és la
 # pèrdua que minimitza, `flat` porta la sortida crua a les unitats en què es desen els
-# paràmetres, `point` el preu puntual que se'n deriva, `quantiles` els quantils predits i
-# `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
+# paràmetres, `point` el preu puntual que se'n deriva, `quantiles` els quantils predits
+# i `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
 #
 # `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
 # sortida crua, de manera que és alhora el que llegeix `parameters` i l'última capa del
 # que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
 # s'escriu un sol cop i l'explicació no se'n pot separar.
-Distribution = collections.namedtuple(
-    "Distribution", "names loss flat point quantiles")
+Distribution = collections.namedtuple("Distribution", "names loss flat point quantiles")
 
 
 def heads(raw, count):
     """Les `count` columnes de paràmetres que la xarxa ha tret, cada una (files, 24)."""
-    return [raw[..., number * HOURS_PER_DAY:(number + 1) * HOURS_PER_DAY]
-            for number in range(count)]
+    return [
+        raw[..., number * HOURS_PER_DAY : (number + 1) * HOURS_PER_DAY]
+        for number in range(count)
+    ]
 
 
 def parameters(distribution, raw):
-    """Els paràmetres en les unitats en què es desen i es llegeixen, `(files, 24, P)`."""
+    """Els paràmetres en les unitats en què es desen i es llegeixen, `(files, 24,
+    P)`."""
     flat = ops.convert_to_numpy(distribution.flat(raw))
     return np.stack(heads(flat, len(distribution.names)), axis=-1)
 
@@ -66,39 +69,69 @@ def build(distribution, columns, tuned):
     if tuned["dropout"] > 0:
         tensor = keras.layers.Dropout(tuned["dropout"])(tensor)
     for neurons, activation, weights, outputs in zip(
-            tuned["hidden"], tuned["activation"], tuned["l1"], tuned["activity_l1"],
-            strict=True):
+        tuned["hidden"],
+        tuned["activation"],
+        tuned["l1"],
+        tuned["activity_l1"],
+        strict=True,
+    ):
         tensor = keras.layers.Dense(
-            neurons, activation=activation,
+            neurons,
+            activation=activation,
             kernel_regularizer=keras.regularizers.L1(weights),
-            activity_regularizer=keras.regularizers.L1(outputs))(tensor)
-    layers = [keras.layers.Dense(len(HOUR_COLUMNS),
-                                 kernel_regularizer=keras.regularizers.L1(penalty))(tensor)
-              for penalty in tuned["parameter_l1"]]
+            activity_regularizer=keras.regularizers.L1(outputs),
+        )(tensor)
+    layers = [
+        keras.layers.Dense(
+            len(HOUR_COLUMNS), kernel_regularizer=keras.regularizers.L1(penalty)
+        )(tensor)
+        for penalty in tuned["parameter_l1"]
+    ]
     if len(layers) != len(distribution.names):
-        raise ValueError(f"{len(layers)} L1 de paràmetre per a una distribució de "
-                         f"{len(distribution.names)} paràmetres")
+        raise ValueError(
+            f"{len(layers)} L1 de paràmetre per a una distribució de "
+            f"{len(distribution.names)} paràmetres"
+        )
     model = keras.Model(entry, keras.layers.Concatenate()(layers))
-    model.compile(optimizer=keras.optimizers.Adam(learning_rate=tuned["learning_rate"]),
-                  loss=distribution.loss)
+    model.compile(
+        optimizer=keras.optimizers.Adam(learning_rate=tuned["learning_rate"]),
+        loss=distribution.loss,
+    )
     return model
 
 
-def fit_rows(distribution, train, validate, tuned, batch=BATCH, epochs=EPOCHS,
-             patience=PATIENCE, seed=SEED):
+def fit_rows(
+    distribution,
+    train,
+    validate,
+    tuned,
+    batch=BATCH,
+    epochs=EPOCHS,
+    patience=PATIENCE,
+    seed=SEED,
+):
     """Una xarxa ajustada amb les files de `train` i aturada quan deixa de millorar a
     les de `validate`, totes dues parelles `(X, y)`."""
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
     keras.utils.set_random_seed(seed)
     model = build(distribution, values.shape[1], tuned)
-    model.fit(values, y.to_numpy(dtype=float), batch_size=batch,
-              epochs=epochs,
-              validation_data=(inputs(X_validate).to_numpy(),
-                               y_validate.to_numpy(dtype=float)),
-              callbacks=[keras.callbacks.EarlyStopping(
-                  monitor="val_loss", patience=patience, restore_best_weights=True)],
-              verbose=0)
+    model.fit(
+        values,
+        y.to_numpy(dtype=float),
+        batch_size=batch,
+        epochs=epochs,
+        validation_data=(
+            inputs(X_validate).to_numpy(),
+            y_validate.to_numpy(dtype=float),
+        ),
+        callbacks=[
+            keras.callbacks.EarlyStopping(
+                monitor="val_loss", patience=patience, restore_best_weights=True
+            )
+        ],
+        verbose=0,
+    )
     return model
 
 

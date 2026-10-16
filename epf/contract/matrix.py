@@ -8,9 +8,10 @@ Tota columna d'entrada ha de ser calculable abans del tancament de la subhasta
 del dia anterior al lliurament.
 
 Les sèries d'on surten, `series`, es llegeixen del conjunt de dades, `data/dataset.csv`,
-com un fitxer i no a través del codi que el fa, a cada crida, de manera que cada model el
-llegeix ell mateix; i un conjunt de dades desfasat es refusa abans de llegir-lo.
+com un fitxer i no a través del codi que el fa, a cada crida, de manera que cada model
+el llegeix ell mateix; i un conjunt de dades desfasat es refusa abans de llegir-lo.
 """
+
 import collections
 import hashlib
 import json
@@ -19,22 +20,32 @@ import numpy as np
 import pandas as pd
 
 from epf import paths
-from epf.parameters import (DAYS_PER_WEEK, FORECAST_LAG, HOUR_COLUMNS, HOURS_PER_DAY,
-                            PREVIOUS_DAY, SCHEDULE_LAG)
+from epf.parameters import (
+    DAYS_PER_WEEK,
+    FORECAST_LAG,
+    HOUR_COLUMNS,
+    HOURS_PER_DAY,
+    PREVIOUS_DAY,
+    SCHEDULE_LAG,
+)
 
 DAY = "day"
 HOUR = "hour"
 PRICE = "price"
 
 # El conjunt d'informació: cada sèrie del conjunt de dades que entra a les matrius, en
-# l'ordre de les seves columnes, amb els dies abans del lliurament en què hi entra. El preu,
-# que és també el que es prediu, hi entra amb les 24 hores dels seus retards; les previsions
-# D+1, del mateix dia que es lliura; i el programa, del dia abans.
-INFORMATION = {PRICE: PREVIOUS_DAY,
-               "demand_fcst": (FORECAST_LAG,), "wind_fcst": (FORECAST_LAG,),
-               "solar_fcst": (FORECAST_LAG,),
-               "nuclear_sched": (SCHEDULE_LAG,), "coal_gas_sched": (SCHEDULE_LAG,),
-               "hydro_sched": (SCHEDULE_LAG,)}
+# l'ordre de les seves columnes, amb els dies abans del lliurament en què hi entra. El
+# preu, que és també el que es prediu, hi entra amb les 24 hores dels seus retards; les
+# previsions D+1, del mateix dia que es lliura; i el programa, del dia abans.
+INFORMATION = {
+    PRICE: PREVIOUS_DAY,
+    "demand_fcst": (FORECAST_LAG,),
+    "wind_fcst": (FORECAST_LAG,),
+    "solar_fcst": (FORECAST_LAG,),
+    "nuclear_sched": (SCHEDULE_LAG,),
+    "coal_gas_sched": (SCHEDULE_LAG,),
+    "hydro_sched": (SCHEDULE_LAG,),
+}
 
 # El dia de la setmana, en set indicadors i no en un enter. Els escriu la matriu i no
 # cap família, perquè és l'única manera que totes vegin el mateix i que una diferència
@@ -50,29 +61,41 @@ Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 
 def column(name, lag):
-    """El nom d'una sèrie d'entrada al seu retard: tal qual al dia que es lliura, i amb el
-    retard al darrere a qualsevol altre."""
+    """El nom d'una sèrie d'entrada al seu retard: tal qual al dia que es lliura, i amb
+    el retard al darrere a qualsevol altre."""
     return f"{name}_lag{lag}" if lag else name
 
 
 def build(series, information):
-    """Torna (X, y) alineats per data de lliurament, sense files incompletes, amb el preu com
-    a `y`.
+    """Torna (X, y) alineats per data de lliurament, sense files incompletes, amb el
+    preu com a `y`.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les. `series`
-    són les sèries per nom, cada una amb les 24 hores de cada dia, i `information` diu quines
-    entren i a quins retards, com `INFORMATION`: una previsió D+1 entra al retard 0, el dia
-    que es lliura, sense desplaçar, perquè es publica el dia abans.
+    són les sèries per nom, cada una amb les 24 hores de cada dia, i `information` diu
+    quines entren i a quins retards, com `INFORMATION`: una previsió D+1 entra al retard
+    0, el dia que es lliura, sense desplaçar, perquè es publica el dia abans.
     """
     price = series[PRICE]
     if list(price.columns) != HOUR_COLUMNS:
-        raise ValueError(f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}")
+        raise ValueError(
+            f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}"
+        )
 
-    blocks = [series[name].shift(lag, freq="D").reindex(price.index)
-              .add_prefix(f"{column(name, lag)}_")
-              for name, lags in information.items() for lag in lags]
-    blocks.append(pd.DataFrame(np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
-                               index=price.index, columns=DAY_OF_WEEK_COLUMNS))
+    blocks = [
+        series[name]
+        .shift(lag, freq="D")
+        .reindex(price.index)
+        .add_prefix(f"{column(name, lag)}_")
+        for name, lags in information.items()
+        for lag in lags
+    ]
+    blocks.append(
+        pd.DataFrame(
+            np.eye(DAYS_PER_WEEK)[price.index.dayofweek],
+            index=price.index,
+            columns=DAY_OF_WEEK_COLUMNS,
+        )
+    )
     features = pd.concat(blocks, axis="columns", sort=False)
 
     complete = features.notna().all(axis="columns")
@@ -103,34 +126,40 @@ def _digest(path):
 
 
 def _refuse_stale():
-    """Refusa un conjunt de dades que no és el que donen els fitxers baixats d'ara: un dels
-    fitxers que va llegir ha canviat o ja no hi és, o `dataset.csv` no és el que es va
-    escriure. Una baixada torna a escriure sempre el fitxer de l'any en curs, de manera que
-    una baixada que no s'ha seguit d'`epf dataset` també es refusa."""
+    """Refusa un conjunt de dades que no és el que donen els fitxers baixats d'ara: un
+    dels fitxers que va llegir ha canviat o ja no hi és, o `dataset.csv` no és el que es
+    va escriure. Una baixada torna a escriure sempre el fitxer de l'any en curs, de
+    manera que una baixada que no s'ha seguit d'`epf dataset` també es refusa."""
     again = "torna'l a fer amb `epf dataset`"
     if not (paths.DATASET.is_file() and paths.DATASET_RECORD.is_file()):
-        raise ValueError(f"no hi ha cap conjunt de dades a {paths.DATA}: fes-lo amb "
-                         f"`epf dataset`")
+        raise ValueError(
+            f"no hi ha cap conjunt de dades a {paths.DATA}: fes-lo amb `epf dataset`"
+        )
     record = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))
-    changed = [name for name, digest in record["files"].items()
-               if not (paths.DOWNLOADS / name).is_file()
-               or _digest(paths.DOWNLOADS / name) != digest]
+    changed = [
+        name
+        for name, digest in record["files"].items()
+        if not (paths.DOWNLOADS / name).is_file()
+        or _digest(paths.DOWNLOADS / name) != digest
+    ]
     if changed:
-        raise ValueError(f"el conjunt de dades és desfasat: {len(changed)} dels fitxers "
-                         f"baixats que va llegir han canviat o no hi són, el primer "
-                         f"{changed[0]}; {again}")
+        raise ValueError(
+            f"el conjunt de dades és desfasat: {len(changed)} dels fitxers "
+            f"baixats que va llegir han canviat o no hi són, el primer "
+            f"{changed[0]}; {again}"
+        )
     if _digest(paths.DATASET) != record["dataset"]:
         raise ValueError(f"{paths.DATASET} no és el que es va escriure; {again}")
 
 
 def series():
-    """Cada sèrie del conjunt de dades, pel seu nom, en dies per hores, tallada al seu tram,
-    del primer al darrer dia amb algun valor: un dia buit fora del tram d'una sèrie faria
-    una fila amb el preu que s'ha de predir absent. Abans, refusa un conjunt de dades
-    desfasat.
+    """Cada sèrie del conjunt de dades, pel seu nom, en dies per hores, tallada al seu
+    tram, del primer al darrer dia amb algun valor: un dia buit fora del tram d'una
+    sèrie faria una fila amb el preu que s'ha de predir absent. Abans, refusa un conjunt
+    de dades desfasat.
 
-    `float_precision="round_trip"` és l'únic lector de pandas que torna exactament el que
-    es va escriure: el de per defecte canvia `0.1 + 0.2`.
+    `float_precision="round_trip"` és l'únic lector de pandas que torna exactament el
+    que es va escriure: el de per defecte canvia `0.1 + 0.2`.
     """
     _refuse_stale()
     table = pd.read_csv(paths.DATASET, float_precision="round_trip", encoding="utf-8")
@@ -140,34 +169,41 @@ def series():
     for name in table.columns.drop([DAY, HOUR]):
         frame = pd.DataFrame(wide[name].to_numpy(), index=days, columns=HOUR_COLUMNS)
         present = frame.index[frame.notna().any(axis="columns")]
-        found[name] = frame.loc[present[0]:present[-1]]
+        found[name] = frame.loc[present[0] : present[-1]]
     return found
 
 
 def matrices(series):
-    """Les dues matrius del conjunt d'informació, `INFORMATION`, i el preu que prediuen: les
-    24 hores del preu del dia abans, les previsions D+1 del dia que es lliura i el programa
-    del dia abans, cada sèrie pel seu nom, i el dia de la setmana.
+    """Les dues matrius del conjunt d'informació, `INFORMATION`, i el preu que prediuen:
+    les 24 hores del preu del dia abans, les previsions D+1 del dia que es lliura i el
+    programa del dia abans, cada sèrie pel seu nom, i el dia de la setmana.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
     la diària, que és la de les xarxes, amb les 24 hores de cada sèrie, i la per hora,
-    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu
-    del dia abans hi és amb les seves 24 hores a totes dues.
+    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El
+    preu del dia abans hi és amb les seves 24 hores a totes dues.
     """
     daily = build(series, INFORMATION)
-    at_the_hour = tuple(column(name, lag) for name, lags in INFORMATION.items()
-                        if name != PRICE for lag in lags)
+    at_the_hour = tuple(
+        column(name, lag)
+        for name, lags in INFORMATION.items()
+        if name != PRICE
+        for lag in lags
+    )
     return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
 
 
 def write(found, folder):
-    """Desa a `folder` les dues matrius, `found`, cada fila amb les seves entrades i el preu
-    que se'n prediu: el del dia, `price_h00` a `price_h23`, a la diària, i el de l'hora,
-    `price`, a la per hora. Una que ja hi és no es torna a escriure: una passada que es
-    continua és del mateix codi i del mateix conjunt de dades que la van començar."""
+    """Desa a `folder` les dues matrius, `found`, cada fila amb les seves entrades i el
+    preu que se'n prediu: el del dia, `price_h00` a `price_h23`, a la diària, i el de
+    l'hora, `price`, a la per hora. Una que ja hi és no es torna a escriure: una passada
+    que es continua és del mateix codi i del mateix conjunt de dades que la van
+    començar."""
     (X, y), (rows, target) = found.daily, found.hourly
-    for name, frame in (("daily", X.join(y.add_prefix(f"{PRICE}_"))),
-                        ("hourly", rows.assign(**{PRICE: target}))):
+    for name, frame in (
+        ("daily", X.join(y.add_prefix(f"{PRICE}_"))),
+        ("hourly", rows.assign(**{PRICE: target})),
+    ):
         path = folder / paths.MATRIX.format(name=name)
         if not path.exists():
             paths.write_whole(path, frame.to_csv(index_label=DAY, lineterminator="\n"))

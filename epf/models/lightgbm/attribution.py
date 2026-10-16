@@ -1,5 +1,6 @@
-"""L'atribució de l'arbre: TreeSHAP i les seves interaccions, i les sumes que se'n tornen a
-fer sobre el fitxer desat."""
+"""L'atribució de l'arbre: TreeSHAP i les seves interaccions, i les sumes que se'n
+tornen a fer sobre el fitxer desat."""
+
 import numpy as np
 import shap
 
@@ -26,9 +27,17 @@ def sums(found, best):
     """Les sumes de l'arbre sobre el seu fitxer: la base més els valors de cada fila
     contra la seva predicció i, a la millor configuració, cada fila d'interaccions
     contra el valor de la seva columna."""
-    found_sums = [(*summed(found["base"], found["values"], 1),
-                   found["predicted"][explained_rows(found, HOURS_PER_DAY)])]
+    found_sums = [
+        (
+            *summed(found["base"], found["values"], 1),
+            found["predicted"][explained_rows(found, HOURS_PER_DAY)],
+        )
+    ]
     if best:
-        found_sums.append((*summed(0.0, found["interactions"], 2),
-                           found["values"][found["interaction_rows"]]))
+        found_sums.append(
+            (
+                *summed(0.0, found["interactions"], 2),
+                found["values"][found["interaction_rows"]],
+            )
+        )
     return found_sums

@@ -1,13 +1,14 @@
-"""La cerca de Trebbien et al. (2023): a cada llavor i família, configuracions a l'atzar de
-l'espai de la família, cada una ajustada amb les files d'entrenament de la llavor i
+"""La cerca de Trebbien et al. (2023): a cada llavor i família, configuracions a l'atzar
+de l'espai de la família, cada una ajustada amb les files d'entrenament de la llavor i
 puntuada sobre les de validació, sense tocar mai les de prova, i les millors desades.
 
 Cada família es puntua com ja es puntuava la seva cerca: l'arbre i la xarxa elàstica pel
-MAE en EUR/MWh, i les xarxes per la seva pèrdua de Keras sobre la validació, amb les L1 a
-dins, que és el que torna el codi de Marcjasz et al. (2023). Una graella es recorre sense
-repetir cap punt; un espai continu es mostreja a l'atzar. Quina matriu llegeix, quina
-graella té i com es prova cada punt ho diu el `search.py` del model de la família.
+MAE en EUR/MWh, i les xarxes per la seva pèrdua de Keras sobre la validació, amb les L1
+a dins, que és el que torna el codi de Marcjasz et al. (2023). Una graella es recorre
+sense repetir cap punt; un espai continu es mostreja a l'atzar. Quina matriu llegeix,
+quina graella té i com es prova cada punt ho diu el `search.py` del model de la família.
 """
+
 import importlib
 
 import optuna
@@ -43,9 +44,11 @@ def main(arguments):
         if arguments.seed:
             outside = sorted(set(arguments.seed) - set(seeds))
             if outside:
-                raise ValueError(f"les llavors {outside} no hi són: "
-                                 f"{'un assaig' if arguments.smoke else 'una mesura'} en "
-                                 f"té {list(seeds)}")
+                raise ValueError(
+                    f"les llavors {outside} no hi són: "
+                    f"{'un assaig' if arguments.smoke else 'una mesura'} en "
+                    f"té {list(seeds)}"
+                )
             seeds = [seed for seed in seeds if seed in arguments.seed]
         matrices = matrix.matrices(matrix.series())
         fingerprints = record.fingerprints()
@@ -60,12 +63,23 @@ def main(arguments):
         where = searches.folder(arguments.smoke, family)
         where.mkdir(parents=True, exist_ok=True)
         for seed in seeds:
-            made = searches.run(where / searches.STUDY.format(seed=seed), family, module, X, y,
-                             split(seed, DEVELOPMENT, BLACKOUT_WEEK), seed,
-                             values["TRIALS"], fingerprints)
+            made = searches.run(
+                where / searches.STUDY.format(seed=seed),
+                family,
+                module,
+                X,
+                y,
+                split(seed, DEVELOPMENT, BLACKOUT_WEEK),
+                seed,
+                values["TRIALS"],
+                fingerprints,
+            )
             found = searches.record(made, family, seed, arguments.smoke)
             searches.save(found, arguments.smoke)
-            print(f"{family} llavor {seed}: {found['trials']} proves, la millor "
-                  f"{found['best'][0]['score']:.4g}", flush=True)
+            print(
+                f"{family} llavor {seed}: {found['trials']} proves, la millor "
+                f"{found['best'][0]['score']:.4g}",
+                flush=True,
+            )
     print(f"les cerques són a {paths.SEARCHES}")
     return 0
