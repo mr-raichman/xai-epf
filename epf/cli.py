@@ -27,8 +27,9 @@ def run_arguments(parser):
     """Els arguments d'una passada o d'una cerca: si és un assaig, i quines famílies.
     `extend` perquè repetir l'opció n'afegeixi els valors en lloc de canviar-los."""
     parser.add_argument("--smoke", action="store_true",
-                        help="un assaig, que no dóna cap xifra: els valors de SMOKE de "
-                             "parameters.py en lloc dels de la mesura")
+                        help="un assaig, que no dóna cap xifra: els valors de la variant "
+                             "d'assaig que tria chosen() de parameters.py en lloc dels "
+                             "de la mesura")
     parser.add_argument("--family", nargs="+", action="extend", metavar="NOM",
                         help="només aquestes famílies, o les famílies d'aquests models")
     return parser

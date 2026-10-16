@@ -12,7 +12,7 @@ import types
 import pandas as pd
 import pytest
 
-from epf import paths
+from epf import parameters, paths
 from epf.contract import matrix, record
 from epf.run import families, figures, run, search
 
@@ -50,6 +50,9 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
     monkeypatch.setattr(search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily"))
     monkeypatch.setattr(figures, "draw", lambda where: None)
+    # Una sola llavor, sigui quina sigui la variant d'assaig que tria `chosen`.
+    real = parameters.chosen
+    monkeypatch.setattr(parameters, "chosen", lambda smoke: real(smoke) | {"SEEDS": (0,)})
     state.module = module
     state.main = lambda: run.main(types.SimpleNamespace(smoke=True, family=None))
     return state

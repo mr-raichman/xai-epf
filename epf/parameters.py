@@ -6,10 +6,10 @@ Els números d'un model tampoc: viuen amb el model, a
 `models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.
 
-Són els valors d'una mesura; `--smoke` posa els de `SMOKE`, al final, en lloc dels seus, i
-no en canvia cap altre. Una passada els desa tots al registre de cada família, amb
-l'empremta del codi i la del conjunt de dades que la van fer, de manera que cada punt
-d'un escombrat es llegeix del seu registre.
+Són els valors d'una mesura; `--smoke` posa en lloc dels seus els d'una de les variants
+d'assaig del final, la que tria `chosen`, i no en canvia cap altre. Una passada els desa
+tots al registre de cada família, amb l'empremta del codi i la del conjunt de dades que la
+van fer, de manera que cada punt d'un escombrat es llegeix del seu registre.
 """
 import datetime
 
@@ -73,18 +73,22 @@ SEED = 0
 
 # ------------------------------------------------------------ l'assaig
 
-# El que `--smoke` posa en lloc dels valors de la mesura, i res més. Un assaig és petit i
-# ràpid a propòsit, una llavor, 50 dies explicats i dues proves per cerca, prou per passar
-# tota la maquinària i prou curt per esperar-s'hi. El seu error no es desa, ni es cita,
-# ni es compara enlloc; només una mesura dóna un resultat, i el nom d'una passada o d'una
-# cerca d'assaig comença amb `assaig_`, de manera que una xifra d'assaig no es pugui llegir
-# mai com una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
+# El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants.
+# `SMOKE` és petita i ràpida a propòsit, una llavor, 50 dies explicats i dues proves per
+# cerca, prou per passar tota la maquinària i prou curta per esperar-s'hi; `SMOKE_1`, cinc
+# llavors i deu proves per cerca, no fixa els dies explicats i n'explica tots els de prova.
+# La que fa servir un assaig la tria `chosen`, i es canvia editant-la. L'error d'un assaig
+# no es desa, ni es cita, ni es compara enlloc; només una mesura dóna un resultat, i el nom
+# d'una passada o d'una cerca d'assaig comença amb `assaig_`, de manera que una xifra
+# d'assaig no es pugui llegir mai com una mesura. "Prova" no hi va: és el nom de les
+# setmanes retingudes.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
 
 def chosen(smoke):
-    """Cada valor d'aquest fitxer pel seu nom, amb els de `SMOKE` en lloc dels de la mesura
-    si és un assaig. `SMOKE` mateix no hi és: són els valors que fa servir una passada."""
+    """Cada valor d'aquest fitxer pel seu nom, amb els d'una variant d'assaig en lloc dels
+    de la mesura si és un assaig. Les variants mateixes no hi són: són els valors que fa
+    servir una passada, que es desen al seu registre."""
     found = {name: value for name, value in globals().items()
-             if name.isupper() and name != "SMOKE"}
+             if name.isupper() and not name.startswith("SMOKE")}
     return (found | SMOKE_1) if smoke else found
