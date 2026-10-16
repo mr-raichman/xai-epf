@@ -59,8 +59,10 @@ def keys(text):
             "marcjasz2023",
         ),
         (
-            "com aconsellen Hyndman i\n# Athanasopoulos (2021) per a una sèrie "
-            "estacional",
+            (
+                "com aconsellen Hyndman i\n# Athanasopoulos (2021) per a una sèrie "
+                "estacional"
+            ),
             "hyndman2021",
         ),
         (
