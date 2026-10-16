@@ -80,11 +80,11 @@ SEED = 0
 # cerca d'assaig comença amb `assaig_`, de manera que una xifra d'assaig no es pugui llegir
 # mai com una mesura. "Prova" no hi va: és el nom de les setmanes retingudes.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
-
+SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
 
 def chosen(smoke):
     """Cada valor d'aquest fitxer pel seu nom, amb els de `SMOKE` en lloc dels de la mesura
     si és un assaig. `SMOKE` mateix no hi és: són els valors que fa servir una passada."""
     found = {name: value for name, value in globals().items()
              if name.isupper() and name != "SMOKE"}
-    return (found | SMOKE) if smoke else found
+    return (found | SMOKE_1) if smoke else found
