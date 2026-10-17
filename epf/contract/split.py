@@ -51,7 +51,9 @@ def _deal(seed, period, deleted, shares):
     )
     test = round(len(kept) * test_share / 100)
     ends = np.cumsum([len(kept) - validation - test, validation, test])
-    return days, [order[start:end] for start, end in zip([0, *ends[:-1]], ends)]
+    return days, [
+        order[start:end] for start, end in zip([0, *ends[:-1]], ends, strict=True)
+    ]
 
 
 def _days_of(days, weeks):

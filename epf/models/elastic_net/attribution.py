@@ -29,7 +29,7 @@ def attribute_rows(model, X):
     columns = [column for column in X.columns if column != HOUR]
     values = np.zeros((len(X), len(columns)))
     base, transformed = np.empty(len(X)), np.empty(len(X))
-    for fitted, rows in zip(model, by_hour(X)):
+    for fitted, rows in zip(model, by_hour(X), strict=True):
         if not len(rows):
             continue
         matrix = design(X.iloc[rows], fitted)

@@ -39,7 +39,9 @@ def daily_errors(models):
                 f"{error.size} errors per a {len(days)} dies de prova: les "
                 f"files no són les dels dies que el fitxer diu"
             )
-        for day, mean in zip(days, error.reshape(len(days), -1).mean(axis=1)):
+        for day, mean in zip(
+            days, error.reshape(len(days), -1).mean(axis=1), strict=True
+        ):
             found.setdefault(day, mean)
     span = np.arange(min(found), max(found) + np.timedelta64(1, "D"))
     return np.array([found.get(day, np.nan) for day in span])
@@ -85,7 +87,7 @@ def report(where, described):
         facecolor=figure.SURFACE,
         squeeze=False,
     )
-    for axis, family in zip(axes.flat, fitted):
+    for axis, family in zip(axes.flat, fitted, strict=False):
         series = daily_errors(described[family])
         statistic, value, correlations = ljung_box(series)
         days = int((~np.isnan(series)).sum())

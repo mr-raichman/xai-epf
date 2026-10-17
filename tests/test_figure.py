@@ -32,7 +32,7 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
         "inputs": inputs,
         "groups": np.array(["other"] + ["demand_fcst"] * len(HOUR_COLUMNS)),
     }
-    x, y = pairs(seed, "location", outputs(seed)["location"], "demand_fcst")
+    x, y = pairs(seed, outputs(seed)["location"], "demand_fcst")
     expected_y = [101 * h + 1000 * d for d in range(days) for h in range(24)]
     expected_x = [inputs[d, h + 1] for d in range(days) for h in range(24)]
     assert np.array_equal(y, expected_y)

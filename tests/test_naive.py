@@ -24,7 +24,7 @@ def test_each_copy_reads_its_own_day_the_weekly_one_seven_back():
 def test_the_similar_day_takes_yesterday_only_from_tuesday_to_friday():
     price = frame_of(range(30))
     days = price.index[10:24]
-    for row, day in zip(similar_day(price, days), days):
+    for row, day in zip(similar_day(price, days), days, strict=True):
         back = 1 if day.dayofweek in (1, 2, 3, 4) else 7
         assert np.array_equal(row, price.loc[day - pd.Timedelta(days=back)].to_numpy())
 

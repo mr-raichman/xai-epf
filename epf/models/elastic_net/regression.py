@@ -102,7 +102,7 @@ def largest_penalty(X, y, mixing):
 def predict_rows(model, X):
     """El preu de cada fila en EUR/MWh, cada una amb el model de la seva hora."""
     prices = np.empty(len(X))
-    for fitted, rows in zip(model, by_hour(X)):
+    for fitted, rows in zip(model, by_hour(X), strict=True):
         if len(rows):
             transformed = fitted.model.predict(design(X.iloc[rows], fitted))
             prices[rows] = fitted.target.back(transformed[:, np.newaxis]).ravel()

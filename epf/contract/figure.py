@@ -57,7 +57,7 @@ def colours(names):
         raise ValueError(
             f"{len(names)} sèries i només {len(LINES)} colors de línia: {names}"
         )
-    return list(zip(LINES, names))
+    return list(zip(LINES, names, strict=False))
 
 
 def style(axis, title=None):
@@ -152,7 +152,9 @@ def shares(values, groups):
     by_group = np.array(
         [np.abs(values[:, groups == name].sum(axis=1)).mean() for name in names]
     )
-    return by_column / by_column.sum(), dict(zip(names, by_group / by_group.sum()))
+    return by_column / by_column.sum(), dict(
+        zip(names, by_group / by_group.sum(), strict=True)
+    )
 
 
 def importance(folder, seeds):
@@ -168,7 +170,7 @@ def importance(folder, seeds):
             facecolor=SURFACE,
             squeeze=False,
         )
-        for axis, output in zip(axes[0], explained):
+        for axis, output in zip(axes[0], explained, strict=True):
             found = [shares(outputs(seed)[output], groups) for seed in seeds]
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
@@ -210,7 +212,7 @@ def members(seed, name):
     )
 
 
-def pairs(seed, output, values, name):
+def pairs(seed, values, name):
     """El valor de la sèrie i la seva contribució, a l'hora de cada fila."""
     inputs = seed["inputs"]
     found = members(seed, name)
@@ -229,7 +231,7 @@ def dependence(folder, seeds, present):
     primera llavor, amb la recta ajustada i el pendent de tots els models, que és el que
     Trebbien et al. (2023) llegeixen."""
     explained = list(outputs(seeds[0]))
-    units = dict(zip(explained, seeds[0]["units"]))
+    units = dict(zip(explained, seeds[0]["units"], strict=True))
     panels, axes = plt.subplots(
         len(present),
         len(explained),
@@ -237,11 +239,11 @@ def dependence(folder, seeds, present):
         facecolor=SURFACE,
         squeeze=False,
     )
-    for row, name in zip(axes, present):
-        for axis, output in zip(row, explained):
+    for row, name in zip(axes, present, strict=True):
+        for axis, output in zip(row, explained, strict=True):
             slopes = []
             for number, seed in enumerate(seeds):
-                x, y = pairs(seed, output, outputs(seed)[output], name)
+                x, y = pairs(seed, outputs(seed)[output], name)
                 slope, intercept = np.polyfit(x / PER_GW, y, 1)
                 slopes.append(slope)
                 if number == 0:

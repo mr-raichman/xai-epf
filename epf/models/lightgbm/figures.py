@@ -27,7 +27,7 @@ def _interactions(folder, seed, present):
         facecolor=figure.SURFACE,
         squeeze=False,
     )
-    for row, name in zip(axes, present):
+    for row, name in zip(axes, present, strict=True):
         (j,) = figure.members(seed, name)
         x = inputs[:, j] / figure.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
@@ -41,7 +41,7 @@ def _interactions(folder, seed, present):
             (2 * interactions[:, j, k], inputs[:, k], f"amb {columns[k]}")
             for k in partners
         ]
-        for axis, (y, colour, title) in zip(row, panels_of_row):
+        for axis, (y, colour, title) in zip(row, panels_of_row, strict=True):
             if colour is None:
                 axis.plot(x, y, ".", color=figure.SERIES, markersize=2, alpha=0.5)
             else:

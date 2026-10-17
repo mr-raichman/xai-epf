@@ -73,7 +73,7 @@ def test_the_same_seed_gives_the_same_split_and_another_seed_another():
     first, again, other = (
         split(seed, DEVELOPMENT, BLACKOUT_WEEK) for seed in (0, 0, 1)
     )
-    assert all(a.equals(b) for a, b in zip(first, again))
+    assert all(a.equals(b) for a, b in zip(first, again, strict=True))
     assert not first.test.equals(other.test)
 
 

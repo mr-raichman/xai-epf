@@ -94,7 +94,7 @@ def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
     model = lightgbm(point, trees)
     if not validation:
         return model.fit(X, y)
-    parts, targets = zip(*validation)
+    parts, targets = zip(*validation, strict=True)
     return model.fit(
         X,
         y,

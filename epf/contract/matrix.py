@@ -4,8 +4,9 @@ La diària té una fila per dia i 24 sortides; la per hora té una fila per dia 
 hora, amb l'hora com a columna, i hi pren a l'hora de la fila la sèrie que s'hi pren
 a l'hora.
 
-Tota columna d'entrada ha de ser calculable abans del tancament de la subhasta
-del dia anterior al lliurament.
+Cap columna d'entrada no porta el preu que explica ni res del que passa el dia del
+lliurament: porta el que es podia esperar a la subhasta del dia anterior, a les 12:00,
+encara que es publiqui més tard.
 
 Les sèries d'on surten, `series`, es llegeixen del conjunt de dades, `data/dataset.csv`,
 com un fitxer i no a través del codi que el fa, a cada crida, de manera que cada model
@@ -47,10 +48,8 @@ INFORMATION = {
     "hydro_sched": (SCHEDULE_LAG,),
 }
 
-# El dia de la setmana, en set indicadors i no en un enter. Els escriu la matriu i no
-# cap família, perquè és l'única manera que totes vegin el mateix i que una diferència
-# entre famílies sigui només d'algorisme. A una xarxa, l'enter li diu que diumenge és
-# sis vegades dimarts.
+# El dia de la setmana, en set indicadors, com els llegeixen l'arbre i la xarxa
+# elàstica; les xarxes en fan un sol enter, a `models/nn/network.py`.
 DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK)]
 
 # Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen.
