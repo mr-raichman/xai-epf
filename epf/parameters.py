@@ -58,8 +58,8 @@ SCHEDULE_LAG = 1
 # tots, el protocol sencer.
 EXPLAINED_DAYS = None
 
-# Proves de la cerca de cada família a cada llavor, i quantes de les millors se
-# n'expliquen: Trebbien et al. (2023) en guarden les deu millors i no diuen quantes en
+# Intents de la cerca de cada família a cada llavor, i quants dels millors se
+# n'expliquen: Trebbien et al. (2023) en guarden els deu millors i no diuen quants en
 # proven, i cinquanta és el nombre del projecte.
 TRIALS = 50
 BEST = 10
@@ -75,9 +75,9 @@ SEED = 0
 # ------------------------------------------------------------ l'assaig
 
 # El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants.
-# `SMOKE` és petita i ràpida a propòsit, una llavor, 50 dies explicats i dues proves per
+# `SMOKE` és petita i ràpida a propòsit, una llavor, 50 dies explicats i dos intents per
 # cerca, prou per passar tota la maquinària i prou curta per esperar-s'hi; `SMOKE_1`,
-# cinc llavors i deu proves per cerca, no fixa els dies explicats i n'explica tots els
+# cinc llavors i deu intents per cerca, no fixa els dies explicats i n'explica tots els
 # de prova. La que fa servir un assaig la tria `chosen`, i es canvia editant-la. L'error
 # d'un assaig no es desa, ni es cita, ni es compara enlloc; només una mesura dóna un
 # resultat, i el nom d'una passada o d'una cerca d'assaig comença amb `assaig_`, de

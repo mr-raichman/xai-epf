@@ -1,4 +1,4 @@
-"""Les figures de l'arbre i de la prova de datació, dibuixades del que la passada va
+"""Les figures de l'arbre i de la sonda de datació, dibuixades del que la passada va
 desar: la importància de cada columna i de cada grup, la dependència de cada sèrie i les
 seves interaccions."""
 

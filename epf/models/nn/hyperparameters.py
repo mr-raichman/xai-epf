@@ -15,7 +15,7 @@ EPOCHS = 1500
 PATIENCE = 50
 
 # Els números de cada família mentre no s'ha cercat: de les quatre cerques de 2048
-# proves que l'article va publicar per distribució, i per a la xarxa de punt, la de
+# intents que l'article va publicar per distribució, i per a la xarxa de punt, la de
 # millor puntuació pròpia, el fitxer `COPIED_FROM` del seu repositori. Els blocs
 # d'entrada que aquella cerca va triar no hi són: la xarxa llegeix totes les columnes.
 # L'L1 dels paràmetres va en l'ordre de `distributions`, i no en el del codi de

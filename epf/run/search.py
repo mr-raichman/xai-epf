@@ -77,7 +77,7 @@ def main(arguments):
             found = searches.record(made, family, seed, arguments.smoke)
             searches.save(found, arguments.smoke)
             print(
-                f"{family} llavor {seed}: {found['trials']} proves, la millor "
+                f"{family} llavor {seed}: {found['trials']} intents, el millor "
                 f"{found['best'][0]['score']:.4g}",
                 flush=True,
             )

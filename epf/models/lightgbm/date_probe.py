@@ -1,4 +1,4 @@
-"""La prova de datació de Trebbien et al. (2023), una família pròpia: l'arbre ajustat de
+"""La sonda de datació de Trebbien et al. (2023), una família pròpia: l'arbre ajustat de
 nou sobre la mateixa matriu per hora amb un comptador de dies, que treu el que el model
 pot fer amb la data i res més.
 
@@ -37,7 +37,7 @@ FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la prova: la matriu per hora amb el comptador, i a cada llavor
+    """La passada de la sonda: la matriu per hora amb el comptador, i a cada llavor
     l'arbre de la configuració ajustat, comprovat, puntuat i desat. Torna les parelles
     `[llavor, configuració]` que ha desat ara."""
     rows, y = matrix.matrices(matrix.series()).hourly

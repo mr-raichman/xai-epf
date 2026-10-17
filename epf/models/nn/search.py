@@ -34,7 +34,7 @@ def penalty(optuna_trial, name):
 
 
 def space(optuna_trial, distribution, penalised=True):
-    """Els hiperparàmetres d'una prova, en la forma en què els llegeix `network.build`.
+    """Els hiperparàmetres d'un intent, en la forma en què els llegeix `network.build`.
 
     Sense `penalised`, la capa de sortida no té cap L1 i no se'n cerca cap, que és la
     xarxa de punt de l'article: qui crida ho diu, i no s'endevina de la distribució.

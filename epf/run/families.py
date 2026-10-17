@@ -1,7 +1,7 @@
 """Les famílies: els noms que pren `--family`, cada família pel seu i cada model, una
 carpeta de `models/`, per totes les seves, i si una passada les té totes. On un model i
 una família es diuen igual, el nom és el del model, de manera que `lightgbm` vol dir
-l'arbre i la seva prova de datació.
+l'arbre i la seva sonda de datació.
 
 Que una passada sigui acabada es llegeix del pla de cada família i dels fitxers que hi
 ha, i no es desa enlloc: una família esborrada per tornar-la a planificar, o una passada

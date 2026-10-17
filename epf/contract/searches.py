@@ -2,13 +2,13 @@
 família, el registre de les seves millors configuracions, i quines configuracions ajusta
 una passada a cada llavor.
 
-Optuna desa cada prova en un estudi SQLite, de manera que una cerca interrompuda es
-reprèn on era. Quan una llavor té totes les seves proves, el seu registre en desa les
-millors en la forma en què les pren l'ajust, i sobre quines files es van fer: les
+Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompuda es
+reprèn on era. Quan una llavor té tots els seus intents, el seu registre en desa els
+millors en la forma en què els pren l'ajust, i sobre quines files es van fer: les
 columnes del conjunt i la partició. Una passada no llegeix un registre fet sobre unes
-altres files, i una cerca no es reprèn sobre unes altres files. Cada prova desa les
+altres files, i una cerca no es reprèn sobre unes altres files. Cada intent desa les
 empremtes del codi, del conjunt de dades i de les biblioteques amb què es va fer, i el
-registre les de cada una de les millors; una cerca es reprèn igualment sobre un altre
+registre les de cada un dels millors; una cerca es reprèn igualment sobre un altre
 codi, un altre conjunt de dades o unes altres biblioteques, i només unes altres files la
 refusen.
 """
@@ -49,7 +49,7 @@ def made_on(columns):
 
 
 def completed(study):
-    """Les proves acabades d'un estudi."""
+    """Els intents acabats d'un estudi."""
     return [
         one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE
     ]
@@ -65,13 +65,13 @@ def _seed(*parts):
 
 
 def _sampler(searcher, family, seed, study):
-    """Com tria cada prova la seva configuració, de la graella del cercador, `GRID`, o
+    """Com tria cada intent la seva configuració, de la graella del cercador, `GRID`, o
     del seu espai continu si no en té.
 
-    Una graella es barreja amb una llavor de la família i de la partició, i la prova `k`
+    Una graella es barreja amb una llavor de la família i de la partició, i l'intent `k`
     en pren el punt `k`: una cerca represa continua per on anava, i cap punt no es
-    repeteix. Un espai continu es mostreja amb una llavor que compta també les proves
-    que l'estudi ja porta, perquè una cerca represa no torni a proposar les primeres. El
+    repeteix. Un espai continu es mostreja amb una llavor que compta també els intents
+    que l'estudi ja porta, perquè una cerca represa no torni a proposar els primers. El
     nom de la família hi entra perquè dues famílies del mateix espai no proposin les
     mateixes.
     """
@@ -84,15 +84,15 @@ def _sampler(searcher, family, seed, study):
 
 
 def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
-    """L'estudi d'una família en una llavor, amb les proves que li falten fins a
+    """L'estudi d'una família en una llavor, amb els intents que li falten fins a
     `trials`.
 
-    `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i la
-    prova, `trial`. Cada prova s'ajusta amb les files d'entrenament de `parts` i es
+    `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i
+    l'intent, `trial`. Cada intent s'ajusta amb les files d'entrenament de `parts` i es
     puntua sobre les de validació, i la matriu no n'hi dóna cap altra. Els números que
-    en surten es desen a la prova, en la forma en què els pren l'ajust, amb les
+    en surten es desen a l'intent, en la forma en què els pren l'ajust, amb les
     empremtes, `fingerprints`, del codi, del conjunt de dades i de les biblioteques que
-    la fan. Un estudi fet sobre unes altres files es refusa en lloc de reprendre's.
+    el fan. Un estudi fet sobre unes altres files es refusa en lloc de reprendre's.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(
@@ -118,7 +118,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
             family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
         )
         optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar, perquè la durada de la prova, que Optuna
+        # La càrrega de la màquina en acabar, perquè la durada de l'intent, que Optuna
         # desa, porti les condicions en què es va prendre. Windows no la dóna, i hi
         # queda buida.
         optuna_trial.set_user_attr(
@@ -127,7 +127,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
         for name, value in fingerprints.items():
             optuna_trial.set_user_attr(name, value)
         print(
-            f"{family} llavor {seed} prova {len(completed(study)) + 1} de {trials}: "
+            f"{family} llavor {seed} intent {len(completed(study)) + 1} de {trials}: "
             f"{score:.4g}, {time.time() - start:.1f} s",
             flush=True,
         )
@@ -140,9 +140,9 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
 
 
 def record(study, family, seed, smoke):
-    """El registre d'una cerca acabada: les `BEST` millors proves, de la millor a la
+    """El registre d'una cerca acabada: els `BEST` millors intents, del millor al
     pitjor, amb els seus números, la seva puntuació i les empremtes amb què es van fer,
-    quantes proves les van triar i sobre quines files."""
+    quants intents els van triar i sobre quines files."""
     done = sorted(completed(study), key=lambda one: one.value)
     return {
         "family": family,

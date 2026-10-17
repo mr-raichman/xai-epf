@@ -26,7 +26,7 @@ GRID = {
 
 
 def space(optuna_trial):
-    """El punt de la graella d'una prova."""
+    """El punt de la graella d'un intent."""
     return {
         name: optuna_trial.suggest_categorical(name, values)
         for name, values in GRID.items()
