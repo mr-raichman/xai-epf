@@ -1,12 +1,11 @@
-"""La sonda de datació de Trebbien et al. (2023), una família pròpia: l'arbre ajustat de
-nou sobre la mateixa matriu per hora amb un comptador de dies, que treu el que el model
-pot fer amb la data i res més.
+"""La sonda de datació de Trebbien et al. (2023), l'arbre amb un comptador de dies.
 
-Amb una partició barrejada, una setmana retinguda queda entre setmanes d'entrenament, i
-un model que sap situar una fila en el temps pot interpolar el nivell del període en
-lloc de llegir-lo de l'entrada. La part de l'atribució que pren el comptador, i el que
-treu de l'error, diuen quant ho fa. S'ajusta amb la millor configuració de cada llavor
-de la cerca de l'arbre, de manera que només el comptador la separa de l'arbre amb què es
+És una família pròpia, ajustada sobre la matriu per hora amb el comptador de més. Amb
+una partició barrejada, una setmana retinguda queda entre setmanes d'entrenament, i un
+model que sap situar una fila en el temps pot interpolar el nivell del període en lloc
+de llegir-lo de l'entrada: la part de l'atribució que pren el comptador, i el que treu
+de l'error, diuen quant ho fa. S'ajusta amb la millor configuració de cada llavor de la
+cerca de l'arbre, de manera que només el comptador la separa de l'arbre amb què es
 compara.
 """
 
@@ -30,14 +29,17 @@ DAY_COUNTER = "day_counter"
 DATE = "date"
 
 # La família, com la planifica una passada: els números de l'arbre, i la millor
-# configuració de cada llavor de la seva cerca.
+# configuració de cada llavor de la cerca de l'arbre.
 FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la sonda: la matriu per hora amb el comptador, i a cada llavor
-    l'arbre de la configuració ajustat, comprovat, puntuat i desat. Torna les parelles
-    `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+
+    La matriu és la per hora amb el comptador. `configurations` és el pla de la família
+    per llavor, i `explained_days` els dies de prova que s'expliquen de cada llavor,
+    tots amb `None`. Torna les parelles `[llavor, configuració]` que ha desat ara.
+    """
     rows, y = matrix.matrices(matrix.series()).hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
