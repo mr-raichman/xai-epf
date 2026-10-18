@@ -1,16 +1,4 @@
-"""Com es baixen i es llegeixen els fitxers d'ESIOS, l'API de Red Eléctrica.
-
-Es desa la resposta de l'API tal com arriba, un fitxer per any, amb el que el servidor
-agrega de cada hora: la mitjana o, d'una energia servida per quarts d'hora, la suma.
-Quins indicadors es baixen i es llegeixen, i com els serveix ESIOS, ho diu la taula de
-`build.py`, un `Indicator` per fila; aquí hi ha el client, amb la clau que llegeix del
-fitxer `api-keys` de l'arrel, i el lector: la geografia, la graella d'hores, que refusa
-qualsevol valor fora de l'hora en punt, la regla del zero amb la seva àncora i la
-reparació dels canvis d'hora.
-
-Hi ha també el rellotge del mercat: la zona horària i la reparació dels dies de canvi
-d'hora.
-"""
+"""El client i el lector dels fitxers d'ESIOS, l'API de Red Eléctrica."""
 
 import collections
 import datetime
@@ -53,8 +41,7 @@ Indicator = collections.namedtuple(
 
 
 def periods(today):
-    """Nom del fitxer, primer dia i últim dia de cada any que es demana, fins al de
-    `today`.
+    """Dona, de cada any fins al de `today`, el nom del fitxer, el primer dia i l'últim.
 
     L'any en curs es demana sencer: el que ESIOS publica per endavant, com les
     previsions de l'endemà, hi arriba igual.
@@ -64,7 +51,7 @@ def periods(today):
 
 
 def _is_complete(path, last):
-    """Un fitxer és complet si es va baixar prou després de tancar-se el seu període."""
+    """Diu si `path` es va baixar prou després de l'últim dia del seu any, `last`."""
     if not path.exists():
         return False
     closed = (
@@ -86,7 +73,10 @@ def _json_or_empty(response):
 
 
 def api_key(name, path=KEYS):
-    """Valor de la línia `name=valor` del fitxer de claus de l'arrel."""
+    """Torna el valor de la línia `name=<valor>` del fitxer de claus, `path`.
+
+    Refusa un fitxer que no existeix o que no té la línia.
+    """
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
@@ -101,16 +91,21 @@ def api_key(name, path=KEYS):
 
 
 def session_for(key=None):
-    """Sessió amb la clau i la capçalera que l'API demana."""
+    """Torna una sessió amb la clau i la capçalera que l'API demana.
+
+    Sense `key`, la clau és la línia `ESIOS_KEY` del fitxer de claus.
+    """
     session = requests.Session()
     session.headers.update({"x-api-key": key or api_key("ESIOS_KEY"), "Accept": ACCEPT})
     return session
 
 
 def download(indicator, folder, session=None):
-    """Baixa cada any d'un indicador que encara no tingui un fitxer complet, amb
-    l'agregació que l'indicador demana, i torna quants n'ha escrit i, dels que ESIOS ha
-    refusat, el camí i l'estat HTTP.
+    """Baixa a `folder` cada any d'un indicador que encara no hi té un fitxer complet.
+
+    Desa la resposta tal com arriba, amb l'agregació de les hores que l'indicador
+    demana. Torna quants fitxers ha escrit i, de cada any que ESIOS ha refusat, el camí
+    i l'estat HTTP.
     """
     session = session or session_for()
     folder = pathlib.Path(folder)
@@ -140,10 +135,10 @@ def download(indicator, folder, session=None):
 
 
 def files(folder):
-    """Els fitxers desats d'un indicador, un per any, en ordre.
+    """Torna els fitxers baixats d'un indicador, un per any, en ordre.
 
-    Només els del seu format, `<any>.json`, i no el `.part` que hi hagi deixat una
-    baixada interrompuda.
+    Només els `<any>.json`, i no el `.part` que hi hagi deixat una baixada interrompuda.
+    Refusa una carpeta que no en té cap.
     """
     paths = sorted(pathlib.Path(folder).glob("????.json"))
     if not paths:
@@ -155,7 +150,7 @@ def files(folder):
 
 
 def values(paths):
-    """Tots els valors desats d'un indicador, de tots els seus fitxers."""
+    """Torna tots els valors dels fitxers baixats d'un indicador, `paths`."""
     return [
         value
         for path in paths
@@ -164,12 +159,12 @@ def values(paths):
 
 
 def admissible(values, indicator):
-    """Els valors d'un indicador que se'n poden fer servir: els de la seva geografia.
+    """Torna els valors de la geografia de l'indicador.
 
-    Amb `only`, un fitxer que porti cap altra geografia es refusa: vol dir que ESIOS ja
+    Amb `only`, refusa uns valors que portin cap altra geografia: vol dir que ESIOS ja
     no serveix l'indicador com diu la taula, i el que se'n triés podria ser una altra
-    cosa amb el mateix nom. Sense, la geografia es tria entre les que porta el fitxer,
-    com la del preu, que en porta sis.
+    cosa amb el mateix nom. Sense `only`, tria la geografia d'entre les que porten els
+    valors, com els del preu, que en porten sis.
     """
     if indicator.only:
         others = {value["geo_name"] for value in values} - {indicator.geography}
@@ -182,7 +177,7 @@ def admissible(values, indicator):
 
 
 def published_instants(values):
-    """Els instants, en UTC, en què hi ha algun valor."""
+    """Torna els instants, en UTC, en què hi ha algun valor."""
     return set(
         pd.to_datetime(
             [value["datetime"] for value in values], format="ISO8601", utc=True
@@ -208,8 +203,10 @@ def repair_dst(hours):
 
 
 def _counted(instants, one, many):
-    """Compta uns instants en UTC i en diu el primer: `3 valors fora de l'hora en punt,
-    el primer a 2019-05-01 08:15 UTC`."""
+    """Torna `3 valors fora de l'hora en punt, el primer a 2019-05-01 08:15 UTC`.
+
+    `instants` són en UTC, i `one` i `many` el nom en singular i en plural.
+    """
     first = f"{instants[0]:%Y-%m-%d %H:%M} UTC"
     if len(instants) == 1:
         return f"1 {one}, a {first}"
@@ -217,22 +214,21 @@ def _counted(instants, one, many):
 
 
 def hourly(values, anchor=None):
-    """Valors d'ESIOS com a dies per hores.
+    """Torna uns valors d'ESIOS com a dies per hores.
 
-    La clau és `datetime`, que porta el desplaçament horari: `datetime_utc` etiqueta
-    malament la primera 02:00 del canvi d'hora d'octubre. Un valor fora de l'hora en
-    punt es refusa: la graella només té hores, i el deixaria fora sense dir-ho, com en
-    deixaria tres de cada quatre d'un indicador servit per quarts d'hora. Dos valors al
-    mateix instant es refusen: d'una sola geografia, són una hora repetida, i sumats la
-    doblarien sense dir-ho. Amb tots dos refusats, cap dia local no porta més valors que
-    hores té. Amb `anchor`, els instants que va publicar l'àncora, una hora absent val
-    zero si l'àncora la va publicar, del primer dia publicat de l'indicador a l'últim de
-    l'àncora, també passat l'últim de l'indicador.
+    `anchor` són els instants que va publicar l'àncora de l'indicador: una hora absent
+    que l'àncora va publicar hi val zero, del primer dia publicat de l'indicador a
+    l'últim de l'àncora, també passat l'últim de l'indicador. Refusa un valor fora de
+    l'hora en punt, que la graella deixaria fora sense dir-ho, com tres de cada quatre
+    d'un indicador servit per quarts d'hora; i dos valors al mateix instant, que d'una
+    sola geografia són una hora repetida i sumats la doblarien.
     """
     if not values:
         return pd.DataFrame(
             columns=HOUR_COLUMNS, index=pd.DatetimeIndex([], name="day")
         )
+    # `datetime` i no `datetime_utc`, que etiqueta malament la primera 02:00 del canvi
+    # d'hora d'octubre.
     instants = pd.to_datetime(
         [value["datetime"] for value in values], format="ISO8601", utc=True
     )
