@@ -1,5 +1,4 @@
-"""La cerca de LightGBM: la graella del grup de Trebbien et al. (2023) i com s'hi prova
-cada punt.
+"""La cerca de l'arbre, sobre la graella del grup de Trebbien et al. (2023).
 
 L'article no publica la seva cerca, i el seu codi, que la porta, no és enlloc. La
 graella és la del codi de dos dels seus autors per a un altre problema, amb LightGBM.
@@ -15,7 +14,7 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 MATRIX = "hourly"
 
 # La graella del codi de Kruse, Schäfer i Witthaut per a l'activació de la reserva
-# secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`: 288 punts.
+# secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`.
 GRID = {
     "num_leaves": (10, 30, 200, 900),
     "max_depth": (10, 5),
@@ -26,7 +25,7 @@ GRID = {
 
 
 def space(optuna_trial):
-    """El punt de la graella d'un intent."""
+    """Torna el punt de la graella que proposa un intent."""
     return {
         name: optuna_trial.suggest_categorical(name, values)
         for name, values in GRID.items()
@@ -34,9 +33,12 @@ def space(optuna_trial):
 
 
 def trial(family, optuna_trial, train, validate, seed):
-    """Un punt de la graella, ajustat amb les files d'entrenament, `(X, y)`, aturat quan
-    qualsevol de les quatre parts de la validació deixa de millorar, com a la passada, i
-    puntuat pel MAE de tota la validació."""
+    """Ajusta un punt de la graella i el puntua pel MAE de tota la validació.
+
+    S'ajusta amb les files d'entrenament, `train`, i s'atura quan qualsevol de les
+    quatre parts de la validació, `validate`, deixa de millorar, com a la passada. Torna
+    el punt i la puntuació.
+    """
     (X, y), (X_validate, y_validate) = train, validate
     point = space(optuna_trial)
     weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
