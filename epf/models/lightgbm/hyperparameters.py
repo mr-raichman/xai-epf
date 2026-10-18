@@ -1,10 +1,4 @@
-"""Els números del gradient boosting.
-
-Els que ningú no cerca són els del codi del grup de Trebbien et al. (2023) d'on surt la
-graella: el sostre d'arbres i la paciència dels ajustos que s'aturen, i les dues coses
-que hi fixa a cada punt. El punt de la graella encara no s'ha cercat, i el que hi ha és
-`UNSEARCHED`, marcat com a tal al registre de cada passada.
-"""
+"""Els números de l'arbre."""
 
 # Nom del model i de la seva família, el de la implementació.
 NAME = "lightgbm"
@@ -20,9 +14,8 @@ PATIENCE = 20
 SUBSAMPLE_FREQ = 1
 MIN_CHILD_WEIGHT = 0
 
-# El punt mentre no s'ha cercat, inventat: els arbres, la taxa i les fulles d'abans de
-# la graella, i els valors per defecte de LightGBM per a la resta, cap límit de
-# profunditat, totes les files i 20 per fulla.
+# El punt mentre no s'ha cercat: els arbres i la taxa, inventats, i per a la resta els
+# valors per defecte de LightGBM.
 UNSEARCHED = {
     "learning_rate": 0.05,
     "num_leaves": 31,
