@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from epf.run import pool
+from epf.run import families, pool
 
 
 @pytest.fixture(autouse=True)
@@ -20,15 +20,65 @@ def restored(monkeypatch):
         monkeypatch.setenv(name, "")
 
 
-def test_a_failing_task_is_reported_and_the_others_still_return(capsys):
-    tasks = [("bé", int, ("3",)), ("malament", int, ("x",)), ("també", int, ("4",))]
-    results, failed = pool.done(tasks, 2, 1)
-    assert results == {"bé": 3, "també": 4}
-    assert failed == ["malament"]
-    assert "malament: ha petat" in capsys.readouterr().out
+class Shown:
+    """Un bloc que només recorda el que se li diu."""
+
+    def __init__(self):
+        self.finished, self.failed, self.closed = [], [], False
+
+    def finish(self, family):
+        self.finished.append(family)
+
+    def fail(self, family, seed, message):
+        self.failed.append((family, seed, message))
+
+    def tick(self):
+        pass
+
+    def close(self):
+        self.closed = True
 
 
-def test_the_thread_cap_is_in_each_worker_s_environment():
+def test_a_failing_task_is_reported_and_the_others_still_return(tmp_path):
+    tasks = [
+        (("bé", 0), int, ("3",)),
+        (("malament", 1), int, ("x",)),
+        (("també", 2), int, ("4",)),
+    ]
+    block, log = Shown(), tmp_path / "workers.log"
+    results, failed = pool.done(tasks, 2, 1, log, block)
+    assert results == {("bé", 0): 3, ("també", 2): 4}
+    assert failed == [("malament", 1)]
+    assert block.failed == [
+        ("malament", 1, "ValueError: invalid literal for int() with base 10: 'x'")
+    ]
+    assert "malament llavor 1 ha fallat:\nTraceback" in log.read_text(encoding="utf-8")
+    assert block.closed
+
+
+def test_a_refusal_in_a_task_is_its_message_alone(tmp_path):
+    block, log = Shown(), tmp_path / "workers.log"
+    _, failed = pool.done([(("x", 0), families.named, (["cap"], {}))], 1, 1, log, block)
+    assert failed == [("x", 0)]
+    assert block.failed[0][2].startswith('"cap" no és cap família')
+    assert "ha fallat" not in log.read_text(encoding="utf-8")
+
+
+def test_what_a_worker_writes_goes_to_the_file_and_not_to_the_terminal(tmp_path, capfd):
+    # El que escriu una biblioteca de C també, pel descriptor.
+    tasks = [
+        (("a", 0), print, ("des de print",)),
+        (("b", 0), os.write, (2, b"des del descriptor\n")),
+    ]
+    log = tmp_path / "workers.log"
+    pool.done(tasks, 2, 1, log, Shown())
+    written = log.read_text(encoding="utf-8")
+    assert "des de print" in written and "des del descriptor" in written
+    assert "des de" not in capfd.readouterr().err
+
+
+def test_the_thread_cap_is_in_each_worker_s_environment(tmp_path):
     names = list(pool.environment(3))
-    results, _ = pool.done([(name, os.getenv, (name,)) for name in names], 2, 3)
-    assert results == pool.environment(3)
+    tasks = [((name, 0), os.getenv, (name,)) for name in names]
+    results, _ = pool.done(tasks, 2, 3, tmp_path / "workers.log", Shown())
+    assert {name: value for (name, _), value in results.items()} == pool.environment(3)

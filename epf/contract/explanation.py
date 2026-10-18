@@ -10,6 +10,7 @@ família.
 
 import numpy as np
 
+from epf import Refusal
 from epf.contract.matrix import INFORMATION
 
 # Les unitats d'una contribució: un preu, un preu a l'espai de la transformació de Lago
@@ -21,8 +22,7 @@ UNITLESS = "sense unitats"
 
 # Marge de la comprovació d'additivitat, en EUR/MWh: molt per sota de qualsevol
 # diferència que vulgui dir res en un preu. Es comprova sobre el que hi ha a la memòria,
-# abans de desar, i el residu de cada llavor s'imprimeix al costat de les seves
-# puntuacions.
+# abans de desar, i el residu de cada llavor es desa al costat de les seves puntuacions.
 TOLERANCE = 1e-3
 
 # Marge de l'additivitat a l'espai transformat, a part perquè és en les seves unitats i
@@ -45,14 +45,13 @@ def group(column):
     return "calendar"
 
 
-def check(fitted, family, seed, rank):
-    """Falla si la base més les contribucions d'un model ajustat se separen de la
+def check(fitted, rank):
+    """Refusa un model ajustat la base més les contribucions del qual se separen de la
     predicció que expliquen més que el marge del seu espai."""
     if fitted.gap > fitted.tolerance:
-        raise ValueError(
-            f"l'explicació de {family}, llavor {seed}, configuració {rank}, no "
-            f"torna la seva predicció: se n'allunya {fitted.gap:.3g}, per sobre "
-            f"del marge de {fitted.tolerance}"
+        raise Refusal(
+            f"l'explicació de la configuració {rank} no torna la predicció: se "
+            f"n'allunya {fitted.gap:.2g}, més que el marge de {fitted.tolerance:.2g}"
         )
 
 
@@ -81,14 +80,17 @@ def explained_rows(found, per_day):
 
 
 def read_back(path, stored, tolerance):
-    """Quant es passen del seu marge les sumes d'un fitxer desat, en el pitjor cas: el
-    marge és el de la comprovació a la memòria més el que l'arrodoniment a `float32`
-    pot haver mogut els termes de cada suma, i zero o menys vol dir que el fitxer torna
-    el que explica."""
+    """Torna la distància i el marge de la suma d'un fitxer desat que més es passa del
+    seu marge: el de la comprovació a la memòria més el que l'arrodoniment a `float32`
+    pot haver mogut els termes de la suma. Una distància dins del marge vol dir que el
+    fitxer torna el que explica."""
     worst = []
     with np.load(path) as found:
         for total, magnitude, target in stored(found):
             target = np.asarray(target, dtype=np.float64)
-            margin = tolerance + ROUNDING * (magnitude + np.abs(target))
-            worst.append(np.max(np.abs(total - target) - margin))
-    return float(np.max(worst))
+            distance = np.abs(total - target).ravel()
+            margin = (tolerance + ROUNDING * (magnitude + np.abs(target))).ravel()
+            # `argmax` i no `nanargmax`: una suma que no és un número ha de guanyar.
+            index = int(np.argmax(distance - margin))
+            worst.append((float(distance[index]), float(margin[index])))
+    return max(worst, key=lambda pair: np.nan_to_num(pair[0] - pair[1], nan=np.inf))

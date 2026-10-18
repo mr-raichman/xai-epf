@@ -8,16 +8,17 @@ indicadors que suma. `epf download` baixa el que encara falta de cada indicador.
 dataset` els llegeix tots, en fa les sèries, les escriu a `data/dataset.part`, hi passa
 les comprovacions de `check/checks.py` i, només si passen totes, li dona el seu nom i
 escriu `data/dataset.json`, l'empremta de cada fitxer llegit i la del conjunt; després
-dibuixa les figures de les dades i imprimeix l'informe de veïnatge de cada sèrie.
+dibuixa les figures de les dades i en desa l'informe de veïnatge de cada sèrie.
 """
 
 import hashlib
 import json
+import sys
 
 import numpy as np
 import pandas as pd
 
-from epf import paths
+from epf import Refusal, paths
 from epf.dataset import esios, figures
 from epf.dataset.check import checks, outliers
 from epf.dataset.esios import Indicator
@@ -92,10 +93,32 @@ SERIES = {
 
 
 def download():
-    """`epf download`: el que encara falta de cada indicador, a la seva carpeta."""
+    """`epf download`: baixa el que encara falta de cada indicador, a la seva carpeta, i
+    torna 1 si ESIOS n'ha refusat algun fitxer."""
     session = esios.session_for()
+    refused = []
     for name, indicator in INDICATORS.items():
-        esios.download(indicator, paths.DOWNLOADS / name, session)
+        written, failed = esios.download(indicator, paths.DOWNLOADS / name, session)
+        for path, status in failed:
+            print(
+                f"error: no s'ha pogut baixar {paths.relative(path)}: HTTP {status}",
+                file=sys.stderr,
+            )
+        files = "fitxer baixat" if written == 1 else "fitxers baixats"
+        print(f"{name}: {written} {files}", file=sys.stderr)
+        refused += [path for path, _ in failed]
+    print(file=sys.stderr)
+    if not refused:
+        return 0
+    first = paths.relative(refused[0])
+    if len(refused) == 1:
+        print(f"error: no s'ha pogut baixar 1 fitxer, {first}", file=sys.stderr)
+    else:
+        print(
+            f"error: no s'han pogut baixar {len(refused)} fitxers, el primer {first}",
+            file=sys.stderr,
+        )
+    return 1
 
 
 def indicators(directory):
@@ -108,11 +131,15 @@ def indicators(directory):
     published, frames, read = {}, {}, []
     for name, indicator in INDICATORS.items():
         found = esios.files(directory / name)
-        values = esios.admissible(esios.values(found), indicator)
-        if name in anchors:
-            published[name] = esios.published_instants(values)
-        anchor = published[indicator.anchor] if indicator.anchor else None
-        frames[name] = esios.hourly(values, anchor)
+        # El lector diu què té de malament un indicador, i aquí, quin.
+        try:
+            values = esios.admissible(esios.values(found), indicator)
+            if name in anchors:
+                published[name] = esios.published_instants(values)
+            anchor = published[indicator.anchor] if indicator.anchor else None
+            frames[name] = esios.hourly(values, anchor)
+        except Refusal as refusal:
+            raise Refusal(f"l'indicador {name} té {refusal}") from None
         read += found
     return frames, read
 
@@ -190,27 +217,13 @@ def write(rows, read):
 
 
 def main():
-    """`epf dataset`: el conjunt de dades construït, comprovat i escrit, les seves
+    """`epf dataset`: fa el conjunt de dades, el comprova i l'escriu, i en desa les
     figures i l'informe de veïnatge de cada sèrie."""
-    try:
-        frames, read = indicators(paths.DOWNLOADS)
-        found = series(frames)
-        write(table(found), read)
-    except (FileNotFoundError, ValueError) as refused:
-        print(refused)
-        return 1
-    print(
-        f"el conjunt de dades és a {paths.DATASET}, fet de {len(read)} fitxers baixats:"
-    )
+    frames, read = indicators(paths.DOWNLOADS)
+    found = series(frames)
+    write(table(found), read)
     for name, frame in found.items():
-        print(
-            f"  {name}: {len(frame)} dies, de {frame.index[0].date()} "
-            f"a {frame.index[-1].date()}"
-        )
-    for name, frame in found.items():
-        print()
         (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
         figures.draw(name, frame)
         outliers.draw(name, frame, *outliers.report(name, frame))
-    print(f"\nles figures són a {paths.DATA_FIGURES}")
     return 0

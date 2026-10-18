@@ -8,8 +8,9 @@ costat dels bancs de comparació, i els residus de cada família ajustada.
 """
 
 import importlib
+import sys
 
-from epf import paths
+from epf import Refusal, paths
 from epf.contract import figure
 from epf.contract.figure import plt
 from epf.run import families, residuals
@@ -90,16 +91,17 @@ def draw(where):
 
 
 def main(arguments):
-    """Les figures de la passada que es nomeni o, sense nom, de l'última acabada del seu
-    tipus, de mesura si no és `--smoke`."""
+    """Torna a dibuixar les figures de la passada que es nomeni o, sense nom, de
+    l'última acabada del seu tipus, de mesura si no és `--smoke`."""
     if arguments.run is None:
         found = [
             where for where in paths.runs(arguments.smoke) if families.finished(where)
         ]
         if not found:
             kind = "d'assaig" if arguments.smoke else "de mesura"
-            print(f"no hi ha cap passada {kind} acabada a {paths.RUNS}")
-            return 1
+            raise Refusal(
+                f"no hi ha cap passada {kind} acabada a {paths.relative(paths.RUNS)}/"
+            )
         where = found[-1]
     else:
         # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
@@ -107,9 +109,9 @@ def main(arguments):
             path.name: path for smoke in (False, True) for path in paths.runs(smoke)
         }
         if arguments.run not in found:
-            print(f"no hi ha cap passada {arguments.run} a {paths.RUNS}")
-            return 1
+            runs = paths.relative(paths.RUNS)
+            raise Refusal(f'no hi ha cap passada "{arguments.run}" a {runs}/')
         where = found[arguments.run]
+    print(f"Passada {where.name}\n", file=sys.stderr)
     draw(where)
-    print(f"figures de la passada a {where}")
     return 0

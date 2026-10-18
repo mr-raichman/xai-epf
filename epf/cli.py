@@ -15,6 +15,7 @@ cada mòdul els tornaria a importar tots.
 import argparse
 import collections
 import importlib
+import sys
 
 import epf
 
@@ -30,9 +31,8 @@ def run_arguments(parser):
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help="un assaig, que no dóna cap xifra: els valors de la variant "
-        "d'assaig que tria chosen() de parameters.py en lloc dels "
-        "de la mesura",
+        help="un assaig: els valors d'assaig de parameters.py en lloc dels de la "
+        "mesura",
     )
     parser.add_argument(
         "--family",
@@ -53,7 +53,7 @@ def search_arguments(parser):
         nargs="+",
         action="extend",
         metavar="N",
-        help="només aquestes llavors, d'entre les del seu tipus",
+        help="només aquestes llavors",
     )
     return parser
 
@@ -86,22 +86,21 @@ COMMANDS = {
     "dataset": Command(
         "epf.dataset.build",
         "main",
-        "fa el conjunt de dades dels fitxers baixats, el comprova, en dibuixa les "
-        "figures i informa dels valors allunyats dels seus veïns",
+        "fa el conjunt de dades dels fitxers baixats, el comprova i en desa les "
+        "figures i els valors més allunyats dels veïns",
         None,
     ),
     "search": Command(
         "epf.run.search",
         "main",
-        "cerca els números de cada família amb la cerca a l'atzar "
-        "de Trebbien et al. (2023), reprenent la que hi hagi",
+        "cerca els hiperparàmetres de cada família amb la cerca a l'atzar de "
+        "Trebbien et al. (2023)",
         search_arguments,
     ),
     "run": Command(
         "epf.run.run",
         "main",
-        "descriu el preu amb el protocol de Trebbien et al. (2023), "
-        "continuant l'última passada si no és acabada",
+        "descriu el preu amb el protocol de Trebbien et al. (2023)",
         run_arguments,
     ),
     "figures": Command(
@@ -126,4 +125,11 @@ def main():
     arguments = parser.parse_args()
     command = COMMANDS[arguments.command]
     function = getattr(importlib.import_module(command.module), command.function)
-    return function() if command.arguments is None else function(arguments)
+    try:
+        status = function() if command.arguments is None else function(arguments)
+    except epf.Refusal as refusal:
+        print(f"error: {refusal}", file=sys.stderr)
+        return 1
+    if not status:
+        print("Acabat", file=sys.stderr)
+    return status

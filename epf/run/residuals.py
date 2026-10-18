@@ -9,6 +9,7 @@ ingènues no s'ajusten, i la pregunta del test no és seva.
 """
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 from epf.contract import figure
@@ -22,6 +23,9 @@ LAGS = 2 * DAYS_PER_WEEK
 
 # Columnes de la figura, una família per quadre.
 PANELS_PER_ROW = 4
+
+# El test de cada família, un per fila, al costat de la figura.
+RESIDUALS = "residuals.csv"
 
 
 def daily_errors(models):
@@ -74,8 +78,8 @@ def ljung_box(series, lags=LAGS):
 
 
 def report(where, described):
-    """El correlograma de cada família ajustada, amb la distància de la partició i la
-    setmana marcades, i una línia per família amb el test."""
+    """Dibuixa el correlograma de cada família ajustada, amb la distància de la partició
+    i la setmana marcades, i desa el test de cada una a `residuals.csv`."""
     fitted = [family for family in sorted(described) if family not in COPIES]
     if not fitted:
         return
@@ -87,13 +91,13 @@ def report(where, described):
         facecolor=figure.SURFACE,
         squeeze=False,
     )
+    tests = []
     for axis, family in zip(axes.flat, fitted, strict=False):
         series = daily_errors(described[family])
         statistic, value, correlations = ljung_box(series)
         days = int((~np.isnan(series)).sum())
-        print(
-            f"residus de {family}: Q de Ljung-Box a {LAGS} retards "
-            f"{statistic:.1f}, valor p {value:.3g}, sobre {days} dies"
+        tests.append(
+            {"family": family, "lags": LAGS, "q": statistic, "p": value, "days": days}
         )
         axis.bar(np.arange(1, LAGS + 1), correlations, color=figure.SERIES, width=0.6)
         for lag in (GAP, DAYS_PER_WEEK):
@@ -104,3 +108,6 @@ def report(where, described):
     for axis in axes.flat[len(fitted) :]:
         axis.set_visible(False)
     figure.save(panels, where, "residuals")
+    pd.DataFrame(tests).to_csv(
+        where / RESIDUALS, index=False, lineterminator="\n", encoding="utf-8"
+    )

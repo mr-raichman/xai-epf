@@ -1,7 +1,7 @@
 """Com s'allunya cada valor d'una sèrie dels seus veïns, i quins són els més allunyats.
 
-La puntuació, l'informe que la llegeix i la figura que la dibuixa viuen junts: la taula
-que s'imprimeix i la figura han de ser dels mateixos números. L'informe no refusa res i
+La puntuació, l'informe que en desa les més altes i la figura que la dibuixa viuen
+junts: el fitxer i la figura han de ser dels mateixos números. L'informe no refusa res i
 no porta cap llindar, i no n'hi pot haver: la puntuació és distància partit per MAD, i
 al preu els seus extrems són moviments ordinaris dins de finestres de preu gairebé pla,
 no moviments grans.
@@ -22,8 +22,7 @@ from epf.parameters import HOURS_PER_DAY
 HOUR_HALF_WIDTH = 12
 DAY_HALF_WIDTH = 7
 
-# Quantes de les puntuacions més altes s'informen. És quantes files s'imprimeixen i
-# no un llindar: no decideix res sobre cap valor.
+# Les puntuacions més altes que es desen de cada veïnatge; no és cap llindar.
 HIGHEST = 100
 
 # La majoria de puntuacions són inferiors a 10 i les més altes arriben als milers:
@@ -64,30 +63,13 @@ def highest(scores):
     return np.argsort(flat)[-HIGHEST:]
 
 
-def _describe(days, values, label, scores, median, mad):
-    """Resum de les puntuacions més altes: com és la finestra i on cauen."""
-    marks = highest(scores)
-    years = (
-        pd.Series(days.repeat(HOURS_PER_DAY)[marks].year).value_counts().sort_index()
-    )
-    print(f"{label}, les {HIGHEST} puntuacions més altes:")
-    print(
-        f"  MAD de la finestra, mediana {np.median(mad[marks]):.2f}, "
-        f"màxim {mad[marks].max():.2f}"
-    )
-    print(f"  mediana de la finestra, mediana {np.median(median[marks]):.2f}")
-    print(
-        f"  distància del valor a la mediana, mediana "
-        f"{np.median(np.abs(values - median)[marks]):.2f}"
-    )
-    print("  per any: " + ", ".join(f"{year} {count}" for year, count in years.items()))
-
-
 def report(name, frame):
-    """Imprimeix les puntuacions de veïnatge més altes i les torna, per si es dibuixen.
+    """Desa les puntuacions de veïnatge més altes de cada vista a la carpeta de la
+    sèrie, `outliers_<sèrie>.csv`, cada una amb el valor i la mediana i la MAD de la
+    seva finestra, i les torna totes per dibuixar-les.
 
-    Les dues vistes: contra les hores adjacents de la sèrie cronològica, i contra la
-    mateixa hora dels dies del voltant.
+    Les dues vistes: contra les hores adjacents de la sèrie cronològica, `hours`, i
+    contra la mateixa hora dels dies del voltant, `days`.
     """
     values = frame.to_numpy().ravel()
     by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
@@ -97,28 +79,46 @@ def report(name, frame):
             for column in frame.columns
         ]
     )
-
     hour_median, hour_mad = window_median_mad(values, HOUR_HALF_WIDTH)
     day_parts = [
         window_median_mad(frame[column].to_numpy(), DAY_HALF_WIDTH)
         for column in frame.columns
     ]
-    print(f"veïnatge de {name}:")
-    _describe(
-        frame.index,
-        values,
-        f"hores adjacents (±{HOUR_HALF_WIDTH} h)",
-        by_hours,
-        hour_median,
-        hour_mad,
+    views = (
+        ("hours", by_hours, hour_median, hour_mad),
+        (
+            "days",
+            by_days,
+            np.column_stack([part[0] for part in day_parts]).ravel(),
+            np.column_stack([part[1] for part in day_parts]).ravel(),
+        ),
     )
-    _describe(
-        frame.index,
-        values,
-        f"mateixa hora (±{DAY_HALF_WIDTH} dies)",
-        by_days,
-        np.column_stack([part[0] for part in day_parts]).ravel(),
-        np.column_stack([part[1] for part in day_parts]).ravel(),
+    days = frame.index.repeat(HOURS_PER_DAY).strftime("%Y-%m-%d")
+    hours = np.tile(np.arange(HOURS_PER_DAY), len(frame))
+    rows = []
+    for view, scores, median, mad in views:
+        marks = highest(scores)
+        marks = marks[np.argsort(-scores.ravel()[marks], kind="stable")]
+        rows.append(
+            pd.DataFrame(
+                {
+                    "neighbourhood": view,
+                    "day": days[marks],
+                    "hour": hours[marks],
+                    "value": values[marks],
+                    "median": median[marks],
+                    "mad": mad[marks],
+                    "score": scores.ravel()[marks],
+                }
+            )
+        )
+    folder = paths.DATA_FIGURES / name
+    folder.mkdir(parents=True, exist_ok=True)
+    pd.concat(rows).to_csv(
+        folder / f"outliers_{name}.csv",
+        index=False,
+        lineterminator="\n",
+        encoding="utf-8",
     )
     return by_hours, by_days
 
@@ -137,10 +137,10 @@ def _style(axis, title, ylabel):
 
 
 def draw(name, frame, by_hours, by_days):
-    """La figura de les puntuacions de veïnatge d'una sèrie, les que `report` ha imprès,
-    a la carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores adjacents, un dia
-    per línia, i les de la mateixa hora dels dies del voltant, en el temps, amb les més
-    altes en vermell."""
+    """La figura de les puntuacions de veïnatge d'una sèrie, les més altes de les quals
+    desa `report`, a la carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores
+    adjacents, un dia per línia, i les de la mateixa hora dels dies del voltant, en el
+    temps, amb les més altes en vermell."""
     panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
     hours = np.arange(HOURS_PER_DAY)

@@ -35,7 +35,7 @@ def test_a_coherent_dataset_passes():
 def test_a_repeated_day_and_hour_is_refused():
     table = table_of()
     doubled = pd.concat([table, table.iloc[[30]]]).sort_index()
-    with pytest.raises(ValueError, match="repetits"):
+    with pytest.raises(ValueError, match="repeteix un dia i una hora"):
         check(doubled, {"price": NONE})
 
 
@@ -53,14 +53,14 @@ def test_a_day_missing_from_the_middle_is_refused_and_named():
 
 def test_a_day_without_its_24_hours_is_refused():
     table = table_of()
-    with pytest.raises(ValueError, match="1 dies sense 24 hores"):
+    with pytest.raises(ValueError, match="1 dia sense 24 hores, el 2024-01-03"):
         check(table.drop(("2024-01-03", 23)), {"price": NONE})
 
 
 def test_one_absent_value_is_refused_and_its_series_named():
     table = table_of(names=("price", "demand_fcst"))
     table.iloc[50, 1] = None
-    with pytest.raises(ValueError, match="la sèrie demand_fcst té 1 valors absents"):
+    with pytest.raises(ValueError, match="la sèrie demand_fcst té 1 valor absent"):
         check(table, {"price": NONE, "demand_fcst": NONE})
 
 

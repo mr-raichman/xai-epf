@@ -4,8 +4,6 @@ les files d'entrenament de cada llavor i puntuat sobre les de prova. Es puntua i
 s'explica.
 """
 
-import time
-
 import numpy as np
 
 from epf import paths
@@ -62,14 +60,8 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            start = time.time()
             fitted = _fitted(X, y, parts)
             scores = scored(fitted.predicted, fitted.actual)
             save_model(path, parts, explained, fitted, scores, rank)
             done.append([seed, rank])
-            print(
-                f"{family} llavor {seed} configuració {rank}: R² {scores['r2']:.3f}, "
-                f"MAE {scores['mae']:.2f} EUR/MWh, {time.time() - start:.1f} s",
-                flush=True,
-            )
     return done

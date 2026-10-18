@@ -18,12 +18,23 @@ al disc i no d'un ajust nou.
 import datetime
 import importlib
 import json
+import sys
 import time
 
-from epf import parameters, paths
+from epf import Refusal, parameters, paths
 from epf.contract import matrix, record
 from epf.contract.searches import configurations
-from epf.run import families, figures, pool, search
+from epf.contract.split import split, validation_parts
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.run import families, figures, pool, progress, search
+
+# Com diu el refús d'una passada continuada cada empremta que no és la d'ara: la que la
+# va començar i aquella amb què s'ha d'acabar.
+DIFFERENT = {
+    "code": ("un altre codi", "aquell codi"),
+    "dataset": ("un altre conjunt de dades", "aquell conjunt de dades"),
+    "environment": ("unes altres biblioteques", "aquelles biblioteques"),
+}
 
 # Cada família, en l'ordre en què una passada les ajusta, amb el mòdul del seu model que
 # l'ajusta, que s'importa quan es tria la família.
@@ -50,14 +61,20 @@ def _where(smoke, fingerprints):
     if not found or families.finished(found[-1]):
         return paths.next_run(smoke, datetime.date.today())
     latest = found[-1]
+    differ = set()
     for path in sorted(latest.glob(f"*/{paths.SEED_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
-        if any(made.get(name) != value for name, value in fingerprints.items()):
-            raise ValueError(
-                f"la passada {latest.name} es va fer amb un altre codi, un altre "
-                f"conjunt de dades o unes altres biblioteques: acaba-la amb "
-                f"aquells, o esborra-la"
-            )
+        differ |= {
+            name for name, value in fingerprints.items() if made.get(name) != value
+        }
+    if differ:
+        then = [DIFFERENT[name] for name in DIFFERENT if name in differ]
+        raise Refusal(
+            f"la passada {latest.name} es va començar amb "
+            f"{' i '.join(other for other, _ in then)}; continuar amb "
+            f"{' i '.join(that for _, that in then)}, o esborrar "
+            f"{paths.relative(latest)}/"
+        )
     return latest
 
 
@@ -80,35 +97,28 @@ def _train(module, family, folder, seed, planned, explained_days):
 def main(arguments):
     values = parameters.chosen(arguments.smoke)
     # Tot el que es pot refusar, abans d'escriure res: les famílies, el conjunt de
-    # dades, la passada, i el pla de cada família que encara no en té, de manera que una
-    # cerca a mitges o feta sobre unes altres files es refusa abans de gastar-hi res.
-    # Una cerca es compara amb les columnes de la matriu que llegeix la seva. El nom de
-    # la passada surt tan bon punt se sap, abans que els mòduls de les xarxes, en
-    # importar-se, escriguin.
-    try:
-        chosen = families.named(arguments.family, TRAINERS)
-        matrices = matrix.matrices(matrix.series())
-        fingerprints = record.fingerprints()
-        where = _where(arguments.smoke, fingerprints)
-        print(f"passada {where.name}", flush=True)
-        trainers = {
-            family: importlib.import_module(TRAINERS[family]) for family in chosen
-        }
-        plans = {}
-        for family in chosen:
-            if families.recorded(where / family) is not None:
-                continue
-            plan = trainers[family].FAMILIES[family]
-            columns = None
-            if plan["kept"]:
-                X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
-                columns = X.columns
-            plans[family] = configurations(
-                arguments.smoke, plan, columns, values["SEEDS"]
-            )
-    except ValueError as refused:
-        print(refused)
-        return 1
+    # dades, la partició, la passada, i el pla de cada família que encara no en té, de
+    # manera que una cerca a mitges o feta sobre unes altres files es refusa abans de
+    # gastar-hi res. Una cerca es compara amb les columnes de la matriu que llegeix la
+    # seva.
+    chosen = families.named(arguments.family, TRAINERS)
+    matrices = matrix.matrices(matrix.series())
+    split(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
+    validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
+    fingerprints = record.fingerprints()
+    where = _where(arguments.smoke, fingerprints)
+    continued = where.exists()
+    trainers = {family: importlib.import_module(TRAINERS[family]) for family in chosen}
+    plans = {}
+    for family in chosen:
+        if families.recorded(where / family) is not None:
+            continue
+        plan = trainers[family].FAMILIES[family]
+        columns = None
+        if plan["kept"]:
+            X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
+            columns = X.columns
+        plans[family] = configurations(arguments.smoke, plan, columns, values["SEEDS"])
     where.mkdir(parents=True, exist_ok=True)
     matrix.write(matrices, where)
     for family, planned in plans.items():
@@ -129,9 +139,10 @@ def main(arguments):
         )
     # Una llavor que ja hi té tots els fitxers no s'ajusta, i el registre de la seva
     # família guarda el que va desar i va trigar cada llavor l'última vegada.
+    missing = {family: families.missing(where / family) for family in chosen}
     tasks = [
         (
-            f"{family} llavor {seed}",
+            (family, seed),
             _train,
             (
                 TRAINERS[family],
@@ -143,9 +154,17 @@ def main(arguments):
             ),
         )
         for family in chosen
-        for seed, planned in families.missing(where / family).items()
+        for seed, planned in missing[family].items()
     ]
-    results, failed = pool.done(tasks, values["WORKERS"], values["THREADS"])
+    totals = {family: len(families.recorded(where / family)) for family in chosen}
+    block = progress.Block(
+        f"Passada {where.name}{', continuada' if continued else ''}",
+        totals,
+        {family: totals[family] - len(missing[family]) for family in chosen},
+    )
+    results, failed = pool.done(
+        tasks, values["WORKERS"], values["THREADS"], where / paths.WORKERS_LOG, block
+    )
     for family in chosen:
         found = sorted(
             (one for one in results.values() if one["family"] == family),
@@ -163,11 +182,10 @@ def main(arguments):
             },
         )
     if failed:
+        counted = progress.counted(failed, chosen)
         print(
-            f"han petat {len(failed)} ajustos: {', '.join(failed)}; la passada "
-            f"{where.name} no és acabada"
+            f"error: la passada {where.name} no és acabada: {counted}", file=sys.stderr
         )
         return 1
     figures.draw(where)
-    print(f"la passada és a {where}, amb les seves figures")
     return 0

@@ -11,6 +11,7 @@ import collections
 import numpy as np
 import pandas as pd
 
+from epf import Refusal
 from epf.parameters import DAYS_PER_WEEK, GAP, SHARES
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
@@ -34,7 +35,7 @@ def _deal(seed, period, deleted, shares):
     days = pd.date_range(*period, freq="D")
     weeks, remainder = divmod(len(days), DAYS_PER_WEEK)
     if remainder:
-        raise ValueError(f"{len(days)} dies no són setmanes senceres")
+        raise Refusal(f"els {len(days)} dies del període no són setmanes senceres")
     first = days.get_indexer([pd.Timestamp(deleted[0])])[0]
     if (
         first < 0
@@ -42,7 +43,10 @@ def _deal(seed, period, deleted, shares):
         or (pd.Timestamp(deleted[1]) - pd.Timestamp(deleted[0])).days
         != DAYS_PER_WEEK - 1
     ):
-        raise ValueError(f"{deleted} no és cap de les setmanes del període")
+        raise Refusal(
+            f"la setmana que s'exclou, de {deleted[0]} a {deleted[1]}, no és cap de "
+            f"les setmanes del període"
+        )
     kept = np.delete(np.arange(weeks), first // DAYS_PER_WEEK)
     order = np.random.default_rng(seed).permutation(kept)
     _, validation_share, test_share = shares
@@ -101,7 +105,7 @@ def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARE
     days, dealt = _deal(seed, period, deleted, shares)
     weeks = dealt[Split._fields.index("validation")]
     if len(weeks) % count:
-        raise ValueError(
-            f"{len(weeks)} setmanes de validació no fan {count} parts iguals"
+        raise Refusal(
+            f"les {len(weeks)} setmanes de validació no fan {count} parts iguals"
         )
     return [_days_of(days, chunk) for chunk in np.split(weeks, count)]

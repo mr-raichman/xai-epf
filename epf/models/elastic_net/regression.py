@@ -52,8 +52,8 @@ def _prepared(rows, target):
     ]
     scaled = [column for column in moving if column not in DAY_OF_WEEK_COLUMNS]
     dummies = [column for column in moving if column in DAY_OF_WEEK_COLUMNS]
-    inputs = Scaler(rows[scaled].to_numpy(dtype=float), std_where_flat=True)
-    output = Scaler(target.to_numpy(dtype=float)[:, np.newaxis])
+    inputs = Scaler(rows[scaled].to_numpy(dtype=float), scaled, std_where_flat=True)
+    output = Scaler(target.to_numpy(dtype=float)[:, np.newaxis], [target.name])
     fitted = Hour(None, scaled + dummies, inputs, output, None)
     scaled_target = output.forward(target.to_numpy(dtype=float)[:, np.newaxis]).ravel()
     return fitted, design(rows, fitted), scaled_target

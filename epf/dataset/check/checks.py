@@ -11,6 +11,7 @@ hores desalinearia les hores, i un valor absent es propagaria al model.
 import numpy as np
 import pandas as pd
 
+from epf import Refusal
 from epf.parameters import HOURS_PER_DAY
 
 
@@ -24,43 +25,72 @@ def check(table, gaps):
     valor, perquè fora d'ell la sèrie no té res.
     """
 
-    def refuse(condition, detail):
-        if condition:
-            raise ValueError(f"el conjunt de dades no és coherent: {detail}")
+    def refused(detail):
+        return Refusal(f"el conjunt de dades no és coherent: {detail}")
+
+    def counted(count, one, many, first=None):
+        # `3 dies sense 24 hores, el primer 2020-03-29`, o `1 dia ..., el 2020-03-29`.
+        found = f"1 {one}" if count == 1 else f"{count} {many}"
+        if first is None:
+            return found
+        return f"{found}, el {first}" if count == 1 else f"{found}, el primer {first}"
 
     days = pd.to_datetime(table.index.get_level_values(0), format="%Y-%m-%d")
     hours = table.index.get_level_values(1)
-    refuse(
-        table.index.has_duplicates,
-        f"{table.index.duplicated().sum()} dies i hores repetits",
-    )
-    refuse(not table.index.is_monotonic_increasing, "les files no estan ordenades")
+    repeated = int(table.index.duplicated().sum())
+    if repeated:
+        raise refused(
+            counted(
+                repeated,
+                "fila repeteix un dia i una hora",
+                "files repeteixen un dia i una hora",
+            )
+        )
+    if not table.index.is_monotonic_increasing:
+        raise refused("les files no estan ordenades")
     present = days.unique()
     missing = pd.date_range(present[0], present[-1], freq="D").difference(present)
-    refuse(
-        len(missing) > 0,
-        f"{len(missing)} dies buits entre {present[0].date()} i {present[-1].date()}, "
-        f"el primer {missing[0].date() if len(missing) else ''}",
-    )
-    outside = ~np.isin(hours, np.arange(HOURS_PER_DAY))
-    refuse(outside.any(), f"{outside.sum()} hores fora de 0 a {HOURS_PER_DAY - 1}")
+    if len(missing):
+        span = f"de {present[0].date()} a {present[-1].date()}"
+        raise refused(
+            counted(
+                len(missing),
+                f"dia sense cap fila {span}",
+                f"dies sense cap fila {span}",
+                missing[0].date(),
+            )
+        )
+    outside = int((~np.isin(hours, np.arange(HOURS_PER_DAY))).sum())
+    if outside:
+        hours_kept = f"una hora fora de 0 a {HOURS_PER_DAY - 1}"
+        raise refused(
+            counted(outside, f"fila amb {hours_kept}", f"files amb {hours_kept}")
+        )
     counts = days.value_counts()
     short = counts.index[counts != HOURS_PER_DAY].sort_values()
-    refuse(
-        len(short) > 0,
-        f"{len(short)} dies sense {HOURS_PER_DAY} hores, el primer "
-        f"{short[0].date() if len(short) else ''}",
-    )
+    if len(short):
+        raise refused(
+            counted(
+                len(short),
+                f"dia sense {HOURS_PER_DAY} hores",
+                f"dies sense {HOURS_PER_DAY} hores",
+                short[0].date(),
+            )
+        )
 
     instants = days + pd.to_timedelta(hours, unit="h")
     for name in table.columns:
         values = table[name].to_numpy()
         found = np.flatnonzero(~np.isnan(values))
-        refuse(len(found) == 0, f"la sèrie {name} no té cap valor")
+        if not len(found):
+            raise refused(f"la sèrie {name} no té cap valor")
         span = (days >= days[found[0]]) & (days <= days[found[-1]])
         absent = instants[span & np.isnan(values)].difference(gaps[name])
-        refuse(
-            len(absent) > 0,
-            f"la sèrie {name} té {len(absent)} valors absents, el primer "
-            f"a {absent[0] if len(absent) else ''}",
-        )
+        if len(absent):
+            moment = f"{absent[0]:%Y-%m-%d %H:%M}"
+            raise refused(
+                f"la sèrie {name} té 1 valor absent, a {moment}"
+                if len(absent) == 1
+                else f"la sèrie {name} té {len(absent)} valors absents, el primer a "
+                f"{moment}"
+            )

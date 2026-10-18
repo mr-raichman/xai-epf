@@ -16,14 +16,12 @@ Una xarxa per distribució i llavor, on Marcjasz et al. (2023) en mitjanen quatr
 membre seria una cerca més, i el que costa és la cerca.
 """
 
-import time
-
 import numpy as np
 
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, UNITLESS, check, group
-from epf.contract.metrics import INTERVALS, scored, scored_distribution
+from epf.contract.metrics import scored, scored_distribution
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.nn import network
@@ -115,22 +113,11 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            start = time.time()
             fitted = _fitted(
                 distribution, X, y, parts, explained, configuration["numbers"]
             )
-            check(fitted, family, seed, rank)
+            check(fitted, rank)
             scores = scored(fitted.predicted, fitted.actual) | fitted.scores
             save_model(path, parts, explained, fitted, scores, rank)
             done.append([seed, rank])
-            kupiec = " i ".join(
-                f"{scores[f'kupiec_{level}']} al {level}%" for level in INTERVALS
-            )
-            print(
-                f"{family} llavor {seed} configuració {rank}: R² {scores['r2']:.3f}, "
-                f"MAE {scores['mae']:.2f} EUR/MWh, CRPS {scores['crps']:.2f}, hores "
-                f"que passen el test de Kupiec: {kupiec}, residu de l'explicació "
-                f"{fitted.gap:.1e}, {time.time() - start:.1f} s",
-                flush=True,
-            )
     return done

@@ -36,8 +36,8 @@ def test_every_schedule_indicator_is_asked_for_the_hours_sum(monkeypatch):
     monkeypatch.setattr(
         esios,
         "download",
-        lambda indicator, folder, session: asked.__setitem__(
-            folder.name, indicator.aggregation
+        lambda indicator, folder, session: (
+            asked.__setitem__(folder.name, indicator.aggregation) or (0, [])
         ),
     )
     build.download()

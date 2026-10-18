@@ -38,6 +38,10 @@ SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
 
+# El fitxer on cada procés d'una passada o d'una cerca escriu la seva sortida, i on van
+# les traces de les seves fallades.
+WORKERS_LOG = "workers.log"
+
 # Una passada es diu pel dia local en què va començar i pel seu número de dues xifres
 # dins del dia, `2026-10-14_01`, de manera que la de nom més gran és la més nova. La
 # d'un assaig porta davant `SMOKE_PREFIX` i es compta a part, i la cerca d'assaig d'una
@@ -69,6 +73,12 @@ def next_run(smoke, day):
 # partició, i no d'una passada, i la llegeixen totes les que es facin sobre aquelles
 # files.
 SEARCHES = ROOT / "searches"
+
+
+def relative(path):
+    """El camí d'un fitxer de l'arrel tal com el veu qui hi treballa, relatiu a l'arrel
+    i amb `/`."""
+    return pathlib.Path(path).relative_to(ROOT, walk_up=True).as_posix()
 
 
 def write_whole(path, text):

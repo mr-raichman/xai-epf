@@ -13,7 +13,7 @@ import types
 import pandas as pd
 import pytest
 
-from epf import parameters, paths
+from epf import Refusal, parameters, paths
 from epf.contract import matrix, record
 from epf.run import families, figures, pool, run, search
 
@@ -64,7 +64,7 @@ def fake(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(figures, "draw", lambda where: None)
 
-    def done(tasks, workers, threads):
+    def done(tasks, workers, threads, log, block):
         results, failed = {}, []
         for label, function, arguments in tasks:
             try:
@@ -101,22 +101,24 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     assert fake.calls[-1][1] == {
         0: [{"rank": 0, "numbers": {"value": 1}, "unsearched": True}]
     }
-    assert capsys.readouterr().out.count(f"passada {_name(1)}\n") == 2
+    shown = capsys.readouterr().err
+    assert f"Passada {_name(1)}\n" in shown
+    assert f"Passada {_name(1)}, continuada\n" in shown
 
 
 def test_a_finished_run_is_never_continued(fake, capsys):
     assert fake.main() == 0
     assert fake.main() == 0
-    out = capsys.readouterr().out
-    assert f"passada {_name(1)}\n" in out and f"passada {_name(2)}\n" in out
+    shown = capsys.readouterr().err
+    assert f"Passada {_name(1)}\n" in shown and f"Passada {_name(2)}\n" in shown
 
 
-def test_a_run_made_by_other_code_is_refused_and_not_continued(fake, capsys):
+def test_a_run_made_by_other_code_is_refused_and_not_continued(fake):
     fake.failing = {"second"}
     assert fake.main() == 1
     fake.failing = set()
     fake.fingerprints["code"] = "un altre codi"
     calls = len(fake.calls)
-    assert fake.main() == 1
+    with pytest.raises(Refusal, match=f"la passada {_name(1)} .* un altre codi;"):
+        fake.main()
     assert len(fake.calls) == calls
-    assert _name(1) in capsys.readouterr().out.splitlines()[-1]

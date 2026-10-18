@@ -22,8 +22,9 @@ import zoneinfo
 import pandas as pd
 import requests
 
+from epf import Refusal
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY
-from epf.paths import KEYS, write_whole
+from epf.paths import KEYS, relative, write_whole
 
 # La zona horària del mercat diari espanyol, en la qual es compten els dies i les hores.
 MARKET_TIMEZONE = zoneinfo.ZoneInfo("Europe/Madrid")
@@ -50,10 +51,6 @@ PUBLICATION_MARGIN = datetime.timedelta(days=2)
 Indicator = collections.namedtuple(
     "Indicator", "id aggregation geography only anchor gaps"
 )
-
-# Previsions que ESIOS sobreescriu amb actualitzacions posteriors al tancament de
-# la subhasta. No són admissibles com a variables d'entrada.
-REVISED_FORECASTS = {460, 541, 542, 543, 10034, 10249}
 
 
 def periods(today):
@@ -94,14 +91,14 @@ def api_key(name, path=KEYS):
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
-        raise FileNotFoundError(
-            f"no existeix {path}; ha de contenir la línia {name}=..."
+        raise Refusal(
+            f"no existeix {relative(path)}; crear amb la línia {name}=<clau>"
         ) from None
     for line in lines:
         found, separator, value = line.partition("=")
         if separator and found.strip() == name and value.strip():
             return value.strip()
-    raise KeyError(f"falta la línia {name}=... a {path}")
+    raise Refusal(f"{relative(path)} no té la línia {name}=<clau>")
 
 
 def session_for(key=None):
@@ -113,13 +110,14 @@ def session_for(key=None):
 
 def download(indicator, folder, session=None):
     """Baixa cada any d'un indicador que encara no tingui un fitxer complet, amb
-    l'agregació que l'indicador demana.
+    l'agregació que l'indicador demana, i torna quants n'ha escrit i, dels que ESIOS ha
+    refusat, el camí i l'estat HTTP.
 
     Un indicador i no tots: qui en vol diversos els recorre, i diu on va cada un.
     """
     session = session or session_for()
     folder = pathlib.Path(folder)
-    written = 0
+    written, refused = 0, []
     for name, first, last in periods(datetime.date.today()):
         path = folder / f"{name}.json"
         if _is_complete(path, last):
@@ -136,16 +134,12 @@ def download(indicator, folder, session=None):
             },
         )
         if response.status_code != 200 or "indicator" not in _json_or_empty(response):
-            print(
-                f"no s'ha pogut baixar {folder.name} de {name}: "
-                f"HTTP {response.status_code}",
-                flush=True,
-            )
+            refused.append((path, response.status_code))
             continue
         folder.mkdir(parents=True, exist_ok=True)
         write_whole(path, response.text)
         written += 1
-    print(f"{folder.name}: {written} fitxers baixats", flush=True)
+    return written, refused
 
 
 def files(folder):
@@ -156,7 +150,10 @@ def files(folder):
     """
     paths = sorted(pathlib.Path(folder).glob("????.json"))
     if not paths:
-        raise FileNotFoundError(f"no hi ha cap any d'ESIOS desat a {folder}")
+        raise Refusal(
+            f'no hi ha cap any baixat a {relative(folder)}/; baixar amb "uv run epf '
+            f'download"'
+        )
     return paths
 
 
@@ -172,21 +169,17 @@ def values(paths):
 def admissible(values, indicator):
     """Els valors d'un indicador que se'n poden fer servir: els de la seva geografia.
 
-    Una previsió revisada es refusa sencera. Amb `only`, un fitxer que porti cap altra
-    geografia es refusa: vol dir que ESIOS ja no serveix l'indicador com diu la taula, i
-    el que se'n triés podria ser una altra cosa amb el mateix nom. Sense, la geografia
-    es tria entre les que porta el fitxer, com la del preu, que en porta sis.
+    Amb `only`, un fitxer que porti cap altra geografia es refusa: vol dir que ESIOS ja
+    no serveix l'indicador com diu la taula, i el que se'n triés podria ser una altra
+    cosa amb el mateix nom. Sense, la geografia es tria entre les que porta el fitxer,
+    com la del preu, que en porta sis.
     """
-    if indicator.id in REVISED_FORECASTS:
-        raise ValueError(
-            f"l'indicador {indicator.id} és una previsió revisada, no admissible"
-        )
     if indicator.only:
         others = {value["geo_name"] for value in values} - {indicator.geography}
         if others:
-            raise ValueError(
-                f"l'indicador {indicator.id} porta altres geografies que "
-                f"{indicator.geography}: {sorted(others)}"
+            raise Refusal(
+                f"altres geografies a més de {indicator.geography}: "
+                f"{', '.join(sorted(others))}"
             )
     return [value for value in values if value["geo_name"] == indicator.geography]
 
@@ -214,10 +207,16 @@ def repair_dst(hours):
     if len(hours) == HOURS_PER_DAY + 1:
         merged = statistics.mean(hours[DST_HOUR : DST_HOUR + 2])
         return hours[:DST_HOUR] + [merged] + hours[DST_HOUR + 2 :]
-    raise ValueError(
-        f"un dia de {len(hours)} hores, s'esperaven "
-        f"{HOURS_PER_DAY - 1}, {HOURS_PER_DAY} o {HOURS_PER_DAY + 1}"
-    )
+    raise ValueError(f"un dia de {len(hours)} hores")
+
+
+def _counted(instants, one, many):
+    """Compta uns instants en UTC i en diu el primer: `3 valors fora de l'hora en punt,
+    el primer a 2019-05-01 08:15 UTC`."""
+    first = f"{instants[0]:%Y-%m-%d %H:%M} UTC"
+    if len(instants) == 1:
+        return f"1 {one}, a {first}"
+    return f"{len(instants)} {many}, el primer a {first}"
 
 
 def hourly(values, anchor=None):
@@ -242,13 +241,17 @@ def hourly(values, anchor=None):
     )
     off = instants[instants != instants.floor("h")]
     if len(off):
-        raise ValueError(
-            f"{len(off)} valors fora de l'hora en punt, el primer {off[0]}"
+        raise Refusal(
+            _counted(
+                off, "valor fora de l'hora en punt", "valors fora de l'hora en punt"
+            )
         )
     repeated = instants[instants.duplicated()]
     if len(repeated):
-        raise ValueError(
-            f"{len(repeated)} instants amb més d'un valor, el primer {repeated[0]}"
+        raise Refusal(
+            _counted(
+                repeated, "instant amb més d'un valor", "instants amb més d'un valor"
+            )
         )
     series = pd.Series([value["value"] for value in values], index=instants)
 

@@ -8,13 +8,11 @@ les famílies. La del dia similar porta, a més, la distribució amb què Marcja
 (2023) la fan probabilística. Es puntuen i no s'expliquen.
 """
 
-import time
-
 import numpy as np
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.metrics import INTERVALS, scored, scored_distribution
+from epf.contract.metrics import scored, scored_distribution
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
@@ -138,26 +136,8 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            start = time.time()
             fitted = _fitted(family, price, y, parts)
             scores = scored(fitted.predicted, fitted.actual) | (fitted.scores or {})
             save_model(path, parts, explained, fitted, scores, rank)
             done.append([seed, rank])
-            distribution = (
-                ""
-                if fitted.scores is None
-                else (
-                    f", CRPS {scores['crps']:.2f}, hores que passen el test de Kupiec: "
-                    + " i ".join(
-                        f"{scores[f'kupiec_{level}']} al {level}%"
-                        for level in INTERVALS
-                    )
-                )
-            )
-            print(
-                f"{family} llavor {seed} configuració {rank}: R² {scores['r2']:.3f}, "
-                f"MAE {scores['mae']:.2f} EUR/MWh{distribution}, "
-                f"{time.time() - start:.1f} s",
-                flush=True,
-            )
     return done

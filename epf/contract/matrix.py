@@ -20,7 +20,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from epf import paths
+from epf import Refusal, paths
 from epf.parameters import (
     DAYS_PER_WEEK,
     FORECAST_LAG,
@@ -77,7 +77,8 @@ def build(series, information):
     price = series[PRICE]
     if list(price.columns) != HOUR_COLUMNS:
         raise ValueError(
-            f"s'esperaven les columnes {HOUR_COLUMNS}, i no {list(price.columns)}"
+            f"s'esperaven les columnes de {HOUR_COLUMNS[0]} a {HOUR_COLUMNS[-1]}, i no "
+            f"{', '.join(map(str, price.columns))}"
         )
 
     blocks = [
@@ -129,10 +130,11 @@ def _refuse_stale():
     dels fitxers que va llegir ha canviat o ja no hi és, o `dataset.csv` no és el que es
     va escriure. Una baixada torna a escriure sempre el fitxer de l'any en curs, de
     manera que una baixada que no s'ha seguit d'`epf dataset` també es refusa."""
-    again = "torna'l a fer amb `epf dataset`"
+    again = 'recrear amb "uv run epf dataset"'
     if not (paths.DATASET.is_file() and paths.DATASET_RECORD.is_file()):
-        raise ValueError(
-            f"no hi ha cap conjunt de dades a {paths.DATA}: fes-lo amb `epf dataset`"
+        raise Refusal(
+            f"no hi ha cap conjunt de dades a {paths.relative(paths.DATA)}/; crear amb "
+            f'"uv run epf dataset"'
         )
     record = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))
     changed = [
@@ -142,13 +144,18 @@ def _refuse_stale():
         or _digest(paths.DOWNLOADS / name) != digest
     ]
     if changed:
-        raise ValueError(
-            f"el conjunt de dades és desfasat: {len(changed)} dels fitxers "
-            f"baixats que va llegir han canviat o no hi són, el primer "
-            f"{changed[0]}; {again}"
+        first = paths.relative(paths.DOWNLOADS / changed[0])
+        counted = (
+            f"1 dels fitxers baixats que va llegir ha canviat o no hi és, {first}"
+            if len(changed) == 1
+            else f"{len(changed)} dels fitxers baixats que va llegir han canviat o no "
+            f"hi són, el primer {first}"
         )
+        raise Refusal(f"el conjunt de dades és desfasat: {counted}; {again}")
     if _digest(paths.DATASET) != record["dataset"]:
-        raise ValueError(f"{paths.DATASET} no és el que es va escriure; {again}")
+        raise Refusal(
+            f"{paths.relative(paths.DATASET)} ha canviat des que es va fer; {again}"
+        )
 
 
 def series():

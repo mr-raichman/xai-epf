@@ -10,8 +10,6 @@ de la cerca de l'arbre, de manera que només el comptador la separa de l'arbre a
 compara.
 """
 
-import time
-
 import numpy as np
 import pandas as pd
 
@@ -57,7 +55,6 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            start = time.time()
             found = fitted(
                 X,
                 y,
@@ -68,14 +65,8 @@ def train(family, folder, configurations, explained_days):
                 configuration["numbers"],
                 best=rank == 0,
             )
-            check(found, family, seed, rank)
+            check(found, rank)
             scores = scored(found.predicted, found.actual)
             save_model(path, parts, explained, found, scores, rank)
             done.append([seed, rank])
-            print(
-                f"{family} llavor {seed} configuració {rank}: R² {scores['r2']:.3f}, "
-                f"MAE {scores['mae']:.2f} EUR/MWh, residu de l'explicació "
-                f"{found.gap:.1e}, {time.time() - start:.1f} s",
-                flush=True,
-            )
     return done

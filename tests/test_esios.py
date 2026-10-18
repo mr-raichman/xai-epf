@@ -1,5 +1,5 @@
 """Valors d'ESIOS: canvis d'hora i la seva reparació, un valor fora de l'hora, un
-instant repetit, hores absents i previsions revisades."""
+instant repetit i hores absents."""
 
 import datetime
 
@@ -8,9 +8,6 @@ import pytest
 
 from epf.dataset.esios import (
     MARKET_TIMEZONE,
-    REVISED_FORECASTS,
-    Indicator,
-    admissible,
     hourly,
     repair_dst,
 )
@@ -151,12 +148,6 @@ def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_b
     frame = hourly(NUCLEAR, anchor)
     assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
     assert (frame.loc["2024-03-10"] == 0.0).all()
-
-
-def test_revised_forecasts_are_refused_by_the_reader():
-    for number in REVISED_FORECASTS:
-        with pytest.raises(ValueError, match="revisada"):
-            admissible([], Indicator(number, "average", "Península", True, None, ()))
 
 
 # 2025-03-30: 23 períodes, sense l'hora local 02. Primers cinc preus espanyols.

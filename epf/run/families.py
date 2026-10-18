@@ -10,7 +10,7 @@ interrompuda, deixarien malament el que s'hagués desat.
 
 import json
 
-from epf import paths
+from epf import Refusal, paths
 
 # Cada model amb les seves famílies. Les xarxes són un model, `nn`, i cada una de les
 # seves dues carpetes, `dnn` i `ddnn`, també.
@@ -29,22 +29,21 @@ EVERY = frozenset(family for model in MODELS.values() for family in model)
 
 
 def named(names, among):
-    """Les famílies d'`among` que diu `names`, en l'ordre d'`among`; totes si `names` és
-    `None`. Refusa un nom que no és cap família ni cap model, i uns noms entre els quals
-    no n'hi ha cap d'`among`."""
+    """Torna les famílies d'`among` que diu `names`, en l'ordre d'`among`, i totes si
+    `names` és `None`; cap, si cap no hi és. Refusa un nom que no és cap família ni cap
+    model."""
     if names is None:
         return list(among)
     unknown = [name for name in names if name not in MODELS and name not in EVERY]
     if unknown:
-        raise ValueError(
-            f"{unknown} no són cap família ni cap model; les famílies són "
-            f"{sorted(EVERY)} i els models {sorted(MODELS)}"
+        quoted = ", ".join(f'"{name}"' for name in unknown)
+        verb = "és" if len(unknown) == 1 else "són"
+        raise Refusal(
+            f"{quoted} no {verb} cap família ni cap model; les famílies: "
+            f"{', '.join(sorted(EVERY))}; els models: {', '.join(sorted(MODELS))}"
         )
     wanted = {family for name in names for family in MODELS.get(name, (name,))}
-    found = [family for family in among if family in wanted]
-    if not found:
-        raise ValueError(f"{names} no diuen cap de {list(among)}")
-    return found
+    return [family for family in among if family in wanted]
 
 
 def recorded(folder):

@@ -25,7 +25,7 @@ def test_a_missing_value_fails_naming_where_it_is():
     # cas que la guarda existeix per agafar.
     holed = frame_of(30, offset=3.0)
     holed.iloc[4, 0] = np.nan
-    with pytest.raises(ValueError, match="h00"):
+    with pytest.raises(ValueError, match="1 valor absent, a .* 00:00"):
         refuse_missing(holed, "el preu real")
 
 

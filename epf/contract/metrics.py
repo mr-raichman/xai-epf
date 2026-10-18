@@ -9,6 +9,8 @@ import numpy as np
 from scipy import stats
 from scipy.special import xlogy
 
+from epf import Refusal
+
 # Els percentils sobre els quals s'aproxima el CRPS. Marcjasz et al. (2023) en fan
 # servir 99, que és el pinball mitjà sobre tots els centils interiors.
 PERCENTILES = np.arange(1, 100) / 100
@@ -33,9 +35,12 @@ def refuse_missing(frame, what):
         return
     flat = missing.stack()
     row, column = next(iter(flat[flat].index))
+    count = int(missing.to_numpy().sum())
+    moment = f"{row:%Y-%m-%d} {int(column[1:]):02d}:00"
     raise ValueError(
-        f"{int(missing.to_numpy().sum())} valors absents a {what}, "
-        f"el primer a {row} hora {column}"
+        f"{what} té 1 valor absent, a {moment}"
+        if count == 1
+        else f"{what} té {count} valors absents, el primer a {moment}"
     )
 
 
@@ -44,7 +49,7 @@ def _checked(actual, quantiles):
     valor que no sigui un número."""
     refuse_missing(actual, "el preu real")
     if not np.isfinite(quantiles).all():
-        raise ValueError("els quantils predits porten valors no finits")
+        raise Refusal("els quantils predits tenen valors no finits")
     return actual.to_numpy()[:, :, None]
 
 

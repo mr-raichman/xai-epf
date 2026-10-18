@@ -183,7 +183,7 @@ def test_a_dataset_whose_downloaded_files_changed_is_refused(downloaded):
 def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
     with paths.DATASET.open("a", encoding="utf-8") as handle:
         handle.write("\n")
-    with pytest.raises(ValueError, match="no és el que es va escriure"):
+    with pytest.raises(ValueError, match="ha canviat des que es va fer"):
         matrix.series()
 
 

@@ -17,7 +17,7 @@ import json
 
 import numpy as np
 
-from epf import paths
+from epf import Refusal, paths
 from epf.contract.explanation import read_back
 
 # El que surt d'ajustar una família en una llavor i una configuració: la predicció i el
@@ -113,11 +113,11 @@ def save_model(path, parts, explained, fitted, scores, rank):
     with open(partial, "wb") as handle:
         np.savez(handle, **arrays)
     if fitted.stored is not None:
-        excess = read_back(partial, fitted.stored, fitted.tolerance)
-        # `not ... <= 0` i no `> 0`, perquè un NaN també es refusi.
-        if not excess <= 0:
-            raise ValueError(
-                f"l'explicació desada a {partial} no torna el que explica: "
-                f"se'n passa del marge en {excess:.3g}"
+        distance, margin = read_back(partial, fitted.stored, fitted.tolerance)
+        # `not ... <=` i no `>`, perquè un NaN també es refusi.
+        if not distance <= margin:
+            raise Refusal(
+                f"l'explicació desada de la configuració {rank} no torna la predicció: "
+                f"se n'allunya {distance:.2g}, més que el marge de {margin:.2g}"
             )
     partial.replace(path)

@@ -15,12 +15,11 @@ refusen.
 
 import json
 import os
-import time
 
 import numpy as np
 import optuna
 
-from epf import paths
+from epf import Refusal, paths
 from epf.contract.record import plain, write_record
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
 
@@ -105,15 +104,13 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
     if not study.trials:
         study.set_user_attr("made_on", now)
     elif study.user_attrs.get("made_on") != now:
-        raise ValueError(
-            f"l'estudi {store} es va fer sobre unes altres files que les "
-            f"d'ara: esborra'l per tornar-lo a començar"
+        raise Refusal(
+            f"l'estudi es va fer sobre altres files; esborrar {paths.relative(store)}"
         )
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
 
     def objective(optuna_trial):
-        start = time.time()
         numbers, score = searcher.trial(
             family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
         )
@@ -126,11 +123,6 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
         )
         for name, value in fingerprints.items():
             optuna_trial.set_user_attr(name, value)
-        print(
-            f"{family} llavor {seed} intent {len(completed(study)) + 1} de {trials}: "
-            f"{score:.4g}, {time.time() - start:.1f} s",
-            flush=True,
-        )
         return score
 
     remaining = trials - len(completed(study))
@@ -184,10 +176,11 @@ def searched(smoke, family, seed, columns):
         return None
     found = json.loads(path.read_text(encoding="utf-8"))
     if found["made_on"] != made_on(columns):
-        raise ValueError(
-            f"la cerca de {family}, llavor {seed}, es va fer sobre unes altres "
-            f"files que les d'ara: esborra {path} i el seu estudi, i torna-la "
-            f"a fer amb epf search"
+        study = path.with_name(STUDY.format(seed=seed))
+        raise Refusal(
+            f"la cerca de {family} llavor {seed} es va fer sobre altres files; "
+            f"esborrar {paths.relative(path)} i {paths.relative(study)}, cercar amb "
+            f'"uv run epf search"'
         )
     return found
 
@@ -215,9 +208,13 @@ def configurations(smoke, plan, columns, seeds):
             for seed in seeds
         }
     if missing:
-        raise ValueError(
-            f"la cerca de {family} no té les llavors {missing}: acaba-la amb "
-            f"epf search abans de fer-la servir"
+        asked = (
+            f"la llavor {missing[0]}"
+            if len(missing) == 1
+            else f"les llavors {', '.join(map(str, missing))}"
+        )
+        raise Refusal(
+            f'la cerca de {family} no té {asked}; acabar amb "uv run epf search"'
         )
     return {
         seed: [

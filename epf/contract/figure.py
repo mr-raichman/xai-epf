@@ -55,7 +55,8 @@ def colours(names):
     names = list(names)
     if len(names) > len(LINES):
         raise ValueError(
-            f"{len(names)} sèries i només {len(LINES)} colors de línia: {names}"
+            f"{len(names)} sèries i només {len(LINES)} colors de línia: "
+            f"{', '.join(map(str, names))}"
         )
     return list(zip(LINES, names, strict=False))
 

@@ -13,14 +13,15 @@ alhora; si alguna peta, les altres acaben i l'ordre ho diu en sortir.
 """
 
 import importlib
+import sys
 
 import optuna
 
-from epf import parameters, paths
+from epf import Refusal, parameters, paths
 from epf.contract import matrix, record, searches
-from epf.contract.split import split
+from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-from epf.run import families, pool
+from epf.run import families, pool, progress
 
 # Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
 # model, que s'importa quan la família es cerca o es planifica.
@@ -39,8 +40,8 @@ def searcher(family):
 
 
 def _search(family, seed, smoke, trials, fingerprints):
-    """La cerca d'una família en una llavor, una tasca de `pool`: l'estudi fins a
-    `trials` intents, el seu registre desat, i la línia que el resumeix."""
+    """Fa la cerca d'una família en una llavor, una tasca de `pool`: l'estudi fins a
+    `trials` intents i el seu registre desat."""
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     module = searcher(family)
     X, y = getattr(matrix.matrices(matrix.series()), module.MATRIX)
@@ -55,13 +56,7 @@ def _search(family, seed, smoke, trials, fingerprints):
         trials,
         fingerprints,
     )
-    found = searches.record(made, family, seed, smoke)
-    searches.save(found, smoke)
-    print(
-        f"{family} llavor {seed}: {found['trials']} intents, el millor "
-        f"{found['best'][0]['score']:.4g}",
-        flush=True,
-    )
+    searches.save(searches.record(made, family, seed, smoke), smoke)
 
 
 def main(arguments):
@@ -69,37 +64,51 @@ def main(arguments):
     seeds = values["SEEDS"]
     # Tot el que es pot refusar, abans de cercar res. Les matrius les torna a llegir
     # cada tasca, i aquí només es refusen.
-    try:
-        chosen = families.named(arguments.family, SEARCHERS)
-        if arguments.seed:
-            outside = sorted(set(arguments.seed) - set(seeds))
-            if outside:
-                raise ValueError(
-                    f"les llavors {outside} no hi són: "
-                    f"{'un assaig' if arguments.smoke else 'una mesura'} en "
-                    f"té {list(seeds)}"
-                )
-            seeds = [seed for seed in seeds if seed in arguments.seed]
-        matrix.matrices(matrix.series())
-        fingerprints = record.fingerprints()
-    except ValueError as refused:
-        print(refused)
-        return 1
+    chosen = families.named(arguments.family, SEARCHERS)
+    if not chosen:
+        named = ", ".join(f'"{name}"' for name in arguments.family)
+        raise Refusal(
+            f"no es pot fer una cerca de {named}; les famílies que es cerquen: "
+            f"{', '.join(SEARCHERS)}"
+        )
+    if arguments.seed:
+        outside = sorted(set(arguments.seed) - set(seeds))
+        if outside:
+            kind = "un assaig" if arguments.smoke else "una mesura"
+            asked = (
+                f"la llavor {outside[0]}"
+                if len(outside) == 1
+                else f"les llavors {', '.join(map(str, outside))}"
+            )
+            raise Refusal(
+                f"{kind} no té {asked}; les que té: {', '.join(map(str, seeds))}"
+            )
+        seeds = [seed for seed in seeds if seed in arguments.seed]
+    matrix.matrices(matrix.series())
+    split(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
+    validation_parts(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
+    fingerprints = record.fingerprints()
 
     for family in chosen:
         searches.folder(arguments.smoke, family).mkdir(parents=True, exist_ok=True)
     tasks = [
         (
-            f"{family} llavor {seed}",
+            (family, seed),
             _search,
             (family, seed, arguments.smoke, values["TRIALS"], fingerprints),
         )
         for family in chosen
         for seed in seeds
     ]
-    _, failed = pool.done(tasks, values["WORKERS"], values["THREADS"])
+    block = progress.Block(
+        "Cerca d'assaig" if arguments.smoke else "Cerca",
+        {family: len(seeds) for family in chosen},
+    )
+    prefix = paths.SMOKE_PREFIX if arguments.smoke else ""
+    log = paths.SEARCHES / f"{prefix}{paths.WORKERS_LOG}"
+    _, failed = pool.done(tasks, values["WORKERS"], values["THREADS"], log, block)
     if failed:
-        print(f"han petat {len(failed)} cerques: {', '.join(failed)}")
+        counted = progress.counted(failed, chosen)
+        print(f"error: la cerca no és acabada: {counted}", file=sys.stderr)
         return 1
-    print(f"les cerques són a {paths.SEARCHES}")
     return 0

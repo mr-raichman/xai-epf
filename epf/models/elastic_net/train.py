@@ -6,8 +6,6 @@ preu de les setmanes de prova, la seva puntuació, l'atribució de les files que
 s'expliquen, la comprovació que suma la predicció que explica, i el fitxer.
 """
 
-import time
-
 import numpy as np
 
 from epf import paths
@@ -86,16 +84,9 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            start = time.time()
             fitted = _fitted(X, y, parts, explained, configuration["numbers"])
-            check(fitted, family, seed, rank)
+            check(fitted, rank)
             scores = scored(fitted.predicted, fitted.actual)
             save_model(path, parts, explained, fitted, scores, rank)
             done.append([seed, rank])
-            print(
-                f"{family} llavor {seed} configuració {rank}: R² {scores['r2']:.3f}, "
-                f"MAE {scores['mae']:.2f} EUR/MWh, residu de l'explicació "
-                f"{fitted.gap:.1e}, {time.time() - start:.1f} s",
-                flush=True,
-            )
     return done

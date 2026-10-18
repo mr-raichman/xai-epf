@@ -6,7 +6,9 @@ les figures semblarien les que es demanaven.
 
 import types
 
-from epf import paths
+import pytest
+
+from epf import Refusal, paths
 from epf.run import families, figures
 
 
@@ -38,4 +40,5 @@ def test_with_no_finished_run_of_its_kind_nothing_is_drawn(tmp_path, monkeypatch
     (tmp_path / "2026-10-15_01").mkdir()
     monkeypatch.setattr(families, "finished", lambda where: False)
     monkeypatch.setattr(figures, "draw", lambda where: None)
-    assert figures.main(types.SimpleNamespace(run=None, smoke=False)) == 1
+    with pytest.raises(Refusal, match="no hi ha cap passada de mesura acabada"):
+        figures.main(types.SimpleNamespace(run=None, smoke=False))
