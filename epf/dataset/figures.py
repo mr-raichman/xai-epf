@@ -1,6 +1,4 @@
-"""La figura de cada sèrie del conjunt de dades, cada valor horari, a
-`data/figures/<sèrie>/<sèrie>.png`. Cada sèrie té la seva carpeta, on hi ha també la
-figura dels seus valors allunyats dels veïns."""
+"""La figura de cada valor horari de cada sèrie del conjunt de dades."""
 
 import numpy as np
 import pandas as pd
@@ -10,8 +8,7 @@ from epf.contract import figure
 from epf.contract.figure import GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 from epf.parameters import HOURS_PER_DAY
 
-# El títol i la unitat de la figura de cada sèrie: el preu en EUR/MWh, les previsions
-# D+1 en MW i el programa, l'energia programada de cada hora, en MWh.
+# El títol i la unitat de la figura de cada sèrie.
 LABELS = {
     "price": ("Preu horari del mercat diari espanyol", "EUR/MWh"),
     "demand_fcst": ("Previsió D+1 de la demanda", "MW"),
@@ -27,9 +24,11 @@ LABELS = {
 
 
 def draw(name, frame):
-    """Cada valor horari d'una sèrie, `frame` en dies per hores, a la carpeta de la
-    sèrie. Una hora absent, com les de l'apagada, talla la línia en lloc d'unir-ne les
-    veïnes."""
+    """Dibuixa cada valor horari d'una sèrie, `frame` en dies per hores.
+
+    La figura va a la carpeta de la sèrie, `<sèrie>.png`, i una hora absent, com les de
+    l'apagada, hi talla la línia en lloc d'unir-ne les veïnes.
+    """
     instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
         np.tile(np.arange(HOURS_PER_DAY), len(frame)), unit="h"
     )
