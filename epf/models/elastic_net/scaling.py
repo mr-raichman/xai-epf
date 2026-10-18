@@ -1,8 +1,7 @@
-"""Els dos escalats robustos de Lago et al. (2021): el de la mediana i, a sobre, el que
-estabilitza la variància, que és el de la xarxa elàstica.
+"""Els dos escalats robustos de Lago et al. (2021): el de la mediana, i l'asinh a sobre.
 
-El valor centrat en la mediana de cada columna i dividit per la seva escala, presos de
-les files d'ajust i mai de les que es prediuen; el segon en pren a més l'asinh.
+La mediana i l'escala de cada columna es prenen de les files d'ajust, i mai de les que
+es prediuen.
 """
 
 import numpy as np
