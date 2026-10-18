@@ -1,5 +1,4 @@
-"""Les comprovacions del conjunt de dades, les mateixes per a totes les sèries, sobre el
-conjunt final.
+"""Les comprovacions del conjunt de dades, les mateixes per a totes les sèries.
 
 L'error de cada una donaria més endavant un número plausible en lloc de fallar: un dia
 i una hora repetits doblarien el seu pes, unes files fora d'ordre o un dia que falta
@@ -18,17 +17,21 @@ def check(table, gaps):
     """Refusa el conjunt de dades si no és coherent.
 
     `table` té una fila per dia i hora, amb el dia, `AAAA-MM-DD`, i l'hora, de 0 a 23,
-    com a índex, i una columna per sèrie. `gaps` són, per sèrie, les hores que declara
-    que la font no va publicar, que no s'omplen: un valor absent només s'admet en una
-    d'elles, i es busca dins del tram de la sèrie, del primer al darrer dia amb algun
-    valor, perquè fora d'ell la sèrie no té res.
+    com a índex, i una columna per sèrie. `gaps` són, per sèrie, les hores que la font
+    no va publicar: un valor absent només s'admet en una d'elles, i es busca dins del
+    tram de la sèrie, del primer al darrer dia amb algun valor, perquè fora d'ell la
+    sèrie no té res.
     """
 
     def refused(detail):
         return Refusal(f"el conjunt de dades no és coherent: {detail}")
 
     def counted(count, one, many, first=None):
-        # `3 dies sense 24 hores, el primer 2020-03-29`, o `1 dia ..., el 2020-03-29`.
+        """Torna `3 dies sense 24 hores, el primer 2020-03-29`, en singular o en plural.
+
+        `one` i `many` són el nom en singular i en plural, i sense `first` no en diu el
+        primer.
+        """
         found = f"1 {one}" if count == 1 else f"{count} {many}"
         if first is None:
             return found
@@ -61,9 +64,9 @@ def check(table, gaps):
         )
     outside = int((~np.isin(hours, np.arange(HOURS_PER_DAY))).sum())
     if outside:
-        hours_kept = f"una hora fora de 0 a {HOURS_PER_DAY - 1}"
+        wrong_hour = f"una hora fora de 0 a {HOURS_PER_DAY - 1}"
         raise refused(
-            counted(outside, f"fila amb {hours_kept}", f"files amb {hours_kept}")
+            counted(outside, f"fila amb {wrong_hour}", f"files amb {wrong_hour}")
         )
     counts = days.value_counts()
     short = counts.index[counts != HOURS_PER_DAY].sort_values()
