@@ -82,8 +82,6 @@ def test_a_gap_removes_the_rows_that_need_it_instead_of_shifting_them():
 
 
 def test_the_day_of_week_is_seven_indicators_on_the_delivery_day():
-    # Set indicadors i no un enter: l'enter li diu a una xarxa que diumenge és sis
-    # vegades dimarts, i mentre hi era cada família el veia d'una manera diferent.
     X, _ = build({PRICE: frame_of(range(30))}, PRICE_ONLY)
     day = X.index[5]
     row = X.loc[day, DAY_OF_WEEK_COLUMNS]

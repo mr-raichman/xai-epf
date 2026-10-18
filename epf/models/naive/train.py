@@ -21,7 +21,7 @@ PREVIOUS_DAY = 1
 PREVIOUS_WEEK = 7
 
 # Dies en què la predicció similar pren el dia anterior; la resta prenen la setmana
-# anterior, perquè el cap de setmana no s'assembla als dies feiners. Dilluns és 0.
+# anterior. Dilluns és 0.
 WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
 
 # Les parts de la llavor d'on la predicció ingènua pren els errors per fer-se

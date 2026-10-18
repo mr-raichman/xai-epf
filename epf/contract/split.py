@@ -2,8 +2,7 @@
 llavor i repartides en entrenament, validació i prova.
 
 A diferència del seu article, el preu del dia abans és una entrada, i per això
-l'entrenament perd el dia de cada costat d'una setmana retinguda. La llegeixen la
-passada i la cerca, que la passada llegeix, i per això és aquí i no a cap de les dues.
+l'entrenament perd el dia de cada costat d'una setmana retinguda.
 """
 
 import collections

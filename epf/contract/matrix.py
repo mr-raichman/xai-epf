@@ -9,8 +9,7 @@ lliurament: porta el que es podia esperar a la subhasta del dia anterior, a les 
 encara que es publiqui més tard.
 
 Les sèries d'on surten, `series`, es llegeixen del conjunt de dades, `data/dataset.csv`,
-com un fitxer i no a través del codi que el fa, a cada crida, de manera que cada model
-el llegeix ell mateix; i un conjunt de dades desfasat es refusa abans de llegir-lo.
+a cada crida, i un conjunt de dades desfasat es refusa abans de llegir-lo.
 """
 
 import collections
@@ -54,8 +53,7 @@ DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK
 
 # Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen.
 # `daily` i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el
-# `y` de la diària, anomenat un sol cop aquí perquè tres entrades el volen i cap no
-# ha de saber que és el segon element del primer parell.
+# `y` de la diària.
 Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 

@@ -1,14 +1,11 @@
 """Les dues distribucions de sortida de Marcjasz et al. (2023), i què en cal saber.
 
 Cada una defineix una família a part, que és el que fa l'article: la normal té dos
-paràmetres per hora i la de Johnson SU en té quatre, i la diferència entre les dues és
-la seva pròpia evidència que els moments alts compten en aquest mercat.
+paràmetres per hora i la de Johnson SU en té quatre.
 
 De cada una en calen cinc coses. Quantes sortides vol la xarxa, la pèrdua que
 minimitza, quin preu puntual se'n deriva, com se'n treuen els quantils i com es diuen
-els seus paràmetres. Les tres primeres són de la xarxa i les dues últimes de qui la
-puntua, i hi són juntes perquè totes cinc parlen de la mateixa distribució: separar-les
-seria tenir la definició en dos llocs.
+els seus paràmetres.
 
 La pèrdua és la log-versemblança negativa, que és el que l'article minimitza allà on la
 xarxa de punt minimitza el MAE, i és tota la diferència entre les dues.
@@ -95,7 +92,7 @@ def _johnson_quantiles(parameters, probabilities):
 
 
 # El preu puntual és la mediana de la distribució i no la mitjana, que és el que fa
-# l'article per al MAE: la mediana és el que minimitza l'error absolut.
+# l'article per al MAE.
 NORMAL = Distribution(
     names=("location", "scale"),
     loss=_normal_loss,

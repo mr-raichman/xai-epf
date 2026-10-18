@@ -73,7 +73,7 @@ class Block:
     """El bloc d'una ordre: `title` a la primera línia, les llavors que planifica cada
     família, `totals`, i les que ja tenia acabades, `done`.
 
-    Escriu a stderr, com tot el que mostra la línia d'ordres.
+    Escriu a stderr.
     """
 
     def __init__(self, title, totals, done=None):

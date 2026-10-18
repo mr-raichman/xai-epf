@@ -1,12 +1,12 @@
 """El que comparteixen totes les xarxes de Marcjasz et al. (2023), les distribucionals i
 la de punt, sobre la matriu diària: les entrades, les capes, la sortida i l'ajust.
 
-Com les construeix el codi de l'article, que és el que va produir les seves xifres: les
-entrades normalitzades per lots com a primera capa, sense cap escalador i amb els preus
-sense escalar; un dropout opcional després de l'entrada; dues capes amagades, cada una
-amb la seva activació i una L1 als pesos i una altra a la sortida; i una capa lineal per
-paràmetre de la sortida, cada una amb la seva L1. Les distribucionals minimitzen una
-log-versemblança, i la de punt l'error absolut.
+Com les construeix el codi de l'article: les entrades normalitzades per lots com a
+primera capa, sense cap escalador i amb els preus sense escalar; un dropout opcional
+després de l'entrada; dues capes amagades, cada una amb la seva activació i una L1 als
+pesos i una altra a la sortida; i una capa lineal per paràmetre de la sortida, cada una
+amb la seva L1. Les distribucionals minimitzen una log-versemblança, i la de punt
+l'error absolut.
 
 Cada xarxa llegeix totes les columnes de la matriu, com les altres famílies, i el dia de
 la setmana en una sola columna, com el seu codi el dóna a la xarxa.
@@ -33,9 +33,8 @@ DAY = "day_of_week"
 # i `names` com es diuen els seus paràmetres, en l'ordre en què surten de la xarxa.
 #
 # `flat` és d'operacions de Keras i torna els paràmetres en el mateix ordre pla que la
-# sortida crua, de manera que és alhora el que llegeix `parameters` i l'última capa del
-# que DeepExplainer explica: la correspondència entre la sortida i els paràmetres
-# s'escriu un sol cop i l'explicació no se'n pot separar.
+# sortida crua: és alhora el que llegeix `parameters` i l'última capa del que
+# DeepExplainer explica.
 Distribution = collections.namedtuple("Distribution", "names loss flat point quantiles")
 
 

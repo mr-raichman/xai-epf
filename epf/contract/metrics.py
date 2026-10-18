@@ -1,8 +1,6 @@
 """Les puntuacions de tots els models: la R-quadrat i el MAE, el CRPS d'una predicció
 distribucional, el test de cobertura dels seus intervals, i la guarda que ha de passar
 el preu real.
-
-Res d'aquí tria cap paràmetre: escollir es fa sobre la validació, no sobre la prova.
 """
 
 import numpy as np
@@ -56,11 +54,8 @@ def _checked(actual, quantiles):
 def crps(actual, quantiles, probabilities=PERCENTILES):
     """CRPS d'una predicció distribucional, pel pinball mitjà sobre els percentils.
 
-    El CRPS és la mesura pròpia d'una predicció distribucional: diu si tota la
-    distribució és bona i no només el seu centre, de manera que un model que encerta el
-    preu i s'equivoca en la incertesa en paga el preu. S'aproxima com fa Marcjasz et
-    al. (2023), amb el pinball mitjà sobre 99 percentils, que és l'aproximació
-    habitual.
+    S'aproxima com fa Marcjasz et al. (2023), amb el pinball mitjà sobre 99
+    percentils.
 
     El pinball d'un quantil `q` és `(1-q)(Q - y)` quan el preu real queda per sota del
     quantil predit i `q(y - Q)` quan queda per sobre: penalitza més quedar-se curt als
@@ -84,7 +79,7 @@ def kupiec(actual, bounds, coverage):
     test compara la fracció d'encerts amb la nominal per la raó de versemblances
     `-2 log((1 - c)^n0 c^n1 / ((1 - p)^n0 p^n1))`, una khi quadrat d'un grau, amb `n0`
     les fallades, `n1` els encerts i `p` la fracció d'encerts (Nowotarski i Weron,
-    2018). Es fa hora a hora perquè les 24 d'un dia surten de la mateixa informació.
+    2018).
 
     `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
     hora que no falla mai donaria un NaN, i un NaN no passa mai el test sense dir per

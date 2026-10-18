@@ -2,10 +2,9 @@
 comparteixen les figures dels models explicats.
 
 El llegeix tot el que dibuixa: les figures de les dades d'origen, les de cada model i
-les que comparen les famílies. Només hi ha el que fan servir dues coses o més: el que és
-d'una figura concreta, com el vermell dels valors marcats, viu amb ella. Les dels models
-explicats es dibuixen del que la passada va desar, un fitxer per model: la importància
-de cada columna i de cada grup, i la dependència de cada sèrie.
+les que comparen les famílies. Les dels models explicats es dibuixen del que la passada
+va desar, un fitxer per model: la importància de cada columna i de cada grup, i la
+dependència de cada sèrie.
 
 El motor és `Agg`, sense finestra, i es tria aquí: qui importa aquest mòdul ja el té
 triat i no ha de recordar-ho abans d'importar `pyplot`.
@@ -33,14 +32,12 @@ SERIES = "#2a78d6"
 
 DPI = 300
 
-# Escala seqüencial d'un sol to: la magnitud es llegeix igual en color i en escala de
-# grisos impresa.
+# Escala seqüencial d'un sol to.
 MAGNITUDE = LinearSegmentedColormap.from_list(
     "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"]
 )
 
-# Seqüència de colors de línia, encapçalada pel blau de la sèrie. Una línia per color,
-# perquè dues del mateix color en una llegenda no es distingeixen.
+# Seqüència de colors de línia, encapçalada pel blau de la sèrie.
 LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
 
 

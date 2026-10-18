@@ -34,15 +34,13 @@ BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 # Cada indicador, pel nom de la seva carpeta a `downloads/`, i com el serveix ESIOS. El
 # preu, el del mercat diari en EUR/MWh, es tria entre els sis països que porta el seu
 # fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són de Red
-# Eléctrica, i la solar és només la fotovoltaica; la d'eòlica més fotovoltaica que pren
-# Lago et al. (2021) no hi és, perquè ESIOS la publica com a 10358 i és exactament la
-# suma de les dues d'aquí. El programa base de funcionament (PBF), en MWh per hora, es
-# demana com la suma de cada hora: des del 2025-10-01 ESIOS el serveix com a energia per
-# quart d'hora, i la mitjana en seria la quarta part. L'eòlica programada, que no val
-# mai zero, és l'àncora de la resta del programa: una hora que publica i un altre
-# indicador no hi val zero, també passat l'últim dia de l'indicador. L'hidràulica és la
-# de les unitats de gestió hidràulica (UGH) i la de fora d'elles, i el bombeig, el seu
-# turbinatge.
+# Eléctrica, i la solar és només la fotovoltaica. El programa base de funcionament
+# (PBF), en MWh per hora, es demana com la suma de cada hora: des del 2025-10-01 ESIOS
+# el serveix com a energia per quart d'hora, i la mitjana en seria la quarta part.
+# L'eòlica programada, que no val mai zero, és l'àncora de la resta del programa: una
+# hora que publica i un altre indicador no hi val zero, també passat l'últim dia de
+# l'indicador. L'hidràulica és la de les unitats de gestió hidràulica (UGH) i la de fora
+# d'elles, i el bombeig, el seu turbinatge.
 INDICATORS = {
     "price": Indicator(600, "average", "España", False, None, ()),
     "demand_fcst": Indicator(1775, "average", "Península", True, None, ()),

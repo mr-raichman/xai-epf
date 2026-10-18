@@ -37,7 +37,7 @@ def space(optuna_trial, distribution, penalised=True):
     """Els hiperparàmetres d'un intent, en la forma en què els llegeix `network.build`.
 
     Sense `penalised`, la capa de sortida no té cap L1 i no se'n cerca cap, que és la
-    xarxa de punt de l'article: qui crida ho diu, i no s'endevina de la distribució.
+    xarxa de punt de l'article.
 
     L'L1 de cada paràmetre es demana pel nom que té a `distribution`, i en el seu ordre:
     el codi de l'article posa el pes de la cua de Johnson SU abans de l'asimetria.

@@ -1,7 +1,7 @@
 """Tot el que s'ha triat per a una passada, un sol valor de cada.
 
 El que és un fet del mercat o de la font no és aquí, llevat de les hores del dia: això
-viu a `dataset/esios.py`, i canvia quan canvia el món, no quan es prova un número.
+viu a `dataset/esios.py`.
 Els números d'un model tampoc: viuen amb el model, a
 `models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
 passada sencera.
@@ -9,15 +9,14 @@ passada sencera.
 Són els valors d'una mesura; `--smoke` posa en lloc dels seus els d'una de les variants
 d'assaig del final, la que tria `chosen`, i no en canvia cap altre. Una passada els desa
 tots al registre de cada família, amb l'empremta del codi i la del conjunt de dades que
-la van fer, de manera que cada punt d'un escombrat es llegeix del seu registre.
+la van fer.
 """
 
 import datetime
 
 DAYS_PER_WEEK = 7
 
-# Les hores d'un dia local i el nom de la columna de cada una. Són un fet i no una tria,
-# i són aquí perquè les llegeix tot el paquet.
+# Les hores d'un dia local i el nom de la columna de cada una.
 HOURS_PER_DAY = 24
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
@@ -41,11 +40,10 @@ SHARES = (48, 32, 20)
 # es miren l'un a l'altre.
 GAP = 1
 
-# Una partició per llavor. La dispersió entre totes és la robustesa que es reporta.
+# Una partició per llavor.
 SEEDS = tuple(range(10))
 
-# Retards de preu del conjunt: el dia abans, les seves 24 hores, que és d'on ha de venir
-# el nivell.
+# Retards de preu del conjunt: el dia abans, les seves 24 hores.
 PREVIOUS_DAY = (1,)
 
 # El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del
@@ -65,18 +63,15 @@ TRIALS = 50
 BEST = 10
 
 # Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,
-# triades a l'atzar amb la llavor. Totes costarien unes onze vegades més.
+# triades a l'atzar amb la llavor.
 INTERACTION_ROWS = 1000
 
-# Llavor de tota família que en faci servir. És de la passada i no d'un model, de
-# manera que totes les que en prenen una prenen la mateixa.
+# Llavor de tota família que en faci servir.
 SEED = 0
 
 # ------------------------------------------------------------ els processos
 
-# Quants processos fan alhora els ajustos d'una cerca o d'una passada. És a l'empremta
-# del codi, com tot aquest fitxer, de manera que una passada a mitges es continua amb
-# els mateixos.
+# Quants processos fan alhora els ajustos d'una cerca o d'una passada.
 WORKERS = 4
 
 # Els fils de cada procés, sempre els mateixos: amb uns altres un ajust dóna uns altres
@@ -86,15 +81,9 @@ THREADS = 4
 
 # ------------------------------------------------------------ l'assaig
 
-# El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants.
-# `SMOKE` és petita i ràpida a propòsit, una llavor, 50 dies explicats i dos intents per
-# cerca, prou per passar tota la maquinària i prou curta per esperar-s'hi; `SMOKE_1`,
-# cinc llavors i deu intents per cerca, no fixa els dies explicats i n'explica tots els
-# de prova. La que fa servir un assaig la tria `chosen`, i es canvia editant-la. L'error
-# d'un assaig no es desa, ni es cita, ni es compara enlloc; només una mesura dóna un
-# resultat, i el nom d'una passada o d'una cerca d'assaig comença amb `assaig_`, de
-# manera que una xifra d'assaig no es pugui llegir mai com una mesura. "Prova" no hi va:
-# és el nom de les setmanes retingudes.
+# El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants:
+# `SMOKE`, i `SMOKE_1`, que no fixa els dies explicats i n'explica tots els de prova. La
+# que fa servir un assaig la tria `chosen`, i es canvia editant-la.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
 

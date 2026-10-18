@@ -1,6 +1,6 @@
 """La figura de cada sèrie del conjunt de dades, cada valor horari, a
 `data/figures/<sèrie>/<sèrie>.png`. Cada sèrie té la seva carpeta, on hi ha també la
-figura dels seus valors allunyats dels veïns, i on aniran les que s'hi afegeixin."""
+figura dels seus valors allunyats dels veïns."""
 
 import numpy as np
 import pandas as pd

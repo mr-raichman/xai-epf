@@ -1,10 +1,9 @@
 """Les figures d'una passada, les de Trebbien et al. (2023) adaptades, dibuixades del
 que la passada va desar, sense tornar a ajustar res.
 
-Són un joc de treball: quines es queden per a la memòria es decideix quan tot el codi
-sigui fet. A la carpeta de cada família, les seves, que dibuixa el `figures.py` del seu
-model; a dalt de la passada, les que comparen les famílies: com puntua cada una al
-costat dels bancs de comparació, i els residus de cada família ajustada.
+A la carpeta de cada família, les seves, que dibuixa el `figures.py` del seu model; a
+dalt de la passada, les que comparen les famílies: com puntua cada una al costat dels
+bancs de comparació, i els residus de cada família ajustada.
 """
 
 import importlib
@@ -35,8 +34,7 @@ FIGURES = {
 def _performance(where, described):
     """La R-quadrat i el MAE de cada família sobre les setmanes de prova, la millor
     configuració de cada llavor amb una marca, i la resta de les seves deu millors amb
-    una de petita i grisa al darrere, al costat dels bancs de comparació. Dos gràfics i
-    no dos eixos.
+    una de petita i grisa al darrere, al costat dels bancs de comparació.
 
     Només les famílies explicades tenen color; els bancs de comparació, que no desen cap
     contribució, van en gris, i el nom de sota diu quin és cada un.

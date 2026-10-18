@@ -1,5 +1,5 @@
 """El protocol de Trebbien et al. (2023) sobre el període que es descriu, amb la
-partició de `contract/split.py`: la robustesa és la dispersió entre llavors.
+partició de `contract/split.py`.
 
 `epf run` fa de cada família triada, a cada llavor a la qual falta algun fitxer, una
 tasca de `run/pool.py`, que en fa unes quantes alhora: el `train.py` del model de la
@@ -11,8 +11,8 @@ diu el nom primer. Abans d'ajustar-ne cap, planifica amb `contract/searches.py` 
 famílies triades que encara no hi tenen pla: les millors configuracions de la cerca de
 cada llavor o, mentre la cerca no s'ha fet, uns números que no s'han cercat. El pla
 queda al registre de la família i ja no canvia, i cada ajust, el primer també, el
-llegeix d'allà. Tot es desa per llavor, de manera que les figures surten del que hi ha
-al disc i no d'un ajust nou.
+llegeix d'allà. Tot es desa per llavor, i les figures es dibuixen del que hi ha al
+disc.
 """
 
 import datetime

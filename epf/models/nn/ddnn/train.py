@@ -1,19 +1,16 @@
 """La passada de les xarxes distribucionals de Marcjasz et al. (2023), una distribució
 cada vegada, de la matriu diària als seus fitxers.
 
-Una família per distribució, que és el que fa l'article, i la diferència entre les dues
-és la seva pròpia evidència que els moments alts compten. **La predicció puntual és la
-mediana de la distribució**, que és el que minimitza l'error absolut i el que l'article
-fa servir per al MAE. Els paràmetres es desen a part, perquè una distribució no són 24
-preus.
+Una família per distribució, que és el que fa l'article. **La predicció puntual és la
+mediana de la distribució**, la que l'article fa servir per al MAE. Els paràmetres es
+desen a part.
 
 Per a cada llavor: la xarxa de la configuració ajustada amb les files d'entrenament i
 aturada sobre tota la validació, els paràmetres de les setmanes de prova, la puntuació
 del punt i de la distribució, l'atribució de cada paràmetre de les files que s'expliquen
 contra els dies d'entrenament, la comprovació que suma, i el fitxer.
 
-Una xarxa per distribució i llavor, on Marcjasz et al. (2023) en mitjanen quatre: cada
-membre seria una cerca més, i el que costa és la cerca.
+Una xarxa per distribució i llavor, on Marcjasz et al. (2023) en mitjanen quatre.
 """
 
 import numpy as np
@@ -55,8 +52,7 @@ def _fitted(distribution, X, y, parts, explained, numbers):
         distribution, fitted, X[shown], background=X[training]
     )
     # Dues sumes: la base més les contribucions torna cada paràmetre, i la base és la
-    # mitjana de cada paràmetre sobre tots els dies d'entrenament, que és el fons
-    # que s'ha triat i el que es perdria si se'n retallés una mostra.
+    # mitjana de cada paràmetre sobre tots els dies d'entrenament.
     gap = max(
         np.abs(
             explanation.base

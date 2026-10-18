@@ -2,8 +2,7 @@
 
 Cada registre, el d'una cerca i el d'una passada, porta les empremtes del codi que el va
 fer, del conjunt de dades sobre el qual es va fer i de les biblioteques amb què es va
-fer, de manera que qualsevol pot tornar a calcular la del codi d'una còpia i comprovar
-quin codi va donar una xifra. `plain` escriu un valor a JSON sense perdre què era:
+fer. `plain` escriu un valor a JSON sense perdre què era:
 converteix les dates, les tuples i les claus, i deixa que qualsevol altra cosa faci
 petar l'escriptura, en lloc d'escriure-la com a text sense dir-ho. `save_model` desa un
 model primer a un fitxer a part, en torna a fer les sumes de l'explicació sobre el que

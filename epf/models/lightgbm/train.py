@@ -1,10 +1,7 @@
 """Gradient boosting sobre la matriu per hora: un sol model per a totes les hores, i la
 seva passada, de la matriu als seus fitxers.
 
-LightGBM no fa sortida múltiple i TreeSHAP tampoc no l'admetria, així que la
-família comparteix un model entre les 24 hores i rep l'hora com a columna. A
-canvi, les interaccions de SHAP amb l'hora diuen com canvia un efecte al llarg
-del dia.
+La família rep l'hora com a columna.
 
 Per a cada llavor i configuració: l'arbre ajustat amb les files d'entrenament i aturat
 sobre les de validació, el preu de les setmanes de prova, la seva puntuació, l'atribució
@@ -64,10 +61,7 @@ def lightgbm(point, trees, seed=SEED):
     `deterministic` amb `force_row_wise` perquè dos ajustos de la mateixa finestra
     donin els mateixos arbres: sense això no els donen, i la predicció no ho
     destapa perquè segueix un sol camí per arbre mentre SHAP recorre tots els camins
-    pesats per la cobertura. Mesurat el 2026-10-07 sobre la finestra de 1085 dies, tres
-    ajustos: 1,21 s cada un i models diferents sense les dues banderes, 1,88 s i
-    idèntics amb elles. No són números que es toquin per guanyar error, i per això no
-    viuen al fitxer d'hiperparàmetres.
+    pesats per la cobertura.
     """
     return LGBMRegressor(
         n_estimators=trees,

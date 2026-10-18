@@ -8,8 +8,8 @@ fitxer `api-keys` de l'arrel, i el lector: la geografia, la graella d'hores, que
 qualsevol valor fora de l'hora en punt, la regla del zero amb la seva àncora i la
 reparació dels canvis d'hora.
 
-Hi ha també el rellotge del mercat, que el lector és el primer a fer servir: la zona
-horària i la reparació dels dies de canvi d'hora.
+Hi ha també el rellotge del mercat: la zona horària i la reparació dels dies de canvi
+d'hora.
 """
 
 import collections
@@ -35,9 +35,8 @@ DST_HOUR = 2
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 
-# Primer any que es demana, més enrere del que la font arriba a servir: la decisió
-# és baixar cada font tan enrere com vagi, i una resposta buida es desa igual i no
-# es torna a demanar mai més.
+# Primer any que es demana, més enrere del que la font arriba a servir: una resposta
+# buida es desa igual i no es torna a demanar mai més.
 FIRST_YEAR = 2010
 
 # Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.
@@ -112,8 +111,6 @@ def download(indicator, folder, session=None):
     """Baixa cada any d'un indicador que encara no tingui un fitxer complet, amb
     l'agregació que l'indicador demana, i torna quants n'ha escrit i, dels que ESIOS ha
     refusat, el camí i l'estat HTTP.
-
-    Un indicador i no tots: qui en vol diversos els recorre, i diu on va cada un.
     """
     session = session or session_for()
     folder = pathlib.Path(folder)

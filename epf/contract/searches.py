@@ -115,9 +115,8 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
             family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
         )
         optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar, perquè la durada de l'intent, que Optuna
-        # desa, porti les condicions en què es va prendre. Windows no la dóna, i hi
-        # queda buida.
+        # La càrrega de la màquina en acabar l'intent; Windows no la dóna, i hi queda
+        # buida.
         optuna_trial.set_user_attr(
             "load", os.getloadavg() if hasattr(os, "getloadavg") else None
         )

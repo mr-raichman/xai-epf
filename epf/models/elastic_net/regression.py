@@ -4,8 +4,7 @@ Cada hora té el seu model, ajustat només amb les files de la seva hora de la m
 hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
 de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021): la
 logarítmica de l'article no admet preus a zero o per sota. La penalització és una per a
-les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per defecte, perquè
-les tria una cerca.
+les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per defecte.
 
 Tot és sobre files donades, les d'entrenament d'una llavor.
 """

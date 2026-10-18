@@ -1,10 +1,6 @@
 """Com s'allunya cada valor d'una sèrie dels seus veïns, i quins són els més allunyats.
 
-La puntuació, l'informe que en desa les més altes i la figura que la dibuixa viuen
-junts: el fitxer i la figura han de ser dels mateixos números. L'informe no refusa res i
-no porta cap llindar, i no n'hi pot haver: la puntuació és distància partit per MAD, i
-al preu els seus extrems són moviments ordinaris dins de finestres de preu gairebé pla,
-no moviments grans.
+L'informe no refusa res i no porta cap llindar.
 """
 
 import numpy as np
@@ -29,7 +25,7 @@ HIGHEST = 100
 # eix lineal fins a 1 i logarítmic a partir d'aquí.
 LINEAR_UP_TO = 1
 
-# Vermell de les puntuacions marcades, que és d'aquesta figura i de cap altra.
+# Vermell de les puntuacions marcades.
 HIGHLIGHT_COLOR = "#e34948"
 
 

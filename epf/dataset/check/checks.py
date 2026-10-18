@@ -1,9 +1,8 @@
 """Les comprovacions del conjunt de dades, les mateixes per a totes les sèries, sobre el
 conjunt final.
 
-Cap d'elles no és de cap font, i totes produirien un número plausible més endavant en
-lloc de petar, que és per això que es comproven aquí i no es deixen al model: un dia i
-una hora repetits doblarien el seu pes, unes files fora d'ordre o un dia que falta
+L'error de cada una donaria més endavant un número plausible en lloc de fallar: un dia
+i una hora repetits doblarien el seu pes, unes files fora d'ordre o un dia que falta
 desplaçarien els retards cap a un dia que no és el que toca, un dia sense les seves 24
 hores desalinearia les hores, i un valor absent es propagaria al model.
 """

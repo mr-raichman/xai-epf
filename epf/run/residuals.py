@@ -5,7 +5,7 @@ ajustada està correlacionat d'un dia a l'altre, el test que Bergmeir, Hyndman i
 Les setmanes de prova de les llavors es cusen en una sola sèrie, cada dia de la primera
 llavor que el prova i del millor model d'aquella llavor, i un dia que cap llavor no
 prova queda buit. Un residu per dia, l'error mitjà de les seves hores. Les còpies
-ingènues no s'ajusten, i la pregunta del test no és seva.
+ingènues no es comproven.
 """
 
 import numpy as np

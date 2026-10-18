@@ -1,8 +1,6 @@
 """Tot el que es tecleja a mà, en una sola ordre amb subordres.
 
-`epf --help` és la llista de què es pot teclejar. Aquest és l'únic lloc que sap quines
-subordres hi ha, com es diuen, quins arguments prenen i quina funció de quin mòdul
-n'executa cada una, de manera que afegir-ne una és una fila de `COMMANDS` i res més.
+`epf --help` és la llista de què es pot teclejar.
 
 Els mòduls s'importen quan es tria la subordre i no abans.
 `models/lightgbm/attribution.py` porta `shap`, que costa un segon llarg, i amb els

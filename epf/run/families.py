@@ -4,8 +4,7 @@ una família es diuen igual, el nom és el del model, de manera que `lightgbm` v
 l'arbre i la seva sonda de datació.
 
 Que una passada sigui acabada es llegeix del pla de cada família i dels fitxers que hi
-ha, i no es desa enlloc: una família esborrada per tornar-la a planificar, o una passada
-interrompuda, deixarien malament el que s'hagués desat.
+ha, i no es desa enlloc.
 """
 
 import json
