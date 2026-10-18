@@ -13,8 +13,8 @@ from epf.contract import figure
 from epf.contract.figure import GRID, INK, MUTED_INK, SERIES, SURFACE, plt
 from epf.parameters import HOURS_PER_DAY
 
-# Veïns d'un valor: les hores adjacents de la sèrie cronològica, i la mateixa hora en
-# els dies del voltant.
+# Veïns d'un valor, a cada costat: les hores adjacents de la sèrie cronològica, i la
+# mateixa hora dels dies del voltant.
 HOUR_HALF_WIDTH = 12
 DAY_HALF_WIDTH = 7
 
@@ -30,8 +30,11 @@ HIGHLIGHT_COLOR = "#e34948"
 
 
 def window_median_mad(values, half_width):
-    """Mediana i MAD de la finestra centrada en cada valor, amb `half_width` valors
-    a cada costat. Els extrems, sense finestra completa, valen NaN."""
+    """Torna la mediana i la MAD de la finestra centrada en cada valor.
+
+    La finestra té `half_width` valors a cada costat, i els extrems, sense finestra
+    completa, valen NaN.
+    """
     values = np.asarray(values, dtype=float)
     windows = sliding_window_view(values, 2 * half_width + 1)
     median = np.median(windows, axis=-1)
@@ -41,7 +44,7 @@ def window_median_mad(values, half_width):
 
 
 def hampel_score(values, half_width):
-    """Distància a la mediana de la finestra centrada, en MADs de la finestra.
+    """Torna la distància de cada valor a la mediana de la seva finestra, en MADs.
 
     Una finestra de MAD zero puntua 0, i els extrems sense finestra completa, NaN.
     """
@@ -54,18 +57,22 @@ def hampel_score(values, half_width):
 
 
 def highest(scores):
-    """Posicions de les `HIGHEST` puntuacions més altes, sense comptar les NaN."""
+    """Torna les posicions de les `HIGHEST` puntuacions més altes, sense les NaN.
+
+    Són posicions de `scores` aplanat, de la puntuació més baixa a la més alta.
+    """
     flat = np.nan_to_num(scores.ravel(), nan=-np.inf)
     return np.argsort(flat)[-HIGHEST:]
 
 
 def report(name, frame):
-    """Desa les puntuacions de veïnatge més altes de cada vista a la carpeta de la
-    sèrie, `outliers_<sèrie>.csv`, cada una amb el valor i la mediana i la MAD de la
-    seva finestra, i les torna totes per dibuixar-les.
+    """Puntua cada valor d'una sèrie contra els seus veïns i en desa les més altes.
 
-    Les dues vistes: contra les hores adjacents de la sèrie cronològica, `hours`, i
-    contra la mateixa hora dels dies del voltant, `days`.
+    De cada veïnatge, les hores adjacents de la sèrie cronològica, `hours`, i la mateixa
+    hora dels dies del voltant, `days`, desa les `HIGHEST` puntuacions més altes a
+    `outliers_<sèrie>.csv`, a la carpeta de la sèrie, cada una amb el valor i la mediana
+    i la MAD de la seva finestra. Torna totes les puntuacions de cada veïnatge, en dies
+    per hores, per dibuixar-les.
     """
     values = frame.to_numpy().ravel()
     by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
@@ -120,6 +127,10 @@ def report(name, frame):
 
 
 def _style(axis, title, ylabel):
+    """Dona a uns eixos l'aspecte de la figura.
+
+    L'eix vertical és lineal fins a `LINEAR_UP_TO` i logarítmic a partir d'aquí.
+    """
     axis.set_facecolor(SURFACE)
     axis.set_title(title, color=INK, loc="left")
     axis.set_ylabel(ylabel, color=MUTED_INK)
@@ -133,10 +144,12 @@ def _style(axis, title, ylabel):
 
 
 def draw(name, frame, by_hours, by_days):
-    """La figura de les puntuacions de veïnatge d'una sèrie, les més altes de les quals
-    desa `report`, a la carpeta de la sèrie, `outliers_<sèrie>.png`: les de les hores
-    adjacents, un dia per línia, i les de la mateixa hora dels dies del voltant, en el
-    temps, amb les més altes en vermell."""
+    """Dibuixa les puntuacions de veïnatge d'una sèrie a `outliers_<sèrie>.png`.
+
+    A la carpeta de la sèrie: les de les hores adjacents, `by_hours`, un dia per línia,
+    i les de la mateixa hora dels dies del voltant, `by_days`, en el temps, amb les
+    `HIGHEST` més altes de cada veïnatge en vermell.
+    """
     panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 
     hours = np.arange(HOURS_PER_DAY)
