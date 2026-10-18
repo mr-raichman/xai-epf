@@ -1,15 +1,4 @@
-"""El conjunt de dades, `data/dataset.csv`: les sèries que llegeixen els models,
-construïdes dels fitxers d'ESIOS de `downloads/`, una fila per dia local i hora i una
-columna per sèrie.
-
-Es llegeix de dalt a baix. Les dues taules diuen què hi ha: `INDICATORS`, cada indicador
-d'ESIOS que es baixa i com el serveix, i `SERIES`, cada columna del conjunt amb els
-indicadors que suma. `epf download` baixa el que encara falta de cada indicador. `epf
-dataset` els llegeix tots, en fa les sèries, les escriu a `data/dataset.part`, hi passa
-les comprovacions de `check/checks.py` i, només si passen totes, li dona el seu nom i
-escriu `data/dataset.json`, l'empremta de cada fitxer llegit i la del conjunt; després
-dibuixa les figures de les dades i en desa l'informe de veïnatge de cada sèrie.
-"""
+"""El conjunt de dades, `data/dataset.csv`, fet dels fitxers d'ESIOS de `downloads/`."""
 
 import hashlib
 import json
@@ -38,9 +27,9 @@ BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 # (PBF), en MWh per hora, es demana com la suma de cada hora: des del 2025-10-01 ESIOS
 # el serveix com a energia per quart d'hora, i la mitjana en seria la quarta part.
 # L'eòlica programada, que no val mai zero, és l'àncora de la resta del programa: una
-# hora que publica i un altre indicador no hi val zero, també passat l'últim dia de
-# l'indicador. L'hidràulica és la de les unitats de gestió hidràulica (UGH) i la de fora
-# d'elles, i el bombeig, el seu turbinatge.
+# hora que l'àncora publica i un altre indicador no, hi val zero, també passat l'últim
+# dia de l'indicador. L'hidràulica és la de les unitats de gestió hidràulica (UGH) i la
+# de fora d'elles, i el bombeig, el seu turbinatge.
 INDICATORS = {
     "price": Indicator(600, "average", "España", False, None, ()),
     "demand_fcst": Indicator(1775, "average", "Península", True, None, ()),
@@ -69,10 +58,7 @@ INDICATORS = {
 }
 
 # Cada columna del conjunt de dades, en el seu ordre, amb els indicadors que suma, en
-# l'ordre en què se sumen: el carbó, l'antracita i el subbituminós, amb el cicle
-# combinat, la turbina de vapor de gas natural i la cogeneració de gas natural, i
-# l'hidràulica amb el turbinatge de bombeig. L'eòlica programada no és cap columna:
-# només fa d'àncora.
+# l'ordre en què se sumen. L'eòlica programada no és cap columna: només fa d'àncora.
 SERIES = {
     "price": ("price",),
     "demand_fcst": ("demand_fcst",),
@@ -91,8 +77,11 @@ SERIES = {
 
 
 def download():
-    """`epf download`: baixa el que encara falta de cada indicador, a la seva carpeta, i
-    torna 1 si ESIOS n'ha refusat algun fitxer."""
+    """Baixa el que encara falta de cada indicador, l'ordre `epf download`.
+
+    Escriu a stderr quants fitxers ha baixat de cada indicador i cada fitxer que ESIOS
+    ha refusat, i torna 1 si n'hi ha cap, i 0 si no.
+    """
     session = esios.session_for()
     refused = []
     for name, indicator in INDICATORS.items():
@@ -120,16 +109,16 @@ def download():
 
 
 def indicators(directory):
-    """Cada indicador en dies per hores, pel seu nom, i els fitxers que s'han llegit.
+    """Llegeix cada indicador de `directory` en dies per hores, pel seu nom.
 
-    Una àncora es llegeix abans que els indicadors que hi estan ancorats, que és l'ordre
-    de la taula, i els instants que publica es guarden per a ells.
+    Torna també els fitxers llegits. Una àncora ha de precedir a `INDICATORS` els
+    indicadors que hi estan ancorats. Un indicador que el lector refusa es refusa amb el
+    seu nom.
     """
     anchors = {indicator.anchor for indicator in INDICATORS.values()} - {None}
     published, frames, read = {}, {}, []
     for name, indicator in INDICATORS.items():
         found = esios.files(directory / name)
-        # El lector diu què té de malament un indicador, i aquí, quin.
         try:
             values = esios.admissible(esios.values(found), indicator)
             if name in anchors:
@@ -143,9 +132,11 @@ def indicators(directory):
 
 
 def series(frames):
-    """Cada sèrie de `SERIES`, la suma dels seus indicadors en el seu ordre, en dies per
-    hores, del seu primer dia a l'últim sense cap dia que falti: un dia que cap dels
-    seus indicadors va publicar, com el de l'apagada, hi queda buit."""
+    """Torna cada sèrie de `SERIES`, la suma dels seus indicadors, en dies per hores.
+
+    Va del seu primer dia a l'últim sense cap dia que falti: un dia que cap dels seus
+    indicadors va publicar, com el de l'apagada, hi queda buit.
+    """
     found = {}
     for name, parts in SERIES.items():
         total = sum((frames[part] for part in parts[1:]), frames[parts[0]])
@@ -156,16 +147,18 @@ def series(frames):
 
 
 def gaps(name):
-    """Les hores que una sèrie declara que la font no va publicar: les dels seus
-    indicadors."""
+    """Torna les hores d'una sèrie que la font no va publicar."""
     return pd.DatetimeIndex(
         sorted({hour for part in SERIES[name] for hour in INDICATORS[part].gaps})
     )
 
 
 def table(found):
-    """El conjunt de dades: una fila per dia local i hora, del primer dia que té alguna
-    sèrie a l'últim, i una columna per sèrie, buida fora del seu tram."""
+    """Torna el conjunt de dades, una fila per dia local i hora i una columna per sèrie.
+
+    Va del primer dia que té alguna sèrie a l'últim, i cada columna és buida fora del
+    tram de la seva sèrie.
+    """
     days = pd.date_range(
         min(frame.index[0] for frame in found.values()),
         max(frame.index[-1] for frame in found.values()),
@@ -183,14 +176,18 @@ def table(found):
 
 
 def _digest(path):
+    """Torna la SHA-256 d'un fitxer, en hexadecimal."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def write(rows, read):
-    """Escriu el conjunt de dades a part, hi passa les comprovacions sobre el que s'ha
-    escrit, llegit com el llegeixen els models, i, si passen totes, li dona el seu nom i
-    n'escriu el registre: l'empremta de cada fitxer llegit, pel seu camí sota
-    `downloads/`, i la del conjunt."""
+    """Escriu el conjunt de dades i el seu registre, si passa les comprovacions.
+
+    Es comprova el fitxer escrit, llegit com el llegeixen els models, abans que porti el
+    seu nom, de manera que un conjunt de dades refusat deixa l'anterior com era. El
+    registre porta l'empremta de cada fitxer de `read`, pel seu camí sota
+    `downloads/`, i la del conjunt.
+    """
     paths.DATA.mkdir(exist_ok=True)
     partial = paths.DATASET.with_suffix(".part")
     rows.to_csv(partial, index=False, lineterminator="\n", encoding="utf-8")
@@ -215,8 +212,11 @@ def write(rows, read):
 
 
 def main():
-    """`epf dataset`: fa el conjunt de dades, el comprova i l'escriu, i en desa les
-    figures i l'informe de veïnatge de cada sèrie."""
+    """Fa el conjunt de dades, l'ordre `epf dataset`, i torna 0.
+
+    El comprova i l'escriu, i en desa les figures i l'informe de veïnatge de cada sèrie.
+    Refusa el que refusen el lector d'ESIOS o les comprovacions.
+    """
     frames, read = indicators(paths.DOWNLOADS)
     found = series(frames)
     write(table(found), read)
