@@ -1,12 +1,6 @@
-"""Gradient boosting sobre la matriu per hora: un sol model per a totes les hores, i la
-seva passada, de la matriu als seus fitxers.
+"""L'arbre, LightGBM sobre la matriu per hora, i la seva passada.
 
-La família rep l'hora com a columna.
-
-Per a cada llavor i configuració: l'arbre ajustat amb les files d'entrenament i aturat
-sobre les de validació, el preu de les setmanes de prova, la seva puntuació, l'atribució
-de les files que s'expliquen i, a la millor configuració, les seves interaccions, la
-comprovació que sumen la predicció que expliquen, i el fitxer.
+Un sol model per a les 24 hores, que rep l'hora com a columna.
 """
 
 import numpy as np
@@ -38,7 +32,7 @@ from epf.parameters import (
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
 # cerquen, el punt de lloc mentre no hi ha cerca, sense els seus arbres, perquè els
-# arbres els decideix l'aturada, i les deu millors de cada llavor de la seva pròpia
+# arbres els decideix l'aturada, i les `BEST` millors de cada llavor de la seva pròpia
 # cerca.
 FAMILIES = {
     NAME: {
@@ -53,15 +47,10 @@ FAMILIES = {
 
 
 def lightgbm(point, trees, seed=SEED):
-    """Un regressor de LightGBM sense ajustar, i repetible, d'un punt de la graella i
-    amb `trees` arbres com a molt.
+    """Torna un regressor de LightGBM sense ajustar d'un punt de la graella, `point`.
 
-    La llavor fixa quines files pren cada arbre quan el punt en pren menys de totes.
-
-    `deterministic` amb `force_row_wise` perquè dos ajustos de la mateixa finestra
-    donin els mateixos arbres: sense això no els donen, i la predicció no ho
-    destapa perquè segueix un sol camí per arbre mentre SHAP recorre tots els camins
-    pesats per la cobertura.
+    Fa `trees` arbres com a molt, i la llavor fixa quines files pren cada arbre quan el
+    punt en pren menys de totes.
     """
     return LGBMRegressor(
         n_estimators=trees,
@@ -75,13 +64,16 @@ def lightgbm(point, trees, seed=SEED):
         random_state=seed,
         n_jobs=THREADS,
         verbose=-1,
+        # Sense totes dues, dos ajustos de la mateixa finestra no donen els mateixos
+        # arbres, i la predicció no ho destapa perquè segueix un sol camí per arbre
+        # mentre SHAP recorre tots els camins pesats per la cobertura.
         deterministic=True,
         force_row_wise=True,
     )
 
 
 def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
-    """Un model ajustat amb les files donades, d'un punt de la graella.
+    """Ajusta i torna un model d'un punt de la graella amb les files donades.
 
     Sense `validation` fa `trees` arbres, ni un més ni un menys. Amb `validation`,
     parelles `(X, y)`, `trees` és el sostre, i l'entrenament s'atura quan qualsevol
@@ -104,15 +96,17 @@ def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
 
 
 def predict_rows(model, X):
-    """El preu de cada fila."""
     return model.predict(X)
 
 
 def fitted(X, y, groups, parts, explained, seed, numbers, best):
-    """L'arbre d'una configuració, aturat quan qualsevol de les quatre parts de la
-    validació deixa de millorar, l'atribució de les files explicades i, a la millor
-    configuració de la llavor, `best`, les interaccions sobre una mostra d'aquelles
-    files. `groups` és el grup de cada columna de `X`."""
+    """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
+
+    S'atura quan qualsevol de les quatre parts de la validació deixa de millorar. A la
+    millor configuració de la llavor, `best`, explica també les interaccions d'una
+    mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna
+    de `X`, i `numbers` el punt de la configuració.
+    """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)
     )
@@ -155,8 +149,12 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
-    puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     X, y = matrix.matrices(matrix.series()).hourly
     groups = np.array([group(column) for column in X.columns])
     done = []
