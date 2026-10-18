@@ -1,8 +1,8 @@
-"""La partició de Trebbien et al. (2023): les setmanes del període, barrejades per
-llavor i repartides en entrenament, validació i prova.
+"""La partició de Trebbien et al. (2023), per setmanes barrejades amb la llavor.
 
-A diferència del seu article, el preu del dia abans és una entrada, i per això
-l'entrenament perd el dia de cada costat d'una setmana retinguda.
+Les setmanes del període es reparteixen en entrenament, validació i prova. A diferència
+del seu article, el preu del dia abans és una entrada, i per això l'entrenament perd el
+dia de cada costat d'una setmana retinguda.
 """
 
 import collections
@@ -22,14 +22,14 @@ VALIDATION_PARTS = 4
 
 
 def _deal(seed, period, deleted, shares):
-    """Els dies del període i, per a cada part, les setmanes que li toquen, en l'ordre
-    en què la llavor les ha repartit.
+    """Torna els dies del període i les setmanes de cada part, en l'ordre de la llavor.
 
     El període es talla en setmanes de set dies des del primer, i la setmana `deleted`
     en surt i no és de cap part. La resta es barregen amb la llavor i es reparteixen en
     l'ordre de `Split`: a la validació, la seva part de `shares` arrodonida a un
     múltiple de `VALIDATION_PARTS`, perquè es parteixi en parts iguals; a la prova, la
-    seva arrodonida; i a l'entrenament, la resta.
+    seva arrodonida; i a l'entrenament, la resta. Refusa un període que no és de
+    setmanes senceres i una setmana `deleted` que no és cap de les seves.
     """
     days = pd.date_range(*period, freq="D")
     weeks, remainder = divmod(len(days), DAYS_PER_WEEK)
@@ -60,7 +60,7 @@ def _deal(seed, period, deleted, shares):
 
 
 def _days_of(days, weeks):
-    """Els dies de les setmanes donades, en ordre de data."""
+    """Torna els dies de les setmanes `weeks`, en ordre de data."""
     return days[
         np.sort(
             np.concatenate(
@@ -74,12 +74,11 @@ def _days_of(days, weeks):
 
 
 def split(seed, period, deleted, shares=SHARES, gap=GAP):
-    """Els dies d'entrenament, de validació i de prova d'una llavor.
+    """Torna els dies d'entrenament, de validació i de prova d'una llavor.
 
-    Després de repartir les setmanes surt de l'entrenament tot dia que tingui un dia
-    retingut a `gap` dies o menys, a qualsevol costat: aquest dia no és de cap part. La
-    setmana suprimida no és retinguda, i els dies del seu costat es reparteixen com
-    qualsevol altre.
+    Surt de l'entrenament tot dia que tingui un dia retingut a `gap` dies o menys, a
+    qualsevol costat, i no és de cap part. La setmana suprimida, `deleted`, no és
+    retinguda: els dies del seu costat es reparteixen com qualsevol altre.
     """
     days, dealt = _deal(seed, period, deleted, shares)
     part_of_week = np.full(len(days) // DAYS_PER_WEEK, -1)
@@ -99,8 +98,12 @@ def split(seed, period, deleted, shares=SHARES, gap=GAP):
 
 
 def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARES):
-    """Les setmanes de validació d'una llavor en `count` parts iguals, en l'ordre en
-    què la llavor les ha repartit, de manera que cada part és de setmanes a l'atzar."""
+    """Torna els dies de validació d'una llavor en `count` parts iguals de setmanes.
+
+    Les parts segueixen l'ordre en què la llavor ha repartit les setmanes, de manera que
+    cada una és de setmanes a l'atzar. Refusa unes setmanes de validació que no fan
+    `count` parts iguals.
+    """
     days, dealt = _deal(seed, period, deleted, shares)
     weeks = dealt[Split._fields.index("validation")]
     if len(weeks) % count:
