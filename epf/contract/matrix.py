@@ -1,15 +1,8 @@
-"""Matrius de característiques, totes dues alineades per dia de lliurament.
-
-La diària té una fila per dia i 24 sortides; la per hora té una fila per dia i
-hora, amb l'hora com a columna, i hi pren a l'hora de la fila la sèrie que s'hi pren
-a l'hora.
+"""Les dues matrius que llegeixen els models, alineades per dia de lliurament.
 
 Cap columna d'entrada no porta el preu que explica ni res del que passa el dia del
 lliurament: porta el que es podia esperar a la subhasta del dia anterior, a les 12:00,
 encara que es publiqui més tard.
-
-Les sèries d'on surten, `series`, es llegeixen del conjunt de dades, `data/dataset.csv`,
-a cada crida, i un conjunt de dades desfasat es refusa abans de llegir-lo.
 """
 
 import collections
@@ -35,8 +28,7 @@ PRICE = "price"
 
 # El conjunt d'informació: cada sèrie del conjunt de dades que entra a les matrius, en
 # l'ordre de les seves columnes, amb els dies abans del lliurament en què hi entra. El
-# preu, que és també el que es prediu, hi entra amb les 24 hores dels seus retards; les
-# previsions D+1, del mateix dia que es lliura; i el programa, del dia abans.
+# preu, que és també el que es prediu, hi entra amb les 24 hores de cada retard.
 INFORMATION = {
     PRICE: PREVIOUS_DAY,
     "demand_fcst": (FORECAST_LAG,),
@@ -58,19 +50,16 @@ Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 
 def column(name, lag):
-    """El nom d'una sèrie d'entrada al seu retard: tal qual al dia que es lliura, i amb
-    el retard al darrere a qualsevol altre."""
+    """Torna el nom d'una sèrie a un retard, `price_lag1`, o tal qual al retard 0."""
     return f"{name}_lag{lag}" if lag else name
 
 
 def build(series, information):
-    """Torna (X, y) alineats per data de lliurament, sense files incompletes, amb el
-    preu com a `y`.
+    """Torna la matriu diària, `(X, y)` amb el preu com a `y`, sense files incompletes.
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les. `series`
     són les sèries per nom, cada una amb les 24 hores de cada dia, i `information` diu
-    quines entren i a quins retards, com `INFORMATION`: una previsió D+1 entra al retard
-    0, el dia que es lliura, sense desplaçar, perquè es publica el dia abans.
+    quines entren i a quins retards, com `INFORMATION`.
     """
     price = series[PRICE]
     if list(price.columns) != HOUR_COLUMNS:
@@ -101,11 +90,10 @@ def build(series, information):
 
 
 def per_hour(X, y, at_the_hour=()):
-    """Les mateixes files repartides en una per dia i hora, amb l'hora com a columna.
+    """Reparteix cada fila en una per hora del dia, amb l'hora com a columna.
 
-    El gradient boosting comparteix un sol model per a totes les hores i és la matriu
-    que li cal. L'índex continua sent el dia de lliurament, repetit 24 vegades,
-    perquè la partició hi segueixi triant per dia.
+    L'índex continua sent el dia de lliurament, repetit 24 vegades, perquè la partició
+    hi segueixi triant per dia.
 
     Una sèrie d'`at_the_hour` hi deixa les seves 24 columnes per una de sola, el valor
     de l'hora de la fila, com Trebbien et al. (2023) prenen les previsions.
@@ -120,14 +108,17 @@ def per_hour(X, y, at_the_hour=()):
 
 
 def _digest(path):
+    """Torna la SHA-256 d'un fitxer, en hexadecimal."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _refuse_stale():
-    """Refusa un conjunt de dades que no és el que donen els fitxers baixats d'ara: un
-    dels fitxers que va llegir ha canviat o ja no hi és, o `dataset.csv` no és el que es
-    va escriure. Una baixada torna a escriure sempre el fitxer de l'any en curs, de
-    manera que una baixada que no s'ha seguit d'`epf dataset` també es refusa."""
+    """Refusa un conjunt de dades que no hi és o que no és el dels fitxers d'ara.
+
+    Els fitxers que va llegir han de ser com eren, i `dataset.csv` com es va escriure.
+    Una baixada torna a escriure sempre el fitxer de l'any en curs, de manera que una
+    baixada que no s'ha seguit d'`epf dataset` també es refusa.
+    """
     again = 'recrear amb "uv run epf dataset"'
     if not (paths.DATASET.is_file() and paths.DATASET_RECORD.is_file()):
         raise Refusal(
@@ -157,15 +148,15 @@ def _refuse_stale():
 
 
 def series():
-    """Cada sèrie del conjunt de dades, pel seu nom, en dies per hores, tallada al seu
-    tram, del primer al darrer dia amb algun valor: un dia buit fora del tram d'una
-    sèrie faria una fila amb el preu que s'ha de predir absent. Abans, refusa un conjunt
-    de dades desfasat.
+    """Llegeix cada sèrie del conjunt de dades, pel seu nom, en dies per hores.
 
-    `float_precision="round_trip"` és l'únic lector de pandas que torna exactament el
-    que es va escriure: el de per defecte canvia `0.1 + 0.2`.
+    Cada una va del primer al darrer dia amb algun valor: un dia buit fora del tram
+    d'una sèrie faria una fila amb el preu que s'ha de predir absent. Refusa un conjunt
+    de dades que no hi és o que és desfasat.
     """
     _refuse_stale()
+    # `round_trip`, l'únic lector de pandas que torna exactament el que es va escriure:
+    # el de per defecte canvia `0.1 + 0.2`.
     table = pd.read_csv(paths.DATASET, float_precision="round_trip", encoding="utf-8")
     wide = table.pivot(index=DAY, columns=HOUR)
     days = pd.DatetimeIndex(pd.to_datetime(wide.index, format="%Y-%m-%d"), name=DAY)
@@ -178,14 +169,12 @@ def series():
 
 
 def matrices(series):
-    """Les dues matrius del conjunt d'informació, `INFORMATION`, i el preu que prediuen:
-    les 24 hores del preu del dia abans, les previsions D+1 del dia que es lliura i el
-    programa del dia abans, cada sèrie pel seu nom, i el dia de la setmana.
+    """Torna les dues matrius del conjunt d'informació, `INFORMATION`, i el preu real.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
-    la diària, que és la de les xarxes, amb les 24 hores de cada sèrie, i la per hora,
-    que és la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El
-    preu del dia abans hi és amb les seves 24 hores a totes dues.
+    la diària, la de les xarxes, amb les 24 hores de cada sèrie, i la per hora, la de
+    l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu del dia
+    abans hi és amb les seves 24 hores a totes dues.
     """
     daily = build(series, INFORMATION)
     at_the_hour = tuple(
@@ -198,11 +187,12 @@ def matrices(series):
 
 
 def write(found, folder):
-    """Desa a `folder` les dues matrius, `found`, cada fila amb les seves entrades i el
-    preu que se'n prediu: el del dia, `price_h00` a `price_h23`, a la diària, i el de
-    l'hora, `price`, a la per hora. Una que ja hi és no es torna a escriure: una passada
-    que es continua és del mateix codi i del mateix conjunt de dades que la van
-    començar."""
+    """Desa a `folder` les dues matrius, `found`, amb el preu que se'n prediu.
+
+    A la diària, el del dia, de `price_h00` a `price_h23`, i a la per hora, el de
+    l'hora, `price`. Una que ja hi és no es torna a escriure: una passada que es
+    continua és del mateix codi i del mateix conjunt de dades que la van començar.
+    """
     (X, y), (rows, target) = found.daily, found.hourly
     for name, frame in (
         ("daily", X.join(y.add_prefix(f"{PRICE}_"))),
