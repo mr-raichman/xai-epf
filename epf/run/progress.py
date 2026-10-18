@@ -1,11 +1,11 @@
 """El bloc que mostra una cerca o una passada mentre es fa: una línia per família amb
 les llavors acabades, les fallades a sota i el temps transcorregut.
 
-En un terminal el bloc es reescriu al seu lloc amb els codis del cursor; sense, o a una
-consola de Windows que no admet el mode VT, s'escriu una línia per llavor acabada.
+En un terminal el bloc es reescriu al seu lloc amb els codis del cursor, cada línia
+tallada a l'amplada del terminal fins que es tanca; sense, o a una consola de Windows
+que no admet el mode VT, s'escriu una línia per llavor acabada.
 """
 
-import math
 import os
 import sys
 import time
@@ -17,6 +17,9 @@ SHOWN_FAILURES = 5
 # Puja el cursor n línies, i esborra del cursor al final de la pantalla.
 UP = "\x1b[{}A"
 ERASE_BELOW = "\x1b[J"
+
+# El final d'una línia tallada.
+MORE = "..."
 
 
 def _live(stream):
@@ -34,6 +37,20 @@ def _live(stream):
         return False
     # ENABLE_VIRTUAL_TERMINAL_PROCESSING; zero vol dir que la consola no l'admet.
     return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
+
+
+def _cut(line, columns):
+    """Torna la primera fila de `line` tallada a `columns` columnes.
+
+    Si en treu res, acaba amb `MORE`. Amb 0 columnes, que és com respon un terminal que
+    no diu la seva amplada, no la talla pel llarg.
+    """
+    first, newline, _ = line.partition("\n")
+    # Una columna de marge: hi ha terminals que parteixen la línia que hi arriba.
+    room = columns - 1 if columns else len(first) + len(MORE)
+    if len(first) <= room and not newline:
+        return first
+    return first[: max(room - len(MORE), 0)] + MORE
 
 
 def elapsed(seconds):
@@ -100,7 +117,7 @@ class Block:
     def close(self):
         """Deixa l'estat final i la línia en blanc que va abans de la de tancament."""
         if self.live:
-            self._draw()
+            self._draw(whole=True)
             self._write("\n")
         else:
             self._write(f"\n{self._time()}\n\n")
@@ -135,19 +152,18 @@ class Block:
         lines.append(self._time())
         return lines
 
-    def _draw(self):
-        text = "\n".join(self._lines())
+    def _draw(self, whole=False):
+        """Torna a escriure el bloc al seu lloc, cada línia en una fila de la pantalla,
+        o sencera si `whole`, quan ja no s'ha de tornar a escriure."""
+        lines = self._lines()
+        if not whole:
+            # Una línia que es partís en dues files faria pujar el cursor massa poc, i
+            # un bloc més alt que la pantalla no es pot tornar a escriure.
+            columns = os.get_terminal_size(self.stream.fileno()).columns
+            lines = [_cut(line, columns) for line in lines]
         back = UP.format(self.shown) + "\r" + ERASE_BELOW if self.shown else ""
-        self._write(back + text + "\n")
-        # Les files de pantalla que ocupa, on una línia més ampla que el terminal en fa
-        # més d'una; un terminal que no diu la seva amplada, 0, no en parteix cap.
-        # shortcut: un bloc més alt que la pantalla en deixa còpies de la part de dalt
-        # a l'historial del terminal; mostrar només les fallades que hi càpiguen.
-        columns = os.get_terminal_size(self.stream.fileno()).columns
-        self.shown = sum(
-            max(1, math.ceil(len(row) / columns)) if columns else 1
-            for row in text.split("\n")
-        )
+        self._write(back + "\n".join(lines) + "\n")
+        self.shown = len(lines)
 
     def _write(self, text):
         self.stream.write(text)

@@ -28,3 +28,13 @@ def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
     ]
     assert lines[6].startswith("Temps transcorregut: 0:00:0")
     assert lines[7:] == [""]
+
+
+def test_a_live_line_is_cut_to_one_row_of_the_terminal():
+    # Una línia més ampla que el terminal es partia en dues files, i el cursor, que en
+    # pujava una per línia, deixava a la pantalla la part de dalt del bloc d'abans.
+    line = "error: lightgbm llavor 3 ha fallat: " + "x" * 100
+    assert progress._cut(line, 80) == line[:76] + "..."
+    assert len(progress._cut(line, 80)) == 79
+    assert progress._cut("ValueError: una\nque en té dues", 80) == "ValueError: una..."
+    assert progress._cut(line, 0) == line
