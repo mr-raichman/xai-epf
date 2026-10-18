@@ -1,5 +1,4 @@
-"""L'atribució de l'arbre: TreeSHAP i les seves interaccions, i les sumes que se'n
-tornen a fer sobre el fitxer desat."""
+"""L'atribució de l'arbre, TreeSHAP i les seves interaccions."""
 
 import numpy as np
 import shap
@@ -9,24 +8,29 @@ from epf.parameters import HOURS_PER_DAY
 
 
 def attribute_rows(model, X):
-    """Els valors de SHAP de cada fila, `(files, columnes)`, i la base.
+    """Torna els valors de SHAP de cada fila, `(files, columnes)`, i la base.
 
-    TreeSHAP al mode que LightGBM calcula ell mateix, i un sol model per a les 24
-    hores, de manera que la base és la mateixa per a totes les files.
+    TreeSHAP al mode que LightGBM calcula ell mateix; com que el model és un de sol per
+    a les 24 hores, la base és la mateixa per a totes les files.
     """
     explainer = shap.TreeExplainer(model)
     return explainer.shap_values(X), float(np.ravel(explainer.expected_value)[0])
 
 
 def interaction_rows(model, X):
-    """Els valors d'interacció de SHAP de cada fila, `(files, columnes, columnes)`."""
+    """Torna els valors d'interacció de SHAP de cada fila.
+
+    Són `(files, columnes, columnes)`.
+    """
     return shap.TreeExplainer(model).shap_interaction_values(X)
 
 
 def sums(found, best):
-    """Les sumes de l'arbre sobre el seu fitxer: la base més els valors de cada fila
-    contra la seva predicció i, a la millor configuració, cada fila d'interaccions
-    contra el valor de la seva columna."""
+    """Torna les sumes de l'arbre que es tornen a fer sobre el seu fitxer, `found`.
+
+    La base més els valors de cada fila contra la seva predicció i, a la millor
+    configuració, `best`, cada fila d'interaccions contra el valor de la seva columna.
+    """
     found_sums = [
         (
             *summed(found["base"], found["values"], 1),
