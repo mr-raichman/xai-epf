@@ -3,8 +3,8 @@
 Cada hora té el seu model, ajustat només amb les files de la seva hora de la matriu per
 hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
 de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021): la
-logarítmica de l'article no admet preus a zero o per sota. La penalització és una per a
-les 24 hores, com a l'article, i ni ella ni la barreja tenen valor per defecte.
+logarítmica de l'article no admet preus a zero o per sota. El càstig és un per a les
+24 hores, com a l'article, i ni ell ni la barreja tenen valor per defecte.
 
 Tot és sobre files donades, les d'entrenament d'una llavor.
 """
@@ -29,20 +29,23 @@ Hour = collections.namedtuple("Hour", "model columns inputs target background")
 
 
 def design(rows, fitted):
-    """Les files com la matriu del model d'una hora: entrades transformades i
-    indicadors."""
+    """Torna les files com la matriu del model d'una hora, `fitted`.
+
+    Les entrades, transformades, i els indicadors del dia de la setmana.
+    """
     scaled = len(fitted.inputs.median)
     values = rows[fitted.columns].to_numpy(dtype=float)
     return np.hstack([fitted.inputs.forward(values[:, :scaled]), values[:, scaled:]])
 
 
 def _prepared(rows, target):
-    """Les files d'una hora com les veu el seu model: el que cal per llegir-lo, encara
-    sense model, la matriu i l'objectiu transformat.
+    """Prepara les files d'una hora per al seu model, encara sense ajustar.
 
-    Una columna que no es mou a les files de l'hora no hi entra, que és la previsió
-    solar de nit. La que es mou sense MAD s'escala per la seva desviació típica, que és
-    la solar dels vespres d'estiu: la transformació de Lago et al. (2021) la refusaria.
+    Torna el que cal per llegir el model, encara sense model, la matriu i l'objectiu
+    transformat. Una columna que no es mou a les files de l'hora no hi entra, que és la
+    previsió solar de nit. La que es mou sense MAD s'escala per la seva desviació
+    típica, que és la solar dels vespres d'estiu: la transformació de Lago et al. (2021)
+    la refusaria.
     """
     moving = [
         column
@@ -59,7 +62,7 @@ def _prepared(rows, target):
 
 
 def _fit_hour(rows, target, penalty, mixing, max_iter):
-    """El model d'una hora, amb les seves files i prou."""
+    """Ajusta el model d'una hora amb les seves files i prou."""
     fitted, matrix, scaled_target = _prepared(rows, target)
     model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=max_iter)
     return fitted._replace(
@@ -68,13 +71,13 @@ def _fit_hour(rows, target, penalty, mixing, max_iter):
 
 
 def by_hour(X):
-    """La posició de les files de cada hora."""
+    """Torna les posicions de les files de cada hora."""
     hours = X[HOUR].to_numpy()
     return [np.flatnonzero(hours == hour) for hour in range(HOURS_PER_DAY)]
 
 
 def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
-    """Els 24 models, cada un ajustat amb les files de la seva hora i cap més."""
+    """Ajusta els 24 models, cada un amb les files de la seva hora i cap més."""
     return tuple(
         _fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
         for rows in by_hour(X)
@@ -82,13 +85,13 @@ def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
 
 
 def largest_penalty(X, y, mixing):
-    """El càstig més petit que deixa a zero tots els coeficients de les 24 hores, amb
-    aquesta barreja.
+    """Torna el càstig més petit que deixa a zero tots els coeficients de les 24 hores.
 
-    El de cada hora és el de scikit-learn, el màxim sobre les columnes de `|X'y|`
-    dividit per les files i per la barreja, sobre la matriu i l'objectiu del model de
-    l'hora centrats, perquè el model ajusta un terme constant. Un sol càstig serveix les
-    24 hores, i per deixar-les totes a zero ha de ser el més gran dels 24.
+    És amb la barreja `mixing`. El de cada hora és el de scikit-learn, el màxim sobre
+    les columnes de `|X'y|` dividit per les files i per la barreja, sobre la matriu i
+    l'objectiu del model de l'hora centrats, perquè el model ajusta un terme constant.
+    Un sol càstig serveix les 24 hores, i per deixar-les totes a zero ha de ser el més
+    gran dels 24.
     """
     found = []
     for rows in by_hour(X):
@@ -99,7 +102,7 @@ def largest_penalty(X, y, mixing):
 
 
 def predict_rows(model, X):
-    """El preu de cada fila en EUR/MWh, cada una amb el model de la seva hora."""
+    """Torna el preu de cada fila en EUR/MWh, cada una amb el model de la seva hora."""
     prices = np.empty(len(X))
     for fitted, rows in zip(model, by_hour(X), strict=True):
         if len(rows):
