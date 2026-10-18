@@ -1,13 +1,6 @@
-"""Com es fa i com es veu una figura d'aquest projecte, en un sol lloc, i el que
-comparteixen les figures dels models explicats.
+"""L'aspecte de les figures, i les que dibuixen igual tots els models explicats.
 
-El llegeix tot el que dibuixa: les figures de les dades d'origen, les de cada model i
-les que comparen les famílies. Les dels models explicats es dibuixen del que la passada
-va desar, un fitxer per model: la importància de cada columna i de cada grup, i la
-dependència de cada sèrie.
-
-El motor és `Agg`, sense finestra, i es tria aquí: qui importa aquest mòdul ja el té
-triat i no ha de recordar-ho abans d'importar `pyplot`.
+Les dels models explicats es dibuixen del que la passada va desar, un fitxer per model.
 """
 
 import matplotlib
@@ -17,6 +10,8 @@ from epf.contract.matrix import INFORMATION, PRICE
 from epf.parameters import HOUR_COLUMNS
 from epf.paths import SEED
 
+# El motor sense finestra, triat abans d'importar `pyplot`: qui importa aquest mòdul ja
+# el té triat.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
@@ -42,12 +37,10 @@ LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f
 
 
 def colours(names):
-    """Un color per nom, en l'ordre dels noms.
+    """Torna un color per nom, en l'ordre dels noms.
 
-    Peta si n'hi ha més que colors. `zip(LINES, ...)` els deixaria fora sense dir-ho,
-    i una figura que perd un model en silenci és pitjor que una figura que no es
-    dibuixa. Repetir-ne un no val: dues línies del mateix color en una llegenda no es
-    distingeixen.
+    Falla si n'hi ha més que colors: `zip(LINES, ...)` els deixaria fora sense dir-ho, i
+    repetir-ne un faria dues línies que la llegenda no distingeix.
     """
     names = list(names)
     if len(names) > len(LINES):
@@ -59,7 +52,7 @@ def colours(names):
 
 
 def style(axis, title=None):
-    """El títol, les marques i el marc d'uns eixos, iguals a tot el projecte."""
+    """Dona a uns eixos el títol, les marques i el marc de tot el projecte."""
     if title:
         axis.set_title(title, color=INK, loc="left", fontsize=10)
     axis.tick_params(colors=MUTED_INK, length=0)
@@ -75,6 +68,7 @@ def colorbar(figure, image, axis, label):
 
 
 def save(figure, folder, name):
+    """Desa una figura a `folder/<name>.png` i la tanca."""
     figure.tight_layout()
     figure.savefig(folder / f"{name}.png", dpi=DPI)
     plt.close(figure)
@@ -115,8 +109,10 @@ PER_GW = 1000
 
 
 def seeds(folder):
-    """Els models desats d'una família, un per fitxer, en ordre de llavor i de
-    configuració: el primer és la millor configuració de la primera llavor."""
+    """Torna els models desats d'una família, en ordre de llavor i de configuració.
+
+    El primer és la millor configuració de la primera llavor.
+    """
     paths = sorted(
         folder.glob(SEED.format(seed="*", rank="*")),
         key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]),
@@ -125,8 +121,7 @@ def seeds(folder):
 
 
 def outputs(seed):
-    """Les contribucions de cada sortida explicada, `(files, columnes)`, i les entrades
-    que hi corresponen, per nom de sortida.
+    """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
 
     L'arbre i la xarxa elàstica en tenen una per fila. La xarxa distribucional en té una
     per paràmetre, amb una fila per dia i hora, on la columna d'una previsió a l'hora de
@@ -142,9 +137,11 @@ def outputs(seed):
 
 
 def shares(values, groups):
-    """La importància normalitzada a u de cada columna i de cada grup, la de Trebbien et
-    al. (2023): la mitjana del valor absolut, i la d'un grup suma les contribucions de
-    les seves columnes abans de prendre'l."""
+    """Torna la importància de cada columna i grup, la de Trebbien et al. (2023).
+
+    És la mitjana del valor absolut, normalitzada a u, i la d'un grup suma les
+    contribucions de les seves columnes abans de prendre'l.
+    """
     by_column = np.abs(values).mean(axis=0)
     names = list(dict.fromkeys(groups))
     by_group = np.array(
@@ -156,7 +153,10 @@ def shares(values, groups):
 
 
 def importance(folder, seeds):
-    """La importància de les columnes que més pesen i la dels grups, amb cada llavor."""
+    """Dibuixa la importància de les columnes i dels grups, amb cada llavor.
+
+    De les columnes, les `SHOWN` que més pesen.
+    """
     explained = list(outputs(seeds[0]))
     groups = seeds[0]["groups"]
     columns = seeds[0]["columns"]
@@ -192,15 +192,17 @@ def importance(folder, seeds):
 
 
 def present(seed):
-    """Les sèries amb gràfic de dependència que porta el fitxer d'un model, en l'ordre
-    de `DEPENDENCE`."""
+    """Torna les sèries de `DEPENDENCE` que porta el fitxer d'un model."""
     names = set(seed["groups"])
     return [name for name in DEPENDENCE if name in names]
 
 
 def members(seed, name):
-    """Les columnes de la sèrie `name`, pel grup que la passada hi va desar: una a la
-    matriu per hora, la de l'hora de la fila, i les 24 de la diària en ordre d'hora."""
+    """Torna les posicions de les columnes de la sèrie `name` al fitxer d'un model.
+
+    Les troba pel grup que la passada hi va desar: una a la matriu per hora, la de
+    l'hora de la fila, i les 24 de la diària en ordre d'hora.
+    """
     members = np.flatnonzero(seed["groups"] == name)
     if len(members) == 1:
         return members
@@ -211,7 +213,7 @@ def members(seed, name):
 
 
 def pairs(seed, values, name):
-    """El valor de la sèrie i la seva contribució, a l'hora de cada fila."""
+    """Torna el valor de la sèrie `name` i la seva contribució a l'hora de cada fila."""
     inputs = seed["inputs"]
     found = members(seed, name)
     if len(found) == 1:
@@ -225,9 +227,11 @@ def pairs(seed, values, name):
 
 
 def dependence(folder, seeds, present):
-    """La contribució de cada previsió contra el seu valor, al millor model de la
-    primera llavor, amb la recta ajustada i el pendent de tots els models, que és el que
-    Trebbien et al. (2023) llegeixen."""
+    """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
+
+    Al millor model de la primera llavor, amb la recta ajustada, i el pendent de tots
+    els models, que és el que llegeixen Trebbien et al. (2023).
+    """
     explained = list(outputs(seeds[0]))
     units = dict(zip(explained, seeds[0]["units"], strict=True))
     panels, axes = plt.subplots(
