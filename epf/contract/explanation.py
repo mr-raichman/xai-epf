@@ -1,11 +1,8 @@
-"""El que comparteixen les explicacions de tots els models: el grup de cada columna, les
-unitats d'una contribució i la comprovació que la base més les contribucions torna la
-predicció que expliquen.
+"""El que comparteixen les explicacions de tots els models.
 
-La comprovació es fa dues vegades: a la memòria, abans de desar, contra el marge del seu
-espai, i sobre el fitxer desat, amb el mateix marge més el que hi pot haver mogut
-l'arrodoniment a `float32`. Quines sumes es tornen a fer sobre el fitxer ho diu cada
-família.
+La comprovació que la base més les contribucions torna la predicció es fa dues vegades:
+a la memòria, abans de desar, contra el marge del seu espai, i sobre el fitxer desat,
+amb el mateix marge més el que hi pot haver mogut l'arrodoniment a `float32`.
 """
 
 import numpy as np
@@ -21,13 +18,12 @@ TRANSFORMED_UNITS = "espai transformat"
 UNITLESS = "sense unitats"
 
 # Marge de la comprovació d'additivitat, en EUR/MWh: molt per sota de qualsevol
-# diferència que vulgui dir res en un preu. Es comprova sobre el que hi ha a la memòria,
-# abans de desar, i el residu de cada llavor es desa al costat de les seves puntuacions.
+# diferència que vulgui dir res en un preu.
 TOLERANCE = 1e-3
 
-# Marge de l'additivitat a l'espai transformat, a part perquè és en les seves unitats i
-# no en un preu: en EUR/MWh val tant com el de dalt, perquè a prop d'1 la derivada de
-# `sinh` és d'1,5 i la MAD de les files d'ajust va en desenes d'euros.
+# Marge de l'additivitat a l'espai transformat, en les seves unitats: en EUR/MWh val
+# tant com el de dalt, perquè a prop d'1 la derivada de `sinh` és d'1,5 i la MAD de les
+# files d'ajust va en desenes d'euros.
 TRANSFORMED_TOLERANCE = 1e-4
 
 # El que es pot moure un nombre, en relatiu, en desar-lo a `float32`, que és com es
@@ -36,9 +32,10 @@ ROUNDING = np.finfo(np.float32).eps / 2
 
 
 def group(column):
-    """El grup d'una columna a la importància per grups: la sèrie del conjunt
-    d'informació d'on surt o, la resta, el calendari. Una columna que només afegeix un
-    model en dona el grup ell mateix."""
+    """Torna el grup d'una columna: la sèrie d'on surt, o el calendari.
+
+    Una columna que només afegeix un model en dona el grup ell mateix.
+    """
     for name in INFORMATION:
         if column == name or column.startswith(f"{name}_"):
             return name
@@ -46,8 +43,11 @@ def group(column):
 
 
 def check(fitted, rank):
-    """Refusa un model ajustat la base més les contribucions del qual se separen de la
-    predicció que expliquen més que el marge del seu espai."""
+    """Refusa un model ajustat si la seva explicació no torna la predicció.
+
+    La base més les contribucions no se'n pot allunyar més que el marge del seu espai,
+    `fitted.tolerance`. `rank` és el lloc de la configuració, que diu el missatge.
+    """
     if fitted.gap > fitted.tolerance:
         raise Refusal(
             f"l'explicació de la configuració {rank} no torna la predicció: se "
@@ -56,20 +56,22 @@ def check(fitted, rank):
 
 
 def summed(base, values, axis):
-    """La base més les contribucions sumades sobre `axis`, en `float64`, i la suma dels
-    seus valors absoluts, que fita el que l'arrodoniment a `float32` hi pot haver
-    mogut."""
+    """Torna la base més les contribucions sumades sobre `axis`, en `float64`.
+
+    Torna també la suma dels seus valors absoluts, que fita el que l'arrodoniment a
+    `float32` hi pot haver mogut.
+    """
     base = np.asarray(base, dtype=np.float64)
     values = np.asarray(values, dtype=np.float64)
     return base + values.sum(axis=axis), np.abs(base) + np.abs(values).sum(axis=axis)
 
 
 def explained_rows(found, per_day):
-    """Les files de les prediccions de prova d'un fitxer que són dels dies explicats.
+    """Torna les files de prova d'un fitxer, `found`, que són dels dies explicats.
 
-    Són les primeres, perquè la partició dona els dies de cada part en ordre de data i
-    s'expliquen els primers dies de prova; el fitxer ho ha de confirmar, amb els seus
-    dies explicats al començament dels seus dies de prova.
+    Són les primeres, `per_day` per dia, perquè la partició dona els dies de cada part
+    en ordre de data i s'expliquen els primers dies de prova; el fitxer ho ha de
+    confirmar, amb els seus dies explicats al començament dels seus dies de prova.
     """
     explained, test = found["days_explained"], found["days_test"]
     if not np.array_equal(explained, test[: len(explained)]):
@@ -80,10 +82,12 @@ def explained_rows(found, per_day):
 
 
 def read_back(path, stored, tolerance):
-    """Torna la distància i el marge de la suma d'un fitxer desat que més es passa del
-    seu marge: el de la comprovació a la memòria més el que l'arrodoniment a `float32`
-    pot haver mogut els termes de la suma. Una distància dins del marge vol dir que el
-    fitxer torna el que explica."""
+    """Torna la distància i el marge de la suma que més se'n passa en un fitxer desat.
+
+    El marge és `tolerance` més el que l'arrodoniment a `float32` pot haver mogut els
+    termes de la suma, i una distància dins del marge vol dir que el fitxer torna el que
+    explica. `stored` és la funció de la família que dona les sumes del fitxer.
+    """
     worst = []
     with np.load(path) as found:
         for total, magnitude, target in stored(found):
