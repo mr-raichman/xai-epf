@@ -1,7 +1,4 @@
-"""Les puntuacions de tots els models: la R-quadrat i el MAE, el CRPS d'una predicció
-distribucional, el test de cobertura dels seus intervals, i la guarda que ha de passar
-el preu real.
-"""
+"""Les puntuacions de tots els models."""
 
 import numpy as np
 from scipy import stats
@@ -23,10 +20,10 @@ SIGNIFICANCE = 0.05
 
 
 def refuse_missing(frame, what):
-    """Falla si la matriu porta cap valor absent, anomenant on és el primer.
+    """Falla si `frame` té cap valor absent, i diu on és el primer.
 
     Un NaN faria tornar NaN la mesura sencera, o la faria saltar l'hora i informar-la
-    com si fos neta, segons com es mitjanés: es refusa abans, dient on és.
+    com si fos neta, segons com es mitjanés. `what` és el nom de la matriu al missatge.
     """
     missing = frame.isna()
     if not missing.to_numpy().any():
@@ -43,8 +40,10 @@ def refuse_missing(frame, what):
 
 
 def _checked(actual, quantiles):
-    """El preu real, `(dies, hores, 1)`, si ni ell ni els quantils predits porten cap
-    valor que no sigui un número."""
+    """Torna el preu real, `(dies, hores, 1)`, si ell i els quantils són números.
+
+    Falla amb un preu absent, i refusa uns quantils que no són finits.
+    """
     refuse_missing(actual, "el preu real")
     if not np.isfinite(quantiles).all():
         raise Refusal("els quantils predits tenen valors no finits")
@@ -52,15 +51,7 @@ def _checked(actual, quantiles):
 
 
 def crps(actual, quantiles, probabilities=PERCENTILES):
-    """CRPS d'una predicció distribucional, pel pinball mitjà sobre els percentils.
-
-    S'aproxima com fa Marcjasz et al. (2023), amb el pinball mitjà sobre 99
-    percentils.
-
-    El pinball d'un quantil `q` és `(1-q)(Q - y)` quan el preu real queda per sota del
-    quantil predit i `q(y - Q)` quan queda per sobre: penalitza més quedar-se curt als
-    quantils alts i llarg als baixos, que és el que fa que una distribució massa
-    estreta surti pitjor que una massa ampla amb el mateix centre.
+    """Torna el CRPS, el pinball mitjà sobre els percentils, com Marcjasz et al. (2023).
 
     `quantiles` és `(dies, hores, percentils)` i `actual` la matriu de preus dels
     mateixos dies, en el mateix ordre.
@@ -72,24 +63,20 @@ def crps(actual, quantiles, probabilities=PERCENTILES):
 
 
 def kupiec(actual, bounds, coverage):
-    """El valor p del test de cobertura incondicional de Kupiec (1995) a cada hora.
+    """Torna el valor p del test de cobertura incondicional de Kupiec (1995), per hora.
 
     `bounds` són els extrems de l'interval, `(dies, hores, 2)`, i `coverage` la seva
     cobertura nominal. Un preu dins l'interval, extrems inclosos, n'és un encert, i el
-    test compara la fracció d'encerts amb la nominal per la raó de versemblances
-    `-2 log((1 - c)^n0 c^n1 / ((1 - p)^n0 p^n1))`, una khi quadrat d'un grau, amb `n0`
-    les fallades, `n1` els encerts i `p` la fracció d'encerts (Nowotarski i Weron,
-    2018).
-
-    `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
-    hora que no falla mai donaria un NaN, i un NaN no passa mai el test sense dir per
-    què.
+    test és la raó de versemblances de Nowotarski i Weron (2018), una khi quadrat d'un
+    grau.
     """
     price = _checked(actual, bounds)[..., 0]
     hits = (bounds[..., 0] <= price) & (price <= bounds[..., 1])
     inside = hits.sum(axis=0)
     outside = len(hits) - inside
     observed = inside / len(hits)
+    # `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
+    # hora que no falla mai donaria un NaN, que no passa mai el test.
     statistic = -2 * (
         xlogy(outside, 1 - coverage)
         + xlogy(inside, coverage)
@@ -104,7 +91,7 @@ def mae(predicted, actual):
 
 
 def scored(predicted, actual):
-    """La R-quadrat i el MAE sobre totes les files de prova juntes."""
+    """Torna la R-quadrat i el MAE de totes les files juntes."""
     error = np.asarray(predicted) - np.asarray(actual)
     spread = np.asarray(actual) - np.mean(actual)
     return {
@@ -114,12 +101,11 @@ def scored(predicted, actual):
 
 
 def scored_distribution(actual, quantiles):
-    """El CRPS sobre totes les hores de prova i, de cada interval, quantes hores passen
-    el test de Kupiec, que és el que en reporten Marcjasz et al. (2023).
+    """Torna el CRPS i, de cada interval, quantes hores passen el test de Kupiec.
 
-    `actual` és la matriu del preu real de les files de prova i `quantiles` la funció
-    que en dóna els quantils predits a les probabilitats que se li demanen, `(dies,
-    hores, probabilitats)`.
+    És el que en reporten Marcjasz et al. (2023). `actual` és la matriu del preu real i
+    `quantiles` la funció que en dóna els quantils predits a les probabilitats que se li
+    demanen, `(dies, hores, probabilitats)`.
     """
     found = {"crps": crps(actual, quantiles(PERCENTILES))}
     for level, bounds in INTERVALS.items():
