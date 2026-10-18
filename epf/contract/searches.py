@@ -1,16 +1,12 @@
-"""El que comparteixen les cerques de tots els models: un estudi d'Optuna per llavor i
-família, el registre de les seves millors configuracions, i quines configuracions ajusta
-una passada a cada llavor.
+"""El que comparteixen les cerques de tots els models.
 
-Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompuda es
-reprèn on era. Quan una llavor té tots els seus intents, el seu registre en desa els
-millors en la forma en què els pren l'ajust, i sobre quines files es van fer: les
-columnes del conjunt i la partició. Una passada no llegeix un registre fet sobre unes
-altres files, i una cerca no es reprèn sobre unes altres files. Cada intent desa les
-empremtes del codi, del conjunt de dades i de les biblioteques amb què es va fer, i el
-registre les de cada un dels millors; una cerca es reprèn igualment sobre un altre
-codi, un altre conjunt de dades o unes altres biblioteques, i només unes altres files la
-refusen.
+Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompuda
+continua on era. Quan una llavor té tots els seus intents, el seu registre en desa els
+millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
+columnes del conjunt i la partició. Una cerca continua sobre un altre codi, un altre
+conjunt de dades o unes altres biblioteques, i cada intent en desa les empremtes, però
+no sobre unes altres files; i una passada no llegeix un registre fet sobre unes altres
+files.
 """
 
 import json
@@ -29,13 +25,12 @@ RECORD = "seed_{seed}.json"
 
 
 def folder(smoke, family):
-    """On viu la cerca d'una família: `searches/<família>/`, o
-    `searches/assaig_<família>/` la d'assaig."""
+    """Torna la carpeta de la cerca d'una família, la d'assaig si `smoke`."""
     return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
 
 
 def made_on(columns):
-    """Les files sobre què es fa una cerca: les columnes del conjunt i la partició."""
+    """Torna les files d'una cerca: les columnes del conjunt i la partició."""
     return plain(
         {
             "columns": list(columns),
@@ -48,15 +43,16 @@ def made_on(columns):
 
 
 def completed(study):
-    """Els intents acabats d'un estudi."""
     return [
         one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE
     ]
 
 
 def _seed(*parts):
-    """Una llavor d'Optuna de la del projecte i de `parts`, enters o textos, que no
-    canvia d'un procés a un altre com el `hash` d'un text."""
+    """Torna una llavor d'Optuna feta de la del projecte i de `parts`, enters o textos.
+
+    No canvia d'un procés a un altre, com faria el `hash` d'un text.
+    """
     entropy = [SEED]
     for part in parts:
         entropy += list(part.encode()) if isinstance(part, str) else [part]
@@ -64,14 +60,13 @@ def _seed(*parts):
 
 
 def _sampler(searcher, family, seed, study):
-    """Com tria cada intent la seva configuració, de la graella del cercador, `GRID`, o
-    del seu espai continu si no en té.
+    """Torna el mostrejador d'un estudi: la graella del cercador, `GRID`, o l'espai.
 
     Una graella es barreja amb una llavor de la família i de la partició, i l'intent `k`
-    en pren el punt `k`: una cerca represa continua per on anava, i cap punt no es
+    en pren el punt `k`: una cerca continuada segueix per on anava, i cap punt no es
     repeteix. Un espai continu es mostreja amb una llavor que compta també els intents
-    que l'estudi ja porta, perquè una cerca represa no torni a proposar els primers. El
-    nom de la família hi entra perquè dues famílies del mateix espai no proposin les
+    que l'estudi ja porta, perquè una cerca continuada no torni a proposar els primers.
+    El nom de la família hi entra perquè dues famílies del mateix espai no proposin les
     mateixes.
     """
     if searcher.GRID is not None:
@@ -83,15 +78,14 @@ def _sampler(searcher, family, seed, study):
 
 
 def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
-    """L'estudi d'una família en una llavor, amb els intents que li falten fins a
-    `trials`.
+    """Fa els intents que falten fins a `trials` a l'estudi d'una família en una llavor.
 
-    `searcher` és el `search.py` del model de la família: la seva graella, `GRID`, i
-    l'intent, `trial`. Cada intent s'ajusta amb les files d'entrenament de `parts` i es
-    puntua sobre les de validació, i la matriu no n'hi dóna cap altra. Els números que
-    en surten es desen a l'intent, en la forma en què els pren l'ajust, amb les
-    empremtes, `fingerprints`, del codi, del conjunt de dades i de les biblioteques que
-    el fan. Un estudi fet sobre unes altres files es refusa en lloc de reprendre's.
+    Torna l'estudi. `searcher` és el `search.py` del model de la família: la seva
+    graella, `GRID`, i l'intent, `trial`. Cada intent s'ajusta amb les files
+    d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
+    dóna cap altra. Els números que en surten es desen a l'intent, en la forma en què
+    els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del conjunt de dades
+    i de les biblioteques que el fan. Refusa un estudi fet sobre unes altres files.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(
@@ -131,9 +125,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
 
 
 def record(study, family, seed, smoke):
-    """El registre d'una cerca acabada: els `BEST` millors intents, del millor al
-    pitjor, amb els seus números, la seva puntuació i les empremtes amb què es van fer,
-    quants intents els van triar i sobre quines files."""
+    """Torna el registre d'una cerca acabada, amb els seus `BEST` millors intents."""
     done = sorted(completed(study), key=lambda one: one.value)
     return {
         "family": family,
@@ -156,19 +148,17 @@ def record(study, family, seed, smoke):
 
 
 def save(found, smoke):
-    """Desa un registre sencer, de manera que un registre amb nom és sempre una cerca
-    acabada."""
+    """Desa el registre d'una cerca acabada, `found`, sencer o gens."""
     write_record(
         folder(smoke, found["family"]) / RECORD.format(seed=found["seed"]), found
     )
 
 
 def searched(smoke, family, seed, columns):
-    """El registre de la cerca d'una família en una llavor, o `None` si no n'hi ha cap
-    d'acabada.
+    """Torna el registre de la cerca d'una família en una llavor, o `None` si no en té.
 
-    Un registre fet sobre unes altres columnes o una altra partició es refusa: els seus
-    números s'haurien triat per unes altres files, i res no ho diria.
+    Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició:
+    els seus números s'haurien triat per unes altres files, i res no ho diria.
     """
     path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
@@ -185,16 +175,16 @@ def searched(smoke, family, seed, columns):
 
 
 def configurations(smoke, plan, columns, seeds):
-    """Les configuracions que s'ajusten a cada llavor, de la millor a la pitjor, cada
-    una amb el seu lloc a la cerca.
+    """Torna les configuracions que s'ajusten a cada llavor, de la millor a la pitjor.
 
-    `plan` és l'entrada de la família a `FAMILIES` del seu model: les `kept` millors de
-    la cerca de la família `searched_as` del mateix tipus, si totes les llavors en
-    tenen; els números de lloc, `placeholder`, marcats, si no en té cap cap llavor; i
-    una sola sense números per a una família que no es cerca, `kept` zero. Una cerca que
-    només té algunes llavors es refusa: la dispersió barrejaria llavors cercades i sense
-    cercar, i res no ho diria. `columns` són les de la matriu sobre la qual es cerca,
-    que la cerca compara amb les seves.
+    Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
+    `FAMILIES` del seu model: les `kept` millors de la cerca de la família `searched_as`
+    del mateix tipus, si totes les llavors en tenen; els números de lloc,
+    `placeholder`, marcats, si no en té cap cap llavor; i una sola sense números per a
+    una família que no es cerca, `kept` zero. `columns` són les de la matriu sobre la
+    qual es cerca, que la cerca compara amb les seves. Refusa una cerca que només té
+    algunes llavors: la dispersió barrejaria llavors cercades i sense cercar, i res no
+    ho diria.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
