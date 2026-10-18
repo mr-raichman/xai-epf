@@ -1,13 +1,4 @@
-"""El que porta cada registre, com s'escriu, i com es desa el fitxer de cada model.
-
-Cada registre, el d'una cerca i el d'una passada, porta les empremtes del codi que el va
-fer, del conjunt de dades sobre el qual es va fer i de les biblioteques amb què es va
-fer. `plain` escriu un valor a JSON sense perdre què era:
-converteix les dates, les tuples i les claus, i deixa que qualsevol altra cosa faci
-petar l'escriptura, en lloc d'escriure-la com a text sense dir-ho. `save_model` desa un
-model primer a un fitxer a part, en torna a fer les sumes de l'explicació sobre el que
-s'ha escrit, i només llavors li dona el seu nom.
-"""
+"""Els registres de les cerques i de les passades, i el fitxer de cada model."""
 
 import collections
 import datetime
@@ -33,11 +24,13 @@ Fitted = collections.namedtuple(
 
 
 def code(package):
-    """L'empremta d'un paquet: la SHA-256 de tots els seus fitxers `.py`, en l'ordre del
-    seu camí dins del paquet escrit amb `/`, cada un amb aquest camí al davant. Els
-    finals de línia de Windows hi entren com els de Linux, perquè una mateixa còpia doni
-    la mateixa empremta als dos sistemes; qualsevol altre canvi, en un comentari també,
-    la canvia."""
+    """Torna l'empremta d'un paquet, la SHA-256 de tots els seus fitxers `.py`.
+
+    Cada fitxer hi entra en l'ordre del seu camí dins del paquet, escrit amb `/`, i amb
+    aquest camí al davant. Els finals de línia de Windows hi entren com els de Linux,
+    perquè una mateixa còpia doni la mateixa empremta als dos sistemes; qualsevol altre
+    canvi, en un comentari també, la canvia.
+    """
     digest = hashlib.sha256()
     found = {
         path.relative_to(package).as_posix(): path for path in package.rglob("*.py")
@@ -49,14 +42,18 @@ def code(package):
 
 
 def environment(lock):
-    """L'empremta de les biblioteques: la SHA-256 de `uv.lock`, que en fixa la versió
-    exacta, amb els finals de línia de Windows com els de Linux."""
+    """Torna l'empremta de les biblioteques, la SHA-256 de `uv.lock`.
+
+    Els finals de línia de Windows hi entren com els de Linux.
+    """
     return hashlib.sha256(lock.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def fingerprints():
-    """Les empremtes que porta cada registre: la del codi del paquet, la del conjunt de
-    dades, que `data/dataset.json` desa, i la de les biblioteques."""
+    """Torna les empremtes del codi, del conjunt de dades i de les biblioteques.
+
+    La del conjunt de dades és la que desa `data/dataset.json`.
+    """
     dataset = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))["dataset"]
     return {
         "code": code(paths.PACKAGE),
@@ -66,7 +63,11 @@ def fingerprints():
 
 
 def plain(value):
-    """El valor tal com es pot escriure a JSON, sense perdre què era."""
+    """Torna un valor tal com es pot escriure a JSON, sense perdre què era.
+
+    Converteix les dates, les tuples i les claus, i deixa que qualsevol altra cosa faci
+    fallar l'escriptura, en lloc d'escriure-la com a text sense dir-ho.
+    """
     if isinstance(value, dict):
         return {str(key): plain(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
@@ -77,20 +78,24 @@ def plain(value):
 
 
 def write_record(path, content):
-    """Escriu un registre a JSON, sencer."""
+    """Escriu el registre `content` a JSON, sencer o gens."""
     path.parent.mkdir(parents=True, exist_ok=True)
     paths.write_whole(path, json.dumps(plain(content), indent=2) + "\n")
 
 
 def _days(index):
+    """Torna els dies d'un índex com a `datetime64[D]`."""
     return index.to_numpy().astype("datetime64[D]")
 
 
 def save_model(path, parts, explained, fitted, scores, rank):
-    """Desa un model, `fitted`, primer a un fitxer a part i després al seu nom, de
-    manera que un fitxer amb nom és sempre un model sencer i, d'un model explicat, un
-    que torna el que explica: les sumes de l'explicació es tornen a fer sobre el que
-    s'ha escrit."""
+    """Desa un model ajustat, `fitted`, amb la seva partició i les seves puntuacions.
+
+    Un fitxer amb nom és sempre un model sencer i, d'un model explicat, un que torna el
+    que explica: les sumes de l'explicació es tornen a fer sobre el que s'ha escrit, i
+    un model que no les passa es refusa. Les taules de més d'una dimensió es desen en
+    `float32`. `rank` és el lloc de la configuració.
+    """
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
     arrays |= {
         "rank": rank,
