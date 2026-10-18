@@ -114,6 +114,9 @@ def fit_rows(
     les de `validate`, totes dues parelles `(X, y)`."""
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
+    # L'estat que Keras guarda entre ajustos, buidat: sense això un ajust amb dropout
+    # depèn del que el mateix procés va ajustar abans.
+    keras.backend.clear_session()
     keras.utils.set_random_seed(seed)
     model = build(distribution, values.shape[1], tuned)
     model.fit(

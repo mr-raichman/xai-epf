@@ -58,14 +58,22 @@ def recorded(folder):
     return {int(seed): planned for seed, planned in found.items()}
 
 
+def missing(folder):
+    """Les llavors del pla d'una família a les quals falta algun fitxer, cada una amb
+    les seves configuracions."""
+    return {
+        seed: planned
+        for seed, planned in recorded(folder).items()
+        if not all(
+            (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
+            for one in planned
+        )
+    }
+
+
 def complete(folder):
     """Si una família té pla i hi té tots els fitxers que diu."""
-    found = recorded(folder)
-    return found is not None and all(
-        (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
-        for seed, planned in found.items()
-        for one in planned
-    )
+    return recorded(folder) is not None and not missing(folder)
 
 
 def finished(where):

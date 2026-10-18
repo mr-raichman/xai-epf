@@ -1,15 +1,18 @@
 """El protocol de Trebbien et al. (2023) sobre el període que es descriu, amb la
 partició de `contract/split.py`: la robustesa és la dispersió entre llavors.
 
-`epf run` crida el `train.py` del model de cada família triada, l'una rere l'altra, que
-l'ajusta a cada llavor, la puntua sobre les setmanes de prova i n'explica les files de
-prova si el model s'explica. Continua l'última passada del seu tipus mentre no és
-acabada, amb totes les famílies, i si ho és en comença una altra; en diu el nom primer.
-Abans d'ajustar-ne cap, planifica amb `contract/searches.py` les famílies triades que
-encara no hi tenen pla: les millors configuracions de la cerca de cada llavor o, mentre
-la cerca no s'ha fet, uns números que no s'han cercat. El pla queda al registre de la
-família i ja no canvia, i cada ajust, el primer també, el llegeix d'allà. Tot es desa
-per llavor, de manera que les figures surten del que hi ha al disc i no d'un ajust nou.
+`epf run` fa de cada família triada, a cada llavor a la qual falta algun fitxer, una
+tasca de `run/pool.py`, que en fa unes quantes alhora: el `train.py` del model de la
+família l'ajusta en aquella llavor, la puntua sobre les setmanes de prova i n'explica
+les files de prova si el model s'explica. Si alguna tasca peta, les altres acaben, la
+passada queda a mitges i les figures no es dibuixen. Continua l'última passada del seu
+tipus mentre no és acabada, amb totes les famílies, i si ho és en comença una altra; en
+diu el nom primer. Abans d'ajustar-ne cap, planifica amb `contract/searches.py` les
+famílies triades que encara no hi tenen pla: les millors configuracions de la cerca de
+cada llavor o, mentre la cerca no s'ha fet, uns números que no s'han cercat. El pla
+queda al registre de la família i ja no canvia, i cada ajust, el primer també, el
+llegeix d'allà. Tot es desa per llavor, de manera que les figures surten del que hi ha
+al disc i no d'un ajust nou.
 """
 
 import datetime
@@ -20,7 +23,7 @@ import time
 from epf import parameters, paths
 from epf.contract import matrix, record
 from epf.contract.searches import configurations
-from epf.run import families, figures, search
+from epf.run import families, figures, pool, search
 
 # Cada família, en l'ordre en què una passada les ajusta, amb el mòdul del seu model que
 # l'ajusta, que s'importa quan es tria la família.
@@ -56,6 +59,22 @@ def _where(smoke, fingerprints):
                 f"aquells, o esborra-la"
             )
     return latest
+
+
+def _train(module, family, folder, seed, planned, explained_days):
+    """L'ajust d'una família en una llavor, una tasca de `pool`: el `train.py` del seu
+    model, `module`, amb el pla d'aquesta llavor sola. Torna què ha desat i quant ha
+    trigat."""
+    started = time.time()
+    described = importlib.import_module(module).train(
+        family, folder, {seed: planned}, explained_days
+    )
+    return {
+        "family": family,
+        "seed": seed,
+        "described": described,
+        "seconds": round(time.time() - started, 1),
+    }
 
 
 def main(arguments):
@@ -108,25 +127,47 @@ def main(arguments):
                 "parameters": values,
             },
         )
-    # Una família que ja hi té tots els fitxers no s'ajusta, i el seu registre guarda el
-    # temps de l'ajust que la va fer.
-    for family in chosen:
-        folder = where / family
-        if families.complete(folder):
-            continue
-        started = time.time()
-        described_now = trainers[family].train(
-            family, folder, families.recorded(folder), values["EXPLAINED_DAYS"]
+    # Una llavor que ja hi té tots els fitxers no s'ajusta, i el registre de la seva
+    # família guarda el que va desar i va trigar cada llavor l'última vegada.
+    tasks = [
+        (
+            f"{family} llavor {seed}",
+            _train,
+            (
+                TRAINERS[family],
+                family,
+                where / family,
+                seed,
+                planned,
+                values["EXPLAINED_DAYS"],
+            ),
         )
-        path = folder / paths.SEED_RECORD
+        for family in chosen
+        for seed, planned in families.missing(where / family).items()
+    ]
+    results, failed = pool.done(tasks, values["WORKERS"], values["THREADS"])
+    for family in chosen:
+        found = sorted(
+            (one for one in results.values() if one["family"] == family),
+            key=lambda one: one["seed"],
+        )
+        if not found:
+            continue
+        path = where / family / paths.SEED_RECORD
         record.write_record(
             path,
             json.loads(path.read_text(encoding="utf-8"))
             | {
-                "described_now": described_now,
-                "seconds_now": round(time.time() - started, 1),
+                "described_now": [pair for one in found for pair in one["described"]],
+                "seconds_now": {one["seed"]: one["seconds"] for one in found},
             },
         )
+    if failed:
+        print(
+            f"han petat {len(failed)} ajustos: {', '.join(failed)}; la passada "
+            f"{where.name} no és acabada"
+        )
+        return 1
     figures.draw(where)
     print(f"la passada és a {where}, amb les seves figures")
     return 0

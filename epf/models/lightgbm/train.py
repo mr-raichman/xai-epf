@@ -32,7 +32,14 @@ from epf.models.lightgbm.hyperparameters import (
     SUBSAMPLE_FREQ,
     UNSEARCHED,
 )
-from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, INTERACTION_ROWS, SEED
+from epf.parameters import (
+    BEST,
+    BLACKOUT_WEEK,
+    DEVELOPMENT,
+    INTERACTION_ROWS,
+    SEED,
+    THREADS,
+)
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
 # cerquen, el punt de lloc mentre no hi ha cerca, sense els seus arbres, perquè els
@@ -74,7 +81,7 @@ def lightgbm(point, trees, seed=SEED):
         min_child_samples=point["min_child_samples"],
         min_child_weight=MIN_CHILD_WEIGHT,
         random_state=seed,
-        n_jobs=-1,
+        n_jobs=THREADS,
         verbose=-1,
         deterministic=True,
         force_row_wise=True,

@@ -72,6 +72,18 @@ INTERACTION_ROWS = 1000
 # manera que totes les que en prenen una prenen la mateixa.
 SEED = 0
 
+# ------------------------------------------------------------ els processos
+
+# Quants processos fan alhora els ajustos d'una cerca o d'una passada. És a l'empremta
+# del codi, com tot aquest fitxer, de manera que una passada a mitges es continua amb
+# els mateixos.
+WORKERS = 4
+
+# Els fils de cada procés, sempre els mateixos: amb uns altres un ajust dóna uns altres
+# números, i amb aquests una passada dóna els mateixos siguin quants siguin els
+# processos.
+THREADS = 4
+
 # ------------------------------------------------------------ l'assaig
 
 # El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants.

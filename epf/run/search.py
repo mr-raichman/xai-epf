@@ -7,6 +7,9 @@ MAE en EUR/MWh, i les xarxes per la seva pèrdua de Keras sobre la validació, a
 a dins, que és el que torna el codi de Marcjasz et al. (2023). Una graella es recorre
 sense repetir cap punt; un espai continu es mostreja a l'atzar. Quina matriu llegeix,
 quina graella té i com es prova cada punt ho diu el `search.py` del model de la família.
+
+Cada família en cada llavor és una tasca de `run/pool.py`, que en fa unes quantes
+alhora; si alguna peta, les altres acaben i l'ordre ho diu en sortir.
 """
 
 import importlib
@@ -17,7 +20,7 @@ from epf import parameters, paths
 from epf.contract import matrix, record, searches
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-from epf.run import families
+from epf.run import families, pool
 
 # Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
 # model, que s'importa quan la família es cerca o es planifica.
@@ -35,10 +38,37 @@ def searcher(family):
     return importlib.import_module(SEARCHERS[family])
 
 
+def _search(family, seed, smoke, trials, fingerprints):
+    """La cerca d'una família en una llavor, una tasca de `pool`: l'estudi fins a
+    `trials` intents, el seu registre desat, i la línia que el resumeix."""
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    module = searcher(family)
+    X, y = getattr(matrix.matrices(matrix.series()), module.MATRIX)
+    made = searches.run(
+        searches.folder(smoke, family) / searches.STUDY.format(seed=seed),
+        family,
+        module,
+        X,
+        y,
+        split(seed, DEVELOPMENT, BLACKOUT_WEEK),
+        seed,
+        trials,
+        fingerprints,
+    )
+    found = searches.record(made, family, seed, smoke)
+    searches.save(found, smoke)
+    print(
+        f"{family} llavor {seed}: {found['trials']} intents, el millor "
+        f"{found['best'][0]['score']:.4g}",
+        flush=True,
+    )
+
+
 def main(arguments):
     values = parameters.chosen(arguments.smoke)
     seeds = values["SEEDS"]
-    # Tot el que es pot refusar, abans de cercar res.
+    # Tot el que es pot refusar, abans de cercar res. Les matrius les torna a llegir
+    # cada tasca, i aquí només es refusen.
     try:
         chosen = families.named(arguments.family, SEARCHERS)
         if arguments.seed:
@@ -50,36 +80,26 @@ def main(arguments):
                     f"té {list(seeds)}"
                 )
             seeds = [seed for seed in seeds if seed in arguments.seed]
-        matrices = matrix.matrices(matrix.series())
+        matrix.matrices(matrix.series())
         fingerprints = record.fingerprints()
     except ValueError as refused:
         print(refused)
         return 1
 
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
     for family in chosen:
-        module = searcher(family)
-        X, y = getattr(matrices, module.MATRIX)
-        where = searches.folder(arguments.smoke, family)
-        where.mkdir(parents=True, exist_ok=True)
-        for seed in seeds:
-            made = searches.run(
-                where / searches.STUDY.format(seed=seed),
-                family,
-                module,
-                X,
-                y,
-                split(seed, DEVELOPMENT, BLACKOUT_WEEK),
-                seed,
-                values["TRIALS"],
-                fingerprints,
-            )
-            found = searches.record(made, family, seed, arguments.smoke)
-            searches.save(found, arguments.smoke)
-            print(
-                f"{family} llavor {seed}: {found['trials']} intents, el millor "
-                f"{found['best'][0]['score']:.4g}",
-                flush=True,
-            )
+        searches.folder(arguments.smoke, family).mkdir(parents=True, exist_ok=True)
+    tasks = [
+        (
+            f"{family} llavor {seed}",
+            _search,
+            (family, seed, arguments.smoke, values["TRIALS"], fingerprints),
+        )
+        for family in chosen
+        for seed in seeds
+    ]
+    _, failed = pool.done(tasks, values["WORKERS"], values["THREADS"])
+    if failed:
+        print(f"han petat {len(failed)} cerques: {', '.join(failed)}")
+        return 1
     print(f"les cerques són a {paths.SEARCHES}")
     return 0

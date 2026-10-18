@@ -15,13 +15,15 @@ import pytest
 
 from epf import parameters, paths
 from epf.contract import matrix, record
-from epf.run import families, figures, run, search
+from epf.run import families, figures, pool, run, search
 
 
 @pytest.fixture
 def fake(tmp_path, monkeypatch):
     """Passades d'assaig de dues famílies d'un model que no ajusta res: cada una desa un
-    fitxer buit per cada configuració del pla que rep, i peta si és a `failing`."""
+    fitxer buit per cada configuració del pla que rep, i peta si és a `failing`. Les
+    tasques es fan aquí mateix i no en processos nous, que no veurien res del que es
+    canvia aquí."""
     state = types.SimpleNamespace(
         calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
     )
@@ -61,6 +63,17 @@ def fake(tmp_path, monkeypatch):
         search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily")
     )
     monkeypatch.setattr(figures, "draw", lambda where: None)
+
+    def done(tasks, workers, threads):
+        results, failed = {}, []
+        for label, function, arguments in tasks:
+            try:
+                results[label] = function(*arguments)
+            except RuntimeError:
+                failed.append(label)
+        return results, failed
+
+    monkeypatch.setattr(pool, "done", done)
     # Una sola llavor, sigui quina sigui la variant d'assaig que tria `chosen`.
     real = parameters.chosen
     monkeypatch.setattr(
@@ -80,8 +93,7 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     # canvia: la passada que la continua ha d'ajustar el que diu el seu registre, i no
     # tornar a ajustar la primera, que ja hi és sencera.
     fake.failing = {"second"}
-    with pytest.raises(RuntimeError):
-        fake.main()
+    assert fake.main() == 1
     fake.failing = set()
     fake.module.FAMILIES["second"]["placeholder"] = {"value": 2}
     assert fake.main() == 0
@@ -101,8 +113,7 @@ def test_a_finished_run_is_never_continued(fake, capsys):
 
 def test_a_run_made_by_other_code_is_refused_and_not_continued(fake, capsys):
     fake.failing = {"second"}
-    with pytest.raises(RuntimeError):
-        fake.main()
+    assert fake.main() == 1
     fake.failing = set()
     fake.fingerprints["code"] = "un altre codi"
     calls = len(fake.calls)
