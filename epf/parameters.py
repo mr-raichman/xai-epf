@@ -1,15 +1,7 @@
-"""Tot el que s'ha triat per a una passada, un sol valor de cada.
+"""Els valors que tria una passada sencera, un de cada.
 
-El que és un fet del mercat o de la font no és aquí, llevat de les hores del dia: això
-viu a `dataset/esios.py`.
-Els números d'un model tampoc: viuen amb el model, a
-`models/<model>/hyperparameters.py`. Aquí només hi ha el que val per a la
-passada sencera.
-
-Són els valors d'una mesura; `--smoke` posa en lloc dels seus els d'una de les variants
-d'assaig del final, la que tria `chosen`, i no en canvia cap altre. Una passada els desa
-tots al registre de cada família, amb l'empremta del codi i la del conjunt de dades que
-la van fer.
+Són els d'una mesura, i un assaig en canvia els de la seva variant, la que tria
+`chosen`. Una passada els desa tots al registre de cada família.
 """
 
 import datetime
@@ -31,7 +23,7 @@ DEVELOPMENT = (datetime.date(2019, 1, 1), datetime.date(2026, 9, 28))
 # necessiten, el 29 i el 30, són d'aquesta setmana.
 BLACKOUT_WEEK = (datetime.date(2025, 4, 29), datetime.date(2025, 5, 5))
 
-# Percentatge de les setmanes que va a entrenament, a validació i a prova, els de
+# Percentatges de les setmanes que van a entrenament, a validació i a prova, els de
 # Trebbien et al. (2023).
 SHARES = (48, 32, 20)
 
@@ -89,9 +81,7 @@ SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
 
 
 def chosen(smoke):
-    """Cada valor d'aquest fitxer pel seu nom, amb els d'una variant d'assaig en lloc
-    dels de la mesura si és un assaig. Les variants mateixes no hi són: són els valors
-    que fa servir una passada, que es desen al seu registre."""
+    """Torna cada valor d'aquest fitxer pel seu nom, els d'assaig si `smoke`."""
     found = {
         name: value
         for name, value in globals().items()
