@@ -1,10 +1,4 @@
-"""La passada de la xarxa elàstica d'Uniejewski et al. (2016), de la matriu per hora als
-seus fitxers.
-
-Per a cada llavor i configuració: els 24 models ajustats amb les files d'entrenament, el
-preu de les setmanes de prova, la seva puntuació, l'atribució de les files que
-s'expliquen, la comprovació que suma la predicció que explica, i el fitxer.
-"""
+"""La passada de la xarxa elàstica d'Uniejewski et al. (2016)."""
 
 import numpy as np
 
@@ -24,8 +18,8 @@ from epf.models.elastic_net.hyperparameters import MAX_ITER, MIXING, NAME, PENAL
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT
 
 # La família, com la planifica una passada: el sostre d'iteracions, que no es cerca, el
-# càstig i la barreja de lloc mentre no hi ha cerca, i les deu millors de cada llavor de
-# la seva pròpia cerca.
+# càstig i la barreja de lloc mentre no hi ha cerca, i les `BEST` millors de cada llavor
+# de la seva pròpia cerca.
 FAMILIES = {
     NAME: {
         "fixed": {"max_iter": MAX_ITER},
@@ -37,8 +31,10 @@ FAMILIES = {
 
 
 def _fitted(X, y, parts, explained, numbers):
-    """Els 24 models d'una configuració, amb el càstig i la barreja de `numbers`, i
-    l'atribució de les files explicades."""
+    """Ajusta els 24 models d'una configuració i n'explica les files explicades.
+
+    El càstig i la barreja són els de `numbers`.
+    """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)
     )
@@ -70,8 +66,12 @@ def _fitted(X, y, parts, explained, numbers):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la família: cada configuració de cada llavor ajustada, comprovada,
-    puntuada i desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     X, y = matrix.matrices(matrix.series()).hourly
     done = []
     for seed, planned in configurations.items():
