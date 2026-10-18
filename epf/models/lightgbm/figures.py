@@ -1,21 +1,22 @@
-"""Les figures de l'arbre i de la sonda de datació, dibuixades del que la passada va
-desar: la importància de cada columna i de cada grup, la dependència de cada sèrie i les
-seves interaccions."""
+"""Les figures de l'arbre i de la sonda de datació, del que la passada va desar."""
 
 import numpy as np
 
 from epf.contract import figure
 from epf.contract.figure import plt
 
-# Socis de cada sèrie a les interaccions: els tres que més hi interactuen, la regla que
-# fa de les "three selected features" de Trebbien et al. (2023).
+# Socis de cada sèrie a les interaccions, els que més hi interactuen: la regla que fa de
+# les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
 
 def _interactions(folder, seed, present):
-    """Al millor model de la primera llavor, per a cada sèrie: la dependència sencera,
-    l'efecte sense interaccions i la interacció amb els tres socis més forts, amb el
-    color del valor de cada soci."""
+    """Dibuixa les interaccions de cada sèrie al millor model de la primera llavor.
+
+    Aquest model és `seed`. Per sèrie de `present`, la dependència sencera, l'efecte
+    sense interaccions i la interacció amb els `PARTNERS` socis més forts, amb el color
+    del valor de cada soci.
+    """
     columns = list(seed["columns"])
     rows = seed["interaction_rows"]
     inputs, interactions = seed["inputs"][rows], seed["interactions"]
@@ -53,6 +54,10 @@ def _interactions(folder, seed, present):
 
 
 def draw(folder, seeds):
+    """Dibuixa les figures d'una família a `folder`, dels seus models desats, `seeds`.
+
+    La importància, la dependència i, si el fitxer en porta, les interaccions.
+    """
     figure.importance(folder, seeds)
     present = figure.present(seeds[0])
     if present:
