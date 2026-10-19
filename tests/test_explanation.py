@@ -1,9 +1,3 @@
-"""Si el fitxer desat d'un model torna el que explica.
-
-No peta quan falla: un fitxer que no sumés el que explica faria figures d'una explicació
-que no és la del model.
-"""
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -23,8 +17,7 @@ EXPLAINED = TEST_DAYS[:2]
 
 
 def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED):
-    """Desa un model amb `arrays` i `predicted` com ho fa la passada, i en torna el
-    camí."""
+    """Desa un model amb `arrays` i `predicted` com la passada, i en torna el camí."""
     none = TEST_DAYS[:0]
     path = tmp_path / "seed_0_0.npz"
     fitted = Fitted(predicted, predicted, arrays, 0.0, TOLERANCE, stored=stored)
@@ -33,15 +26,15 @@ def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED):
 
 
 def _tree(values):
-    """La predicció de prova de l'arbre que fan els seus valors amb una base de 50, als
-    dies explicats, i qualsevol als altres."""
+    """Torna la predicció de prova que fan `values` amb una base de 50.
+
+    Als dies que no s'expliquen val zero.
+    """
     return np.concatenate([50.0 + values.sum(axis=1), np.zeros(HOURS_PER_DAY)])
 
 
 def test_a_file_off_only_by_float32_rounding_takes_its_name(tmp_path):
-    # Valors prou grans perquè desar-los a `float32` passi tot sol del marge de la
-    # memòria: la fita de l'arrodoniment és el que fa que no es refusi cap model per com
-    # es desa.
+    # Valors prou grans perquè desar-los a `float32` passi tot sol del marge.
     values = np.random.default_rng(0).normal(0, 1e5, (2 * HOURS_PER_DAY, 200))
     rounded = values.astype(np.float32).astype(np.float64)
     assert (
@@ -58,6 +51,7 @@ def test_a_file_off_only_by_float32_rounding_takes_its_name(tmp_path):
 
 
 def test_a_file_that_does_not_add_up_is_refused_and_takes_no_name(tmp_path):
+    """Un fitxer que no sumés el que explica faria figures d'una altra explicació."""
     # Les prediccions desades en un altre ordre, com les deixaria un fitxer mal escrit.
     values = np.random.default_rng(0).normal(0, 10, (2 * HOURS_PER_DAY, 20))
     with pytest.raises(ValueError):
@@ -71,8 +65,7 @@ def test_a_file_that_does_not_add_up_is_refused_and_takes_no_name(tmp_path):
 
 
 def test_a_file_holding_a_nan_is_refused(tmp_path):
-    # Una xarxa que divergeix dona NaN, i un NaN no és més gran que cap marge: la
-    # lectura l'ha de refusar igualment.
+    # Una xarxa que divergeix dona NaN.
     values = np.random.default_rng(0).normal(0, 10, (2 * HOURS_PER_DAY, 20))
     predicted = _tree(values)
     values[0, 0] = np.nan
@@ -86,9 +79,8 @@ def test_a_file_holding_a_nan_is_refused(tmp_path):
 
 
 def test_explained_days_other_than_the_first_test_days_are_refused(tmp_path):
-    # La lectura pren les primeres files de prova pels dies explicats. Amb una altra
-    # tria de dies compararia les sumes amb les prediccions d'uns altres dies, i aquí,
-    # on totes valen igual, no se n'adonaria.
+    # Amb uns altres dies explicats, la lectura compararia les sumes amb les prediccions
+    # d'uns altres dies, i aquí, on totes valen igual, no se n'adonaria.
     values = np.zeros((2 * HOURS_PER_DAY, 3))
     with pytest.raises(ValueError):
         _saved(
