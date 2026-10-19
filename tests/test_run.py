@@ -1,11 +1,3 @@
-"""Una passada: quina es continua, quin pla ajusta cada família, i quina es refusa.
-
-Res d'això no peta quan falla. Una passada acabada que es continués en barrejaria dues;
-un pla fet de nou a mitja passada ajustaria unes famílies amb uns números i, en
-tornar-hi, les altres amb uns altres; i una passada continuada amb un altre codi tindria
-famílies que no ha fet el mateix codi.
-"""
-
 import datetime
 import sys
 import types
@@ -20,10 +12,12 @@ from epf.run import families, figures, pool, run, search
 
 @pytest.fixture
 def fake(tmp_path, monkeypatch):
-    """Passades d'assaig de dues famílies d'un model que no ajusta res: cada una desa un
-    fitxer buit per cada configuració del pla que rep, i peta si és a `failing`. Les
-    tasques es fan aquí mateix i no en processos nous, que no veurien res del que es
-    canvia aquí."""
+    """Prepara passades d'assaig de dues famílies d'un model que no ajusta res.
+
+    Cada família desa un fitxer buit per configuració del pla que rep, i falla si és a
+    `failing`. Les tasques es fan aquí mateix i no en processos nous, que no veurien res
+    del que es canvia aquí. Torna l'estat, amb `main`, que en fa una.
+    """
     state = types.SimpleNamespace(
         calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
     )
@@ -85,13 +79,14 @@ def fake(tmp_path, monkeypatch):
 
 
 def _name(number):
+    """Torna el nom de la passada d'assaig d'avui que porta el número `number`."""
     return f"{paths.SMOKE_PREFIX}{datetime.date.today().isoformat()}_{number:02d}"
 
 
 def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, capsys):
-    # La segona família peta la primera vegada, i mentrestant el seu número de lloc
-    # canvia: la passada que la continua ha d'ajustar el que diu el seu registre, i no
-    # tornar a ajustar la primera, que ja hi és sencera.
+    """Refet en continuar, el pla canviaria els números de les famílies que falten."""
+    # La segona família falla la primera vegada, i el seu número de lloc canvia abans de
+    # continuar; la primera, ja sencera, no es torna a ajustar.
     fake.failing = {"second"}
     assert fake.main() == 1
     fake.failing = set()
@@ -107,6 +102,7 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
 
 
 def test_a_finished_run_is_never_continued(fake, capsys):
+    """Una passada acabada que es continués en barrejaria dues."""
     assert fake.main() == 0
     assert fake.main() == 0
     shown = capsys.readouterr().err
