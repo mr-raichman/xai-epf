@@ -8,7 +8,7 @@ NONE = pd.DatetimeIndex([])
 
 
 def table_of(days=DAYS, names=("price",)):
-    """Torna un conjunt de dades coherent, de `days` dies des del 2024-01-01."""
+    """Torna un dataset coherent, de `days` dies des del 2024-01-01."""
     index = pd.MultiIndex.from_tuples(
         [
             (day.strftime("%Y-%m-%d"), hour)

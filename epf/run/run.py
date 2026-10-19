@@ -17,7 +17,7 @@ from epf.run import families, figures, pool, progress, search
 # va començar i aquella amb què s'ha d'acabar.
 DIFFERENT = {
     "code": ("un altre codi", "aquell codi"),
-    "dataset": ("un altre conjunt de dades", "aquell conjunt de dades"),
+    "dataset": ("un altre dataset", "aquell dataset"),
     "environment": ("unes altres biblioteques", "aquelles biblioteques"),
 }
 
@@ -40,9 +40,9 @@ TRAINERS = {
 def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
 
-    Refusa continuar-ne una que van començar un altre codi, un altre conjunt de dades o
-    unes altres biblioteques, perquè les seves famílies no es podrien comparar. Un
-    registre sense una de les empremtes d'ara és d'un altre codi.
+    Refusa continuar-ne una que van començar un altre codi, un altre dataset o unes
+    altres biblioteques, perquè les seves famílies no es podrien comparar. Un registre
+    sense una de les empremtes d'ara és d'un altre codi.
     """
     found = paths.runs(smoke)
     if not found or families.finished(found[-1]):

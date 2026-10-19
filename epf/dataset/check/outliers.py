@@ -1,4 +1,4 @@
-"""Com s'allunya cada valor d'una sèrie dels seus veïns, i quins són els més allunyats.
+"""L'estudi d'outliers d'una sèrie: com s'allunya cada valor dels seus veïns.
 
 L'informe no refusa res i no porta cap llindar.
 """

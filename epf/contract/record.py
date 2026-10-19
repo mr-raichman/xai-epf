@@ -50,9 +50,9 @@ def environment(lock):
 
 
 def fingerprints():
-    """Torna les empremtes del codi, del conjunt de dades i de les biblioteques.
+    """Torna les empremtes del codi, del dataset i de les biblioteques.
 
-    La del conjunt de dades és la que desa `data/dataset.json`.
+    La del dataset és la que desa `data/dataset.json`.
     """
     dataset = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))["dataset"]
     return {

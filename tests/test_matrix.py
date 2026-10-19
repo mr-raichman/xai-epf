@@ -150,7 +150,7 @@ def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
 
 @pytest.fixture
 def downloaded(tmp_path, monkeypatch):
-    """Escriu un conjunt de dades com `epf dataset`, i torna el fitxer baixat.
+    """Escriu un dataset com `epf dataset`, i torna el fitxer baixat.
 
     El conjunt és un preu de tres dies que val `0.1 + 0.2` a la primera hora.
     """
@@ -188,7 +188,7 @@ def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
 
 def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
     """Una matriu desada que tornés uns altres decimals no ho diria."""
-    # Valors amb tots els decimals d'un float, com els del conjunt de dades.
+    # Valors amb tots els decimals d'un float, com els del dataset.
     found = matrices({name: frame / 7 for name, frame in every_series().items()})
     matrix.write(found, tmp_path)
     for name, (X, y), target in (

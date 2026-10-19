@@ -26,9 +26,9 @@ DAY = "day"
 HOUR = "hour"
 PRICE = "price"
 
-# El conjunt d'informació: cada sèrie del conjunt de dades que entra a les matrius, en
-# l'ordre de les seves columnes, amb els dies abans del lliurament en què hi entra. El
-# preu, que és també el que es prediu, hi entra amb les 24 hores de cada retard.
+# El conjunt d'informació: cada sèrie del dataset que entra a les matrius, en l'ordre de
+# les seves columnes, amb els dies abans del lliurament en què hi entra. El preu, que és
+# també el que es prediu, hi entra amb les 24 hores de cada retard.
 INFORMATION = {
     PRICE: PREVIOUS_DAY,
     "demand_fcst": (FORECAST_LAG,),
@@ -114,7 +114,7 @@ def _digest(path):
 
 
 def _refuse_stale():
-    """Refusa un conjunt de dades que no hi és o que no és el dels fitxers d'ara.
+    """Refusa un dataset que no hi és o que no és el dels fitxers d'ara.
 
     Els fitxers que va llegir han de ser com eren, i `dataset.csv` com es va escriure.
     Una baixada torna a escriure sempre el fitxer de l'any en curs, de manera que una
@@ -123,7 +123,7 @@ def _refuse_stale():
     again = 'recrear amb "uv run epf dataset"'
     if not (paths.DATASET.is_file() and paths.DATASET_RECORD.is_file()):
         raise Refusal(
-            f"no hi ha cap conjunt de dades a {paths.relative(paths.DATA)}/; crear amb "
+            f"no hi ha cap dataset a {paths.relative(paths.DATA)}/; crear amb "
             f'"uv run epf dataset"'
         )
     record = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))
@@ -141,7 +141,7 @@ def _refuse_stale():
             else f"{len(changed)} dels fitxers baixats que va llegir han canviat o no "
             f"hi són, el primer {first}"
         )
-        raise Refusal(f"el conjunt de dades és desfasat: {counted}; {again}")
+        raise Refusal(f"el dataset és desfasat: {counted}; {again}")
     if _digest(paths.DATASET) != record["dataset"]:
         raise Refusal(
             f"{paths.relative(paths.DATASET)} ha canviat des que es va fer; {again}"
@@ -149,7 +149,7 @@ def _refuse_stale():
 
 
 def series():
-    """Llegeix cada sèrie del conjunt de dades, pel seu nom, en dies per hores.
+    """Llegeix cada sèrie del dataset, pel seu nom, en dies per hores.
 
     Cada una va del primer al darrer dia amb algun valor: un dia buit fora del tram
     d'una sèrie faria una fila amb el preu que s'ha de predir absent. Refusa un conjunt
@@ -192,7 +192,7 @@ def write(found, folder):
 
     A la diària, el del dia, de `price_h00` a `price_h23`, i a la per hora, el de
     l'hora, `price`. Una que ja hi és no es torna a escriure: una passada que es
-    continua és del mateix codi i del mateix conjunt de dades que la van començar.
+    continua és del mateix codi i del mateix dataset que la van començar.
     """
     (X, y), (rows, target) = found.daily, found.hourly
     for name, frame in (

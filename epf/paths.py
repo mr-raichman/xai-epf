@@ -15,8 +15,8 @@ LOCK = ROOT / "uv.lock"
 # indicador, `downloads/<indicador>/<any>.json`.
 DOWNLOADS = ROOT / "downloads"
 
-# El conjunt de dades, el registre dels fitxers baixats d'on es va fer, i les figures
-# que el descriuen, una carpeta per sèrie.
+# El dataset, el registre dels fitxers baixats d'on es va fer, i les figures que el
+# descriuen, una carpeta per sèrie.
 DATA = ROOT / "data"
 DATASET = DATA / "dataset.csv"
 DATASET_RECORD = DATA / "dataset.json"

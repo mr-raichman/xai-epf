@@ -1,4 +1,4 @@
-"""La figura de cada valor horari de cada sèrie del conjunt de dades."""
+"""La figura de cada valor horari de cada sèrie del dataset."""
 
 import numpy as np
 import pandas as pd

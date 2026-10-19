@@ -4,9 +4,8 @@ Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompud
 continua on era. Quan una llavor té tots els seus intents, el seu registre en desa els
 millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
 columnes de la matriu i la partició. Una cerca continua sobre un altre codi, un altre
-conjunt de dades o unes altres biblioteques, i cada intent en desa les empremtes, però
-no sobre unes altres files; i una passada no llegeix un registre fet sobre unes altres
-files.
+dataset o unes altres biblioteques, i cada intent en desa les empremtes, però no sobre
+unes altres files; i una passada no llegeix un registre fet sobre unes altres files.
 """
 
 import json
@@ -84,8 +83,8 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
     graella, `GRID`, i l'intent, `trial`. Cada intent s'ajusta amb les files
     d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
     dona cap altra. Els números que en surten es desen a l'intent, en la forma en què
-    els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del conjunt de dades
-    i de les biblioteques que el fan. Refusa un estudi fet sobre unes altres files.
+    els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del dataset i de les
+    biblioteques que el fan. Refusa un estudi fet sobre unes altres files.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(

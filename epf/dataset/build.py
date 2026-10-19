@@ -1,4 +1,4 @@
-"""El conjunt de dades, `data/dataset.csv`, fet dels fitxers d'ESIOS de `downloads/`."""
+"""El dataset, `data/dataset.csv`, fet dels fitxers d'ESIOS de `downloads/`."""
 
 import hashlib
 import json
@@ -57,8 +57,8 @@ INDICATORS = {
     ),
 }
 
-# Cada columna del conjunt de dades, en el seu ordre, amb els indicadors que suma, en
-# l'ordre en què se sumen. L'eòlica programada no és cap columna: només fa d'àncora.
+# Cada columna del dataset, en el seu ordre, amb els indicadors que suma, en l'ordre en
+# què se sumen. L'eòlica programada no és cap columna: només fa d'àncora.
 SERIES = {
     "price": ("price",),
     "demand_fcst": ("demand_fcst",),
@@ -156,7 +156,7 @@ def gaps(name):
 
 
 def table(found):
-    """Torna el conjunt de dades, una fila per dia local i hora i una columna per sèrie.
+    """Torna el dataset, una fila per dia local i hora i una columna per sèrie.
 
     Va del primer dia que té alguna sèrie a l'últim, i cada columna és buida fora del
     tram de la seva sèrie.
@@ -183,12 +183,12 @@ def _digest(path):
 
 
 def write(rows, read):
-    """Escriu el conjunt de dades i el seu registre, si passa les comprovacions.
+    """Escriu el dataset i el seu registre, si passa les comprovacions.
 
     Es comprova el fitxer escrit, llegit com el llegeixen els models, abans que porti el
-    seu nom, de manera que un conjunt de dades refusat deixa l'anterior com era. El
-    registre porta l'empremta de cada fitxer de `read`, pel seu camí sota `downloads/`,
-    i la del conjunt de dades.
+    seu nom, de manera que un dataset refusat deixa l'anterior com era. El registre
+    porta l'empremta de cada fitxer de `read`, pel seu camí sota `downloads/`, i la del
+    dataset.
     """
     paths.DATA.mkdir(exist_ok=True)
     partial = paths.DATASET.with_suffix(".part")
@@ -214,9 +214,9 @@ def write(rows, read):
 
 
 def main():
-    """Fa el conjunt de dades, la comanda `epf dataset`, i torna 0.
+    """Fa el dataset, la comanda `epf dataset`, i torna 0.
 
-    El comprova i l'escriu, i en desa les figures i l'informe de veïnatge de cada sèrie.
+    El comprova i l'escriu, i en desa les figures i l'estudi d'outliers de cada sèrie.
     Refusa el que refusen el lector d'ESIOS o les comprovacions.
     """
     frames, read = indicators(paths.DOWNLOADS)

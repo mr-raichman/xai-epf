@@ -1,4 +1,4 @@
-"""Les comprovacions del conjunt de dades, les mateixes per a totes les sèries.
+"""Les comprovacions del dataset, les mateixes per a totes les sèries.
 
 L'error de cada una donaria més endavant un número plausible en lloc de fallar: un dia i
 una hora repetits doblarien el seu pes, unes files fora d'ordre o un dia que falta
@@ -14,7 +14,7 @@ from epf.parameters import HOURS_PER_DAY
 
 
 def check(table, gaps):
-    """Refusa el conjunt de dades si no és coherent.
+    """Refusa el dataset si no és coherent.
 
     `table` té una fila per dia i hora, amb el dia, `AAAA-MM-DD`, i l'hora, de 0 a 23,
     com a índex, i una columna per sèrie. `gaps` són, per sèrie, les hores que la font
@@ -24,7 +24,7 @@ def check(table, gaps):
     """
 
     def refused(detail):
-        return Refusal(f"el conjunt de dades no és coherent: {detail}")
+        return Refusal(f"el dataset no és coherent: {detail}")
 
     def counted(count, one, many, first=None):
         """Torna `3 dies sense 24 hores, el primer 2020-03-29`, en singular o en plural.
