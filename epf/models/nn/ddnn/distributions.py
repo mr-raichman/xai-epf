@@ -1,25 +1,12 @@
-"""Les dues distribucions de sortida de Marcjasz et al. (2023), i què en cal saber.
-
-Cada una defineix una família a part, que és el que fa l'article: la normal té dos
-paràmetres per hora i la de Johnson SU en té quatre.
-
-De cada una en calen cinc coses. Quantes sortides vol la xarxa, la pèrdua que
-minimitza, quin preu puntual se'n deriva, com se'n treuen els quantils i com es diuen
-els seus paràmetres.
-
-La pèrdua és la log-versemblança negativa, que és el que l'article minimitza allà on la
-xarxa de punt minimitza el MAE, i és tota la diferència entre les dues.
-"""
+"""Les dues distribucions de sortida de Marcjasz et al. (2023)."""
 
 from keras import ops
 from scipy import stats
 
 from epf.models.nn.network import Distribution, heads
 
-# Com surten l'escala i el pes de la cua de la sortida crua, al codi de Marcjasz et al.
-# (2023): `FLOOR + STRETCH * softplus` l'escala, que no pot ser zero perquè un zero hi
-# fa infinita la log-versemblança, i `TAIL_FLOOR + STRETCH * softplus` el pes de la cua
-# de Johnson SU, que mai no baixa d'1.
+# Els mínims de l'escala i del pes de la cua, i el factor del softplus que s'hi suma,
+# els del codi de l'article: una escala de zero faria infinita la log-versemblança.
 FLOOR = 1e-3
 STRETCH = 3
 TAIL_FLOOR = 1
@@ -34,6 +21,7 @@ def _tail(raw):
 
 
 def _normal_loss(target, raw):
+    """Torna la log-versemblança negativa de la normal, llevat de constants."""
     location, scale = heads(raw, 2)
     scale = _scale(scale)
     return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
@@ -52,11 +40,10 @@ def _normal_quantiles(parameters, probabilities):
 
 
 def _johnson_loss(target, raw):
-    """La de Johnson SU, amb l'asimetria i el pes de la cua com a paràmetres propis.
+    """Torna la log-versemblança negativa de Johnson SU, llevat de constants.
 
     `-log p = 0.5 * (skew + tail * asinh(z))^2 + log(scale) + 0.5 * log(1 + z^2)
-    - log(tail)`, amb `z = (y - location) / scale`, llevat de constants que no depenen
-    de cap paràmetre i que per tant no mouen cap gradient.
+    - log(tail)`, amb `z = (y - location) / scale`.
     """
     location, scale, skew, tail = heads(raw, 4)
     scale, tail = _scale(scale), _tail(tail)
@@ -79,7 +66,7 @@ def _johnson_flat(raw):
 
 def _johnson_quantiles(parameters, probabilities):
     # `scipy` anomena `a` l'asimetria i `b` el pes de la cua, i la seva densitat porta
-    # `a + b * asinh(z)`, que és la mateixa parametrització que la pèrdua de dalt.
+    # `a + b * asinh(z)`, que és la mateixa parametrització que `_johnson_loss`.
     location, scale = parameters[..., 0], parameters[..., 1]
     skew, tail = parameters[..., 2], parameters[..., 3]
     return stats.johnsonsu.ppf(
@@ -91,8 +78,7 @@ def _johnson_quantiles(parameters, probabilities):
     )
 
 
-# El preu puntual és la mediana de la distribució i no la mitjana, que és el que fa
-# l'article per al MAE.
+# El preu puntual de cada una és la mediana i no la mitjana, com a l'article per al MAE.
 NORMAL = Distribution(
     names=("location", "scale"),
     loss=_normal_loss,
