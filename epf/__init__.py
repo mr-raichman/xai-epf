@@ -3,9 +3,9 @@ formació."""
 
 
 class Refusal(ValueError):
-    """El refús d'una ordre: les dades, els paràmetres o el que s'ha teclejat no li
-    permeten continuar, i el missatge en diu el motiu.
+    """El refús d'una ordre que no pot continuar, amb el motiu al missatge.
 
-    La línia d'ordres l'escriu com a `error: <missatge>`; qualsevol altra excepció és un
-    error del codi i en mostra la traça.
+    El causen les dades, els paràmetres o el que s'ha teclejat. La línia d'ordres
+    l'escriu com a `error: <missatge>`; qualsevol altra excepció és un error del codi, i
+    en mostra la traça.
     """
