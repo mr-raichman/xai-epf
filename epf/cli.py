@@ -1,14 +1,4 @@
-"""Tot el que es tecleja a mà, en una sola ordre amb subordres.
-
-`epf --help` és la llista de què es pot teclejar.
-
-Els mòduls s'importen quan es tria la subordre i no abans.
-`models/lightgbm/attribution.py` porta `shap`, que costa un segon llarg, i amb els
-imports a dalt el pagarien `epf dataset` i fins i tot `epf --help`. Per això a la taula
-hi ha el nom del mòdul i no el mòdul, i per això els arguments es declaren aquí:
-`argparse` construeix totes les subordres abans de llegir-ne cap, així que demanar-los a
-cada mòdul els tornaria a importar tots.
-"""
+"""Tot el que es tecleja a mà, en una sola ordre amb subordres."""
 
 import argparse
 import collections
@@ -18,14 +8,16 @@ import sys
 import epf
 
 # Una subordre: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
-# declara els arguments. `arguments` és `None` quan no en pren cap, i és també el que
-# diu que la seva funció es crida sense res.
+# declara els arguments, `None` si no en pren cap i la funció es crida sense res. El
+# mòdul hi va pel nom, perquè s'importi només quan es tria la subordre: `shap` costa un
+# segon llarg, i el pagaria fins i tot `epf --help`.
 Command = collections.namedtuple("Command", "module function help arguments")
 
 
+# Els arguments es declaren aquí, i no al mòdul de cada subordre: `argparse` construeix
+# totes les subordres abans de llegir-ne cap, i els importaria tots.
 def run_arguments(parser):
-    """Els arguments d'una passada o d'una cerca: si és un assaig, i quines famílies.
-    `extend` perquè repetir l'opció n'afegeixi els valors en lloc de canviar-los."""
+    """Declara a `parser` els arguments d'una passada, i el torna."""
     parser.add_argument(
         "--smoke",
         action="store_true",
@@ -35,6 +27,7 @@ def run_arguments(parser):
     parser.add_argument(
         "--family",
         nargs="+",
+        # Repetir l'opció n'afegeix els valors en lloc de canviar-los.
         action="extend",
         metavar="NOM",
         help="només aquestes famílies, o les famílies d'aquests models",
@@ -43,7 +36,7 @@ def run_arguments(parser):
 
 
 def search_arguments(parser):
-    """Els arguments d'una cerca: els d'una passada, i quines llavors."""
+    """Declara a `parser` els arguments d'una cerca, i el torna."""
     run_arguments(parser)
     parser.add_argument(
         "--seed",
@@ -57,8 +50,7 @@ def search_arguments(parser):
 
 
 def figures_arguments(parser):
-    """La passada de la qual es tornen a dibuixar les figures: la que es nomeni o, sense
-    nom, l'última acabada del seu tipus."""
+    """Declara a `parser` els arguments de `epf figures`, i el torna."""
     parser.add_argument(
         "--smoke",
         action="store_true",
@@ -111,6 +103,10 @@ COMMANDS = {
 
 
 def main():
+    """Executa la subordre i en torna l'estat de sortida, o 1 si es refusa.
+
+    Si acaba bé, escriu `Acabat`.
+    """
     parser = argparse.ArgumentParser(prog="epf", description=epf.__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True, metavar="ordre")
     for name, command in COMMANDS.items():
