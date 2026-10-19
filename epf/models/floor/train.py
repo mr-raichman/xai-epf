@@ -1,7 +1,6 @@
-"""El sòl de l'ordre de mèrit de Trebbien et al. (2023): un polinomi cúbic de la càrrega
-residual a l'hora, la demanda menys l'eòlica i la fotovoltaica previstes, ajustat amb
-les files d'entrenament de cada llavor i puntuat sobre les de prova. Es puntua i no
-s'explica.
+"""El sòl de l'ordre de mèrit de Trebbien et al. (2023), i la seva passada.
+
+Un polinomi cúbic de la càrrega residual prevista a l'hora. Es puntua i no s'explica.
 """
 
 import numpy as np
@@ -30,7 +29,10 @@ FAMILIES = {
 
 
 def _fitted(X, y, parts):
-    """El cúbic de les files d'entrenament, i el que se'n desa per dibuixar-lo."""
+    """Ajusta el cúbic amb les files d'entrenament i en prediu les de prova.
+
+    Torna també els coeficients i les files d'entrenament, que dibuixa la figura.
+    """
     training, test = X.index.isin(parts.training), X.index.isin(parts.test)
     load = (X["demand_fcst"] - X["wind_fcst"] - X["solar_fcst"]).to_numpy()
     coefficients = np.polyfit(load[training], y[training].to_numpy(), FLOOR_DEGREE)
@@ -46,8 +48,12 @@ def _fitted(X, y, parts):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada del sòl: per a cada llavor, el cúbic ajustat, puntuat i desat. Torna
-    les parelles `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     X, y = matrix.matrices(matrix.series()).hourly
     done = []
     for seed, planned in configurations.items():
