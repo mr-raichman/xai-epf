@@ -1,16 +1,6 @@
-"""La passada de les xarxes distribucionals de Marcjasz et al. (2023), una distribució
-cada vegada, de la matriu diària als seus fitxers.
+"""La passada de les xarxes distribucionals de Marcjasz et al. (2023).
 
-Una família per distribució, que és el que fa l'article. **La predicció puntual és la
-mediana de la distribució**, la que l'article fa servir per al MAE. Els paràmetres es
-desen a part.
-
-Per a cada llavor: la xarxa de la configuració ajustada amb les files d'entrenament i
-aturada sobre tota la validació, els paràmetres de les setmanes de prova, la puntuació
-del punt i de la distribució, l'atribució de cada paràmetre de les files que s'expliquen
-contra els dies d'entrenament, la comprovació que suma, i el fitxer.
-
-Una xarxa per distribució i llavor, on Marcjasz et al. (2023) en mitjanen quatre.
+Una xarxa per distribució i llavor, on l'article en mitjana quatre.
 """
 
 import numpy as np
@@ -37,8 +27,11 @@ FAMILIES = {
 
 
 def _fitted(distribution, X, y, parts, explained, numbers):
-    """La xarxa d'una distribució, l'atribució de cada paràmetre de les files
-    explicades, i la distribució de les setmanes de prova puntuada."""
+    """Ajusta la xarxa d'una configuració i n'explica les files explicades.
+
+    Explica cada paràmetre contra els dies d'entrenament, i puntua la distribució de les
+    setmanes de prova.
+    """
     training, validation, test, shown = (
         X.index.isin(days) for days in (*parts, explained)
     )
@@ -51,8 +44,8 @@ def _fitted(distribution, X, y, parts, explained, numbers):
     explanation = attribution.attribute_rows(
         distribution, fitted, X[shown], background=X[training]
     )
-    # Dues sumes: la base més les contribucions torna cada paràmetre, i la base és la
-    # mitjana de cada paràmetre sobre tots els dies d'entrenament.
+    # La base més les contribucions torna cada paràmetre, i la base és la mitjana de
+    # cada paràmetre sobre tots els dies d'entrenament.
     gap = max(
         np.abs(
             explanation.base
@@ -94,8 +87,12 @@ def _fitted(distribution, X, y, parts, explained, numbers):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada d'una distribució: cada llavor ajustada, comprovada, puntuada i
-    desada. Torna les parelles `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     X, y = matrix.matrices(matrix.series()).daily
     distribution = DISTRIBUTIONS[family]
     done = []
