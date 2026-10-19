@@ -1,14 +1,3 @@
-"""Les cerques i el que en llegeix una passada: les files que veu un intent, una cerca
-represa, quin registre es llegeix, i quines configuracions s'ajusten a cada llavor.
-
-Res d'això no peta quan falla. Un intent que veiés la prova en triaria els números; una
-cerca represa que repetís els primers intents en faria menys dels que diu; un registre
-llegit per una altra llavor, o fet sobre unes altres files, donaria a una passada
-números que no són seus; una cerca a mitges barrejaria llavors cercades i sense cercar
-en una sola dispersió; i la sonda de datació amb totes les configuracions en lloc de la
-millor no seria la sonda que diu.
-"""
-
 import datetime
 import types
 
@@ -37,6 +26,7 @@ FINGERPRINTS = {"code": "codi", "dataset": "conjunt", "environment": "bibliotequ
 
 
 def _table():
+    """Torna `(X, y)` de `PERIOD`: una columna que compta els dies, i un preu zero."""
     days = pd.date_range(*PERIOD, freq="D")
     return (
         pd.DataFrame({"x": np.arange(len(days), dtype=float)}, index=days),
@@ -45,8 +35,10 @@ def _table():
 
 
 def _searcher(grid, seen):
-    """Un cercador, com el `search.py` d'un model, que no ajusta res: desa els dies que
-    veu cada intent, i la puntuació és la configuració mateixa."""
+    """Torna un cercador com el `search.py` d'un model, que no ajusta res.
+
+    Desa a `seen` els dies que veu cada intent, i la puntuació és el valor proposat.
+    """
 
     def trial(family, optuna_trial, train, validate, seed):
         seen.append((train[0].index, validate[0].index))
@@ -60,6 +52,7 @@ def _searcher(grid, seen):
 
 
 def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path):
+    """Un intent que veiés la prova en triaria els números."""
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     seen = []
@@ -83,9 +76,7 @@ def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path)
 @pytest.mark.parametrize(
     "grid", [{"value": tuple(range(8))}, None], ids=["graella", "continu"]
 )
-def test_a_resumed_search_does_not_repeat_its_trials(tmp_path, grid):
-    # Amb la llavor de sempre a cada procés, el mostrejador d'un espai continu tornaria
-    # a proposar les tres primeres.
+def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     searcher = _searcher(grid, [])
@@ -98,8 +89,10 @@ def test_a_resumed_search_does_not_repeat_its_trials(tmp_path, grid):
 
 
 def _saved(tmp_path, monkeypatch, X, y):
-    """Una cerca de dos intents de la família `fake` a la llavor 0, desada a
-    l'assaig."""
+    """Fa una cerca de dos intents de `fake` a la llavor 0, i la desa a l'assaig.
+
+    Torna el seu registre.
+    """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
     where = folder(True, "fake")
     where.mkdir(parents=True)
@@ -122,6 +115,7 @@ def _saved(tmp_path, monkeypatch, X, y):
 def test_a_saved_search_is_read_for_its_own_family_and_seed_alone(
     tmp_path, monkeypatch
 ):
+    """Llegit per una altra llavor, un registre donaria números que no són seus."""
     X, y = _table()
     found = _saved(tmp_path, monkeypatch, X, y)
     assert searched(True, "fake", 0, X.columns) == found
@@ -133,7 +127,7 @@ def test_a_saved_search_is_read_for_its_own_family_and_seed_alone(
     assert searched(False, "fake", 0, X.columns) is None
 
 
-def test_a_search_made_on_other_columns_is_neither_read_nor_resumed(
+def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
     tmp_path, monkeypatch
 ):
     X, y = _table()
@@ -161,8 +155,10 @@ FAKE = {"fixed": {}, "placeholder": {"value": 0}, "kept": 3, "searched_as": "fak
 
 
 def _searched(tmp_path, monkeypatch, seeds):
-    """Cerques de quatre intents de la família `fake` a l'assaig, per a `seeds`, i les
-    columnes sobre les quals es van fer."""
+    """Fa una cerca de quatre intents de `fake` a cada llavor de `seeds`, a l'assaig.
+
+    Torna les columnes sobre les quals es van fer.
+    """
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
     X, y = _table()
     where = folder(True, "fake")
@@ -203,7 +199,8 @@ def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_firs
         assert [one["rank"] for one in found[seed]] == [0, 1, 2]
         assert [one["numbers"]["value"] for one in found[seed]] == [1, 2, 3]
         assert all(one["trials"] == 4 for one in found[seed])
-    # La sonda de datació en guarda una, de la cerca d'una altra família.
+    # La sonda de datació en guarda una, la millor, de la cerca d'una altra família:
+    # amb més, no seria la sonda que diu.
     probe = {"fixed": {}, "placeholder": None, "kept": 1, "searched_as": "fake"}
     alone = configurations(True, probe, columns, (0, 1))
     assert {
