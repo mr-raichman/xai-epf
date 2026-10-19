@@ -1,9 +1,6 @@
-"""Les figures d'una passada, les de Trebbien et al. (2023) adaptades, dibuixades del
-que la passada va desar, sense tornar a ajustar res.
+"""Les figures d'una passada, adaptades de Trebbien et al. (2023).
 
-A la carpeta de cada família, les seves, que dibuixa el `figures.py` del seu model; a
-dalt de la passada, les que comparen les famílies: com puntua cada una al costat dels
-bancs de comparació, i els residus de cada família ajustada.
+Es dibuixen del que la passada va desar, sense tornar a ajustar res.
 """
 
 import importlib
@@ -15,8 +12,8 @@ from epf.contract.figure import plt
 from epf.run import families, residuals
 
 # Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són
-# totes, de manera que una carpeta d'una família que no hi és fa petar el dibuix en lloc
-# de quedar-se sense figures sense dir-ho.
+# totes: una carpeta d'una família que no hi és fa fallar el dibuix, en lloc de
+# quedar-se sense figures sense dir-ho.
 FIGURES = {
     "lightgbm": "epf.models.lightgbm.figures",
     "date_probe": "epf.models.lightgbm.figures",
@@ -32,12 +29,11 @@ FIGURES = {
 
 
 def _performance(where, described):
-    """La R-quadrat i el MAE de cada família sobre les setmanes de prova, la millor
-    configuració de cada llavor amb una marca, i la resta de les seves deu millors amb
-    una de petita i grisa al darrere, al costat dels bancs de comparació.
+    """Dibuixa la R-quadrat i el MAE de cada família a les setmanes de prova.
 
-    Només les famílies explicades tenen color; els bancs de comparació, que no desen cap
-    contribució, van en gris, i el nom de sota diu quin és cada un.
+    La millor configuració de cada llavor amb una marca, i les altres amb una de petita
+    i grisa al darrere. Només les famílies explicades tenen color; els bancs de
+    comparació, que no desen cap contribució, van en gris.
     """
     families = sorted(described)
     explained = [
@@ -74,7 +70,7 @@ def _performance(where, described):
 
 
 def draw(where):
-    """Totes les figures d'una passada, a partir del que hi ha desat."""
+    """Dibuixa totes les figures d'una passada, `where`, del que hi ha desat."""
     described = {}
     for folder in sorted(path for path in where.iterdir() if path.is_dir()):
         seeds = figure.seeds(folder)
@@ -89,8 +85,12 @@ def draw(where):
 
 
 def main(arguments):
-    """Torna a dibuixar les figures de la passada que es nomeni o, sense nom, de
-    l'última acabada del seu tipus, de mesura si no és `--smoke`."""
+    """Dibuixa de nou les figures d'una passada, l'ordre `epf figures`, i torna 0.
+
+    La passada és la que es nomeni o, sense nom, l'última acabada del seu tipus, de
+    mesura si no és `--smoke`. Refusa un nom que no és cap passada i, sense nom, que no
+    n'hi hagi cap d'acabada.
+    """
     if arguments.run is None:
         found = [
             where for where in paths.runs(arguments.smoke) if families.finished(where)
