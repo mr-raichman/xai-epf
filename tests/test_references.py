@@ -1,5 +1,3 @@
-"""Cada font citada pel codi, amb la seva entrada a `references.bib`."""
-
 import re
 import unicodedata
 
@@ -25,7 +23,7 @@ LINE_BREAK = re.compile(r"\s*\n\s*(?:#\s*)?")
 
 
 def keys(text):
-    """La clau de cada cita del text: el primer cognom, sense accents, i l'any."""
+    """Torna la clau de cada cita del text, el primer cognom sense accents i l'any."""
     flat = LINE_BREAK.sub(" ", text)
     found = set()
     for citation in CITATIONS:
