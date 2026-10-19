@@ -1,16 +1,4 @@
-"""La cerca de Trebbien et al. (2023): a cada llavor i família, configuracions a l'atzar
-de l'espai de la família, cada una ajustada amb les files d'entrenament de la llavor i
-puntuada sobre les de validació, sense tocar mai les de prova, i les millors desades.
-
-Cada família es puntua com ja es puntuava la seva cerca: l'arbre i la xarxa elàstica pel
-MAE en EUR/MWh, i les xarxes per la seva pèrdua de Keras sobre la validació, amb les L1
-a dins, que és el que torna el codi de Marcjasz et al. (2023). Una graella es recorre
-sense repetir cap punt; un espai continu es mostreja a l'atzar. Quina matriu llegeix,
-quina graella té i com es prova cada punt ho diu el `search.py` del model de la família.
-
-Cada família en cada llavor és una tasca de `run/pool.py`, que en fa unes quantes
-alhora; si alguna peta, les altres acaben i l'ordre ho diu en sortir.
-"""
+"""L'ordre `epf search`, la cerca de Trebbien et al. (2023)."""
 
 import importlib
 import sys
@@ -35,13 +23,15 @@ SEARCHERS = {
 
 
 def searcher(family):
-    """El `search.py` del model d'una família que es cerca."""
+    """Torna el `search.py` del model d'una família que es cerca."""
     return importlib.import_module(SEARCHERS[family])
 
 
 def _search(family, seed, smoke, trials, fingerprints):
-    """Fa la cerca d'una família en una llavor, una tasca de `pool`: l'estudi fins a
-    `trials` intents i el seu registre desat."""
+    """Fa la cerca d'una família en una llavor, una tasca de `pool`.
+
+    Fa l'estudi fins a `trials` intents i en desa el registre.
+    """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     module = searcher(family)
     X, y = getattr(matrix.matrices(matrix.series()), module.MATRIX)
@@ -60,10 +50,14 @@ def _search(family, seed, smoke, trials, fingerprints):
 
 
 def main(arguments):
+    """Fa una cerca, l'ordre `epf search`, i torna 0, o 1 si alguna llavor ha fallat.
+
+    Fa la cerca de cada família triada a cada llavor, o a les de `--seed`, unes quantes
+    alhora, i en desa l'estudi i el registre. Tot el que refusa, ho refusa abans de
+    cercar res.
+    """
     values = parameters.chosen(arguments.smoke)
     seeds = values["SEEDS"]
-    # Tot el que es pot refusar, abans de cercar res. Les matrius les torna a llegir
-    # cada tasca, i aquí només es refusen.
     chosen = families.named(arguments.family, SEARCHERS)
     if not chosen:
         named = ", ".join(f'"{name}"' for name in arguments.family)
@@ -84,6 +78,8 @@ def main(arguments):
                 f"{kind} no té {asked}; les que té: {', '.join(map(str, seeds))}"
             )
         seeds = [seed for seed in seeds if seed in arguments.seed]
+    # Les matrius, la partició i les parts de validació, només per refusar-les abans de
+    # cercar res: cada tasca les torna a fer.
     matrix.matrices(matrix.series())
     split(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
     validation_parts(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
