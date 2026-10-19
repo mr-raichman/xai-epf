@@ -26,7 +26,7 @@ HIGHEST = 100
 LINEAR_UP_TO = 1
 
 # Vermell de les puntuacions marcades.
-HIGHLIGHT_COLOR = "#e34948"
+HIGHLIGHT_COLOUR = "#e34948"
 
 
 def window_median_mad(values, half_width):
@@ -163,7 +163,7 @@ def draw(name, frame, by_hours, by_days):
         top_marks % HOURS_PER_DAY,
         by_hours.ravel()[top_marks],
         s=12,
-        color=HIGHLIGHT_COLOR,
+        color=HIGHLIGHT_COLOUR,
         zorder=3,
     )
     top.set_xlim(0, HOURS_PER_DAY - 1)
@@ -186,7 +186,7 @@ def draw(name, frame, by_hours, by_days):
         instants[bottom_marks],
         by_days.ravel()[bottom_marks],
         s=12,
-        color=HIGHLIGHT_COLOR,
+        color=HIGHLIGHT_COLOUR,
         zorder=3,
     )
     bottom.set_xlim(instants[0], instants[-1])

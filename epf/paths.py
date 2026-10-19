@@ -23,6 +23,7 @@ DATASET_RECORD = DATA / "dataset.json"
 DATA_FIGURES = DATA / "figures"
 
 RUNS = ROOT / "runs"
+SEARCHES = ROOT / "searches"
 
 # Els fitxers d'una passada: el model ajustat d'una llavor i d'una configuració, pel
 # lloc de la configuració a la cerca de la llavor, 0 la millor; el registre de la
@@ -62,9 +63,6 @@ def next_run(smoke, day):
         if path.name.startswith(prefix)
     ]
     return RUNS / f"{prefix}{max(numbers, default=0) + 1:02d}"
-
-
-SEARCHES = ROOT / "searches"
 
 
 def relative(path):
