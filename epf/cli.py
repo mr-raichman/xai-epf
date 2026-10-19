@@ -1,4 +1,4 @@
-"""Tot el que es tecleja a mà, en una sola ordre amb subordres."""
+"""Tot el que es tecleja a mà, en una sola comanda amb subcomandes."""
 
 import argparse
 import collections
@@ -8,15 +8,15 @@ import sys
 
 import epf
 
-# Una subordre: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
+# Una subcomanda: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
 # declara els arguments, `None` si no en pren cap i la funció es crida sense res. El
-# mòdul hi va pel nom, perquè s'importi només quan es tria la subordre: `shap` costa un
-# segon llarg, i el pagaria fins i tot `epf --help`.
+# mòdul hi va pel nom, perquè s'importi només quan es tria la subcomanda: `shap` costa
+# un segon llarg, i el pagaria fins i tot `epf --help`.
 Command = collections.namedtuple("Command", "module function help arguments")
 
 
-# Els arguments es declaren aquí, i no al mòdul de cada subordre: `argparse` construeix
-# totes les subordres abans de llegir-ne cap, i els importaria tots.
+# Els arguments es declaren aquí, i no al mòdul de cada subcomanda: `argparse`
+# construeix totes les subcomandes abans de llegir-ne cap, i els importaria tots.
 def run_arguments(parser):
     """Declara a `parser` els arguments d'una passada, i el torna."""
     parser.add_argument(
@@ -77,8 +77,8 @@ COMMANDS = {
     "dataset": Command(
         "epf.dataset.build",
         "main",
-        "fa el conjunt de dades dels fitxers baixats, el comprova i en desa les "
-        "figures i els valors més allunyats dels veïns",
+        "crea el dataset a partir dels fitxers baixats, el comprova i fa l'estudi "
+        "d'outliers",
         None,
     ),
     "search": Command(
@@ -91,27 +91,30 @@ COMMANDS = {
     "run": Command(
         "epf.run.run",
         "main",
-        "descriu el preu amb el protocol de Trebbien et al. (2023)",
+        "entrena els models i descriu el preu amb el protocol de Trebbien et al. "
+        "(2023)",
         run_arguments,
     ),
     "figures": Command(
         "epf.run.figures",
         "main",
-        "torna a dibuixar les figures d'una passada",
+        "torna a dibuixar les figures",
         figures_arguments,
     ),
 }
 
 
 def main():
-    """Executa la subordre i en torna l'estat de sortida, o 1 si es refusa.
+    """Executa la subcomanda i en torna l'estat de sortida, o 1 si es refusa.
 
     Si acaba bé, escriu `Acabat`.
     """
     # El títol del treball, la `description` de `pyproject.toml`.
     title = importlib.metadata.metadata("epf")["Summary"]
     parser = argparse.ArgumentParser(prog="epf", description=title)
-    subcommands = parser.add_subparsers(dest="command", required=True, metavar="ordre")
+    subcommands = parser.add_subparsers(
+        dest="command", required=True, metavar="comanda"
+    )
     for name, command in COMMANDS.items():
         subcommand = subcommands.add_parser(
             name, help=command.help, description=command.help

@@ -85,7 +85,7 @@ def draw(where):
 
 
 def main(arguments):
-    """Dibuixa de nou les figures d'una passada, l'ordre `epf figures`, i torna 0.
+    """Dibuixa de nou les figures d'una passada, la comanda `epf figures`, i torna 0.
 
     La passada és la que es nomeni o, sense nom, l'última acabada del seu tipus, de
     mesura si no és `--smoke`. Refusa un nom que no és cap passada i, sense nom, que no

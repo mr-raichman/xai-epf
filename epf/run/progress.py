@@ -68,7 +68,7 @@ def counted(failed, order):
 
 
 class Block:
-    """El bloc d'una ordre, que escriu a stderr.
+    """El bloc d'una comanda, que escriu a stderr.
 
     `title` va a la primera línia, `totals` són les llavors que planifica cada família,
     i `done` les que ja tenia acabades.

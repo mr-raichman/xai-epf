@@ -1,4 +1,4 @@
-"""L'ordre `epf run`, la passada del protocol de Trebbien et al. (2023)."""
+"""La comanda `epf run`, la passada del protocol de Trebbien et al. (2023)."""
 
 import datetime
 import importlib
@@ -84,7 +84,7 @@ def _train(module, family, folder, seed, planned, explained_days):
 
 
 def main(arguments):
-    """Fa una passada, l'ordre `epf run`, i torna 0, o 1 si alguna llavor ha fallat.
+    """Fa una passada, la comanda `epf run`, i torna 0, o 1 si alguna llavor ha fallat.
 
     Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
     hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors

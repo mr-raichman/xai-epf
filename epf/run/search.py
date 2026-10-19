@@ -1,4 +1,4 @@
-"""L'ordre `epf search`, la cerca de Trebbien et al. (2023)."""
+"""La comanda `epf search`, la cerca de Trebbien et al. (2023)."""
 
 import importlib
 import sys
@@ -50,7 +50,7 @@ def _search(family, seed, smoke, trials, fingerprints):
 
 
 def main(arguments):
-    """Fa una cerca, l'ordre `epf search`, i torna 0, o 1 si alguna llavor ha fallat.
+    """Fa una cerca, la comanda `epf search`, i torna 0, o 1 si alguna llavor ha fallat.
 
     Fa la cerca de cada família triada a cada llavor, o a les de `--seed`, unes quantes
     alhora, i en desa l'estudi i el registre. Tot el que refusa, ho refusa abans de

@@ -77,7 +77,7 @@ SERIES = {
 
 
 def download():
-    """Baixa el que encara falta de cada indicador, l'ordre `epf download`.
+    """Baixa el que encara falta de cada indicador, la comanda `epf download`.
 
     Escriu a stderr quants fitxers ha baixat de cada indicador i cada fitxer que ESIOS
     ha refusat, i torna 1 si n'hi ha cap, i 0 si no.
@@ -212,7 +212,7 @@ def write(rows, read):
 
 
 def main():
-    """Fa el conjunt de dades, l'ordre `epf dataset`, i torna 0.
+    """Fa el conjunt de dades, la comanda `epf dataset`, i torna 0.
 
     El comprova i l'escriu, i en desa les figures i l'informe de veïnatge de cada sèrie.
     Refusa el que refusen el lector d'ESIOS o les comprovacions.
