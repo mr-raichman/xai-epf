@@ -3,7 +3,7 @@ name = "epf"
 version = "0.1.0"
 # La frase del docstring del paquet, `epf/__init__.py`, copiada a propòsit: s'han de
 # mantenir iguals.
-description = "Predicció del preu diari del mercat elèctric espanyol i estudi de la seva formació."
+description = "Aportació a l'heurística apresa en la predicció del preu del mercat elèctric diari espanyol mitjançant aprenentatge automàtic."
 requires-python = "==3.13.*"
 license = "MIT"
 license-files = ["LICENSE"]
