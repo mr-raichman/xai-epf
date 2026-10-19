@@ -12,6 +12,9 @@ SHOWN_FAILURES = 5
 # El final d'una línia tallada.
 MORE = "..."
 
+# Cada procés que fa una unitat d'una família, a la seva línia.
+WORKER = "·"
+
 
 def _cut(line, columns):
     """Torna la primera fila de `line` tallada a `columns` columnes.
@@ -60,6 +63,7 @@ class Block:
             family: {seed: done for seed, (_, done) in seeds.items()}
             for family, seeds in planned.items()
         }
+        self.working = dict.fromkeys(planned, 0)
         self.failed = []
         self.failures = []
         self.stream = sys.stderr
@@ -70,11 +74,18 @@ class Block:
         else:
             self._write(f"{title}\n\n")
 
+    def start(self, family):
+        """Compta un procés que comença una unitat d'una família."""
+        self.working[family] += 1
+        if self.live:
+            self._draw()
+
     def advance(self, family, seed):
         """Compta una unitat acabada d'una seed, i la seed quan és la seva última.
 
         Fora d'un terminal, només es veu la seed acabada.
         """
+        self.working[family] -= 1
         self.done[family][seed] += 1
         if self.live:
             self._draw()
@@ -82,27 +93,31 @@ class Block:
             self._write(f"{family}: {self._count(family)}\n")
 
     def fail(self, family, seed, message):
-        """Compta una seed fallada i en mostra el missatge de l'error.
+        """Compta una unitat fallada i, la primera vegada, la seed i el seu missatge.
 
-        Només la primera vegada: les unitats de la seed que ja es feien poden fallar
-        també.
+        Les unitats de la seed que ja es feien poden fallar també.
         """
-        if self.stopped(family, seed):
-            return
-        self.failed.append((family, seed))
-        line = f"error: {family} seed {seed} ha fallat: {message}"
+        self.working[family] -= 1
+        if not self.stopped(family, seed):
+            self.failed.append((family, seed))
+            line = f"error: {family} seed {seed} ha fallat: {message}"
+            if self.live:
+                self.failures.append(line)
+            else:
+                self._write(line + "\n")
         if self.live:
-            self.failures.append(line)
             self._draw()
-        else:
-            self._write(line + "\n")
 
     def stopped(self, family, seed):
         """Diu si una seed ha fallat, i ja no se n'ha de fer cap altra unitat."""
         return (family, seed) in self.failed
 
     def close(self):
-        """Deixa l'estat final, amb les línies senceres en un terminal."""
+        """Deixa l'estat final, amb les línies senceres en un terminal.
+
+        Cap procés no hi fa res: o han acabat, o un Ctrl+C els ha aturat.
+        """
+        self.working = dict.fromkeys(self.working, 0)
         if self.live:
             self._draw(whole=True)
 
@@ -131,9 +146,16 @@ class Block:
             max(len("seed" if count == 1 else "seeds") for count in seeds),
             max(len(str(sum(units.values()))) for units in self.units.values()),
         )
+        counts = {
+            family: f"{family:<{width}}  {self._count(family, widths)}"
+            for family in self.units
+        }
+        # `fit` i `fits` no fan la mateixa amplada.
+        longest = max(len(count) for count in counts.values())
         lines = [self.title, ""]
-        for family in self.units:
-            line = f"{family:<{width}}  {self._count(family, widths)}"
+        for family, line in counts.items():
+            if self.working[family]:
+                line = f"{line:<{longest}}    {WORKER * self.working[family]}"
             count = sum(failed == family for failed, _ in self.failed)
             if count:
                 line += f", {count} {'ha' if count == 1 else 'han'} fallat"

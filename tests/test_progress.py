@@ -42,10 +42,13 @@ def test_a_seed_finishes_at_its_last_unit_and_fails_once(capsys):
     Comptada a cada una, una sola seed fallada en diria dues.
     """
     block = progress.Block("Passada", "fit", {"lightgbm": {0: (2, 0), 1: (2, 0)}})
+    for _ in range(4):
+        block.start("lightgbm")
     block.advance("lightgbm", 0)
     block.advance("lightgbm", 0)
     block.fail("lightgbm", 1, "la primera")
     block.fail("lightgbm", 1, "la segona")
+    assert block.working == {"lightgbm": 0}
     assert block.failed == [("lightgbm", 1)]
     assert block.stopped("lightgbm", 1) and not block.stopped("lightgbm", 0)
     assert capsys.readouterr().err.splitlines() == [

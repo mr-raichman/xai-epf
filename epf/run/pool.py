@@ -78,12 +78,16 @@ def _task(function, *arguments):
         raise Failure(f"{type(error).__name__}: {error}", trace) from None
 
 
-def _fed(pool, running, tasks):
-    """Dona al pool la tasca següent de `tasks`, si en queda, i l'apunta a `running`."""
+def _fed(pool, running, tasks, block):
+    """Dona al pool la tasca següent de `tasks`, si en queda.
+
+    L'apunta a `running`, i la compta a `block` com a començada.
+    """
     task = next(tasks, None)
     if task is not None:
         label, function, arguments = task
         running[pool.submit(_task, function, *arguments)] = label
+        block.start(label[0])
 
 
 def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
@@ -94,9 +98,10 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
     llegeix una cada vegada que un procés queda lliure, i mai no n'hi ha més de
     `workers` alhora. Torna el resultat de cada etiqueta que ha tornat. Una tasca que
     falla no atura les altres, i un Ctrl+C les acaba totes alhora, com una excepció de
-    `on_return` o de `on_failure`. Cada tasca tornada crida `on_return(etiqueta,
-    resultat)` i es compta a `block`, i cada una fallada crida `on_failure(etiqueta)` i
-    hi compta la seed com a fallada; el bloc es tanca en acabar. La sortida dels
+    `on_return` o de `on_failure`. Cada tasca es compta a `block` quan comença; cada una
+    tornada crida `on_return(etiqueta, resultat)` i s'hi compta, i cada una fallada
+    crida `on_failure(etiqueta)` i hi compta la seed com a fallada; el bloc es tanca en
+    acabar. La sortida dels
     processos s'afegeix a `log`, i el traceback de cada fallada que no és un refús
     també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
@@ -114,7 +119,7 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
     ) as pool:
         try:
             for _ in range(workers):
-                _fed(pool, running, tasks)
+                _fed(pool, running, tasks, block)
             while running:
                 ready, _ = concurrent.futures.wait(
                     running, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
@@ -138,7 +143,7 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
                         if on_return is not None:
                             on_return(label, results[label])
                         block.advance(family, seed)
-                        _fed(pool, running, tasks)
+                        _fed(pool, running, tasks, block)
                         continue
                     if trace:
                         with open(log, "a", encoding="utf-8") as handle:
@@ -150,7 +155,7 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
                         on_failure(label)
                     block.fail(family, seed, message)
                     # Després de comptar la fallada, que la seed ja no en doni cap més.
-                    _fed(pool, running, tasks)
+                    _fed(pool, running, tasks, block)
         except BaseException:
             # Sense, sortir del `with` esperaria que cada procés acabés la seva tasca.
             for worker in multiprocessing.active_children():

@@ -20,6 +20,9 @@ class Shown:
     def __init__(self):
         self.advanced, self.failed, self.closed = [], [], False
 
+    def start(self, family):
+        pass
+
     def advance(self, family, seed):
         self.advanced.append((family, seed))
 
