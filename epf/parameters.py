@@ -87,4 +87,4 @@ def chosen(smoke):
         for name, value in globals().items()
         if name.isupper() and not name.startswith("SMOKE")
     }
-    return (found | SMOKE_1) if smoke else found
+    return (found | SMOKE) if smoke else found
