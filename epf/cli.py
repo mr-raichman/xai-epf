@@ -3,6 +3,7 @@
 import argparse
 import collections
 import importlib
+import importlib.metadata
 import sys
 
 import epf
@@ -107,7 +108,9 @@ def main():
 
     Si acaba bé, escriu `Acabat`.
     """
-    parser = argparse.ArgumentParser(prog="epf", description=epf.__doc__)
+    # El títol del treball, la `description` de `pyproject.toml`.
+    title = importlib.metadata.metadata("epf")["Summary"]
+    parser = argparse.ArgumentParser(prog="epf", description=title)
     subcommands = parser.add_subparsers(dest="command", required=True, metavar="ordre")
     for name, command in COMMANDS.items():
         subcommand = subcommands.add_parser(
