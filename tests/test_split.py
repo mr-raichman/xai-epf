@@ -1,5 +1,3 @@
-"""La partició, sobre el període i les llavors de debò."""
-
 import datetime
 
 import pandas as pd
@@ -50,9 +48,11 @@ def test_no_day_is_in_two_parts_and_only_a_day_beside_a_held_out_week_is_in_none
 
 
 def test_the_deleted_week_is_in_no_part_and_the_days_beside_it_are_dealt_as_any_other():
-    # El dilluns abans i el dimarts després comparteixen setmana amb els seus altres
-    # veïns, de manera que són d'alguna part: si la setmana suprimida comptés com a
-    # retinguda, sortirien de l'entrenament sense cap setmana retinguda al costat.
+    """La setmana suprimida no compta com a retinguda.
+
+    Si ho fes, el dilluns abans i el dimarts després, que comparteixen setmana amb els
+    seus altres veïns, sortirien de l'entrenament sense cap setmana retinguda al costat.
+    """
     deleted = pd.date_range(*BLACKOUT_WEEK, freq="D")
     for seed in SEEDS:
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
