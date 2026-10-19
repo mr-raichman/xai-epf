@@ -26,7 +26,7 @@ from epf.parameters import (
     BLACKOUT_WEEK,
     DEVELOPMENT,
     INTERACTION_ROWS,
-    SEED,
+    PROJECT_SEED,
     THREADS,
 )
 
@@ -46,11 +46,11 @@ FAMILIES = {
 }
 
 
-def lightgbm(point, trees, seed=SEED):
+def lightgbm(point, trees, project_seed=PROJECT_SEED):
     """Torna un regressor de LightGBM sense ajustar d'un punt de la graella, `point`.
 
-    Fa `trees` arbres com a molt, i la seed fixa quines files pren cada arbre quan el
-    punt en pren menys de totes.
+    Fa `trees` arbres com a molt, i `project_seed` fixa quines files pren cada arbre
+    quan el punt en pren menys de totes.
     """
     return LGBMRegressor(
         n_estimators=trees,
@@ -61,7 +61,7 @@ def lightgbm(point, trees, seed=SEED):
         subsample_freq=SUBSAMPLE_FREQ,
         min_child_samples=point["min_child_samples"],
         min_child_weight=MIN_CHILD_WEIGHT,
-        random_state=seed,
+        random_state=project_seed,
         n_jobs=THREADS,
         verbose=-1,
         # Sense totes dues, dos ajustos de la mateixa finestra no donen els mateixos

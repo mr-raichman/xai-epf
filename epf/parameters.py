@@ -1,4 +1,4 @@
-"""Els valors que tria una passada sencera, un de cada.
+"""Els valors fixos de tot el projecte.
 
 Són els d'una mesura, i un assaig en canvia els de la seva variant. Una passada els desa
 tots al registre de cada família.
@@ -6,13 +6,17 @@ tots al registre de cada família.
 
 import datetime
 
+
+# Calendari
+
 DAYS_PER_WEEK = 7
 
 # Les hores d'un dia local i el nom de la columna de cada una.
 HOURS_PER_DAY = 24
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
-# ------------------------------------------------------------ la descripció
+
+# Període i partició
 
 # El període que es descriu, del primer dia de les previsions D+1 a l'últim dilluns de
 # les dades baixades, en setmanes de dimarts a dilluns. Totes les tries s'hi fan.
@@ -35,6 +39,9 @@ GAP = 1
 # Una partició per seed.
 SEEDS = tuple(range(10))
 
+
+# Information set
+
 # Retards de preu de l'information set: el dia abans, les seves 24 hores.
 PREVIOUS_DAY = (1,)
 
@@ -44,9 +51,11 @@ PREVIOUS_DAY = (1,)
 FORECAST_LAG = 0
 SCHEDULE_LAG = 1
 
-# Dies de prova que s'expliquen de cada seed, comptats des del primer. `None` vol dir
-# tots, el protocol sencer.
-EXPLAINED_DAYS = None
+
+# Ajust i cerca
+
+# Seed de tota família que en faci servir.
+PROJECT_SEED = 0
 
 # Trials de la cerca de cada família a cada seed, i quants dels millors se n'expliquen:
 # Trebbien et al. (2023) en guarden els deu millors i no diuen quants en proven, i
@@ -54,14 +63,19 @@ EXPLAINED_DAYS = None
 TRIALS = 50
 BEST = 10
 
+
+# Explicació
+
+# Dies de prova que s'expliquen de cada seed, comptats des del primer. `None` vol dir
+# tots, el protocol sencer.
+EXPLAINED_DAYS = None
+
 # Files explicades de cada seed sobre les quals es calculen les interaccions de l'arbre,
 # triades a l'atzar amb la seed.
 INTERACTION_ROWS = 1000
 
-# Seed de tota família que en faci servir.
-SEED = 0
 
-# ------------------------------------------------------------ els processos
+# Processos
 
 # Quants processos fan alhora els ajustos d'una cerca o d'una passada.
 WORKERS = 4
@@ -71,7 +85,8 @@ WORKERS = 4
 # processos.
 THREADS = 4
 
-# ------------------------------------------------------------ l'assaig
+
+# Assaig
 
 # El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants:
 # `SMOKE`, i `SMOKE_1`, que no fixa els dies explicats i n'explica tots els de prova. La

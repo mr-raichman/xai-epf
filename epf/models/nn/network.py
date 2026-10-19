@@ -12,7 +12,7 @@ from keras import ops
 
 from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.models.nn.hyperparameters import BATCH, EPOCHS, PATIENCE
-from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY, SEED
+from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY, PROJECT_SEED
 
 # El dia de la setmana del dia que es prediu, de dilluns 0 a diumenge 6, en una sola
 # columna com al codi de l'article, que per error hi posa una funció del número de fila.
@@ -101,18 +101,18 @@ def fit_rows(
     batch=BATCH,
     epochs=EPOCHS,
     patience=PATIENCE,
-    seed=SEED,
+    project_seed=PROJECT_SEED,
 ):
     """Ajusta una xarxa amb `train`, amb early stopping sobre `validate`.
 
     Tots dos són parelles `(X, y)`. Torna la xarxa amb els pesos de la millor època.
-    Buida l'estat de Keras i fixa amb `seed` totes les seeds globals.
+    Buida l'estat de Keras i fixa amb `project_seed` totes les seeds globals.
     """
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
     # Sense això, un ajust amb dropout depèn del que el mateix procés va ajustar abans.
     keras.backend.clear_session()
-    keras.utils.set_random_seed(seed)
+    keras.utils.set_random_seed(project_seed)
     model = build(distribution, values.shape[1], tuned)
     model.fit(
         values,

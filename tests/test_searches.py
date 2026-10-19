@@ -149,12 +149,12 @@ def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
         )
 
 
-def test_a_search_made_with_another_SEED_is_neither_read_nor_continued(
+def test_a_search_made_with_another_PROJECT_SEED_is_neither_read_nor_continued(
     tmp_path, monkeypatch
 ):
     X, y = _table()
     _saved(tmp_path, monkeypatch, X, y)
-    monkeypatch.setattr("epf.contract.searches.SEED", 1)
+    monkeypatch.setattr("epf.contract.searches.PROJECT_SEED", 1)
     with pytest.raises(ValueError):
         searched(True, "fake", 0, X.columns)
     with pytest.raises(ValueError):

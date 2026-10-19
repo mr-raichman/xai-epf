@@ -3,10 +3,10 @@
 Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
 on era. Quan una seed té tots els seus trials, el seu registre en desa els millors, en
 la forma en què els pren l'ajust, i sobre quines files es van fer: les columnes de la
-matriu i la partició, i amb quina `SEED`. Una cerca continua sobre un altre codi, un
-altre dataset o unes altres biblioteques, i cada trial en desa les empremtes, però no
-sobre unes altres files ni amb una altra `SEED`; i una passada no llegeix un registre
-fet així.
+matriu i la partició, i amb quina `PROJECT_SEED`. Una cerca continua sobre un altre
+codi, un altre dataset o unes altres biblioteques, i cada trial en desa les empremtes,
+però no sobre unes altres files ni amb una altra `PROJECT_SEED`; i una passada no
+llegeix un registre fet així.
 """
 
 import json
@@ -17,7 +17,7 @@ import optuna
 
 from epf import Refusal, paths
 from epf.contract.record import plain, write_record
-from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
+from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
@@ -51,13 +51,13 @@ def completed(study):
 def _different(made, now):
     """Torna en què es va fer diferent una cerca, `made`, o `None` si no ho va fer.
 
-    `now` són les files d'ara. Una cerca que no diu la seva `SEED` es va fer amb una
-    altra.
+    `now` són les files d'ara. Una cerca que no diu la seva `PROJECT_SEED` es va fer
+    amb una altra.
     """
     if made.get("made_on") != now:
         return "sobre altres files"
-    if made.get("SEED") != SEED:
-        return "amb una altra SEED"
+    if made.get("PROJECT_SEED") != PROJECT_SEED:
+        return "amb una altra PROJECT_SEED"
     return None
 
 
@@ -66,7 +66,7 @@ def _seed(*parts):
 
     No canvia d'un procés a un altre, com faria el `hash` d'un text.
     """
-    entropy = [SEED]
+    entropy = [PROJECT_SEED]
     for part in parts:
         entropy += list(part.encode()) if isinstance(part, str) else [part]
     return int(np.random.SeedSequence(entropy).generate_state(1)[0])
@@ -134,7 +134,7 @@ def run(
     now = made_on(X.columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
-        study.set_user_attr("SEED", SEED)
+        study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
     why = _different(study.user_attrs, now)
     if why:
         raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
@@ -177,7 +177,7 @@ def record(study, family, seed, smoke):
         "seed": seed,
         "trials": len(done),
         "made_on": study.user_attrs["made_on"],
-        "SEED": study.user_attrs["SEED"],
+        "PROJECT_SEED": study.user_attrs["PROJECT_SEED"],
         "best": [
             {
                 "numbers": one.user_attrs["numbers"],
@@ -203,8 +203,8 @@ def searched(smoke, family, seed, columns):
     """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
 
     Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició,
-    o amb una altra `SEED`: els seus números s'haurien triat per unes altres files o amb
-    uns altres trials, i res no ho diria.
+    o amb una altra `PROJECT_SEED`: els seus números s'haurien triat per unes altres
+    files o amb uns altres trials, i res no ho diria.
     """
     path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
