@@ -1,5 +1,5 @@
-"""Predicció del preu diari del mercat elèctric espanyol i estudi de la seva
-formació."""
+"""Aportació a l'heurística apresa en la predicció del preu del mercat elèctric diari
+espanyol mitjançant aprenentatge automàtic."""
 
 
 class Refusal(ValueError):
