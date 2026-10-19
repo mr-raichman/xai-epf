@@ -1,9 +1,3 @@
-"""El test de Ljung-Box dels residus, i la sèrie de dies que el rep.
-
-Res d'això no peta quan falla: un estadístic mal calculat, o un dia pres d'una llavor
-que no tocava, donaria un valor p plausible sobre una altra sèrie.
-"""
-
 import numpy as np
 import pytest
 from statsmodels.stats.diagnostic import acorr_ljungbox
@@ -12,7 +6,8 @@ from epf.run.residuals import LAGS, daily_errors, ljung_box
 
 
 def test_without_gaps_the_statistic_is_the_usual_ljung_box():
-    # Una AR(1) de coeficient 0,3: una implementació que no és la del projecte ha de
+    """Un estadístic mal calculat donaria un valor p plausible."""
+    # Una AR(1) de coeficient 0.3: una implementació que no és la del projecte ha de
     # donar el mateix estadístic i el mateix valor p.
     rng = np.random.default_rng(0)
     series = np.zeros(500)
@@ -36,6 +31,7 @@ def test_a_missing_day_is_left_out_of_its_pairs_as_r_does():
 
 
 def _model(seed_days, offset, rank=0):
+    """Torna un model dels dies `seed_days` amb un error `offset` a cada hora."""
     days = np.array(seed_days, dtype="datetime64[D]")
     actual = np.zeros(len(days) * 24)
     return {
@@ -47,6 +43,7 @@ def _model(seed_days, offset, rank=0):
 
 
 def test_each_day_comes_from_the_first_seed_that_tests_it_and_its_best_model():
+    """Un dia d'una altra llavor donaria un valor p plausible sobre una altra sèrie."""
     first = _model(["2020-01-01", "2020-01-02"], 1.0)
     other = _model(["2020-01-01", "2020-01-02"], 9.0, rank=1)
     second = _model(["2020-01-02", "2020-01-04"], 2.0)
