@@ -12,12 +12,12 @@ from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-PREVIOUS_DAY = 1
-PREVIOUS_WEEK = 7
-
 # Dies en què la predicció similar pren el dia anterior; la resta prenen la setmana
 # anterior. Dilluns és 0.
 WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
+
+PREVIOUS_WEEK = 7
+PREVIOUS_DAY = 1
 
 # Les parts de la seed d'on la predicció ingènua pren els errors per fer-se
 # probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
@@ -29,9 +29,12 @@ def _copied(price, days, lag):
     return price.shift(lag, freq="D").reindex(days).to_numpy(dtype=float)
 
 
-def previous_day(price, days):
-    """Torna el preu de la mateixa hora del dia anterior, `(dies, hores)`."""
-    return _copied(price, days, PREVIOUS_DAY)
+def similar_day(price, days):
+    """Torna el dia anterior de dimarts a divendres, i el de fa una setmana la resta."""
+    yesterday = days.dayofweek.isin(WEEKDAYS_FROM_YESTERDAY)
+    return np.where(
+        yesterday[:, None], previous_day(price, days), previous_week(price, days)
+    )
 
 
 def previous_week(price, days):
@@ -39,12 +42,9 @@ def previous_week(price, days):
     return _copied(price, days, PREVIOUS_WEEK)
 
 
-def similar_day(price, days):
-    """Torna el dia anterior de dimarts a divendres, i el de fa una setmana la resta."""
-    yesterday = days.dayofweek.isin(WEEKDAYS_FROM_YESTERDAY)
-    return np.where(
-        yesterday[:, None], previous_day(price, days), previous_week(price, days)
-    )
+def previous_day(price, days):
+    """Torna el preu de la mateixa hora del dia anterior, `(dies, hores)`."""
+    return _copied(price, days, PREVIOUS_DAY)
 
 
 def bootstrapped(copied, errors, probabilities):

@@ -36,11 +36,6 @@ def normal_parameters(location, scale):
     )
 
 
-def test_the_normals_median_is_its_location():
-    parameters = normal_parameters(60.0, 5.0)
-    assert np.allclose(NORMAL.point(parameters), 60.0)
-
-
 def test_a_symmetric_johnson_su_has_its_location_as_median():
     """Amb l'asimetria i el pes de la cua canviats de lloc, res més no se n'adonaria."""
     # Amb asimetria zero, la de Johnson SU és simètrica al voltant de la localització.
@@ -70,6 +65,31 @@ def test_a_positive_skew_moves_the_median_one_way_and_a_negative_the_other():
         return JOHNSON_SU.point(parameters)[0, 0]
 
     assert median(1.0) < 60.0 < median(-1.0)
+
+
+def test_the_johnson_su_loss_is_its_density_far_below_the_location():
+    """Amb asinh com a `log(z + sqrt(1 + z^2))`, en float32 la pèrdua es desviava.
+
+    Ho feia a z = -1000; a z = -4097 hi faltava més d'una unitat sencera d'asinh, i a
+    z = -10000 era infinita. La de Marcjasz et al. (2023) és la densitat de TFP.
+    """
+    z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
+    raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")
+    raw[:, len(HOUR_COLUMNS) : 2 * len(HOUR_COLUMNS)] = -5.0
+    location, scale, skew, tail = np.moveaxis(parameters(JOHNSON_SU, raw), -1, 0)
+    target = (location + z * scale).astype("float32")
+    loss = keras.ops.convert_to_numpy(JOHNSON_SU.loss(target, raw))
+    # La pèrdua deixa fora la constant de la normal.
+    density = stats.johnsonsu.logpdf(
+        target.astype(float), skew, tail, loc=location, scale=scale
+    )
+    expected = (-density - 0.5 * np.log(2 * np.pi)).mean(axis=1)
+    np.testing.assert_allclose(loss, expected, rtol=1e-5)
+
+
+def test_the_normals_median_is_its_location():
+    parameters = normal_parameters(60.0, 5.0)
+    assert np.allclose(NORMAL.point(parameters), 60.0)
 
 
 def test_the_quantiles_come_out_in_order_and_straddle_the_median():
@@ -116,23 +136,3 @@ def test_a_non_finite_quantile_is_refused_rather_than_averaged_away():
     quantiles[3, 2, 10] = np.inf
     with pytest.raises(ValueError, match="no finits"):
         crps(actual, quantiles)
-
-
-def test_the_johnson_su_loss_is_its_density_far_below_the_location():
-    """Amb asinh com a `log(z + sqrt(1 + z^2))`, en float32 la pèrdua es desviava.
-
-    Ho feia a z = -1000; a z = -4097 hi faltava més d'una unitat sencera d'asinh, i a
-    z = -10000 era infinita. La de Marcjasz et al. (2023) és la densitat de TFP.
-    """
-    z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
-    raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")
-    raw[:, len(HOUR_COLUMNS) : 2 * len(HOUR_COLUMNS)] = -5.0
-    location, scale, skew, tail = np.moveaxis(parameters(JOHNSON_SU, raw), -1, 0)
-    target = (location + z * scale).astype("float32")
-    loss = keras.ops.convert_to_numpy(JOHNSON_SU.loss(target, raw))
-    # La pèrdua deixa fora la constant de la normal.
-    density = stats.johnsonsu.logpdf(
-        target.astype(float), skew, tail, loc=location, scale=scale
-    )
-    expected = (-density - 0.5 * np.log(2 * np.pi)).mean(axis=1)
-    np.testing.assert_allclose(loss, expected, rtol=1e-5)

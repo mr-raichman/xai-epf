@@ -20,25 +20,6 @@ def _tail(raw):
     return TAIL_FLOOR + STRETCH * ops.softplus(raw)
 
 
-def _normal_loss(target, raw):
-    """Torna la log-versemblança negativa de la normal, llevat de constants."""
-    location, scale = heads(raw, 2)
-    scale = _scale(scale)
-    return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
-
-
-def _normal_flat(raw):
-    location, scale = heads(raw, 2)
-    return ops.concatenate([location, _scale(scale)], axis=-1)
-
-
-def _normal_quantiles(parameters, probabilities):
-    location, scale = parameters[..., 0], parameters[..., 1]
-    return stats.norm.ppf(
-        probabilities, loc=location[..., None], scale=scale[..., None]
-    )
-
-
 def _johnson_loss(target, raw):
     """Torna la log-versemblança negativa de Johnson SU, llevat de constants.
 
@@ -78,7 +59,34 @@ def _johnson_quantiles(parameters, probabilities):
     )
 
 
+def _normal_loss(target, raw):
+    """Torna la log-versemblança negativa de la normal, llevat de constants."""
+    location, scale = heads(raw, 2)
+    scale = _scale(scale)
+    return ops.mean(0.5 * ((target - location) / scale) ** 2 + ops.log(scale), axis=-1)
+
+
+def _normal_flat(raw):
+    location, scale = heads(raw, 2)
+    return ops.concatenate([location, _scale(scale)], axis=-1)
+
+
+def _normal_quantiles(parameters, probabilities):
+    location, scale = parameters[..., 0], parameters[..., 1]
+    return stats.norm.ppf(
+        probabilities, loc=location[..., None], scale=scale[..., None]
+    )
+
+
 # El preu puntual de cada una és la mediana i no la mitjana, com a l'article per al MAE.
+JOHNSON_SU = Distribution(
+    names=("location", "scale", "skewness", "tail_weight"),
+    loss=_johnson_loss,
+    flat=_johnson_flat,
+    point=lambda parameters: _johnson_quantiles(parameters, 0.5)[..., 0],
+    quantiles=_johnson_quantiles,
+)
+
 NORMAL = Distribution(
     names=("location", "scale"),
     loss=_normal_loss,
@@ -86,14 +94,6 @@ NORMAL = Distribution(
     # La mediana d'una normal és la seva localització.
     point=lambda parameters: parameters[..., 0],
     quantiles=_normal_quantiles,
-)
-
-JOHNSON_SU = Distribution(
-    names=("location", "scale", "skewness", "tail_weight"),
-    loss=_johnson_loss,
-    flat=_johnson_flat,
-    point=lambda parameters: _johnson_quantiles(parameters, 0.5)[..., 0],
-    quantiles=_johnson_quantiles,
 )
 
 # Com es diu cada família i quina distribució treu.

@@ -48,7 +48,7 @@ def rows(count, seed=0):
     return pd.concat([X, days], axis="columns"), y
 
 
-@pytest.mark.parametrize("distribution", [NORMAL, JOHNSON_SU], ids=["normal", "jsu"])
+@pytest.mark.parametrize("distribution", [JOHNSON_SU, NORMAL], ids=["jsu", "normal"])
 def test_each_parameters_base_and_contributions_add_up_to_it(distribution):
     # La base i les contribucions de DeepExplainer contra la predicció de la xarxa, a
     # través de la normalització per lots de l'entrada i de les L1 de la sortida.
