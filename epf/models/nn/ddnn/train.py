@@ -17,8 +17,8 @@ from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
 from epf.models.nn.hyperparameters import FIXED, copied
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-# Cada família, com la planifica una passada: el lot, les èpoques i la paciència, que no
-# es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
+# Cada família, com la planifica una passada: el batch, les èpoques i la paciència, que
+# no es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
 # configuració de cada llavor de la seva pròpia cerca.
 FAMILIES = {
     name: {"fixed": FIXED, "placeholder": copied(name), "kept": 1, "searched_as": name}

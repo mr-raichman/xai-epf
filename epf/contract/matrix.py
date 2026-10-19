@@ -26,8 +26,8 @@ DAY = "day"
 HOUR = "hour"
 PRICE = "price"
 
-# El conjunt d'informació: cada sèrie del dataset que entra a les matrius, en l'ordre de
-# les seves columnes, amb els dies abans del lliurament en què hi entra. El preu, que és
+# L'information set: cada sèrie del dataset que entra a les matrius, en l'ordre de les
+# seves columnes, amb els dies abans del lliurament en què hi entra. El preu, que és
 # també el que es prediu, hi entra amb les 24 hores de cada retard.
 INFORMATION = {
     PRICE: PREVIOUS_DAY,
@@ -39,12 +39,12 @@ INFORMATION = {
     "hydro_sched": (SCHEDULE_LAG,),
 }
 
-# El dia de la setmana, en set indicadors, com els llegeixen l'arbre i la xarxa
-# elàstica; les xarxes en fan un sol enter, a `models/nn/network.py`.
+# El dia de la setmana, en set dummies, com les llegeixen l'arbre i l'elastic net; les
+# xarxes en fan un sol enter, a `models/nn/network.py`.
 DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK)]
 
-# Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen. `daily`
-# i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el `y` de la
+# Les dues matrius d'un information set i el preu real amb què es comparen. `daily` i
+# `hourly` són les parelles `(X, y)` que una família pren; `actual` és el `y` de la
 # diària.
 Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
@@ -170,7 +170,7 @@ def series():
 
 
 def matrices(series):
-    """Torna les dues matrius del conjunt d'informació, `INFORMATION`, i el preu real.
+    """Torna les dues matrius de l'information set, `INFORMATION`, i el preu real.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
     la diària, la de les xarxes, amb les 24 hores de cada sèrie, i la per hora, la de

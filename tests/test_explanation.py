@@ -124,7 +124,7 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
         np.zeros(3 * HOURS_PER_DAY),
         network.sums,
     ).exists()
-    # La xarxa elàstica, a l'espai transformat.
+    # L'elastic net, a l'espai transformat.
     values = rng.normal(0, 1, (2 * HOURS_PER_DAY, 6))
     base = rng.normal(0, 1, 2 * HOURS_PER_DAY)
     assert _saved(

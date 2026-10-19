@@ -85,8 +85,8 @@ def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
 def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
     """Una contribució a una altra columna sumaria igual, amb la mateixa mitjana.
 
-    L'ordre de la matriu del model, les escalades i després els indicadors, no és el de
-    la matriu per hora.
+    L'ordre de la matriu del model, les escalades i després les dummies, no és el de la
+    matriu per hora.
     """
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)

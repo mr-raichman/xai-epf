@@ -35,9 +35,9 @@ def space(optuna_trial):
 def trial(family, optuna_trial, train, validate, seed):
     """Ajusta un punt de la graella i el puntua pel MAE de tota la validació.
 
-    S'ajusta amb les files d'entrenament, `train`, i s'atura quan qualsevol de les
-    quatre parts de la validació, `validate`, deixa de millorar, com a la passada. Torna
-    el punt i la puntuació.
+    S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan
+    qualsevol de les quatre parts de la validació, `validate`, deixa de millorar, com a
+    la passada. Torna el punt i la puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
     point = space(optuna_trial)

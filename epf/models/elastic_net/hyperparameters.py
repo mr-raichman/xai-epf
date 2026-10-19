@@ -1,4 +1,4 @@
-"""Els números de la xarxa elàstica."""
+"""Els números de l'elastic net."""
 
 # Nom del model i de la seva família.
 NAME = "elastic_net"

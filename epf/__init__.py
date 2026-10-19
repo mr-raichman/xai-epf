@@ -7,5 +7,5 @@ class Refusal(ValueError):
 
     El causen les dades, els paràmetres o el que s'ha teclejat. La línia de comandes
     l'escriu com a `error: <missatge>`; qualsevol altra excepció és un error del codi, i
-    en mostra la traça.
+    en mostra el traceback.
     """

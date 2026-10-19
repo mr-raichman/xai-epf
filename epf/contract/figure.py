@@ -97,8 +97,8 @@ OUTPUT_LABELS = {
     "tail_weight": "pes de la cua",
 }
 
-# Les sèries que tenen gràfic de dependència: totes les del conjunt d'informació menys
-# el preu, les previsions com a Trebbien et al. (2023) i el programa igual.
+# Les sèries que tenen gràfic de dependència: totes les de l'information set menys el
+# preu, les previsions com a Trebbien et al. (2023) i el programa igual.
 DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
 
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
@@ -123,8 +123,8 @@ def saved(folder):
 def outputs(model):
     """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
 
-    L'arbre i la xarxa elàstica en tenen una per fila. La xarxa distribucional en té una
-    per paràmetre, amb una fila per dia i hora.
+    L'arbre i l'elastic net en tenen una per fila. La xarxa distribucional en té una per
+    paràmetre, amb una fila per dia i hora.
     """
     values = model["values"]
     if values.ndim == 2:

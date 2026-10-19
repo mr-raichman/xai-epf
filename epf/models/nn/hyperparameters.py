@@ -1,7 +1,7 @@
 """Els números de les xarxes."""
 
-# Mida del lot, sostre d'èpoques i paciència de l'aturada: els del codi de Marcjasz et
-# al. (2023).
+# Mida del batch, sostre d'èpoques i paciència de l'early stopping: els del codi de
+# Marcjasz et al. (2023).
 BATCH = 32
 EPOCHS = 1500
 PATIENCE = 50

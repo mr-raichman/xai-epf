@@ -1,4 +1,4 @@
-"""L'atribució de la xarxa elàstica, el valor de SHAP exacte d'un model lineal."""
+"""L'atribució de l'elastic net, el valor de SHAP exacte d'un model lineal."""
 
 import collections
 
@@ -43,5 +43,5 @@ def attribute_rows(model, X):
 
 
 def sums(found):
-    """Torna la suma de la xarxa elàstica sobre el seu fitxer, a l'espai transformat."""
+    """Torna la suma de l'elastic net sobre el seu fitxer, a l'espai transformat."""
     return [(*summed(found["base"], found["values"], 1), found["transformed"])]

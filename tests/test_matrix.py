@@ -33,7 +33,7 @@ def frame_of(days, start=datetime.date(2020, 1, 1)):
 
 
 def every_series(days=range(30)):
-    """Torna cada sèrie del conjunt d'informació, el preu per un nombre diferent."""
+    """Torna cada sèrie de l'information set, el preu per un nombre diferent."""
     return {
         name: frame_of(days) * (number + 1) for number, name in enumerate(INFORMATION)
     }

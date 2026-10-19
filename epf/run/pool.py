@@ -13,7 +13,7 @@ from epf import Refusal
 
 
 class Failure(Exception):
-    """La fallada d'una tasca que no és un refús, amb la traça del seu procés.
+    """La fallada d'una tasca que no és un refús, amb el traceback del seu procés.
 
     `line` és la classe i el missatge de l'error.
     """
@@ -63,7 +63,7 @@ def done(tasks, workers, threads, log, block):
     un mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
     etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
     altres. `block` mostra cada llavor acabada o fallada, i el temps cada segon, i es
-    tanca en acabar. La sortida dels processos s'afegeix a `log`, i la traça de cada
+    tanca en acabar. La sortida dels processos s'afegeix a `log`, i el traceback de cada
     fallada que no és un refús també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix

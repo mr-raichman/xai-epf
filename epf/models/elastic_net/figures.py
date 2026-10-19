@@ -1,4 +1,4 @@
-"""Les figures de la xarxa elàstica, del que la passada va desar.
+"""Les figures de l'elastic net, del que la passada va desar.
 
 Són a l'espai transformat, i no en EUR/MWh.
 """

@@ -1,4 +1,4 @@
-"""La cerca de la xarxa elàstica, sobre la graella d'Uniejewski et al. (2016)."""
+"""La cerca de l'elastic net, sobre la graella d'Uniejewski et al. (2016)."""
 
 import numpy as np
 

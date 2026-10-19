@@ -3,8 +3,9 @@
 # Nom del model i de la seva família.
 NAME = "lightgbm"
 
-# Arbres com a molt d'un ajust que s'atura, i rondes sense millorar abans d'aturar-lo:
-# els del codi del grup de Trebbien et al. (2023), que la graella de la cerca acompanya.
+# Arbres com a molt d'un ajust amb early stopping, i rondes sense millorar abans
+# d'aturar-lo: els del codi del grup de Trebbien et al. (2023), que la graella de la
+# cerca acompanya.
 MOST_TREES = 1000
 PATIENCE = 20
 

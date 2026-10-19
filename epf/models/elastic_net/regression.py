@@ -1,4 +1,4 @@
-"""Els models de la xarxa elàstica d'Uniejewski et al. (2016): un model lineal per hora.
+"""Els models de l'elastic net d'Uniejewski et al. (2016): un model lineal per hora.
 
 Cada hora té el seu model, ajustat només amb les files de la seva hora de la matriu per
 hora, que porten les previsions i el programa a aquella hora, com l'article hi porta la
@@ -21,7 +21,7 @@ from epf.models.elastic_net.scaling import Scaler
 from epf.parameters import HOURS_PER_DAY
 
 # El model d'una hora i el que cal per llegir-lo. `columns` són les de la matriu del
-# model en el seu ordre, les escalades i després els indicadors del dia de la setmana,
+# model en el seu ordre, les escalades i després les dummies del dia de la setmana,
 # sense cap de les que no es mouen a les files de l'hora. `inputs` escala les entrades,
 # `target` l'objectiu i és qui torna a EUR/MWh, i `background` és la mitjana de cada
 # columna de la matriu, d'on surten les contribucions.
@@ -31,7 +31,7 @@ Hour = collections.namedtuple("Hour", "model columns inputs target background")
 def design(rows, fitted):
     """Torna les files com la matriu del model d'una hora, `fitted`.
 
-    Les entrades, transformades, i els indicadors del dia de la setmana.
+    Les entrades, transformades, i les dummies del dia de la setmana.
     """
     scaled = len(fitted.inputs.median)
     values = rows[fitted.columns].to_numpy(dtype=float)

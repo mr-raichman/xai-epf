@@ -71,9 +71,9 @@ def space(optuna_trial, distribution, penalised=True):
 def trial(family, optuna_trial, train, validate, seed):
     """Ajusta una configuració de l'espai i la puntua per la pèrdua de la validació.
 
-    S'ajusta amb la sortida de la família i les files d'entrenament, `train`, i s'atura
-    sobre tota la validació, `validate`. La pèrdua és la de Keras, amb les L1 a dins,
-    com la que puntua el codi de l'article. Torna la configuració i la puntuació.
+    S'ajusta amb la sortida de la família i les files d'entrenament, `train`, amb early
+    stopping sobre tota la validació, `validate`. La pèrdua és la de Keras, amb les L1 a
+    dins, com la que puntua el codi de l'article. Torna la configuració i la puntuació.
     """
     X_validate, y_validate = validate
     point = family == POINT_FAMILY

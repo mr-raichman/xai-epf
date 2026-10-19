@@ -35,7 +35,7 @@ GAP = 1
 # Una partició per llavor.
 SEEDS = tuple(range(10))
 
-# Retards de preu del conjunt d'informació: el dia abans, les seves 24 hores.
+# Retards de preu de l'information set: el dia abans, les seves 24 hores.
 PREVIOUS_DAY = (1,)
 
 # El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del

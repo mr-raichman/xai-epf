@@ -1,4 +1,4 @@
-"""La passada de la xarxa elàstica d'Uniejewski et al. (2016)."""
+"""La passada de l'elastic net d'Uniejewski et al. (2016)."""
 
 import numpy as np
 

@@ -45,7 +45,7 @@ def parameters(distribution, raw):
 
 
 def inputs(X):
-    """Torna les entrades de la xarxa, `X` amb `DAY` en lloc dels set indicadors."""
+    """Torna les entrades de la xarxa, `X` amb `DAY` en lloc de les set dummies."""
     found = X.drop(columns=DAY_OF_WEEK_COLUMNS).astype(float)
     found.insert(0, DAY, X[DAY_OF_WEEK_COLUMNS].to_numpy().argmax(axis=1).astype(float))
     return found
@@ -103,7 +103,7 @@ def fit_rows(
     patience=PATIENCE,
     seed=SEED,
 ):
-    """Ajusta una xarxa amb `train` i l'atura quan deixa de millorar a `validate`.
+    """Ajusta una xarxa amb `train`, amb early stopping sobre `validate`.
 
     Tots dos són parelles `(X, y)`. Torna la xarxa amb els pesos de la millor època.
     Buida l'estat de Keras i fixa amb `seed` totes les llavors globals.

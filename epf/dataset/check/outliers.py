@@ -18,7 +18,7 @@ from epf.parameters import HOURS_PER_DAY
 HOUR_HALF_WIDTH = 12
 DAY_HALF_WIDTH = 7
 
-# Les puntuacions més altes que es desen de cada veïnatge; no és cap llindar.
+# Les puntuacions més altes que es desen de cada neighbourhood; no és cap llindar.
 HIGHEST = 100
 
 # On l'eix de les puntuacions passa de lineal a logarítmic: la majoria són inferiors a
@@ -68,11 +68,11 @@ def highest(scores):
 def report(name, frame):
     """Puntua cada valor d'una sèrie contra els seus veïns i en desa les més altes.
 
-    De cada veïnatge, les hores adjacents de la sèrie cronològica, `hours`, i la mateixa
-    hora dels dies del voltant, `days`, desa les `HIGHEST` puntuacions més altes a
-    `outliers_<sèrie>.csv`, a la carpeta de la sèrie, cada una amb el valor i la mediana
-    i la MAD de la seva finestra. Torna totes les puntuacions de cada veïnatge, en dies
-    per hores, per dibuixar-les.
+    De cada neighbourhood, les hores adjacents de la sèrie cronològica, `hours`, i la
+    mateixa hora dels dies del voltant, `days`, desa les `HIGHEST` puntuacions més altes
+    a `outliers_<sèrie>.csv`, a la carpeta de la sèrie, cada una amb el valor i la
+    mediana i la MAD de la seva finestra. Torna totes les puntuacions de cada
+    neighbourhood, en dies per hores, per dibuixar-les.
     """
     values = frame.to_numpy().ravel()
     by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
@@ -141,11 +141,11 @@ def _style(axis, title, ylabel):
 
 
 def draw(name, frame, by_hours, by_days):
-    """Dibuixa les puntuacions de veïnatge d'una sèrie a `outliers_<sèrie>.png`.
+    """Dibuixa les puntuacions d'outliers d'una sèrie a `outliers_<sèrie>.png`.
 
     A la carpeta de la sèrie: les de les hores adjacents, `by_hours`, un dia per línia,
     i les de la mateixa hora dels dies del voltant, `by_days`, en el temps, amb les
-    `HIGHEST` més altes de cada veïnatge en vermell.
+    `HIGHEST` més altes de cada neighbourhood en vermell.
     """
     panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
 

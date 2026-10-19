@@ -29,9 +29,9 @@ def tuned(distribution):
 
 
 def rows(count, seed=0):
-    """Torna `count` files, sis columnes i els indicadors del dia, i els seus preus.
+    """Torna `count` files, sis columnes i les dummies del dia, i els seus preus.
 
-    La xarxa llegeix els set indicadors en una sola columna.
+    La xarxa llegeix les set dummies en una sola columna.
     """
     rng = np.random.default_rng(seed)
     X = pd.DataFrame(

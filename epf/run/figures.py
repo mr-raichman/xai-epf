@@ -29,7 +29,7 @@ FIGURES = {
 
 
 def _performance(where, described):
-    """Dibuixa la R-quadrat i el MAE de cada família a les setmanes de prova.
+    """Dibuixa l'R² i el MAE de cada família a les setmanes de prova.
 
     La millor configuració de cada llavor amb una marca, i les altres amb una de petita
     i grisa al darrere. Només les famílies explicades tenen color; els bancs de
@@ -44,7 +44,7 @@ def _performance(where, described):
         1, 2, figsize=(max(8, 1.1 * len(families)), 5), facecolor=figure.SURFACE
     )
     for axis, metric, label in (
-        (axes[0], "r2", "R-quadrat"),
+        (axes[0], "r2", "R²"),
         (axes[1], "mae", "MAE, EUR/MWh"),
     ):
         for position, family in enumerate(families):

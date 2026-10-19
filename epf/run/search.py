@@ -30,7 +30,7 @@ def searcher(family):
 def _search(family, seed, smoke, trials, fingerprints):
     """Fa la cerca d'una família en una llavor, una tasca de `pool`.
 
-    Fa l'estudi fins a `trials` intents i en desa el registre.
+    Fa el study fins a `trials` intents i en desa el registre.
     """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     module = searcher(family)
@@ -53,7 +53,7 @@ def main(arguments):
     """Fa una cerca, la comanda `epf search`, i torna 0, o 1 si alguna llavor ha fallat.
 
     Fa la cerca de cada família triada a cada llavor, o a les de `--seed`, unes quantes
-    alhora, i en desa l'estudi i el registre. Tot el que refusa, ho refusa abans de
+    alhora, i en desa el study i el registre. Tot el que refusa, ho refusa abans de
     cercar res.
     """
     values = parameters.chosen(arguments.smoke)

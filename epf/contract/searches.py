@@ -1,6 +1,6 @@
 """El que comparteixen les cerques de tots els models.
 
-Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompuda
+Optuna desa cada intent en un study SQLite, de manera que una cerca interrompuda
 continua on era. Quan una llavor té tots els seus intents, el seu registre en desa els
 millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
 columnes de la matriu i la partició. Una cerca continua sobre un altre codi, un altre
@@ -18,7 +18,7 @@ from epf import Refusal, paths
 from epf.contract.record import plain, write_record
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
 
-# Els fitxers d'una cerca, per llavor: l'estudi d'Optuna i el registre del que ha triat.
+# Els fitxers d'una cerca, per llavor: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
 RECORD = "seed_{seed}.json"
 
@@ -59,12 +59,12 @@ def _seed(*parts):
 
 
 def _sampler(searcher, family, seed, study):
-    """Torna el mostrejador d'un estudi: la graella del cercador, `GRID`, o l'espai.
+    """Torna el sampler d'un study: la graella del cercador, `GRID`, o l'espai.
 
     Una graella es barreja amb una llavor de la família i de la partició, i l'intent `k`
     en pren el punt `k`: una cerca continuada segueix per on anava, i cap punt no es
     repeteix. Un espai continu es mostreja amb una llavor que compta també els intents
-    que l'estudi ja porta, perquè una cerca continuada no torni a proposar els primers.
+    que el study ja porta, perquè una cerca continuada no torni a proposar els primers.
     El nom de la família hi entra perquè dues famílies del mateix espai no proposin les
     mateixes.
     """
@@ -77,14 +77,14 @@ def _sampler(searcher, family, seed, study):
 
 
 def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
-    """Fa els intents que falten fins a `trials` a l'estudi d'una família en una llavor.
+    """Fa els intents que falten fins a `trials` al study d'una família en una llavor.
 
-    Torna l'estudi. `searcher` és el `search.py` del model de la família: la seva
+    Torna el study. `searcher` és el `search.py` del model de la família: la seva
     graella, `GRID`, i l'intent, `trial`. Cada intent s'ajusta amb les files
     d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
     dona cap altra. Els números que en surten es desen a l'intent, en la forma en què
     els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del dataset i de les
-    biblioteques que el fan. Refusa un estudi fet sobre unes altres files.
+    biblioteques que el fan. Refusa un study fet sobre unes altres files.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(
@@ -98,7 +98,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
         study.set_user_attr("made_on", now)
     elif study.user_attrs.get("made_on") != now:
         raise Refusal(
-            f"l'estudi es va fer sobre altres files; esborrar {paths.relative(store)}"
+            f"el study es va fer sobre altres files; esborrar {paths.relative(store)}"
         )
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)

@@ -32,8 +32,8 @@ from epf.parameters import (
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
 # cerquen, el punt de lloc mentre no hi ha cerca, sense els seus arbres, perquè els
-# arbres els decideix l'aturada, i les `BEST` millors de cada llavor de la seva pròpia
-# cerca.
+# arbres els decideix l'early stopping, i les `BEST` millors de cada llavor de la seva
+# pròpia cerca.
 FAMILIES = {
     NAME: {
         "fixed": {"most_trees": MOST_TREES, "patience": PATIENCE},
@@ -76,11 +76,11 @@ def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
     """Ajusta i torna un model d'un punt de la graella amb les files donades.
 
     Sense `validation` fa `trees` arbres, ni un més ni un menys. Amb `validation`,
-    parelles `(X, y)`, `trees` és el sostre, i l'entrenament s'atura quan qualsevol
-    d'elles porta `patience` arbres sense millorar, i el model es queda amb el millor
-    arbre d'aquella: amb quatre parelles és l'aturada de Trebbien et al. (2023), que
-    parteix la validació en quatre. Cada crida fa un regressor nou, de manera que cap
-    ajust no hereta res de l'anterior.
+    parelles `(X, y)`, `trees` és el sostre, i l'early stopping atura l'entrenament quan
+    qualsevol d'elles porta `patience` arbres sense millorar, i el model es queda amb el
+    millor arbre d'aquella: amb quatre parelles és l'early stopping de Trebbien et al.
+    (2023), que parteix la validació en quatre. Cada crida fa un regressor nou, de
+    manera que cap ajust no hereta res de l'anterior.
     """
     model = lightgbm(point, trees)
     if not validation:
@@ -102,10 +102,10 @@ def predict_rows(model, X):
 def fitted(X, y, groups, parts, explained, seed, numbers, best):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
-    S'atura quan qualsevol de les quatre parts de la validació deixa de millorar. A la
-    millor configuració de la llavor, `best`, explica també les interaccions d'una
-    mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna
-    de `X`, i `numbers` el punt de la configuració.
+    L'early stopping l'atura quan qualsevol de les quatre parts de la validació deixa de
+    millorar. A la millor configuració de la llavor, `best`, explica també les
+    interaccions d'una mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el
+    grup de cada columna de `X`, i `numbers` el punt de la configuració.
     """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)

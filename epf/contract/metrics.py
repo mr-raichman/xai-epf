@@ -91,7 +91,7 @@ def mae(predicted, actual):
 
 
 def scored(predicted, actual):
-    """Torna la R-quadrat i el MAE de totes les files juntes."""
+    """Torna l'R² i el MAE de totes les files juntes."""
     error = np.asarray(predicted) - np.asarray(actual)
     spread = np.asarray(actual) - np.mean(actual)
     return {
