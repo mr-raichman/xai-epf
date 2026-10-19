@@ -1,6 +1,3 @@
-"""Cada predicció ingènua copia de la sèrie del preu el dia que li toca, i la del dia
-similar porta la distribució dels seus errors hora a hora."""
-
 import numpy as np
 import pandas as pd
 
@@ -32,7 +29,7 @@ def test_the_similar_day_takes_yesterday_only_from_tuesday_to_friday():
 def test_each_hours_bootstrap_is_its_copy_plus_its_own_errors_quantiles():
     # L'hora `h` té els errors 1 a 10 més `100 h`, de manera que un quantil pres d'una
     # altra hora, o de totes juntes, en surt lluny. La inversa de la distribució
-    # empírica dóna al quantil 0,25 el tercer error, i al 0,5 el cinquè.
+    # empírica dóna al quantil 0.25 el tercer error, i al 0.5 el cinquè.
     errors = np.arange(1, 11)[:, None] + 100 * np.arange(24)[None, :]
     copied = np.full((2, 24), 1000.0)
     found = bootstrapped(copied, errors, (0.25, 0.5))
