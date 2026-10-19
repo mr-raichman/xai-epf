@@ -22,13 +22,14 @@ def fake(tmp_path, monkeypatch):
         calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
     )
 
-    def train(family, folder, configurations, explained_days):
+    def train(family, folder, configurations, explained_days, saved):
         state.calls.append((family, configurations))
         if family in state.failing:
             raise RuntimeError("interrompuda")
         for seed, planned in configurations.items():
             for one in planned:
                 (folder / paths.SEED.format(seed=seed, rank=one["rank"])).touch()
+                saved()
         return [
             [seed, one["rank"]]
             for seed, planned in configurations.items()

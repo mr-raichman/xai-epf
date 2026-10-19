@@ -16,10 +16,13 @@ class Shown:
     """Un bloc que només recorda el que se li diu."""
 
     def __init__(self):
-        self.finished, self.failed, self.closed = [], [], False
+        self.finished, self.advanced, self.failed, self.closed = [], [], [], False
 
     def finish(self, family):
         self.finished.append(family)
+
+    def advance(self, family):
+        self.advanced.append(family)
 
     def fail(self, family, seed, message):
         self.failed.append((family, seed, message))
@@ -75,3 +78,12 @@ def test_the_thread_cap_is_in_each_worker_s_environment(tmp_path):
     tasks = [((name, 0), os.getenv, (name,)) for name in names]
     results, _ = pool.done(tasks, 2, 3, tmp_path / "workers.log", Shown())
     assert {name: value for (name, _), value in results.items()} == pool.environment(3)
+
+
+def test_a_unit_a_worker_tells_reaches_the_block(tmp_path):
+    # La tasca és `tell` mateix, cridat a cada procés com el criden una cerca i una
+    # passada.
+    tasks = [(("a", seed), pool.tell, ("a",)) for seed in range(3)]
+    block = Shown()
+    pool.done(tasks, 2, 1, tmp_path / "workers.log", block)
+    assert block.advanced == ["a", "a", "a"]

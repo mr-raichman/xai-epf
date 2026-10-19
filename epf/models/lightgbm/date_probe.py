@@ -33,12 +33,12 @@ DATE = "date"
 FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 
 
-def train(family, folder, configurations, explained_days):
+def train(family, folder, configurations, explained_days, saved=lambda: None):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
     `configurations` és el pla de la família per seed, i `explained_days` els dies de
     prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
-    configuració]` que ha desat ara.
+    configuració]` que ha desat ara, i crida `saved` en desar cada una.
     """
     rows, y = matrix.matrices(matrix.series()).hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
@@ -71,4 +71,5 @@ def train(family, folder, configurations, explained_days):
             scores = scored(found.predicted, found.actual)
             save_model(path, parts, explained, found, scores, rank)
             done.append([seed, rank])
+            saved()
     return done

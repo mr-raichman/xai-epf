@@ -86,12 +86,12 @@ def _fitted(distribution, X, y, parts, explained, numbers):
     )
 
 
-def train(family, folder, configurations, explained_days):
+def train(family, folder, configurations, explained_days, saved=lambda: None):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
     `configurations` és el pla de la família per seed, i `explained_days` els dies de
     prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
-    configuració]` que ha desat ara.
+    configuració]` que ha desat ara, i crida `saved` en desar cada una.
     """
     X, y = matrix.matrices(matrix.series()).daily
     distribution = DISTRIBUTIONS[family]
@@ -113,4 +113,5 @@ def train(family, folder, configurations, explained_days):
             scores = scored(fitted.predicted, fitted.actual) | fitted.scores
             save_model(path, parts, explained, fitted, scores, rank)
             done.append([seed, rank])
+            saved()
     return done

@@ -11,8 +11,15 @@ def test_the_failed_seeds_are_counted_and_the_first_named_in_the_families_order(
 
 
 def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
-    """Una família d'una sola seed, com amb `--seed 3`, en deia `1 de 1 seeds`."""
-    block = progress.Block("Cerca", {"lightgbm": 2, "dnn": 1, "floor": 2}, {"floor": 1})
+    """Una família d'una sola seed, com amb `--seed 3`, la deia en plural."""
+    block = progress.Block(
+        "Cerca",
+        "trial",
+        {"lightgbm": (2, 20), "dnn": (1, 10), "floor": (2, 20)},
+        {"lightgbm": (0, 0), "dnn": (0, 0), "floor": (1, 10)},
+    )
+    for _ in range(10):
+        block.advance("lightgbm")
     block.finish("lightgbm")
     block.finish("dnn")
     block.fail("floor", 1, "<el missatge>")
@@ -21,8 +28,8 @@ def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
     assert lines[:6] == [
         "Cerca",
         "",
-        "lightgbm: 1 de 2 seeds",
-        "dnn: 1 de 1 seed",
+        "lightgbm: 1/2 seeds    10/20 trials",
+        "dnn: 1/1 seed    0/10 trials",
         "error: floor seed 1 ha fallat: <el missatge>",
         "",
     ]

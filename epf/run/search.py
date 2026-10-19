@@ -27,10 +27,16 @@ def searcher(family):
     return importlib.import_module(SEARCHERS[family])
 
 
+def trials_done(smoke, family, seed):
+    """Torna quants trials acabats té ja la cerca d'una família en una seed."""
+    store = searches.folder(smoke, family) / searches.STUDY.format(seed=seed)
+    return searches.trials_done(store, family, seed)
+
+
 def _search(family, seed, smoke, trials, fingerprints):
     """Fa la cerca d'una família en una seed, una tasca de `pool`.
 
-    Fa el study fins a `trials` trials i en desa el registre.
+    Fa el study fins a `trials` trials, en diu cada un al pare, i en desa el registre.
     """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     module = searcher(family)
@@ -45,6 +51,7 @@ def _search(family, seed, smoke, trials, fingerprints):
         seed,
         trials,
         fingerprints,
+        on_trial=lambda: pool.tell(family),
     )
     searches.save(searches.record(made, family, seed, smoke), smoke)
 
@@ -96,9 +103,18 @@ def main(arguments):
         for family in chosen
         for seed in seeds
     ]
+    trials = values["TRIALS"]
+    done = {
+        family: sum(
+            min(trials_done(arguments.smoke, family, seed), trials) for seed in seeds
+        )
+        for family in chosen
+    }
     block = progress.Block(
         "Cerca d'assaig" if arguments.smoke else "Cerca",
-        {family: len(seeds) for family in chosen},
+        "trial",
+        {family: (len(seeds), len(seeds) * trials) for family in chosen},
+        {family: (0, done[family]) for family in chosen},
     )
     prefix = paths.SMOKE_PREFIX if arguments.smoke else ""
     log = paths.SEARCHES / f"{prefix}{paths.WORKERS_LOG}"

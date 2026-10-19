@@ -70,14 +70,16 @@ def counted(failed, order):
 class Block:
     """El bloc d'una comanda, que escriu a stderr.
 
-    `title` va a la primera línia, `totals` són les seeds que planifica cada família, i
-    `done` les que ja tenia acabades.
+    `title` va a la primera línia, i `unit` és el que compta dins de cada seed, `trial`
+    o `fit`. `totals` són les seeds i les unitats que planifica cada família, i `done`
+    les que ja tenia acabades, totes dues parelles `(seeds, unitats)`.
     """
 
-    def __init__(self, title, totals, done=None):
+    def __init__(self, title, unit, totals, done):
         self.title = title
+        self.unit = unit
         self.totals = dict(totals)
-        self.done = {family: 0 for family in self.totals} | dict(done or {})
+        self.done = {family: list(done[family]) for family in self.totals}
         self.failed = {family: 0 for family in self.totals}
         self.failures = []
         self.started = time.monotonic()
@@ -91,11 +93,17 @@ class Block:
 
     def finish(self, family):
         """Compta una seed acabada."""
-        self.done[family] += 1
+        self.done[family][0] += 1
         if self.live:
             self._draw()
         else:
             self._write(f"{family}: {self._count(family)}\n")
+
+    def advance(self, family):
+        """Compta una unitat acabada, que només es veu en un terminal."""
+        self.done[family][1] += 1
+        if self.live:
+            self._draw()
 
     def fail(self, family, seed, message):
         """Compta una seed fallada i en mostra el missatge de l'error."""
@@ -120,20 +128,37 @@ class Block:
         else:
             self._write(f"\n{self._time()}\n\n")
 
-    def _count(self, family, width=0):
-        """Torna `3 de 10 seeds`, les acabades d'una família alineades a `width`."""
-        total = self.totals[family]
-        seeds = "seed" if total == 1 else "seeds"
-        return f"{self.done[family]:>{width}} de {total} {seeds}"
+    def _count(self, family, widths=(0, 0, 0)):
+        """Torna `3/10 seeds    27/100 trials` d'una família.
+
+        `widths` són les amplades que alineen les famílies: la d'un total de seeds, la
+        de la paraula `seeds` i la d'un total d'unitats.
+        """
+        (seeds, units), (done_seeds, done_units) = (
+            self.totals[family],
+            self.done[family],
+        )
+        seed_word = "seed" if seeds == 1 else "seeds"
+        unit_word = self.unit if units == 1 else f"{self.unit}s"
+        seed_width, word_width, unit_width = widths
+        seed_count = f"{done_seeds:>{seed_width}}/{seeds:<{seed_width}}"
+        unit_count = f"{done_units:>{unit_width}}/{units:<{unit_width}}"
+        return f"{seed_count} {seed_word:<{word_width}}    {unit_count} {unit_word}"
 
     def _time(self):
         return f"Temps transcorregut: {elapsed(time.monotonic() - self.started)}"
 
     def _lines(self):
         width = max(len(family) for family in self.totals)
+        seeds = [seeds for seeds, _ in self.totals.values()]
+        widths = (
+            max(len(str(count)) for count in seeds),
+            max(len("seed" if count == 1 else "seeds") for count in seeds),
+            max(len(str(units)) for _, units in self.totals.values()),
+        )
         lines = [self.title, ""]
-        for family, total in self.totals.items():
-            line = f"{family:<{width}}  {self._count(family, len(str(total)))}"
+        for family in self.totals:
+            line = f"{family:<{width}}  {self._count(family, widths)}"
             count = self.failed[family]
             if count:
                 line += f", {count} {'ha' if count == 1 else 'han'} fallat"

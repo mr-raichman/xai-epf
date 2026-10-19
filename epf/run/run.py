@@ -69,11 +69,12 @@ def _train(module, family, folder, seed, planned, explained_days):
     """Ajusta una família en una seed, una tasca de `pool`.
 
     Crida el `train` del mòdul del model, `module`, amb el pla d'aquesta seed sola,
-    `planned`. Torna què ha desat i quant ha trigat.
+    `planned`, i diu al pare cada configuració desada. Torna què ha desat i quant ha
+    trigat.
     """
     started = time.time()
     described = importlib.import_module(module).train(
-        family, folder, {seed: planned}, explained_days
+        family, folder, {seed: planned}, explained_days, lambda: pool.tell(family)
     )
     return {
         "family": family,
@@ -150,11 +151,26 @@ def main(arguments):
         for family in chosen
         for seed, planned in missing[family].items()
     ]
-    totals = {family: len(families.recorded(where / family)) for family in chosen}
+    recorded = {family: families.recorded(where / family) for family in chosen}
+    fits = {
+        family: [
+            where / family / paths.SEED.format(seed=seed, rank=one["rank"])
+            for seed, ones in recorded[family].items()
+            for one in ones
+        ]
+        for family in chosen
+    }
     block = progress.Block(
         f"Passada {where.name}{', continuada' if continued else ''}",
-        totals,
-        {family: totals[family] - len(missing[family]) for family in chosen},
+        "fit",
+        {family: (len(recorded[family]), len(fits[family])) for family in chosen},
+        {
+            family: (
+                len(recorded[family]) - len(missing[family]),
+                sum(path.exists() for path in fits[family]),
+            )
+            for family in chosen
+        },
     )
     results, failed = pool.done(
         tasks, values["WORKERS"], values["THREADS"], where / paths.WORKERS_LOG, block

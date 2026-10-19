@@ -76,21 +76,45 @@ def _sampler(searcher, family, seed, study):
     return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
 
 
-def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
+def _name(family, seed):
+    """Torna el nom del study d'una família en una seed."""
+    return f"{family}_seed_{seed}"
+
+
+def _storage(store):
+    """Torna l'adreça d'Optuna del fitxer d'un study, `store`."""
+    # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
+    return f"sqlite:///{store.as_posix()}"
+
+
+def trials_done(store, family, seed):
+    """Torna quants trials acabats té el study `store` d'una família en una seed.
+
+    Un study que encara no té fitxer en té zero.
+    """
+    if not store.exists():
+        return 0
+    study = optuna.load_study(study_name=_name(family, seed), storage=_storage(store))
+    return len(completed(study))
+
+
+def run(
+    store, family, searcher, X, y, parts, seed, trials, fingerprints, on_trial=None
+):
     """Fa els trials que falten fins a `trials` al study d'una família en una seed.
 
-    Torna el study. `searcher` és el `search.py` del model de la família: la seva
-    graella, `GRID`, i el trial, `trial`. Cada trial s'ajusta amb les files
-    d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
-    dona cap altra. Els números que en surten es desen al trial, en la forma en què els
-    pren l'ajust, amb les empremtes, `fingerprints`, del codi, del dataset i de les
-    biblioteques que el fan. Refusa un study fet sobre unes altres files.
+    Torna el study, i crida `on_trial` en acabar cada trial. `searcher` és el
+    `search.py` del model de la família: la seva graella, `GRID`, i el trial, `trial`.
+    Cada trial s'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de
+    validació, i la matriu no n'hi dona cap altra. Els números que en surten es desen al
+    trial, en la forma en què els pren l'ajust, amb les empremtes, `fingerprints`, del
+    codi, del dataset i de les biblioteques que el fan. Refusa un study fet sobre unes
+    altres files.
     """
-    # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
     study = optuna.create_study(
-        study_name=f"{family}_seed_{seed}",
+        study_name=_name(family, seed),
         direction="minimize",
-        storage=f"sqlite:///{store.as_posix()}",
+        storage=_storage(store),
         load_if_exists=True,
     )
     now = made_on(X.columns)
@@ -117,9 +141,16 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
             optuna_trial.set_user_attr(name, value)
         return score
 
+    def reported(study, optuna_trial):
+        if (
+            on_trial is not None
+            and optuna_trial.state == optuna.trial.TrialState.COMPLETE
+        ):
+            on_trial()
+
     remaining = trials - len(completed(study))
     if remaining > 0:
-        study.optimize(objective, n_trials=remaining)
+        study.optimize(objective, n_trials=remaining, callbacks=[reported])
     return study
 
 
