@@ -1,4 +1,4 @@
-"""La figura del sòl de l'ordre de mèrit, dibuixada del que la passada va desar."""
+"""La figura del sòl de l'ordre de mèrit, del que la passada va desar."""
 
 import numpy as np
 
@@ -7,9 +7,11 @@ from epf.contract.figure import plt
 
 
 def draw(folder, seeds):
-    """El preu contra la càrrega residual a les files d'entrenament de la primera
-    llavor, en densitat, i el polinomi cúbic de cada llavor, la figura del sòl de
-    l'article."""
+    """Dibuixa la figura del sòl a `folder`, dels models desats, `seeds`.
+
+    El preu contra la càrrega residual a les files d'entrenament de la primera llavor,
+    en densitat, i el cúbic de cada llavor, com la figura de Trebbien et al. (2023).
+    """
     first = seeds[0]
     load = first["load_training"] / figure.PER_GW
     panels, axis = plt.subplots(figsize=(8, 5), facecolor=figure.SURFACE)
