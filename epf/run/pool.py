@@ -6,8 +6,11 @@ caigués una línia d'un procés.
 
 import concurrent.futures
 import multiprocessing
+import multiprocessing.connection
 import os
 import queue
+import signal
+import threading
 import traceback
 
 from epf import Refusal
@@ -50,10 +53,24 @@ def _silenced(log):
 
 
 def _started(log, events):
-    """Prepara un procés del pool: la seva sortida a `log`, i `events` per a `tell`."""
+    """Prepara un procés del pool: la seva sortida a `log`, i `events` per a `tell`.
+
+    El procés no fa cas d'un Ctrl+C, que l'atura el pare, i acaba quan el pare ja no hi
+    és.
+    """
     global _events
     _events = events
+    # Amb el Ctrl+C, que arriba a tots els processos, la tasca fallaria i el procés
+    # passaria a la següent.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    threading.Thread(target=_orphaned, daemon=True).start()
     _silenced(log)
+
+
+def _orphaned():
+    """Acaba aquest procés quan el pare ja no hi és, i ningú no en recolliria res."""
+    multiprocessing.connection.wait([multiprocessing.parent_process().sentinel])
+    os._exit(1)
 
 
 def tell(family):
@@ -92,10 +109,10 @@ def done(tasks, workers, threads, log, block):
     Cada tasca és `((família, seed), funció, arguments)`, i la funció ha de viure en un
     mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
     etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
-    altres. `block` mostra cada seed acabada o fallada, cada unitat que una tasca diu
-    amb `tell`, i es tanca en acabar. La sortida dels processos s'afegeix a `log`, i el
-    traceback de cada fallada que no és un refús també. Deixa el límit de fils a
-    l'entorn d'aquest procés.
+    altres, i un Ctrl+C les acaba totes alhora. `block` mostra cada seed acabada o
+    fallada, cada unitat que una tasca diu amb `tell`, i es tanca en acabar. La sortida
+    dels processos s'afegeix a `log`, i el traceback de cada fallada que no és un refús
+    també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
     # el límit en carregar NumPy, LightGBM i TensorFlow.
@@ -110,37 +127,45 @@ def done(tasks, workers, threads, log, block):
         initializer=_started,
         initargs=(str(log), events),
     ) as pool:
-        running = {
-            pool.submit(_task, function, *arguments): label
-            for label, function, arguments in tasks
-        }
-        waiting = set(running)
-        while waiting:
-            ready, waiting = concurrent.futures.wait(
-                waiting, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
-            )
-            _drain(events, block)
-            for future in ready:
-                label = running[future]
-                family, seed = label
-                trace = None
-                try:
-                    results[label] = future.result()
-                    block.finish(family)
-                    continue
-                except Refusal as refusal:
-                    message = str(refusal)
-                except Failure as failure:
-                    message, trace = failure.line, failure.trace
-                except Exception as error:
-                    # El procés mateix, com un que el sistema mata per falta de memòria.
-                    message = f"{type(error).__name__}: {error}"
-                    trace = "".join(traceback.format_exception(error))
-                failed.append(label)
-                block.fail(family, seed, message)
-                if trace:
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(f"{family} seed {seed} ha fallat:\n{trace}")
+        try:
+            running = {
+                pool.submit(_task, function, *arguments): label
+                for label, function, arguments in tasks
+            }
+            waiting = set(running)
+            while waiting:
+                ready, waiting = concurrent.futures.wait(
+                    waiting, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
+                )
+                _drain(events, block)
+                for future in ready:
+                    label = running[future]
+                    family, seed = label
+                    trace = None
+                    try:
+                        results[label] = future.result()
+                        block.finish(family)
+                        continue
+                    except Refusal as refusal:
+                        message = str(refusal)
+                    except Failure as failure:
+                        message, trace = failure.line, failure.trace
+                    except Exception as error:
+                        # El procés mateix, com un que el sistema mata per falta de
+                        # memòria.
+                        message = f"{type(error).__name__}: {error}"
+                        trace = "".join(traceback.format_exception(error))
+                    failed.append(label)
+                    block.fail(family, seed, message)
+                    if trace:
+                        with open(log, "a", encoding="utf-8") as handle:
+                            handle.write(f"{family} seed {seed} ha fallat:\n{trace}")
+        except KeyboardInterrupt:
+            # Sense, sortir del `with` esperaria que cada procés acabés la seva tasca.
+            for worker in multiprocessing.active_children():
+                worker.terminate()
+            block.close()
+            raise
     # Els que un procés va posar a la cua just abans d'acabar la seva última tasca.
     _drain(events, block)
     block.close()

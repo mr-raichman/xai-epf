@@ -4,6 +4,7 @@ import argparse
 import collections
 import importlib
 import importlib.metadata
+import signal
 import sys
 
 import epf
@@ -105,11 +106,17 @@ COMMANDS = {
 }
 
 
-def main():
-    """Executa la subcomanda i torna 0, o 1 si es refusa.
+def _stopped(signum, frame):
+    """Atura la comanda al primer Ctrl+C; els següents ja no en tallen el tancament."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    raise KeyboardInterrupt
 
-    N'escriu el temps transcorregut mentre es fa i en acabar, i després `Finalitzat` o
-    el refús.
+
+def main():
+    """Executa la subcomanda i torna 0, 1 si es refusa o 130 si s'atura amb Ctrl+C.
+
+    N'escriu el temps transcorregut mentre es fa i en acabar, i després `Finalitzat`, el
+    refús o `Aturat`.
     """
     # El títol del treball, la `description` de `pyproject.toml`.
     title = importlib.metadata.metadata("epf")["Summary"]
@@ -126,6 +133,7 @@ def main():
 
     arguments = parser.parse_args()
     command = COMMANDS[arguments.command]
+    signal.signal(signal.SIGINT, _stopped)
     try:
         # Abans d'importar el mòdul de la subcomanda, que pot trigar uns segons.
         with terminal.Clock():
@@ -138,5 +146,8 @@ def main():
     except epf.Refusal as refusal:
         print(f"error: {refusal}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("Aturat", file=sys.stderr)
+        return 130
     print("Finalitzat", file=sys.stderr)
     return 0
