@@ -1,5 +1,4 @@
-"""L'atribució de les xarxes distribucionals: DeepExplainer, paràmetre a paràmetre, i
-les sumes que se'n tornen a fer sobre el fitxer desat."""
+"""L'atribució de les xarxes distribucionals, DeepExplainer paràmetre a paràmetre."""
 
 import collections
 
@@ -10,27 +9,26 @@ import shap
 from epf.contract.explanation import explained_rows, summed
 from epf.models.nn.network import inputs
 
-# L'atribució de cada paràmetre: `values` és `(files, columnes, 24, paràmetres)`, `base`
-# `(24, paràmetres)` i `inputs` les entrades explicades, una columna per a cada una de
-# `columns`, en les unitats en què es desa cada paràmetre: EUR/MWh la localització i
-# l'escala, i sense unitats l'asimetria i el pes de la cua.
+# L'atribució de cada paràmetre, en les seves unitats: `base` és `(24, paràmetres)`,
+# `values` `(files, columnes, 24, paràmetres)`, i `inputs` les entrades explicades, una
+# columna per a cada una de `columns`.
 Explanation = collections.namedtuple("Explanation", "names columns inputs values base")
 
 
 def attribute_rows(distribution, fitted, X, background):
-    """L'atribució de cada paràmetre de cada fila, amb DeepExplainer.
+    """Torna l'atribució de cada paràmetre de cada fila de `X`, amb DeepExplainer.
 
-    S'explica cada paràmetre tal com el dóna la xarxa, i res que se'n construeixi:
-    DeepExplainer no hi té cap regla per a `Log`, `Sinh` ni `Neg`, i no suma bé a
-    través de cap combinació de paràmetres. La base és la sortida mitjana sobre
-    `background`, que a la passada són les files d'entrenament de la llavor. Com que
-    la xarxa no escala el preu, la localització i l'escala surten ja en EUR/MWh.
+    La base és la sortida mitjana sobre les files de `background`. S'explica cada
+    paràmetre tal com el dóna la xarxa, i res que se'n construeixi: DeepExplainer no hi
+    té cap regla per a `Log`, `Sinh` ni `Neg`, i no suma bé a través de cap combinació
+    de paràmetres. Com que la xarxa no escala el preu, la localització i l'escala surten
+    ja en EUR/MWh.
     """
     explained = keras.Model(
         fitted.input, keras.layers.Lambda(distribution.flat)(fitted.output)
     )
-    # shap avisa que retalla el fons a 100 files, però ho fa l'emmascarador de la seva
-    # classe base, que aquest explicador no fa servir: el càlcul les pren totes.
+    # shap avisa que retalla el fons a 100 files, però l'avís és de la seva classe base:
+    # DeepExplainer les pren totes.
     explainer = shap.DeepExplainer(explained, inputs(background).to_numpy())
     shown = inputs(X)
     # Keras avisa que l'estructura de les entrades no és l'esperada perquè DeepExplainer
@@ -46,9 +44,12 @@ def attribute_rows(distribution, fitted, X, background):
 
 
 def sums(found):
-    """La suma d'una xarxa distribucional sobre el seu fitxer, contra els paràmetres de
-    prova dels dies explicats. La de la base contra la mitjana dels dies d'entrenament
-    només es fa a la memòria: el fitxer no en desa els paràmetres."""
+    """Torna la suma d'una xarxa distribucional sobre el seu fitxer, `found`.
+
+    La base més les contribucions, contra els paràmetres de prova dels dies explicats.
+    La de la base contra la mitjana dels dies d'entrenament només es fa a la passada: el
+    fitxer no en desa els paràmetres.
+    """
     return [
         (
             *summed(found["base"], found["values"], 1),
