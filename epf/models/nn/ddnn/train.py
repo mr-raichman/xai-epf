@@ -1,6 +1,6 @@
 """La passada de les xarxes distribucionals de Marcjasz et al. (2023).
 
-Una xarxa per distribució i llavor, on l'article en mitjana quatre.
+Una xarxa per distribució i seed, on l'article en mitjana quatre.
 """
 
 import numpy as np
@@ -19,7 +19,7 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # Cada família, com la planifica una passada: el batch, les èpoques i la paciència, que
 # no es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
-# configuració de cada llavor de la seva pròpia cerca.
+# configuració de cada seed de la seva pròpia cerca.
 FAMILIES = {
     name: {"fixed": FIXED, "placeholder": copied(name), "kept": 1, "searched_as": name}
     for name in DISTRIBUTIONS
@@ -89,8 +89,8 @@ def _fitted(distribution, X, y, parts, explained, numbers):
 def train(family, folder, configurations, explained_days):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     X, y = matrix.matrices(matrix.series()).daily

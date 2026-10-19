@@ -43,7 +43,7 @@ def _model(seed_days, offset, rank=0):
 
 
 def test_each_day_comes_from_the_first_seed_that_tests_it_and_its_best_model():
-    """Un dia d'una altra llavor donaria un valor p plausible sobre una altra sèrie."""
+    """Un dia d'una altra seed donaria un valor p plausible sobre una altra sèrie."""
     first = _model(["2020-01-01", "2020-01-02"], 1.0)
     other = _model(["2020-01-01", "2020-01-02"], 9.0, rank=1)
     second = _model(["2020-01-02", "2020-01-04"], 2.0)

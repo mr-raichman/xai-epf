@@ -6,7 +6,7 @@ previsió de càrrega. Preus i entrades passen per la transformació de Lago et 
 la logarítmica de l'article no admet preus a zero o per sota. El càstig és un per a les
 24 hores, com a l'article.
 
-Tot és sobre files donades, les d'entrenament d'una llavor.
+Tot és sobre files donades, les d'entrenament d'una seed.
 """
 
 import collections

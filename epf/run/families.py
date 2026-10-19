@@ -45,7 +45,7 @@ def named(names, among):
 def recorded(folder):
     """Torna el pla del registre d'una família, o `None` si encara no en té.
 
-    El pla són les configuracions de cada llavor.
+    El pla són les configuracions de cada seed.
     """
     path = folder / paths.SEED_RECORD
     if not path.exists():
@@ -56,7 +56,7 @@ def recorded(folder):
 
 
 def missing(folder):
-    """Torna les llavors a les quals falta algun fitxer, cada una amb el seu pla."""
+    """Torna les seeds a les quals falta algun fitxer, cada una amb el seu pla."""
     return {
         seed: planned
         for seed, planned in recorded(folder).items()

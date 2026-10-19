@@ -59,10 +59,10 @@ def _task(function, *arguments):
 def done(tasks, workers, threads, log, block):
     """Fa les tasques en `workers` processos de `threads` fils cada un.
 
-    Cada tasca és `((família, llavor), funció, arguments)`, i la funció ha de viure en
-    un mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
+    Cada tasca és `((família, seed), funció, arguments)`, i la funció ha de viure en un
+    mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
     etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
-    altres. `block` mostra cada llavor acabada o fallada, i el temps cada segon, i es
+    altres. `block` mostra cada seed acabada o fallada, i el temps cada segon, i es
     tanca en acabar. La sortida dels processos s'afegeix a `log`, i el traceback de cada
     fallada que no és un refús també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
@@ -106,7 +106,7 @@ def done(tasks, workers, threads, log, block):
                 block.fail(family, seed, message)
                 if trace:
                     with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(f"{family} llavor {seed} ha fallat:\n{trace}")
+                        handle.write(f"{family} seed {seed} ha fallat:\n{trace}")
             block.tick()
     block.close()
     return results, failed

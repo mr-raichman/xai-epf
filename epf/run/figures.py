@@ -31,8 +31,8 @@ FIGURES = {
 def _performance(where, described):
     """Dibuixa l'R² i el MAE de cada família a les setmanes de prova.
 
-    La millor configuració de cada llavor amb una marca, i les altres amb una de petita
-    i grisa al darrere. Només les famílies explicades tenen color; els bancs de
+    La millor configuració de cada seed amb una marca, i les altres amb una de petita i
+    grisa al darrere. Només les famílies explicades tenen color; els bancs de
     comparació, que no desen cap contribució, van en gris.
     """
     families = sorted(described)
@@ -65,7 +65,7 @@ def _performance(where, described):
                 )
         axis.set_xticks(range(len(families)), families, fontsize=6, rotation=90)
         axis.set_ylabel(label, color=figure.MUTED_INK)
-        figure.style(axis, f"{label} a les setmanes de prova, la millor de cada llavor")
+        figure.style(axis, f"{label} a les setmanes de prova, la millor de cada seed")
     figure.save(panels, where, "performance")
 
 

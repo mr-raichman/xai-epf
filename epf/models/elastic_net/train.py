@@ -18,7 +18,7 @@ from epf.models.elastic_net.hyperparameters import MAX_ITER, MIXING, NAME, PENAL
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT
 
 # La família, com la planifica una passada: el sostre d'iteracions, que no es cerca, el
-# càstig i la barreja de lloc mentre no hi ha cerca, i les `BEST` millors de cada llavor
+# càstig i la barreja de lloc mentre no hi ha cerca, i les `BEST` millors de cada seed
 # de la seva pròpia cerca.
 FAMILIES = {
     NAME: {
@@ -68,8 +68,8 @@ def _fitted(X, y, parts, explained, numbers):
 def train(family, folder, configurations, explained_days):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     X, y = matrix.matrices(matrix.series()).hourly

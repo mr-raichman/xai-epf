@@ -4,7 +4,7 @@
 una partició barrejada, una setmana retinguda queda entre setmanes d'entrenament, i un
 model que sap situar una fila en el temps pot interpolar el nivell del període en lloc
 de llegir-lo de l'entrada: la part de l'atribució que pren el comptador, i el que treu
-de l'error, diuen quant ho fa. S'ajusta amb la millor configuració de cada llavor de la
+de l'error, diuen quant ho fa. S'ajusta amb la millor configuració de cada seed de la
 cerca de l'arbre, de manera que només el comptador la separa de l'arbre amb què es
 compara.
 """
@@ -29,15 +29,15 @@ DAY_COUNTER = "day_counter"
 DATE = "date"
 
 # La família, com la planifica una passada: els números de l'arbre, i la millor
-# configuració de cada llavor de la cerca de l'arbre.
+# configuració de cada seed de la cerca de l'arbre.
 FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 
 
 def train(family, folder, configurations, explained_days):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     rows, y = matrix.matrices(matrix.series()).hourly

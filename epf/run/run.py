@@ -66,9 +66,9 @@ def _where(smoke, fingerprints):
 
 
 def _train(module, family, folder, seed, planned, explained_days):
-    """Ajusta una família en una llavor, una tasca de `pool`.
+    """Ajusta una família en una seed, una tasca de `pool`.
 
-    Crida el `train` del mòdul del model, `module`, amb el pla d'aquesta llavor sola,
+    Crida el `train` del mòdul del model, `module`, amb el pla d'aquesta seed sola,
     `planned`. Torna què ha desat i quant ha trigat.
     """
     started = time.time()
@@ -84,12 +84,12 @@ def _train(module, family, folder, seed, planned, explained_days):
 
 
 def main(arguments):
-    """Fa una passada, la comanda `epf run`, i torna 0, o 1 si alguna llavor ha fallat.
+    """Fa una passada, la comanda `epf run`, i torna 0, o 1 si alguna seed ha fallat.
 
     Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
     hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors
-    configuracions de la cerca de cada llavor o, sense cerca, uns números que no s'han
-    cercat. Ajusta cada llavor a la qual falta algun fitxer, unes quantes alhora, i
+    configuracions de la cerca de cada seed o, sense cerca, uns números que no s'han
+    cercat. Ajusta cada seed a la qual falta algun fitxer, unes quantes alhora, i
     dibuixa les figures si cap no ha fallat. Tot el que refusa, ho refusa abans
     d'escriure res.
     """

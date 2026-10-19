@@ -32,7 +32,7 @@ from epf.parameters import (
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
 # cerquen, el punt de lloc mentre no hi ha cerca, sense els seus arbres, perquè els
-# arbres els decideix l'early stopping, i les `BEST` millors de cada llavor de la seva
+# arbres els decideix l'early stopping, i les `BEST` millors de cada seed de la seva
 # pròpia cerca.
 FAMILIES = {
     NAME: {
@@ -49,7 +49,7 @@ FAMILIES = {
 def lightgbm(point, trees, seed=SEED):
     """Torna un regressor de LightGBM sense ajustar d'un punt de la graella, `point`.
 
-    Fa `trees` arbres com a molt, i la llavor fixa quines files pren cada arbre quan el
+    Fa `trees` arbres com a molt, i la seed fixa quines files pren cada arbre quan el
     punt en pren menys de totes.
     """
     return LGBMRegressor(
@@ -103,7 +103,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
     L'early stopping l'atura quan qualsevol de les quatre parts de la validació deixa de
-    millorar. A la millor configuració de la llavor, `best`, explica també les
+    millorar. A la millor configuració de la seed, `best`, explica també les
     interaccions d'una mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el
     grup de cada columna de `X`, i `numbers` el punt de la configuració.
     """
@@ -151,8 +151,8 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
 def train(family, folder, configurations, explained_days):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     X, y = matrix.matrices(matrix.series()).hourly

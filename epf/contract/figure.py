@@ -109,9 +109,9 @@ PER_GW = 1000
 
 
 def saved(folder):
-    """Torna els models ajustats d'una família, en ordre de llavor i de configuració.
+    """Torna els models ajustats d'una família, en ordre de seed i de configuració.
 
-    El primer és la millor configuració de la primera llavor.
+    El primer és la millor configuració de la primera seed.
     """
     paths = sorted(
         folder.glob(SEED.format(seed="*", rank="*")),
@@ -228,7 +228,7 @@ def pairs(model, values, name):
 def dependence(folder, models, present):
     """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
 
-    Al millor model ajustat de la primera llavor, amb la recta ajustada, i el pendent de
+    Al millor model ajustat de la primera seed, amb la recta ajustada, i el pendent de
     tots, que és el que llegeixen Trebbien et al. (2023).
     """
     explained = list(outputs(models[0]))

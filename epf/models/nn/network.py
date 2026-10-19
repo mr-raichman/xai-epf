@@ -106,7 +106,7 @@ def fit_rows(
     """Ajusta una xarxa amb `train`, amb early stopping sobre `validate`.
 
     Tots dos són parelles `(X, y)`. Torna la xarxa amb els pesos de la millor època.
-    Buida l'estat de Keras i fixa amb `seed` totes les llavors globals.
+    Buida l'estat de Keras i fixa amb `seed` totes les seeds globals.
     """
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()

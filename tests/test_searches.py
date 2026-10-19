@@ -21,7 +21,7 @@ from epf.contract.searches import (
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
 DELETED = (datetime.date(2019, 4, 30), datetime.date(2019, 5, 6))
 
-# Les empremtes que desa cada intent.
+# Les empremtes que desa cada trial.
 FINGERPRINTS = {"code": "codi", "dataset": "conjunt", "environment": "biblioteques"}
 
 
@@ -37,7 +37,7 @@ def _table():
 def _searcher(grid, seen):
     """Torna un cercador com el `search.py` d'un model, que no ajusta res.
 
-    Desa a `seen` els dies que veu cada intent, i la puntuació és el valor proposat.
+    Desa a `seen` els dies que veu cada trial, i la puntuació és el valor proposat.
     """
 
     def trial(family, optuna_trial, train, validate, seed):
@@ -52,7 +52,7 @@ def _searcher(grid, seen):
 
 
 def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path):
-    """Un intent que veiés la prova en triaria els números."""
+    """Un trial que veiés la prova en triaria els números."""
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     seen = []
@@ -89,7 +89,7 @@ def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
 
 
 def _saved(tmp_path, monkeypatch, X, y):
-    """Fa una cerca de dos intents de `fake` a la llavor 0, i la desa a l'assaig.
+    """Fa una cerca de dos trials de `fake` a la seed 0, i la desa a l'assaig.
 
     Torna el seu registre.
     """
@@ -115,7 +115,7 @@ def _saved(tmp_path, monkeypatch, X, y):
 def test_a_saved_search_is_read_for_its_own_family_and_seed_alone(
     tmp_path, monkeypatch
 ):
-    """Llegit per una altra llavor, un registre donaria números que no són seus."""
+    """Llegit per una altra seed, un registre donaria números que no són seus."""
     X, y = _table()
     found = _saved(tmp_path, monkeypatch, X, y)
     assert searched(True, "fake", 0, X.columns) == found
@@ -149,13 +149,12 @@ def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
         )
 
 
-# Una família que es cerca i se n'ajusten les tres millors configuracions de cada
-# llavor.
+# Una família que es cerca i se n'ajusten les tres millors configuracions de cada seed.
 FAKE = {"fixed": {}, "placeholder": {"value": 0}, "kept": 3, "searched_as": "fake"}
 
 
 def _searched(tmp_path, monkeypatch, seeds):
-    """Fa una cerca de quatre intents de `fake` a cada llavor de `seeds`, a l'assaig.
+    """Fa una cerca de quatre trials de `fake` a cada seed de `seeds`, a l'assaig.
 
     Torna les columnes sobre les quals es van fer.
     """

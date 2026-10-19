@@ -32,7 +32,7 @@ SHARES = (48, 32, 20)
 # es miren l'un a l'altre.
 GAP = 1
 
-# Una partició per llavor.
+# Una partició per seed.
 SEEDS = tuple(range(10))
 
 # Retards de preu de l'information set: el dia abans, les seves 24 hores.
@@ -44,21 +44,21 @@ PREVIOUS_DAY = (1,)
 FORECAST_LAG = 0
 SCHEDULE_LAG = 1
 
-# Dies de prova que s'expliquen de cada llavor, comptats des del primer. `None` vol dir
+# Dies de prova que s'expliquen de cada seed, comptats des del primer. `None` vol dir
 # tots, el protocol sencer.
 EXPLAINED_DAYS = None
 
-# Intents de la cerca de cada família a cada llavor, i quants dels millors se
-# n'expliquen: Trebbien et al. (2023) en guarden els deu millors i no diuen quants en
-# proven, i cinquanta és el nombre del projecte.
+# Trials de la cerca de cada família a cada seed, i quants dels millors se n'expliquen:
+# Trebbien et al. (2023) en guarden els deu millors i no diuen quants en proven, i
+# cinquanta és el nombre del projecte.
 TRIALS = 50
 BEST = 10
 
-# Files explicades de cada llavor sobre les quals es calculen les interaccions de
-# l'arbre, triades a l'atzar amb la llavor.
+# Files explicades de cada seed sobre les quals es calculen les interaccions de l'arbre,
+# triades a l'atzar amb la seed.
 INTERACTION_ROWS = 1000
 
-# Llavor de tota família que en faci servir.
+# Seed de tota família que en faci servir.
 SEED = 0
 
 # ------------------------------------------------------------ els processos

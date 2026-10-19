@@ -19,7 +19,7 @@ PREVIOUS_WEEK = 7
 # anterior. Dilluns és 0.
 WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
 
-# Les parts de la llavor d'on la predicció ingènua pren els errors per fer-se
+# Les parts de la seed d'on la predicció ingènua pren els errors per fer-se
 # probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
 # validació, on la còpia no tria res.
 IN_SAMPLE = ("training", "validation")
@@ -119,8 +119,8 @@ def _fitted(family, price, y, parts):
 def train(family, folder, configurations, explained_days):
     """Copia, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     series = matrix.series()

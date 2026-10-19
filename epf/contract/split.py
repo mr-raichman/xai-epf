@@ -1,4 +1,4 @@
-"""La partició de Trebbien et al. (2023), per setmanes barrejades amb la llavor.
+"""La partició de Trebbien et al. (2023), per setmanes barrejades amb la seed.
 
 Les setmanes del període es reparteixen en entrenament, validació i prova. A diferència
 del seu article, el preu del dia abans és una entrada, i per això l'entrenament perd el
@@ -22,10 +22,10 @@ VALIDATION_PARTS = 4
 
 
 def _deal(seed, period, deleted, shares):
-    """Torna els dies del període i les setmanes de cada part, en l'ordre de la llavor.
+    """Torna els dies del període i les setmanes de cada part, en l'ordre de la seed.
 
     El període es talla en setmanes de set dies des del primer, i la setmana `deleted`
-    en surt i no és de cap part. La resta es barregen amb la llavor i es reparteixen en
+    en surt i no és de cap part. La resta es barregen amb la seed i es reparteixen en
     l'ordre de `Split`: a la validació, la seva part de `shares` arrodonida a un
     múltiple de `VALIDATION_PARTS`, perquè es parteixi en parts iguals; a la prova, la
     seva arrodonida; i a l'entrenament, la resta. Refusa un període que no és de
@@ -74,7 +74,7 @@ def _days_of(days, weeks):
 
 
 def split(seed, period, deleted, shares=SHARES, gap=GAP):
-    """Torna els dies d'entrenament, de validació i de prova d'una llavor.
+    """Torna els dies d'entrenament, de validació i de prova d'una seed.
 
     Surt de l'entrenament tot dia que tingui un dia retingut a `gap` dies o menys, a
     qualsevol costat, i no és de cap part. La setmana suprimida, `deleted`, no és
@@ -98,9 +98,9 @@ def split(seed, period, deleted, shares=SHARES, gap=GAP):
 
 
 def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARES):
-    """Torna els dies de validació d'una llavor en `count` parts iguals de setmanes.
+    """Torna els dies de validació d'una seed en `count` parts iguals de setmanes.
 
-    Les parts segueixen l'ordre en què la llavor ha repartit les setmanes, de manera que
+    Les parts segueixen l'ordre en què la seed ha repartit les setmanes, de manera que
     cada una és de setmanes a l'atzar. Refusa unes setmanes de validació que no fan
     `count` parts iguals.
     """

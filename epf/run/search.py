@@ -28,9 +28,9 @@ def searcher(family):
 
 
 def _search(family, seed, smoke, trials, fingerprints):
-    """Fa la cerca d'una família en una llavor, una tasca de `pool`.
+    """Fa la cerca d'una família en una seed, una tasca de `pool`.
 
-    Fa el study fins a `trials` intents i en desa el registre.
+    Fa el study fins a `trials` trials i en desa el registre.
     """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     module = searcher(family)
@@ -50,9 +50,9 @@ def _search(family, seed, smoke, trials, fingerprints):
 
 
 def main(arguments):
-    """Fa una cerca, la comanda `epf search`, i torna 0, o 1 si alguna llavor ha fallat.
+    """Fa una cerca, la comanda `epf search`, i torna 0, o 1 si alguna seed ha fallat.
 
-    Fa la cerca de cada família triada a cada llavor, o a les de `--seed`, unes quantes
+    Fa la cerca de cada família triada a cada seed, o a les de `--seed`, unes quantes
     alhora, i en desa el study i el registre. Tot el que refusa, ho refusa abans de
     cercar res.
     """
@@ -70,9 +70,9 @@ def main(arguments):
         if outside:
             kind = "un assaig" if arguments.smoke else "una mesura"
             asked = (
-                f"la llavor {outside[0]}"
+                f"la seed {outside[0]}"
                 if len(outside) == 1
-                else f"les llavors {', '.join(map(str, outside))}"
+                else f"les seeds {', '.join(map(str, outside))}"
             )
             raise Refusal(
                 f"{kind} no té {asked}; les que té: {', '.join(map(str, seeds))}"

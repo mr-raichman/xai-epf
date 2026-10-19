@@ -50,8 +50,8 @@ def _fitted(X, y, parts):
 def train(family, folder, configurations, explained_days):
     """Ajusta, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
-    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    `configurations` és el pla de la família per seed, i `explained_days` els dies de
+    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
     configuració]` que ha desat ara.
     """
     X, y = matrix.matrices(matrix.series()).hourly

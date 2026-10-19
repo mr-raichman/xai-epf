@@ -13,7 +13,7 @@ PARTNERS = 3
 def _interactions(folder, model, present):
     """Dibuixa les interaccions de cada sèrie al millor model ajustat, `model`.
 
-    És el de la primera llavor. Per sèrie de `present`, la dependència sencera, l'efecte
+    És el de la primera seed. Per sèrie de `present`, la dependència sencera, l'efecte
     sense interaccions i la interacció amb els `PARTNERS` socis més forts, amb el color
     del valor de cada soci.
     """

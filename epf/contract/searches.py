@@ -1,11 +1,11 @@
 """El que comparteixen les cerques de tots els models.
 
-Optuna desa cada intent en un study SQLite, de manera que una cerca interrompuda
-continua on era. Quan una llavor té tots els seus intents, el seu registre en desa els
-millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
-columnes de la matriu i la partició. Una cerca continua sobre un altre codi, un altre
-dataset o unes altres biblioteques, i cada intent en desa les empremtes, però no sobre
-unes altres files; i una passada no llegeix un registre fet sobre unes altres files.
+Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
+on era. Quan una seed té tots els seus trials, el seu registre en desa els millors, en
+la forma en què els pren l'ajust, i sobre quines files es van fer: les columnes de la
+matriu i la partició. Una cerca continua sobre un altre codi, un altre dataset o unes
+altres biblioteques, i cada trial en desa les empremtes, però no sobre unes altres
+files; i una passada no llegeix un registre fet sobre unes altres files.
 """
 
 import json
@@ -18,7 +18,7 @@ from epf import Refusal, paths
 from epf.contract.record import plain, write_record
 from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, SEED, SHARES
 
-# Els fitxers d'una cerca, per llavor: el study d'Optuna i el registre del que ha triat.
+# Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
 RECORD = "seed_{seed}.json"
 
@@ -48,7 +48,7 @@ def completed(study):
 
 
 def _seed(*parts):
-    """Torna una llavor d'Optuna feta de la del projecte i de `parts`, enters o textos.
+    """Torna una seed d'Optuna feta de la del projecte i de `parts`, enters o textos.
 
     No canvia d'un procés a un altre, com faria el `hash` d'un text.
     """
@@ -61,11 +61,11 @@ def _seed(*parts):
 def _sampler(searcher, family, seed, study):
     """Torna el sampler d'un study: la graella del cercador, `GRID`, o l'espai.
 
-    Una graella es barreja amb una llavor de la família i de la partició, i l'intent `k`
+    Una graella es barreja amb una seed de la família i de la partició, i el trial `k`
     en pren el punt `k`: una cerca continuada segueix per on anava, i cap punt no es
-    repeteix. Un espai continu es mostreja amb una llavor que compta també els intents
-    que el study ja porta, perquè una cerca continuada no torni a proposar els primers.
-    El nom de la família hi entra perquè dues famílies del mateix espai no proposin les
+    repeteix. Un espai continu es mostreja amb una seed que compta també els trials que
+    el study ja porta, perquè una cerca continuada no torni a proposar els primers. El
+    nom de la família hi entra perquè dues famílies del mateix espai no proposin les
     mateixes.
     """
     if searcher.GRID is not None:
@@ -77,13 +77,13 @@ def _sampler(searcher, family, seed, study):
 
 
 def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
-    """Fa els intents que falten fins a `trials` al study d'una família en una llavor.
+    """Fa els trials que falten fins a `trials` al study d'una família en una seed.
 
     Torna el study. `searcher` és el `search.py` del model de la família: la seva
-    graella, `GRID`, i l'intent, `trial`. Cada intent s'ajusta amb les files
+    graella, `GRID`, i el trial, `trial`. Cada trial s'ajusta amb les files
     d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
-    dona cap altra. Els números que en surten es desen a l'intent, en la forma en què
-    els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del dataset i de les
+    dona cap altra. Els números que en surten es desen al trial, en la forma en què els
+    pren l'ajust, amb les empremtes, `fingerprints`, del codi, del dataset i de les
     biblioteques que el fan. Refusa un study fet sobre unes altres files.
     """
     # El camí amb `/`, que és el que la URL d'SQLite admet també a Windows.
@@ -108,7 +108,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
             family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
         )
         optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar l'intent; Windows no la dona, i hi queda
+        # La càrrega de la màquina en acabar el trial; Windows no la dona, i hi queda
         # buida.
         optuna_trial.set_user_attr(
             "load", os.getloadavg() if hasattr(os, "getloadavg") else None
@@ -124,7 +124,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
 
 
 def record(study, family, seed, smoke):
-    """Torna el registre d'una cerca acabada, amb els seus `BEST` millors intents."""
+    """Torna el registre d'una cerca acabada, amb els seus `BEST` millors trials."""
     done = sorted(completed(study), key=lambda one: one.value)
     return {
         "family": family,
@@ -154,7 +154,7 @@ def save(found, smoke):
 
 
 def searched(smoke, family, seed, columns):
-    """Torna el registre de la cerca d'una família en una llavor, o `None` si no en té.
+    """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
 
     Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició:
     els seus números s'haurien triat per unes altres files, i res no ho diria.
@@ -166,7 +166,7 @@ def searched(smoke, family, seed, columns):
     if found["made_on"] != made_on(columns):
         study = path.with_name(STUDY.format(seed=seed))
         raise Refusal(
-            f"la cerca de {family} llavor {seed} es va fer sobre altres files; "
+            f"la cerca de {family} seed {seed} es va fer sobre altres files; "
             f"esborrar {paths.relative(path)} i {paths.relative(study)}, cercar amb "
             f'"uv run epf search"'
         )
@@ -174,15 +174,15 @@ def searched(smoke, family, seed, columns):
 
 
 def configurations(smoke, plan, columns, seeds):
-    """Torna les configuracions que s'ajusten a cada llavor, de la millor a la pitjor.
+    """Torna les configuracions que s'ajusten a cada seed, de la millor a la pitjor.
 
     Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
     `FAMILIES` del seu model: les `kept` millors de la cerca de la família `searched_as`
-    del mateix tipus, si totes les llavors en tenen; els números de lloc, `placeholder`,
-    marcats, si cap llavor no en té; i una sola sense números per a una família que no
-    es cerca, `kept` zero. `columns` són les de la matriu sobre la qual es cerca, que la
-    cerca compara amb les seves. Refusa una cerca que només té algunes llavors: la
-    dispersió barrejaria llavors cercades i sense cercar, i res no ho diria.
+    del mateix tipus, si totes les seeds en tenen; els números de lloc, `placeholder`,
+    marcats, si cap seed no en té; i una sola sense números per a una família que no es
+    cerca, `kept` zero. `columns` són les de la matriu sobre la qual es cerca, que la
+    cerca compara amb les seves. Refusa una cerca que només té algunes seeds: la
+    dispersió barrejaria seeds cercades i sense cercar, i res no ho diria.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
@@ -196,9 +196,9 @@ def configurations(smoke, plan, columns, seeds):
         }
     if missing:
         asked = (
-            f"la llavor {missing[0]}"
+            f"la seed {missing[0]}"
             if len(missing) == 1
-            else f"les llavors {', '.join(map(str, missing))}"
+            else f"les seeds {', '.join(map(str, missing))}"
         )
         raise Refusal(
             f'la cerca de {family} no té {asked}; acabar amb "uv run epf search"'

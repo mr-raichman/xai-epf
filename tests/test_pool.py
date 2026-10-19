@@ -45,7 +45,7 @@ def test_a_failing_task_is_reported_and_the_others_still_return(tmp_path):
     assert block.failed == [
         ("malament", 1, "ValueError: invalid literal for int() with base 10: 'x'")
     ]
-    assert "malament llavor 1 ha fallat:\nTraceback" in log.read_text(encoding="utf-8")
+    assert "malament seed 1 ha fallat:\nTraceback" in log.read_text(encoding="utf-8")
     assert block.closed
 
 

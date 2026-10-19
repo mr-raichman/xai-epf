@@ -21,9 +21,9 @@ LEARNING_RATE = (1e-5, 0.1)
 
 
 def penalty(optuna_trial, name):
-    """Torna el coeficient d'una L1 de l'intent, o zero si no en vol cap.
+    """Torna el coeficient d'una L1 del trial, o zero si no en vol cap.
 
-    Com al codi de l'article, l'intent tria primer si n'hi ha, i el coeficient només si
+    Com al codi de l'article, el trial tria primer si n'hi ha, i el coeficient només si
     n'hi ha.
     """
     if not optuna_trial.suggest_categorical(f"regularize_{name}", (False, True)):
@@ -32,7 +32,7 @@ def penalty(optuna_trial, name):
 
 
 def space(optuna_trial, distribution, penalised=True):
-    """Torna els números d'un intent, en la forma en què els llegeix `network.build`.
+    """Torna els números d'un trial, en la forma en què els llegeix `network.build`.
 
     Sense `penalised`, com a la xarxa de punt de l'article, la sortida no té cap L1 i no
     se'n cerca cap. L'L1 de cada paràmetre es demana pel nom que té a `distribution`, i

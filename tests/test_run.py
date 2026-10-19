@@ -68,7 +68,7 @@ def fake(tmp_path, monkeypatch):
         return results, failed
 
     monkeypatch.setattr(pool, "done", done)
-    # Una sola llavor, sigui quina sigui la variant d'assaig que tria `chosen`.
+    # Una sola seed, sigui quina sigui la variant d'assaig que tria `chosen`.
     real = parameters.chosen
     monkeypatch.setattr(
         parameters, "chosen", lambda smoke: real(smoke) | {"SEEDS": (0,)}

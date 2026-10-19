@@ -55,23 +55,23 @@ def elapsed(seconds):
 
 
 def counted(failed, order):
-    """Torna `2 llavors han fallat, la primera lightgbm llavor 3`.
+    """Torna `2 seeds han fallat, la primera lightgbm seed 3`.
 
-    `failed` són les llavors fallades, `(família, llavor)`, i la primera és en l'ordre
-    de les famílies, `order`.
+    `failed` són les seeds fallades, `(família, seed)`, i la primera és en l'ordre de
+    les famílies, `order`.
     """
     family, seed = min(failed, key=lambda one: (order.index(one[0]), one[1]))
-    first = f"{family} llavor {seed}"
+    first = f"{family} seed {seed}"
     if len(failed) == 1:
-        return f"1 llavor ha fallat, {first}"
-    return f"{len(failed)} llavors han fallat, la primera {first}"
+        return f"1 seed ha fallat, {first}"
+    return f"{len(failed)} seeds han fallat, la primera {first}"
 
 
 class Block:
     """El bloc d'una comanda, que escriu a stderr.
 
-    `title` va a la primera línia, `totals` són les llavors que planifica cada família,
-    i `done` les que ja tenia acabades.
+    `title` va a la primera línia, `totals` són les seeds que planifica cada família, i
+    `done` les que ja tenia acabades.
     """
 
     def __init__(self, title, totals, done=None):
@@ -90,7 +90,7 @@ class Block:
             self._write(f"{title}\n\n")
 
     def finish(self, family):
-        """Compta una llavor acabada."""
+        """Compta una seed acabada."""
         self.done[family] += 1
         if self.live:
             self._draw()
@@ -98,9 +98,9 @@ class Block:
             self._write(f"{family}: {self._count(family)}\n")
 
     def fail(self, family, seed, message):
-        """Compta una llavor fallada i en mostra el missatge de l'error."""
+        """Compta una seed fallada i en mostra el missatge de l'error."""
         self.failed[family] += 1
-        line = f"error: {family} llavor {seed} ha fallat: {message}"
+        line = f"error: {family} seed {seed} ha fallat: {message}"
         if self.live:
             self.failures.append(line)
             self._draw()
@@ -121,9 +121,9 @@ class Block:
             self._write(f"\n{self._time()}\n\n")
 
     def _count(self, family, width=0):
-        """Torna `3 de 10 llavors`, les acabades d'una família alineades a `width`."""
+        """Torna `3 de 10 seeds`, les acabades d'una família alineades a `width`."""
         total = self.totals[family]
-        seeds = "llavor" if total == 1 else "llavors"
+        seeds = "seed" if total == 1 else "seeds"
         return f"{self.done[family]:>{width}} de {total} {seeds}"
 
     def _time(self):
@@ -143,9 +143,9 @@ class Block:
             lines += self.failures[:SHOWN_FAILURES]
             hidden = len(self.failures) - SHOWN_FAILURES
             if hidden == 1:
-                lines.append("i 1 llavor més ha fallat")
+                lines.append("i 1 seed més ha fallat")
             elif hidden > 1:
-                lines.append(f"i {hidden} llavors més han fallat")
+                lines.append(f"i {hidden} seeds més han fallat")
             lines.append("")
         lines.append(self._time())
         return lines

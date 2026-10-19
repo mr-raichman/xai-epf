@@ -32,7 +32,7 @@ def penalties(X, y):
 
 
 def space(optuna_trial):
-    """Torna el punt de la graella que proposa un intent: la barreja i el pas."""
+    """Torna el punt de la graella que proposa un trial: la barreja i el pas."""
     return tuple(
         optuna_trial.suggest_categorical(name, values) for name, values in GRID.items()
     )

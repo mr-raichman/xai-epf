@@ -10,7 +10,7 @@ import numpy as np
 from epf import Refusal, paths
 from epf.contract.explanation import read_back
 
-# El que surt d'ajustar una família en una llavor i una configuració: la predicció i el
+# El que surt d'ajustar una família en una seed i una configuració: la predicció i el
 # preu de les files de prova en el mateix ordre, el que es desa de l'explicació, el
 # pitjor residu de l'explicació contra la predicció que explica, amb el marge que li
 # toca, de les que prediuen una distribució les puntuacions de la distribució, i, de les

@@ -9,8 +9,8 @@ from epf.contract.figure import plt
 def draw(folder, models):
     """Dibuixa la figura del sòl a `folder`, dels seus models ajustats.
 
-    El preu contra la càrrega residual a les files d'entrenament de la primera llavor,
-    en densitat, i el cúbic de cada llavor, com la figura de Trebbien et al. (2023).
+    El preu contra la càrrega residual a les files d'entrenament de la primera seed, en
+    densitat, i el cúbic de cada seed, com la figura de Trebbien et al. (2023).
     """
     first = models[0]
     load = first["load_training"] / figure.PER_GW
@@ -32,6 +32,6 @@ def draw(folder, models):
     figure.style(
         axis,
         "El sòl de l'ordre de mèrit: les files d'entrenament de la "
-        f"primera llavor i el cúbic de cada una, llavors: {len(models)}",
+        f"primera seed i el cúbic de cada una, seeds: {len(models)}",
     )
     figure.save(panels, folder, "floor")

@@ -45,7 +45,7 @@ def search_arguments(parser):
         nargs="+",
         action="extend",
         metavar="N",
-        help="només aquestes llavors",
+        help="només aquestes seeds",
     )
     return parser
 
