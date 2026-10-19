@@ -57,15 +57,20 @@ def recorded(folder):
 
 
 def missing(folder):
-    """Torna les seeds a les quals falta algun fitxer, cada una amb el seu pla."""
-    return {
-        seed: planned
-        for seed, planned in recorded(folder).items()
-        if not all(
-            (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
+    """Torna les seeds a les quals falta algun fitxer.
+
+    Cada una, amb les configuracions que encara no tenen el seu fitxer.
+    """
+    found = {}
+    for seed, planned in recorded(folder).items():
+        absent = [
+            one
             for one in planned
-        )
-    }
+            if not (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
+        ]
+        if absent:
+            found[seed] = absent
+    return found
 
 
 def complete(folder):

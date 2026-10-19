@@ -7,7 +7,6 @@ from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.models.nn import search
 from epf.models.nn.ddnn.attribution import attribute_rows
 from epf.models.nn.ddnn.distributions import JOHNSON_SU, NORMAL
-from epf.models.nn.dnn.train import POINT
 from epf.models.nn.network import build, fit_rows, parameters, parameters_rows
 from epf.parameters import HOUR_COLUMNS
 
@@ -108,11 +107,11 @@ def test_each_parameters_l1_is_the_one_named_after_it():
     rates = {"location": 1e-4, "scale": 1e-3, "skewness": 1e-2, "tail_weight": 1e-1}
     fixed = FIXED | {f"regularize_{name}": True for name in rates}
     fixed |= {f"{name}_l1": rate for name, rate in rates.items()}
-    tuned = search.space(optuna.trial.FixedTrial(fixed), JOHNSON_SU)
+    tuned = search.drawn("ddnn_jsu", optuna.trial.FixedTrial(fixed))
     assert tuned["parameter_l1"] == [rates[name] for name in JOHNSON_SU.names]
 
 
 def test_the_point_networks_space_asks_for_no_output_penalty():
     # Una L1 a la sortida faria fallar `FixedTrial`, que no en té el paràmetre.
-    tuned = search.space(optuna.trial.FixedTrial(FIXED), POINT, penalised=False)
+    tuned = search.drawn("dnn", optuna.trial.FixedTrial(FIXED))
     assert tuned["parameter_l1"] == [0.0]

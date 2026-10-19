@@ -31,15 +31,22 @@ def penalty(optuna_trial, name):
     return optuna_trial.suggest_float(f"{name}_l1", *L1, log=True)
 
 
-def space(optuna_trial, distribution, penalised=True):
+def _output(family):
+    """Torna la sortida d'una família, la seva distribució o els preus de la de punt."""
+    return POINT if family == POINT_FAMILY else DISTRIBUTIONS[family]
+
+
+def drawn(family, optuna_trial):
     """Torna els números d'un trial, en la forma en què els llegeix `network.build`.
 
-    Sense `penalised`, com a la xarxa de punt de l'article, la sortida no té cap L1 i no
-    se'n cerca cap. L'L1 de cada paràmetre es demana pel nom que té a `distribution`, i
-    en el seu ordre, i no en el del codi de l'article, que posa el pes de la cua de
-    Johnson SU abans de l'asimetria.
+    A la xarxa de punt, com a l'article, la sortida no té cap L1 i no se'n cerca cap.
+    L'L1 de cada paràmetre es demana pel nom que té a la seva distribució, i en el seu
+    ordre, i no en el del codi de l'article, que posa el pes de la cua de Johnson SU
+    abans de l'asimetria.
     """
+    names = _output(family).names
     layers = range(1, LAYERS + 1)
+    # El sampler els treu tots d'un sol flux, i en un altre ordre en treuria uns altres.
     return {
         "hidden": [
             optuna_trial.suggest_int(f"neurons_{layer}", *NEURONS) for layer in layers
@@ -58,9 +65,9 @@ def space(optuna_trial, distribution, penalised=True):
             penalty(optuna_trial, f"h{layer}_activation") for layer in layers
         ],
         "parameter_l1": (
-            [penalty(optuna_trial, name) for name in distribution.names]
-            if penalised
-            else [0.0] * len(distribution.names)
+            [0.0] * len(names)
+            if family == POINT_FAMILY
+            else [penalty(optuna_trial, name) for name in names]
         ),
         "learning_rate": optuna_trial.suggest_float(
             "learning_rate", *LEARNING_RATE, log=True
@@ -68,19 +75,16 @@ def space(optuna_trial, distribution, penalised=True):
     }
 
 
-def trial(family, optuna_trial, train, validate, seed):
-    """Ajusta una configuració de l'espai i la puntua per la pèrdua de la validació.
+def trial(family, drawn, train, validate, seed):
+    """Ajusta els números d'un trial, `drawn`, i els puntua per la pèrdua de validació.
 
     S'ajusta amb la sortida de la família i les files d'entrenament, `train`, amb early
     stopping sobre tota la validació, `validate`. La pèrdua és la de Keras, amb les L1 a
-    dins, com la que puntua el codi de l'article. Torna la configuració i la puntuació.
+    dins, com la que puntua el codi de l'article. Torna els números i la puntuació.
     """
     X_validate, y_validate = validate
-    point = family == POINT_FAMILY
-    distribution = POINT if point else DISTRIBUTIONS[family]
-    tuned = space(optuna_trial, distribution, penalised=not point)
-    fitted = network.fit_rows(distribution, train, validate, tuned)
-    return tuned, float(
+    fitted = network.fit_rows(_output(family), train, validate, drawn)
+    return drawn, float(
         fitted.evaluate(
             network.inputs(X_validate).to_numpy(),
             y_validate.to_numpy(dtype=float),

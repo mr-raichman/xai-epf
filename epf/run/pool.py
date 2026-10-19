@@ -8,15 +8,11 @@ import concurrent.futures
 import multiprocessing
 import multiprocessing.connection
 import os
-import queue
 import signal
 import threading
 import traceback
 
 from epf import Refusal
-
-# La cua per on un procés del pool diu al pare cada unitat acabada; al pare és `None`.
-_events = None
 
 
 class Failure(Exception):
@@ -52,14 +48,12 @@ def _silenced(log):
         os.dup2(handle.fileno(), 2)
 
 
-def _started(log, events):
-    """Prepara un procés del pool: la seva sortida a `log`, i `events` per a `tell`.
+def _started(log):
+    """Prepara un procés del pool, amb la seva sortida a `log`.
 
     El procés no fa cas d'un Ctrl+C, que l'atura el pare, i acaba quan el pare ja no hi
     és.
     """
-    global _events
-    _events = events
     # Amb el Ctrl+C, que arriba a tots els processos, la tasca fallaria i el procés
     # passaria a la següent.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -73,25 +67,6 @@ def _orphaned():
     os._exit(1)
 
 
-def tell(family):
-    """Diu al pare que una família ha acabat una unitat, un trial o un fit.
-
-    Fora d'un procés del pool no fa res.
-    """
-    if _events is not None:
-        _events.put(family)
-
-
-def _drain(events, block):
-    """Compta al bloc cada unitat que els processos han dit amb `tell`."""
-    while True:
-        try:
-            family = events.get_nowait()
-        except queue.Empty:
-            return
-        block.advance(family)
-
-
 def _task(function, *arguments):
     """Fa una tasca, i una fallada que no és un refús en surt com a `Failure`."""
     try:
@@ -103,49 +78,53 @@ def _task(function, *arguments):
         raise Failure(f"{type(error).__name__}: {error}", trace) from None
 
 
-def done(tasks, workers, threads, log, block):
+def _fed(pool, running, tasks):
+    """Dona al pool la tasca següent de `tasks`, si en queda, i l'apunta a `running`."""
+    task = next(tasks, None)
+    if task is not None:
+        label, function, arguments = task
+        running[pool.submit(_task, function, *arguments)] = label
+
+
+def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
     """Fa les tasques en `workers` processos de `threads` fils cada un.
 
-    Cada tasca és `((família, seed), funció, arguments)`, i la funció ha de viure en un
-    mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
-    etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
-    altres, i un Ctrl+C les acaba totes alhora. `block` mostra cada seed acabada o
-    fallada, cada unitat que una tasca diu amb `tell`, i es tanca en acabar. La sortida
-    dels processos s'afegeix a `log`, i el traceback de cada fallada que no és un refús
+    Cada tasca és `((família, seed, unitat), funció, arguments)`, i la funció ha de
+    viure en un mòdul, perquè un procés nou la importa pel seu nom. De `tasks` se'n
+    llegeix una cada vegada que un procés queda lliure, i mai no n'hi ha més de
+    `workers` alhora. Torna el resultat de cada etiqueta que ha tornat. Una tasca que
+    falla no atura les altres, i un Ctrl+C les acaba totes alhora, com una excepció de
+    `on_return` o de `on_failure`. Cada tasca tornada crida `on_return(etiqueta,
+    resultat)` i es compta a `block`, i cada una fallada crida `on_failure(etiqueta)` i
+    hi compta la seed com a fallada; el bloc es tanca en acabar. La sortida dels
+    processos s'afegeix a `log`, i el traceback de cada fallada que no és un refús
     també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
     # el límit en carregar NumPy, LightGBM i TensorFlow.
     os.environ.update(environment(threads))
     log.parent.mkdir(parents=True, exist_ok=True)
-    results, failed = {}, []
-    context = multiprocessing.get_context("spawn")
-    events = context.Queue()
+    tasks = iter(tasks)
+    results, running = {}, {}
     with concurrent.futures.ProcessPoolExecutor(
         workers,
-        mp_context=context,
+        mp_context=multiprocessing.get_context("spawn"),
         initializer=_started,
-        initargs=(str(log), events),
+        initargs=(str(log),),
     ) as pool:
         try:
-            running = {
-                pool.submit(_task, function, *arguments): label
-                for label, function, arguments in tasks
-            }
-            waiting = set(running)
-            while waiting:
-                ready, waiting = concurrent.futures.wait(
-                    waiting, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
+            for _ in range(workers):
+                _fed(pool, running, tasks)
+            while running:
+                ready, _ = concurrent.futures.wait(
+                    running, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
                 )
-                _drain(events, block)
                 for future in ready:
-                    label = running[future]
-                    family, seed = label
+                    label = running.pop(future)
+                    family, seed, unit = label
                     trace = None
                     try:
                         results[label] = future.result()
-                        block.finish(family)
-                        continue
                     except Refusal as refusal:
                         message = str(refusal)
                     except Failure as failure:
@@ -155,18 +134,28 @@ def done(tasks, workers, threads, log, block):
                         # memòria.
                         message = f"{type(error).__name__}: {error}"
                         trace = "".join(traceback.format_exception(error))
-                    failed.append(label)
-                    block.fail(family, seed, message)
+                    else:
+                        if on_return is not None:
+                            on_return(label, results[label])
+                        block.advance(family, seed)
+                        _fed(pool, running, tasks)
+                        continue
                     if trace:
                         with open(log, "a", encoding="utf-8") as handle:
-                            handle.write(f"{family} seed {seed} ha fallat:\n{trace}")
-        except KeyboardInterrupt:
+                            handle.write(
+                                f"{family} seed {seed} {block.unit} {unit} ha fallat:\n"
+                                f"{trace}"
+                            )
+                    if on_failure is not None:
+                        on_failure(label)
+                    block.fail(family, seed, message)
+                    # Després de comptar la fallada, que la seed ja no en doni cap més.
+                    _fed(pool, running, tasks)
+        except BaseException:
             # Sense, sortir del `with` esperaria que cada procés acabés la seva tasca.
             for worker in multiprocessing.active_children():
                 worker.terminate()
             block.close()
             raise
-    # Els que un procés va posar a la cua just abans d'acabar la seva última tasca.
-    _drain(events, block)
     block.close()
-    return results, failed
+    return results

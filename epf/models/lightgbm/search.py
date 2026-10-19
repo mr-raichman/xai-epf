@@ -24,7 +24,7 @@ GRID = {
 }
 
 
-def space(optuna_trial):
+def drawn(family, optuna_trial):
     """Torna el punt de la graella que proposa un trial."""
     return {
         name: optuna_trial.suggest_categorical(name, values)
@@ -32,22 +32,21 @@ def space(optuna_trial):
     }
 
 
-def trial(family, optuna_trial, train, validate, seed):
-    """Ajusta un punt de la graella i el puntua pel MAE de tota la validació.
+def trial(family, drawn, train, validate, seed):
+    """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de tota la validació.
 
     S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan
     qualsevol de les quatre parts de la validació, `validate`, deixa de millorar, com a
     la passada. Torna el punt i la puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
-    point = space(optuna_trial)
     weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
     parts = [X_validate.index.isin(days) for days in weeks]
     model = fit_rows(
         X,
         y,
-        point,
+        drawn,
         MOST_TREES,
         validation=[(X_validate[part], y_validate[part]) for part in parts],
     )
-    return point, mae(predict_rows(model, X_validate), y_validate)
+    return drawn, mae(predict_rows(model, X_validate), y_validate)

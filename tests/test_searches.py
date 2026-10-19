@@ -8,13 +8,16 @@ import pytest
 from epf import paths
 from epf.contract.split import split
 from epf.contract.searches import (
+    asked,
     completed,
     configurations,
     folder,
+    opened,
     record,
-    run,
     save,
     searched,
+    told,
+    tried,
 )
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
@@ -40,37 +43,37 @@ def _searcher(grid, seen):
     Desa a `seen` els dies que veu cada trial, i la puntuació és el valor proposat.
     """
 
-    def trial(family, optuna_trial, train, validate, seed):
-        seen.append((train[0].index, validate[0].index))
+    def drawn(family, optuna_trial):
         if grid is None:
-            value = optuna_trial.suggest_float("value", 0.0, 1.0)
-        else:
-            value = optuna_trial.suggest_categorical("value", grid["value"])
-        return {"value": value}, float(value)
+            return optuna_trial.suggest_float("value", 0.0, 1.0)
+        return optuna_trial.suggest_categorical("value", grid["value"])
 
-    return types.SimpleNamespace(MATRIX="daily", GRID=grid, trial=trial)
+    def trial(family, drawn, train, validate, seed):
+        seen.append((train[0].index, validate[0].index))
+        return {"value": drawn}, float(drawn)
+
+    return types.SimpleNamespace(MATRIX="daily", GRID=grid, drawn=drawn, trial=trial)
 
 
-def test_a_trial_sees_the_training_and_validation_days_and_no_test_day(tmp_path):
+def _study(store, searcher, X, y, parts, seed, trials):
+    """Fa en aquest procés els trials que falten fins a `trials`, com una cerca."""
+    study = opened(store, "fake", searcher, seed, X.columns)
+    while len(completed(study)) < trials:
+        optuna_trial, drawn = asked(study, searcher, "fake")
+        numbers, score = tried(searcher, "fake", drawn, X, y, parts, seed)
+        told(study, optuna_trial, numbers, score, FINGERPRINTS)
+    return study
+
+
+def test_a_trial_sees_the_training_and_validation_days_and_no_test_day():
     """Un trial que veiés la prova en triaria els números."""
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     seen = []
-    run(
-        tmp_path / "study.db",
-        "fake",
-        _searcher({"value": tuple(range(8))}, seen),
-        X,
-        y,
-        parts,
-        0,
-        3,
-        FINGERPRINTS,
-    )
-    assert len(seen) == 3
-    for train, validate in seen:
-        assert train.equals(parts.training) and validate.equals(parts.validation)
-        assert not train.isin(parts.test).any() and not validate.isin(parts.test).any()
+    tried(_searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, 0)
+    ((train, validate),) = seen
+    assert train.equals(parts.training) and validate.equals(parts.validation)
+    assert not train.isin(parts.test).any() and not validate.isin(parts.test).any()
 
 
 @pytest.mark.parametrize(
@@ -80,10 +83,8 @@ def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     searcher = _searcher(grid, [])
-    run(tmp_path / "study.db", "fake", searcher, X, y, parts, 0, 3, FINGERPRINTS)
-    study = run(
-        tmp_path / "study.db", "fake", searcher, X, y, parts, 0, 6, FINGERPRINTS
-    )
+    _study(tmp_path / "study.db", searcher, X, y, parts, 0, 3)
+    study = _study(tmp_path / "study.db", searcher, X, y, parts, 0, 6)
     values = [one.params["value"] for one in completed(study)]
     assert len(values) == 6 and len(set(values)) == 6
 
@@ -96,16 +97,14 @@ def _saved(tmp_path, monkeypatch, X, y):
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
     where = folder(True, "fake")
     where.mkdir(parents=True)
-    study = run(
+    study = _study(
         where / "seed_0.db",
-        "fake",
         _searcher({"value": (3, 1, 2)}, []),
         X,
         y,
         split(0, PERIOD, DELETED),
         0,
         2,
-        FINGERPRINTS,
     )
     found = record(study, "fake", 0, True)
     save(found, True)
@@ -136,16 +135,12 @@ def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
     with pytest.raises(ValueError):
         searched(True, "fake", 0, other.columns)
     with pytest.raises(ValueError):
-        run(
+        opened(
             folder(True, "fake") / "seed_0.db",
             "fake",
             _searcher({"value": (3, 1, 2)}, []),
-            other,
-            y,
-            split(0, PERIOD, DELETED),
             0,
-            3,
-            FINGERPRINTS,
+            other.columns,
         )
 
 
@@ -158,16 +153,12 @@ def test_a_search_made_with_another_PROJECT_SEED_is_neither_read_nor_continued(
     with pytest.raises(ValueError):
         searched(True, "fake", 0, X.columns)
     with pytest.raises(ValueError):
-        run(
+        opened(
             folder(True, "fake") / "seed_0.db",
             "fake",
             _searcher({"value": (3, 1, 2)}, []),
-            X,
-            y,
-            split(0, PERIOD, DELETED),
             0,
-            3,
-            FINGERPRINTS,
+            X.columns,
         )
 
 
@@ -185,16 +176,14 @@ def _searched(tmp_path, monkeypatch, seeds):
     where = folder(True, "fake")
     where.mkdir(parents=True)
     for seed in seeds:
-        study = run(
+        study = _study(
             where / f"seed_{seed}.db",
-            "fake",
             _searcher({"value": (4, 1, 3, 2)}, []),
             X,
             y,
             split(seed, PERIOD, DELETED),
             seed,
             4,
-            FINGERPRINTS,
         )
         save(record(study, "fake", seed, True), True)
     return X.columns

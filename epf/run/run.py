@@ -64,23 +64,17 @@ def _where(smoke, fingerprints):
     return latest
 
 
-def _train(module, family, folder, seed, planned, explained_days):
-    """Ajusta una família en una seed, una tasca de `pool`.
+def _train(module, family, folder, seed, configuration, explained_days):
+    """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
-    Crida el `train` del mòdul del model, `module`, amb el pla d'aquesta seed sola,
-    `planned`, i diu al pare cada configuració desada. Torna què ha desat i quant ha
-    trigat.
+    Crida el `train` del mòdul del model, `module`, amb un pla d'aquesta seed i aquesta
+    configuració soles. Torna què ha desat i quants segons ha trigat.
     """
     started = time.time()
     described = importlib.import_module(module).train(
-        family, folder, {seed: planned}, explained_days, lambda: pool.tell(family)
+        family, folder, {seed: [configuration]}, explained_days
     )
-    return {
-        "family": family,
-        "seed": seed,
-        "described": described,
-        "seconds": round(time.time() - started, 1),
-    }
+    return {"described": described, "seconds": time.time() - started}
 
 
 def main(arguments):
@@ -89,9 +83,9 @@ def main(arguments):
     Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
     hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors
     configuracions de la cerca de cada seed o, sense cerca, uns números que no s'han
-    cercat. Ajusta cada seed a la qual falta algun fitxer, unes quantes alhora, i
-    dibuixa les figures si cap no ha fallat. Refusa abans d'escriure res el que no pot
-    fer, i acaba amb un refús si alguna seed ha fallat.
+    cercat. Ajusta cada configuració que encara no té el seu fitxer, unes quantes
+    alhora, i dibuixa les figures si cap seed no ha fallat. Refusa abans d'escriure res
+    el que no pot fer, i acaba amb un refús si alguna seed ha fallat.
     """
     values = parameters.chosen(arguments.smoke)
     chosen = families.named(arguments.family, TRAINERS)
@@ -133,64 +127,65 @@ def main(arguments):
             },
         )
     # Cada ajust, el primer també, llegeix el pla del registre.
+    recorded = {family: families.recorded(where / family) for family in chosen}
     missing = {family: families.missing(where / family) for family in chosen}
-    tasks = [
+    block = progress.Block(
+        f"Passada {where.name}{', continuada' if continued else ''}",
+        "fit",
+        {
+            family: {
+                seed: (len(planned), len(planned) - len(missing[family].get(seed, [])))
+                for seed, planned in recorded[family].items()
+            }
+            for family in chosen
+        },
+    )
+    # Un generador: el pool en llegeix una tasca quan un procés queda lliure, i ja no
+    # llegeix les d'una seed que ha fallat.
+    tasks = (
         (
-            (family, seed),
+            (family, seed, one["rank"]),
             _train,
             (
                 TRAINERS[family],
                 family,
                 where / family,
                 seed,
-                planned,
+                one,
                 values["EXPLAINED_DAYS"],
             ),
         )
         for family in chosen
-        for seed, planned in missing[family].items()
-    ]
-    recorded = {family: families.recorded(where / family) for family in chosen}
-    fits = {
-        family: [
-            where / family / paths.SEED.format(seed=seed, rank=one["rank"])
-            for seed, ones in recorded[family].items()
-            for one in ones
-        ]
-        for family in chosen
-    }
-    block = progress.Block(
-        f"Passada {where.name}{', continuada' if continued else ''}",
-        "fit",
-        {family: (len(recorded[family]), len(fits[family])) for family in chosen},
-        {
-            family: (
-                len(recorded[family]) - len(missing[family]),
-                sum(path.exists() for path in fits[family]),
-            )
-            for family in chosen
-        },
+        for seed, ones in missing[family].items()
+        for one in ones
+        if not block.stopped(family, seed)
     )
-    results, failed = pool.done(
+    results = pool.done(
         tasks, values["WORKERS"], values["THREADS"], where / paths.WORKERS_LOG, block
     )
     for family in chosen:
         found = sorted(
-            (one for one in results.values() if one["family"] == family),
-            key=lambda one: one["seed"],
+            (label, one) for label, one in results.items() if label[0] == family
         )
         if not found:
             continue
+        seconds = {}
+        for (_, seed, _), one in found:
+            seconds[seed] = seconds.get(seed, 0) + one["seconds"]
         path = where / family / paths.SEED_RECORD
         record.write_record(
             path,
             json.loads(path.read_text(encoding="utf-8"))
             | {
-                "described_now": [pair for one in found for pair in one["described"]],
-                "seconds_now": {one["seed"]: one["seconds"] for one in found},
+                "described_now": [
+                    pair for _, one in found for pair in one["described"]
+                ],
+                "seconds_now": {
+                    seed: round(total, 1) for seed, total in seconds.items()
+                },
             },
         )
-    if failed:
-        counted = progress.counted(failed, chosen)
+    if block.failed:
+        counted = progress.counted(block.failed, chosen)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}")
     figures.draw(where)

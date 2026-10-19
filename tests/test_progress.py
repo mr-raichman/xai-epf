@@ -15,21 +15,44 @@ def test_without_a_terminal_each_seed_is_a_line(capsys):
     block = progress.Block(
         "Cerca",
         "trial",
-        {"lightgbm": (2, 20), "dnn": (1, 10), "floor": (2, 20)},
-        {"lightgbm": (0, 0), "dnn": (0, 0), "floor": (1, 10)},
+        {
+            "lightgbm": {0: (10, 0), 1: (10, 0)},
+            "dnn": {3: (10, 0)},
+            "floor": {0: (10, 10), 1: (10, 0)},
+        },
     )
     for _ in range(10):
-        block.advance("lightgbm")
-    block.finish("lightgbm")
-    block.finish("dnn")
+        block.advance("lightgbm", 0)
+    for _ in range(10):
+        block.advance("dnn", 3)
     block.fail("floor", 1, "<el missatge>")
     block.close()
     assert capsys.readouterr().err.splitlines() == [
         "Cerca",
         "",
         "lightgbm: 1/2 seeds    10/20 trials",
-        "dnn: 1/1 seed    0/10 trials",
+        "dnn: 1/1 seed    10/10 trials",
         "error: floor seed 1 ha fallat: <el missatge>",
+    ]
+
+
+def test_a_seed_finishes_at_its_last_unit_and_fails_once(capsys):
+    """Les unitats que una seed ja feia quan falla poden fallar també.
+
+    Comptada a cada una, una sola seed fallada en diria dues.
+    """
+    block = progress.Block("Passada", "fit", {"lightgbm": {0: (2, 0), 1: (2, 0)}})
+    block.advance("lightgbm", 0)
+    block.advance("lightgbm", 0)
+    block.fail("lightgbm", 1, "la primera")
+    block.fail("lightgbm", 1, "la segona")
+    assert block.failed == [("lightgbm", 1)]
+    assert block.stopped("lightgbm", 1) and not block.stopped("lightgbm", 0)
+    assert capsys.readouterr().err.splitlines() == [
+        "Passada",
+        "",
+        "lightgbm: 1/2 seeds    2/4 fits",
+        "error: lightgbm seed 1 ha fallat: la primera",
     ]
 
 

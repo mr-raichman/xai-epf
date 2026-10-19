@@ -44,16 +44,23 @@ class Block:
     """El bloc d'una comanda, que escriu a stderr.
 
     `title` va a la primera línia, i `unit` és el que compta dins de cada seed, `trial`
-    o `fit`. `totals` són les seeds i les unitats que planifica cada família, i `done`
-    les que ja tenia acabades, totes dues parelles `(seeds, unitats)`.
+    o `fit`. `planned` són les seeds de cada família, cada una amb les unitats que
+    planifica i les que ja tenia acabades, una parella `(unitats, acabades)`. `failed`
+    són les seeds fallades, `(família, seed)`, en l'ordre en què han fallat.
     """
 
-    def __init__(self, title, unit, totals, done):
+    def __init__(self, title, unit, planned):
         self.title = title
         self.unit = unit
-        self.totals = dict(totals)
-        self.done = {family: list(done[family]) for family in self.totals}
-        self.failed = {family: 0 for family in self.totals}
+        self.units = {
+            family: {seed: units for seed, (units, _) in seeds.items()}
+            for family, seeds in planned.items()
+        }
+        self.done = {
+            family: {seed: done for seed, (_, done) in seeds.items()}
+            for family, seeds in planned.items()
+        }
+        self.failed = []
         self.failures = []
         self.stream = sys.stderr
         self.live = live(self.stream)
@@ -63,29 +70,36 @@ class Block:
         else:
             self._write(f"{title}\n\n")
 
-    def finish(self, family):
-        """Compta una seed acabada."""
-        self.done[family][0] += 1
+    def advance(self, family, seed):
+        """Compta una unitat acabada d'una seed, i la seed quan és la seva última.
+
+        Fora d'un terminal, només es veu la seed acabada.
+        """
+        self.done[family][seed] += 1
         if self.live:
             self._draw()
-        else:
+        elif self.done[family][seed] == self.units[family][seed]:
             self._write(f"{family}: {self._count(family)}\n")
 
-    def advance(self, family):
-        """Compta una unitat acabada, que només es veu en un terminal."""
-        self.done[family][1] += 1
-        if self.live:
-            self._draw()
-
     def fail(self, family, seed, message):
-        """Compta una seed fallada i en mostra el missatge de l'error."""
-        self.failed[family] += 1
+        """Compta una seed fallada i en mostra el missatge de l'error.
+
+        Només la primera vegada: les unitats de la seed que ja es feien poden fallar
+        també.
+        """
+        if self.stopped(family, seed):
+            return
+        self.failed.append((family, seed))
         line = f"error: {family} seed {seed} ha fallat: {message}"
         if self.live:
             self.failures.append(line)
             self._draw()
         else:
             self._write(line + "\n")
+
+    def stopped(self, family, seed):
+        """Diu si una seed ha fallat, i ja no se n'ha de fer cap altra unitat."""
+        return (family, seed) in self.failed
 
     def close(self):
         """Deixa l'estat final, amb les línies senceres en un terminal."""
@@ -98,10 +112,10 @@ class Block:
         `widths` són les amplades que alineen les famílies: la d'un total de seeds, la
         de la paraula `seeds` i la d'un total d'unitats.
         """
-        (seeds, units), (done_seeds, done_units) = (
-            self.totals[family],
-            self.done[family],
-        )
+        planned, done = self.units[family], self.done[family]
+        seeds = len(planned)
+        done_seeds = sum(done[seed] >= units for seed, units in planned.items())
+        units, done_units = sum(planned.values()), sum(done.values())
         seed_word = "seed" if seeds == 1 else "seeds"
         unit_word = self.unit if units == 1 else f"{self.unit}s"
         seed_width, word_width, unit_width = widths
@@ -110,17 +124,17 @@ class Block:
         return f"{seed_count} {seed_word:<{word_width}}    {unit_count} {unit_word}"
 
     def _lines(self):
-        width = max(len(family) for family in self.totals)
-        seeds = [seeds for seeds, _ in self.totals.values()]
+        width = max(len(family) for family in self.units)
+        seeds = [len(units) for units in self.units.values()]
         widths = (
             max(len(str(count)) for count in seeds),
             max(len("seed" if count == 1 else "seeds") for count in seeds),
-            max(len(str(units)) for _, units in self.totals.values()),
+            max(len(str(sum(units.values()))) for units in self.units.values()),
         )
         lines = [self.title, ""]
-        for family in self.totals:
+        for family in self.units:
             line = f"{family:<{width}}  {self._count(family, widths)}"
-            count = self.failed[family]
+            count = sum(failed == family for failed, _ in self.failed)
             if count:
                 line += f", {count} {'ha' if count == 1 else 'han'} fallat"
             lines.append(line)

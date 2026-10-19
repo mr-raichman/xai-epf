@@ -31,21 +31,21 @@ def penalties(X, y):
     return found
 
 
-def space(optuna_trial):
+def drawn(family, optuna_trial):
     """Torna el punt de la graella que proposa un trial: la barreja i el pas."""
     return tuple(
         optuna_trial.suggest_categorical(name, values) for name, values in GRID.items()
     )
 
 
-def trial(family, optuna_trial, train, validate, seed):
-    """Ajusta un punt de la graella i el puntua pel MAE de les files de validació.
+def trial(family, drawn, train, validate, seed):
+    """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de la validació.
 
     El càstig del seu pas es calcula sobre les files d'entrenament, `train`. Torna el
     càstig i la barreja, i la puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
-    mixing, step = space(optuna_trial)
+    mixing, step = drawn
     penalty = float(penalties(X, y)[mixing][step])
     model = regression.fit_rows(X, y, penalty, mixing)
     return (

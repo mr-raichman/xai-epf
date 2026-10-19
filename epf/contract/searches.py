@@ -1,12 +1,13 @@
 """El que comparteixen les cerques de tots els models.
 
 Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
-on era. Quan una seed té tots els seus trials, el seu registre en desa els millors, en
-la forma en què els pren l'ajust, i sobre quines files es van fer: les columnes de la
-matriu i la partició, i amb quina `PROJECT_SEED`. Una cerca continua sobre un altre
-codi, un altre dataset o unes altres biblioteques, i cada trial en desa les empremtes,
-però no sobre unes altres files ni amb una altra `PROJECT_SEED`; i una passada no
-llegeix un registre fet així.
+on era. Només el procés pare hi escriu: en demana cada trial i en desa el resultat, i
+un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre en desa
+els millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
+columnes de la matriu i la partició, i amb quina `PROJECT_SEED`. Una cerca continua
+sobre un altre codi, un altre dataset o unes altres biblioteques, i cada trial en desa
+les empremtes, però no sobre unes altres files ni amb una altra `PROJECT_SEED`; i una
+passada no llegeix un registre fet així.
 """
 
 import json
@@ -83,11 +84,22 @@ def _sampler(searcher, family, seed, study):
     mateixes.
     """
     if searcher.GRID is not None:
-        return optuna.samplers.GridSampler(
+        return _Grid(
             {name: list(values) for name, values in searcher.GRID.items()},
             seed=_seed(family, seed),
         )
     return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
+
+
+class _Grid(optuna.samplers.GridSampler):
+    """La graella d'Optuna, que no atura el study quan se n'acaba l'últim punt.
+
+    Ho faria amb `study.stop`, que fora d'`optimize` falla, i el pare demana i desa cada
+    trial fora d'`optimize`. Amb més trials que punts, Optuna en torna a fer algun.
+    """
+
+    def after_trial(self, study, trial, state, values):
+        pass
 
 
 def _name(family, seed):
@@ -101,29 +113,12 @@ def _storage(store):
     return f"sqlite:///{store.as_posix()}"
 
 
-def trials_done(store, family, seed):
-    """Torna quants trials acabats té el study `store` d'una família en una seed.
+def opened(store, family, searcher, seed, columns):
+    """Torna el study d'una família en una seed, i el crea si encara no hi és.
 
-    Un study que encara no té fitxer en té zero.
-    """
-    if not store.exists():
-        return 0
-    study = optuna.load_study(study_name=_name(family, seed), storage=_storage(store))
-    return len(completed(study))
-
-
-def run(
-    store, family, searcher, X, y, parts, seed, trials, fingerprints, on_trial=None
-):
-    """Fa els trials que falten fins a `trials` al study d'una família en una seed.
-
-    Torna el study, i crida `on_trial` en acabar cada trial. `searcher` és el
-    `search.py` del model de la família: la seva graella, `GRID`, i el trial, `trial`.
-    Cada trial s'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de
-    validació, i la matriu no n'hi dona cap altra. Els números que en surten es desen al
-    trial, en la forma en què els pren l'ajust, amb les empremtes, `fingerprints`, del
-    codi, del dataset i de les biblioteques que el fan. Refusa un study fet sobre unes
-    altres files.
+    `searcher` és el `search.py` del model de la família, i `columns` les columnes de la
+    matriu sobre la qual es cerca. Refusa un study fet sobre unes altres files o amb una
+    altra `PROJECT_SEED`.
     """
     study = optuna.create_study(
         study_name=_name(family, seed),
@@ -131,7 +126,7 @@ def run(
         storage=_storage(store),
         load_if_exists=True,
     )
-    now = made_on(X.columns)
+    now = made_on(columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
@@ -139,33 +134,47 @@ def run(
     if why:
         raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
     study.sampler = _sampler(searcher, family, seed, study)
-    train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
-
-    def objective(optuna_trial):
-        numbers, score = searcher.trial(
-            family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
-        )
-        optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar el trial; Windows no la dona, i hi queda
-        # buida.
-        optuna_trial.set_user_attr(
-            "load", os.getloadavg() if hasattr(os, "getloadavg") else None
-        )
-        for name, value in fingerprints.items():
-            optuna_trial.set_user_attr(name, value)
-        return score
-
-    def reported(study, optuna_trial):
-        if (
-            on_trial is not None
-            and optuna_trial.state == optuna.trial.TrialState.COMPLETE
-        ):
-            on_trial()
-
-    remaining = trials - len(completed(study))
-    if remaining > 0:
-        study.optimize(objective, n_trials=remaining, callbacks=[reported])
     return study
+
+
+def asked(study, searcher, family):
+    """Demana un trial al study i el torna amb els valors que el cercador en treu."""
+    optuna_trial = study.ask()
+    return optuna_trial, searcher.drawn(family, optuna_trial)
+
+
+def tried(searcher, family, drawn, X, y, parts, seed):
+    """Ajusta els valors d'un trial, `drawn`, i en torna els números i la puntuació.
+
+    S'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de validació,
+    i la matriu no n'hi dona cap altra. Els números són els valors en la forma en què
+    els pren l'ajust.
+    """
+    train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
+    return searcher.trial(
+        family, drawn, (X[train], y[train]), (X[validate], y[validate]), seed
+    )
+
+
+def told(study, optuna_trial, numbers, score, fingerprints):
+    """Desa al study el resultat d'un trial i el dona per acabat.
+
+    Hi desa els números, la càrrega de la màquina i les empremtes, `fingerprints`, del
+    codi, del dataset i de les biblioteques que el fan.
+    """
+    optuna_trial.set_user_attr("numbers", plain(numbers))
+    # La càrrega quan el trial torna; Windows no la dona, i hi queda buida.
+    optuna_trial.set_user_attr(
+        "load", os.getloadavg() if hasattr(os, "getloadavg") else None
+    )
+    for name, value in fingerprints.items():
+        optuna_trial.set_user_attr(name, value)
+    study.tell(optuna_trial, score)
+
+
+def abandoned(study, optuna_trial):
+    """Dona per fallat al study un trial que no ha tornat cap resultat."""
+    study.tell(optuna_trial, state=optuna.trial.TrialState.FAIL)
 
 
 def record(study, family, seed, smoke):

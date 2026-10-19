@@ -22,14 +22,13 @@ def fake(tmp_path, monkeypatch):
         calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
     )
 
-    def train(family, folder, configurations, explained_days, saved):
+    def train(family, folder, configurations, explained_days):
         state.calls.append((family, configurations))
         if family in state.failing:
             raise RuntimeError("interrompuda")
         for seed, planned in configurations.items():
             for one in planned:
                 (folder / paths.SEED.format(seed=seed, rank=one["rank"])).touch()
-                saved()
         return [
             [seed, one["rank"]]
             for seed, planned in configurations.items()
@@ -59,14 +58,17 @@ def fake(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(figures, "draw", lambda where: None)
 
-    def done(tasks, workers, threads, log, block):
-        results, failed = {}, []
+    def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
+        results = {}
         for label, function, arguments in tasks:
+            family, seed, _ = label
             try:
                 results[label] = function(*arguments)
-            except RuntimeError:
-                failed.append(label)
-        return results, failed
+            except RuntimeError as error:
+                block.fail(family, seed, str(error))
+                continue
+            block.advance(family, seed)
+        return results
 
     monkeypatch.setattr(pool, "done", done)
     # Una sola seed, sigui quina sigui la variant d'assaig que tria `chosen`.
