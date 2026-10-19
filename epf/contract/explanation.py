@@ -22,7 +22,7 @@ UNITLESS = "sense unitats"
 TOLERANCE = 1e-3
 
 # Marge de l'additivitat a l'espai transformat, en les seves unitats: en EUR/MWh val
-# tant com el de dalt, perquè a prop d'1 la derivada de `sinh` és d'1,5 i la MAD de les
+# tant com el de dalt, perquè a prop d'1 la derivada de `sinh` és d'1.5 i la MAD de les
 # files d'ajust va en desenes d'euros.
 TRANSFORMED_TOLERANCE = 1e-4
 
