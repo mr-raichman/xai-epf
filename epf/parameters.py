@@ -92,7 +92,8 @@ THREADS = 4
 # `SMOKE`, i `SMOKE_1`, que no fixa els dies explicats i n'explica tots els de prova. La
 # que fa servir un assaig la tria `chosen`, i es canvia editant-la.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
-SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 10}
+SMOKE_1 = {"SEEDS": tuple(range(5)), "TRIALS": 1, "BEST": 1}
+SMOKE_2 = {"SEEDS": tuple(range(5)), "TRIALS": 10, "BEST": 1}
 
 
 def chosen(smoke):
@@ -102,4 +103,4 @@ def chosen(smoke):
         for name, value in globals().items()
         if name.isupper() and not name.startswith("SMOKE")
     }
-    return (found | SMOKE) if smoke else found
+    return (found | SMOKE_1) if smoke else found
