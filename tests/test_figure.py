@@ -1,5 +1,3 @@
-"""Les figures dels models explicats: la importància per grups i la parella a l'hora."""
-
 import numpy as np
 
 from epf.contract.figure import outputs, pairs, shares
