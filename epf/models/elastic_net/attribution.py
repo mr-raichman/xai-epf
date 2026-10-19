@@ -1,7 +1,4 @@
-"""L'atribució de la xarxa elàstica: el valor de SHAP exacte d'un model lineal, a
-l'espai transformat de Lago et al. (2021), i les sumes que se'n tornen a fer sobre el
-fitxer desat.
-"""
+"""L'atribució de la xarxa elàstica, el valor de SHAP exacte d'un model lineal."""
 
 import collections
 
@@ -19,12 +16,12 @@ Explanation = collections.namedtuple("Explanation", "values base transformed")
 
 
 def attribute_rows(model, X):
-    """Les contribucions de cada fila, el valor de SHAP exacte d'un model lineal.
+    """Torna l'atribució de cada fila: les contribucions, la base i la predicció.
 
-    La d'una columna és el seu coeficient per la distància a la mitjana de les files
-    d'ajust de la seva hora. Són a l'espai transformat i no en EUR/MWh: `sinh` no és
-    lineal i no en surt cap versió exacta. Una columna que el model d'una hora no porta
-    hi té zero.
+    La contribució d'una columna és el seu coeficient per la distància a la mitjana de
+    les files d'ajust de la seva hora. Són a l'espai transformat de Lago et al. (2021) i
+    no en EUR/MWh: `sinh` no és lineal i no en surt cap versió exacta. Una columna que
+    el model d'una hora no porta hi té zero.
     """
     columns = [column for column in X.columns if column != HOUR]
     values = np.zeros((len(X), len(columns)))
@@ -46,5 +43,5 @@ def attribute_rows(model, X):
 
 
 def sums(found):
-    """La suma de la xarxa elàstica sobre el seu fitxer, a l'espai transformat."""
+    """Torna la suma de la xarxa elàstica sobre el seu fitxer, a l'espai transformat."""
     return [(*summed(found["base"], found["values"], 1), found["transformed"])]
