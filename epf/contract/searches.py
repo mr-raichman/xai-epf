@@ -2,12 +2,12 @@
 
 Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
 on era. Només el procés pare hi escriu: en demana cada trial i en desa el resultat, i
-un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre en desa
-els millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
-columnes de la matriu i la partició, i amb quina `PROJECT_SEED`. Una cerca continua
-sobre un altre codi, un altre dataset o unes altres biblioteques, i cada trial en desa
-les empremtes, però no sobre unes altres files ni amb una altra `PROJECT_SEED`; i una
-passada no llegeix un registre fet així.
+un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre els
+desa tots, del millor al pitjor, en la forma en què els pren l'ajust, i sobre quines
+files es van fer: les columnes de la matriu i la partició, i amb quina `PROJECT_SEED`.
+Una cerca continua sobre un altre codi, un altre dataset o unes altres biblioteques, i
+cada trial en desa les empremtes, però no sobre unes altres files ni amb una altra
+`PROJECT_SEED`; i una passada no llegeix un registre fet així.
 """
 
 import json
@@ -18,7 +18,7 @@ import optuna
 
 from epf import Refusal, paths
 from epf.contract.record import plain, write_record
-from epf.parameters import BEST, BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
@@ -178,7 +178,7 @@ def abandoned(study, optuna_trial):
 
 
 def record(study, family, seed, smoke):
-    """Torna el registre d'una cerca acabada, amb els seus `BEST` millors trials."""
+    """Torna el registre d'una cerca acabada, amb tots els seus trials, del millor."""
     done = sorted(completed(study), key=lambda one: one.value)
     return {
         "family": family,
@@ -187,7 +187,7 @@ def record(study, family, seed, smoke):
         "trials": len(done),
         "made_on": study.user_attrs["made_on"],
         "PROJECT_SEED": study.user_attrs["PROJECT_SEED"],
-        "best": [
+        "ranked": [
             {
                 "numbers": one.user_attrs["numbers"],
                 "score": one.value,
@@ -196,7 +196,7 @@ def record(study, family, seed, smoke):
                 "dataset": one.user_attrs["dataset"],
                 "environment": one.user_attrs["environment"],
             }
-            for one in done[:BEST]
+            for one in done
         ],
     }
 
@@ -230,19 +230,23 @@ def searched(smoke, family, seed, columns):
     return found
 
 
-def configurations(smoke, plan, columns, seeds):
+def configurations(smoke, plan, columns, seeds, trials, best):
     """Torna les configuracions que s'ajusten a cada seed, de la millor a la pitjor.
 
     Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
     `FAMILIES` del seu model: les `kept` millors de la cerca de la família `searched_as`
-    del mateix tipus, si totes les seeds en tenen; els números de lloc, `placeholder`,
-    marcats, si cap seed no en té; i una sola sense números per a una família que no es
-    cerca, `kept` zero. `columns` són les de la matriu sobre la qual es cerca, que la
-    cerca compara amb les seves. Refusa una cerca que només té algunes seeds: la
-    dispersió barrejaria seeds cercades i sense cercar, i res no ho diria.
+    del mateix tipus, o les `best` millors si `kept` és `"BEST"`, si totes les seeds en
+    tenen; els números de lloc, `placeholder`, marcats, si cap seed no en té; i una sola
+    sense números per a una família que no es cerca, `kept` zero. `columns` són les de
+    la matriu sobre la qual es cerca, que la cerca compara amb les seves. `trials` i
+    `best` són els valors de `TRIALS` i `BEST` de la comanda. Refusa una cerca que
+    només té algunes seeds: la dispersió barrejaria seeds cercades i sense cercar, i res
+    no ho diria. Refusa també una seed cercada amb uns altres trials que `trials`: el
+    registre de la passada diria uns trials que la cerca no té.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
+    kept = best if plan["kept"] == "BEST" else plan["kept"]
     family = plan["searched_as"]
     found = {seed: searched(smoke, family, seed, columns) for seed in seeds}
     missing = [seed for seed, record in found.items() if record is None]
@@ -260,6 +264,18 @@ def configurations(smoke, plan, columns, seeds):
         raise Refusal(
             f'la cerca de {family} no té {asked}; acabar amb "uv run epf search"'
         )
+    for seed, record in found.items():
+        if record["trials"] != trials:
+            has = record["trials"]
+            what = (
+                'acabar amb "uv run epf search"'
+                if has < trials
+                else f"posar TRIALS a {has}"
+            )
+            raise Refusal(
+                f"la cerca de {family} seed {seed} té {has} "
+                f"{'trial' if has == 1 else 'trials'}, i TRIALS en diu {trials}; {what}"
+            )
     return {
         seed: [
             {
@@ -269,7 +285,7 @@ def configurations(smoke, plan, columns, seeds):
                 "trial": one["trial"],
                 "trials": record["trials"],
             }
-            for rank, one in enumerate(record["best"][: plan["kept"]])
+            for rank, one in enumerate(record["ranked"][:kept])
         ]
         for seed, record in found.items()
     }

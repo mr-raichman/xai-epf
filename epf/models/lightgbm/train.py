@@ -22,7 +22,6 @@ from epf.models.lightgbm.hyperparameters import (
     UNSEARCHED,
 )
 from epf.parameters import (
-    BEST,
     BLACKOUT_WEEK,
     DEVELOPMENT,
     INTERACTION_ROWS,
@@ -40,7 +39,7 @@ FAMILIES = {
         "placeholder": {
             name: value for name, value in UNSEARCHED.items() if name != "trees"
         },
-        "kept": BEST,
+        "kept": "BEST",
         "searched_as": NAME,
     }
 }

@@ -107,7 +107,14 @@ def main(arguments):
         if plan["kept"]:
             X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
             columns = X.columns
-        plans[family] = configurations(arguments.smoke, plan, columns, values["SEEDS"])
+        plans[family] = configurations(
+            arguments.smoke,
+            plan,
+            columns,
+            values["SEEDS"],
+            values["TRIALS"],
+            values["BEST"],
+        )
     where.mkdir(parents=True, exist_ok=True)
     matrix.write(matrices, where)
     for family, planned in plans.items():
