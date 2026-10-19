@@ -28,8 +28,9 @@ def interaction_rows(model, X):
 def sums(found, best):
     """Torna les sumes de l'arbre que es tornen a fer sobre el seu fitxer, `found`.
 
-    La base més els valors de cada fila contra la seva predicció i, a la millor
-    configuració, `best`, cada fila d'interaccions contra el valor de la seva columna.
+    La base més les contribucions de cada fila contra la seva predicció i, a la millor
+    configuració, `best`, cada fila d'interaccions contra la contribució de la seva
+    columna.
     """
     found_sums = [
         (

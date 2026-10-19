@@ -9,20 +9,20 @@ import numpy as np
 from epf import Refusal
 
 # La mediana de les desviacions absolutes dividida per aquesta constant estima la
-# desviació típica d'una normal; és el que fa `statsmodels.robust.mad`, i el que
-# la referència utilitza encara que l'article només digui "MAD".
+# desviació típica d'una normal. És la de `statsmodels.robust.mad`, que fa servir el
+# codi de l'article encara que l'article només digui "MAD".
 NORMAL_CONSISTENCY = 0.6744897501960817
 
 
 class Median:
     """El valor centrat en la mediana de cada columna i dividit per la seva MAD.
 
-    Una columna sense MAD es refusa, on el codi de l'article divideix per zero sense
-    dir res. Qui declara `std_where_flat` hi posa en canvi la desviació típica: és el
-    cas d'una previsió solar que val zero més de la meitat dels dies a una hora del
-    vespre i que l'altra meitat arriba a milers de MW. Una columna que no es mou gens
-    no té escala de cap mena, i qui la vulgui ajustar l'ha de treure abans. `names` són
-    els noms de les columnes, que diuen quina es refusa.
+    Una columna sense MAD es refusa, on el codi de l'article divideix per zero sense dir
+    res. Qui declara `std_where_flat` hi posa en canvi la desviació típica: és el cas
+    d'una previsió solar que val zero més de la meitat dels dies a una hora del vespre i
+    que l'altra meitat arriba a milers de MW. Una columna que no es mou gens no té
+    escala de cap mena, i qui la vulgui ajustar l'ha de treure abans. `names` són els
+    noms de les columnes, que diuen quina es refusa.
     """
 
     def __init__(self, values, names, std_where_flat=False):
@@ -48,7 +48,7 @@ class Median:
 
 
 class Scaler(Median):
-    """Transformació de variància estabilitzada: asinh del valor centrat i escalat."""
+    """La transformació que estabilitza la variància: l'asinh del valor de `Median`."""
 
     def forward(self, values):
         return np.arcsinh(super().forward(values))

@@ -11,8 +11,8 @@ from epf.models.nn.dnn.train import POINT
 from epf.models.nn.network import build, fit_rows, parameters, parameters_rows
 from epf.parameters import HOUR_COLUMNS
 
-# Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn
-# de com d'ajustada estigui.
+# Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn de
+# com d'ajustada estigui.
 TUNED = {
     "hidden": [8, 8],
     "activation": ["relu", "softplus"],
@@ -80,7 +80,7 @@ def test_a_parameter_l1_for_another_distribution_is_refused():
 
 
 def test_the_tail_weight_never_drops_below_one():
-    """Un pes de la cua sota 1 donaria una distribució que l'article no permet."""
+    """Marcjasz et al. (2023) no permeten un pes de la cua sota 1."""
     # Com més negativa la sortida crua, més a prop d'1 queda el pes de la cua.
     raw = np.full((3, len(JOHNSON_SU.names) * 24), -50.0, dtype="float32")
     tail = parameters(JOHNSON_SU, raw)[..., JOHNSON_SU.names.index("tail_weight")]

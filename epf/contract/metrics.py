@@ -75,7 +75,7 @@ def kupiec(actual, bounds, coverage):
     inside = hits.sum(axis=0)
     outside = len(hits) - inside
     observed = inside / len(hits)
-    # `xlogy` dóna zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
+    # `xlogy` dona zero al terme d'un recompte zero, que n'és el límit: amb `log`, una
     # hora que no falla mai donaria un NaN, que no passa mai el test.
     statistic = -2 * (
         xlogy(outside, 1 - coverage)
@@ -104,7 +104,7 @@ def scored_distribution(actual, quantiles):
     """Torna el CRPS i, de cada interval, quantes hores passen el test de Kupiec.
 
     És el que en reporten Marcjasz et al. (2023). `actual` és la matriu del preu real i
-    `quantiles` la funció que en dóna els quantils predits a les probabilitats que se li
+    `quantiles` la funció que en dona els quantils predits a les probabilitats que se li
     demanen, `(dies, hores, probabilitats)`.
     """
     found = {"crps": crps(actual, quantiles(PERCENTILES))}

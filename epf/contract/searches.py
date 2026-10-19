@@ -3,7 +3,7 @@
 Optuna desa cada intent en un estudi SQLite, de manera que una cerca interrompuda
 continua on era. Quan una llavor té tots els seus intents, el seu registre en desa els
 millors, en la forma en què els pren l'ajust, i sobre quines files es van fer: les
-columnes del conjunt i la partició. Una cerca continua sobre un altre codi, un altre
+columnes de la matriu i la partició. Una cerca continua sobre un altre codi, un altre
 conjunt de dades o unes altres biblioteques, i cada intent en desa les empremtes, però
 no sobre unes altres files; i una passada no llegeix un registre fet sobre unes altres
 files.
@@ -30,7 +30,7 @@ def folder(smoke, family):
 
 
 def made_on(columns):
-    """Torna les files d'una cerca: les columnes del conjunt i la partició."""
+    """Torna les files d'una cerca: les columnes de la matriu i la partició."""
     return plain(
         {
             "columns": list(columns),
@@ -83,7 +83,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
     Torna l'estudi. `searcher` és el `search.py` del model de la família: la seva
     graella, `GRID`, i l'intent, `trial`. Cada intent s'ajusta amb les files
     d'entrenament de `parts` i es puntua sobre les de validació, i la matriu no n'hi
-    dóna cap altra. Els números que en surten es desen a l'intent, en la forma en què
+    dona cap altra. Els números que en surten es desen a l'intent, en la forma en què
     els pren l'ajust, amb les empremtes, `fingerprints`, del codi, del conjunt de dades
     i de les biblioteques que el fan. Refusa un estudi fet sobre unes altres files.
     """
@@ -109,7 +109,7 @@ def run(store, family, searcher, X, y, parts, seed, trials, fingerprints):
             family, optuna_trial, (X[train], y[train]), (X[validate], y[validate]), seed
         )
         optuna_trial.set_user_attr("numbers", plain(numbers))
-        # La càrrega de la màquina en acabar l'intent; Windows no la dóna, i hi queda
+        # La càrrega de la màquina en acabar l'intent; Windows no la dona, i hi queda
         # buida.
         optuna_trial.set_user_attr(
             "load", os.getloadavg() if hasattr(os, "getloadavg") else None
@@ -179,12 +179,11 @@ def configurations(smoke, plan, columns, seeds):
 
     Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
     `FAMILIES` del seu model: les `kept` millors de la cerca de la família `searched_as`
-    del mateix tipus, si totes les llavors en tenen; els números de lloc,
-    `placeholder`, marcats, si no en té cap cap llavor; i una sola sense números per a
-    una família que no es cerca, `kept` zero. `columns` són les de la matriu sobre la
-    qual es cerca, que la cerca compara amb les seves. Refusa una cerca que només té
-    algunes llavors: la dispersió barrejaria llavors cercades i sense cercar, i res no
-    ho diria.
+    del mateix tipus, si totes les llavors en tenen; els números de lloc, `placeholder`,
+    marcats, si cap llavor no en té; i una sola sense números per a una família que no
+    es cerca, `kept` zero. `columns` són les de la matriu sobre la qual es cerca, que la
+    cerca compara amb les seves. Refusa una cerca que només té algunes llavors: la
+    dispersió barrejaria llavors cercades i sense cercar, i res no ho diria.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}

@@ -19,7 +19,7 @@ def attribute_rows(distribution, fitted, X, background):
     """Torna l'atribució de cada paràmetre de cada fila de `X`, amb DeepExplainer.
 
     La base és la sortida mitjana sobre les files de `background`. S'explica cada
-    paràmetre tal com el dóna la xarxa, i res que se'n construeixi: DeepExplainer no hi
+    paràmetre tal com el dona la xarxa, i res que se'n construeixi: DeepExplainer no hi
     té cap regla per a `Log`, `Sinh` ni `Neg`, i no suma bé a través de cap combinació
     de paràmetres. Com que la xarxa no escala el preu, la localització i l'escala surten
     ja en EUR/MWh.

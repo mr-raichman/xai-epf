@@ -1,10 +1,10 @@
 """Els models de la xarxa elàstica d'Uniejewski et al. (2016): un model lineal per hora.
 
 Cada hora té el seu model, ajustat només amb les files de la seva hora de la matriu per
-hora, que porten les tres previsions a aquella hora, com l'article hi porta la previsió
-de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021): la
-logarítmica de l'article no admet preus a zero o per sota. El càstig és un per a les
-24 hores, com a l'article, i ni ell ni la barreja tenen valor per defecte.
+hora, que porten les previsions i el programa a aquella hora, com l'article hi porta la
+previsió de càrrega. Preus i entrades passen per la transformació de Lago et al. (2021):
+la logarítmica de l'article no admet preus a zero o per sota. El càstig és un per a les
+24 hores, com a l'article.
 
 Tot és sobre files donades, les d'entrenament d'una llavor.
 """
@@ -39,7 +39,7 @@ def design(rows, fitted):
 
 
 def _prepared(rows, target):
-    """Prepara les files d'una hora per al seu model, encara sense ajustar.
+    """Prepara les files d'una hora per al seu model.
 
     Torna el que cal per llegir el model, encara sense model, la matriu i l'objectiu
     transformat. Una columna que no es mou a les files de l'hora no hi entra, que és la

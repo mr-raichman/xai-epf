@@ -116,7 +116,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
         X[training], y[training], numbers, MOST_TREES, validation=validation
     )
     values, base = attribution.attribute_rows(model, X[shown])
-    # La base més els valors torna la predicció.
+    # La base més les contribucions torna la predicció.
     gap = np.abs(base + values.sum(axis=1) - predict_rows(model, X[shown])).max()
     arrays = {
         "columns": np.array(X.columns, dtype=str),
@@ -135,7 +135,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
             )
         )
         interactions = attribution.interaction_rows(model, X[shown].iloc[sample])
-        # Cada fila d'interaccions torna el valor de la seva columna.
+        # Cada fila d'interaccions torna la contribució de la seva columna.
         gap = max(gap, np.abs(interactions.sum(axis=2) - values[sample]).max())
         arrays |= {"interaction_rows": sample, "interactions": interactions}
     return Fitted(

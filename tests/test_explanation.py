@@ -94,8 +94,8 @@ def test_explained_days_other_than_the_first_test_days_are_refused(tmp_path):
 
 def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
     rng = np.random.default_rng(0)
-    # L'arbre a la seva millor configuració: cada fila d'interaccions suma el valor de
-    # la seva columna, aquí posat a la diagonal.
+    # L'arbre a la seva millor configuració: cada fila d'interaccions suma la
+    # contribució de la seva columna, aquí posada a la diagonal.
     values = rng.normal(0, 10, (2 * HOURS_PER_DAY, 4))
     sample = np.array([1, 5, 30])
     interactions = np.zeros((len(sample), 4, 4))
@@ -111,7 +111,7 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
         _tree(values),
         lambda found: tree.sums(found, best=True),
     ).exists()
-    # La xarxa distribucional: valors per fila, columna, hora i paràmetre, i els
+    # La xarxa distribucional: contribucions per fila, columna, hora i paràmetre, i els
     # paràmetres de tots els dies de prova.
     values = rng.normal(0, 10, (2, 5, HOURS_PER_DAY, 2))
     base = rng.normal(0, 10, (HOURS_PER_DAY, 2))

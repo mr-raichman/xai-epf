@@ -67,7 +67,7 @@ def done(tasks, workers, threads, log, block):
     fallada que no és un refús també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
-    # el límit en carregar numpy, LightGBM i TensorFlow.
+    # el límit en carregar NumPy, LightGBM i TensorFlow.
     os.environ.update(environment(threads))
     log.parent.mkdir(parents=True, exist_ok=True)
     results, failed = {}, []

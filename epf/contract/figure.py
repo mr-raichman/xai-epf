@@ -87,8 +87,8 @@ GROUP_LABELS = {
     "date": "comptador de dies",
 }
 
-# Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de
-# les famílies que n'expliquen un de sol.
+# Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de les
+# famílies que n'expliquen un de sol.
 OUTPUT_LABELS = {
     "": "contribució",
     "location": "localització",
@@ -104,7 +104,7 @@ DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
 SHOWN = 20
 
-# MW per GW, perquè els pendents es llegeixen per GW com a l'article.
+# MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
 
 
@@ -124,8 +124,7 @@ def outputs(seed):
     """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
 
     L'arbre i la xarxa elàstica en tenen una per fila. La xarxa distribucional en té una
-    per paràmetre, amb una fila per dia i hora, on la columna d'una previsió a l'hora de
-    la fila és la que la parella a l'hora.
+    per paràmetre, amb una fila per dia i hora.
     """
     values = seed["values"]
     if values.ndim == 2:
@@ -153,7 +152,7 @@ def shares(values, groups):
 
 
 def importance(folder, seeds):
-    """Dibuixa la importància de les columnes i dels grups, amb cada llavor.
+    """Dibuixa la importància de les columnes i dels grups, amb cada model desat.
 
     De les columnes, les `SHOWN` que més pesen.
     """

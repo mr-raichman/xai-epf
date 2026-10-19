@@ -21,8 +21,8 @@ DAY_HALF_WIDTH = 7
 # Les puntuacions més altes que es desen de cada veïnatge; no és cap llindar.
 HIGHEST = 100
 
-# La majoria de puntuacions són inferiors a 10 i les més altes arriben als milers:
-# eix lineal fins a 1 i logarítmic a partir d'aquí.
+# On l'eix de les puntuacions passa de lineal a logarítmic: la majoria són inferiors a
+# 10 i les més altes arriben als milers.
 LINEAR_UP_TO = 1
 
 # Vermell de les puntuacions marcades.
@@ -127,10 +127,7 @@ def report(name, frame):
 
 
 def _style(axis, title, ylabel):
-    """Dona a uns eixos l'aspecte de la figura.
-
-    L'eix vertical és lineal fins a `LINEAR_UP_TO` i logarítmic a partir d'aquí.
-    """
+    """Dona a uns eixos l'aspecte de la figura."""
     axis.set_facecolor(SURFACE)
     axis.set_title(title, color=INK, loc="left")
     axis.set_ylabel(ylabel, color=MUTED_INK)

@@ -1,7 +1,7 @@
 """Els valors que tria una passada sencera, un de cada.
 
-Són els d'una mesura, i un assaig en canvia els de la seva variant, la que tria
-`chosen`. Una passada els desa tots al registre de cada família.
+Són els d'una mesura, i un assaig en canvia els de la seva variant. Una passada els desa
+tots al registre de cada família.
 """
 
 import datetime
@@ -35,7 +35,7 @@ GAP = 1
 # Una partició per llavor.
 SEEDS = tuple(range(10))
 
-# Retards de preu del conjunt: el dia abans, les seves 24 hores.
+# Retards de preu del conjunt d'informació: el dia abans, les seves 24 hores.
 PREVIOUS_DAY = (1,)
 
 # El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del
@@ -54,8 +54,8 @@ EXPLAINED_DAYS = None
 TRIALS = 50
 BEST = 10
 
-# Files de prova de cada llavor sobre les quals es calculen les interaccions de l'arbre,
-# triades a l'atzar amb la llavor.
+# Files explicades de cada llavor sobre les quals es calculen les interaccions de
+# l'arbre, triades a l'atzar amb la llavor.
 INTERACTION_ROWS = 1000
 
 # Llavor de tota família que en faci servir.
@@ -66,8 +66,8 @@ SEED = 0
 # Quants processos fan alhora els ajustos d'una cerca o d'una passada.
 WORKERS = 4
 
-# Els fils de cada procés, sempre els mateixos: amb uns altres un ajust dóna uns altres
-# números, i amb aquests una passada dóna els mateixos siguin quants siguin els
+# Els fils de cada procés, sempre els mateixos: amb uns altres un ajust dona uns altres
+# números, i amb aquests una passada dona els mateixos siguin quants siguin els
 # processos.
 THREADS = 4
 

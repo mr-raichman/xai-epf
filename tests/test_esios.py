@@ -9,8 +9,8 @@ from epf.dataset.esios import (
     repair_dst,
 )
 
-# 2024-10-27, demanda real (1293): la primera 02:00 porta `datetime_utc` 01:00Z,
-# que és la de la segona.
+# 2024-10-27, demanda real (1293): la primera 02:00 porta `datetime_utc` 01:00Z, que és
+# la de la segona.
 AUTUMN = [
     {
         "datetime": "2024-10-27T00:00:00.000+02:00",

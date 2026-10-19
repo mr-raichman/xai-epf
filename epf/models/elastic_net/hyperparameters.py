@@ -1,5 +1,6 @@
 """Els números de la xarxa elàstica."""
 
+# Nom del model i de la seva família.
 NAME = "elastic_net"
 
 # Sostre d'iteracions del descens de coordenades: el `MaxIter` per defecte de `lasso.m`,

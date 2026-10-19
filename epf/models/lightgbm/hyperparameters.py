@@ -1,6 +1,6 @@
 """Els números de l'arbre."""
 
-# Nom del model i de la seva família, el de la implementació.
+# Nom del model i de la seva família.
 NAME = "lightgbm"
 
 # Arbres com a molt d'un ajust que s'atura, i rondes sense millorar abans d'aturar-lo:

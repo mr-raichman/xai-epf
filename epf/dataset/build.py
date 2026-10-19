@@ -21,8 +21,8 @@ DAY, HOUR = "day", "hour"
 BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 
 # Cada indicador, pel nom de la seva carpeta a `downloads/`, i com el serveix ESIOS. El
-# preu, el del mercat diari en EUR/MWh, es tria entre els sis països que porta el seu
-# fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són de Red
+# preu, el del mercat diari en EUR/MWh, es tria entre les sis geografies que porta el
+# seu fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són de Red
 # Eléctrica, i la solar és només la fotovoltaica. El programa base de funcionament
 # (PBF), en MWh per hora, es demana com la suma de cada hora: des del 2025-10-01 ESIOS
 # el serveix com a energia per quart d'hora, i la mitjana en seria la quarta part.
@@ -185,8 +185,8 @@ def write(rows, read):
 
     Es comprova el fitxer escrit, llegit com el llegeixen els models, abans que porti el
     seu nom, de manera que un conjunt de dades refusat deixa l'anterior com era. El
-    registre porta l'empremta de cada fitxer de `read`, pel seu camí sota
-    `downloads/`, i la del conjunt.
+    registre porta l'empremta de cada fitxer de `read`, pel seu camí sota `downloads/`,
+    i la del conjunt de dades.
     """
     paths.DATA.mkdir(exist_ok=True)
     partial = paths.DATASET.with_suffix(".part")

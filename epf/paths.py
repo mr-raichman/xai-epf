@@ -12,8 +12,7 @@ KEYS = ROOT / "api-keys"
 LOCK = ROOT / "uv.lock"
 
 # Els fitxers tal com els serveix ESIOS, on només escriu la baixada: una carpeta per
-# indicador, `downloads/<indicador>/<any>.json`, perquè un fitxer d'ESIOS només porta
-# l'any al nom.
+# indicador, `downloads/<indicador>/<any>.json`.
 DOWNLOADS = ROOT / "downloads"
 
 # El conjunt de dades, el registre dels fitxers baixats d'on es va fer, i les figures

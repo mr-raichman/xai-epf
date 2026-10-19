@@ -122,7 +122,7 @@ def test_the_johnson_su_loss_is_its_density_far_below_the_location():
     """Amb asinh com a `log(z + sqrt(1 + z^2))`, en float32 la pèrdua es desviava.
 
     Ho feia a z = -1000; a z = -4097 hi faltava més d'una unitat sencera d'asinh, i a
-    z = -10000 era infinita. La de l'article és la densitat de TFP.
+    z = -10000 era infinita. La de Marcjasz et al. (2023) és la densitat de TFP.
     """
     z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
     raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")

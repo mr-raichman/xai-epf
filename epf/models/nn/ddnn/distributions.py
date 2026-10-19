@@ -49,7 +49,7 @@ def _johnson_loss(target, raw):
     scale, tail = _scale(scale), _tail(tail)
     z = (target - location) / scale
     # `arcsinh` i no `log(z + sqrt(1 + z^2))`, que en float32 es cancel·la per a z
-    # negatives: a z = -10000 dóna menys infinit.
+    # negatives: a z = -10000 dona menys infinit.
     return ops.mean(
         0.5 * (skew + tail * ops.arcsinh(z)) ** 2
         + ops.log(scale)

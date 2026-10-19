@@ -22,8 +22,8 @@ def test_the_held_out_parts_are_whole_weeks_in_their_shares():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
         assert (len(parts.validation), len(parts.test)) == (128 * 7, 81 * 7)
         for days in (parts.validation, parts.test):
-            # Una setmana va de dimarts a dilluns: cada dimarts retingut porta els
-            # sis dies següents a la mateixa part.
+            # Una setmana va de dimarts a dilluns: cada dimarts retingut porta els sis
+            # dies següents a la mateixa part.
             tuesdays = days[days.dayofweek == 1]
             assert len(days) == 7 * len(tuesdays)
             assert all(

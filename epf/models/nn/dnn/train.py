@@ -27,9 +27,9 @@ POINT = network.Distribution(
 
 POINT_FAMILY = "dnn"
 
-# La família, com la planifica una passada: els números de les xarxes que no es cerquen,
-# els copiats de l'article mentre no hi ha cerca, i la millor configuració de cada
-# llavor de la seva pròpia cerca.
+# La família, com la planifica una passada: el lot, les èpoques i la paciència, que no
+# es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
+# configuració de cada llavor de la seva pròpia cerca.
 FAMILIES = {
     POINT_FAMILY: {
         "fixed": FIXED,

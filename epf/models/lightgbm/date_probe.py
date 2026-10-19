@@ -36,9 +36,9 @@ FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
 def train(family, folder, configurations, explained_days):
     """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
 
-    La matriu és la per hora amb el comptador. `configurations` és el pla de la família
-    per llavor, i `explained_days` els dies de prova que s'expliquen de cada llavor,
-    tots amb `None`. Torna les parelles `[llavor, configuració]` que ha desat ara.
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
     """
     rows, y = matrix.matrices(matrix.series()).hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days

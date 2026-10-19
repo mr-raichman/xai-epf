@@ -43,9 +43,9 @@ INFORMATION = {
 # elàstica; les xarxes en fan un sol enter, a `models/nn/network.py`.
 DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK)]
 
-# Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen.
-# `daily` i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el
-# `y` de la diària.
+# Les dues matrius d'un conjunt d'informació i el preu real amb què es comparen. `daily`
+# i `hourly` són les parelles `(X, y)` que una família pren; `actual` és el `y` de la
+# diària.
 Matrices = collections.namedtuple("Matrices", "daily hourly actual")
 
 

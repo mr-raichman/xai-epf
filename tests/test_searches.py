@@ -199,8 +199,8 @@ def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_firs
         assert [one["rank"] for one in found[seed]] == [0, 1, 2]
         assert [one["numbers"]["value"] for one in found[seed]] == [1, 2, 3]
         assert all(one["trials"] == 4 for one in found[seed])
-    # La sonda de datació en guarda una, la millor, de la cerca d'una altra família:
-    # amb més, no seria la sonda que diu.
+    # La sonda de datació en guarda una, la millor, de la cerca d'una altra família: amb
+    # més, no seria la sonda que diu.
     probe = {"fixed": {}, "placeholder": None, "kept": 1, "searched_as": "fake"}
     alone = configurations(True, probe, columns, (0, 1))
     assert {
