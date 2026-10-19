@@ -71,7 +71,7 @@ COMMANDS = {
     "download": Command(
         "epf.dataset.build",
         "download",
-        "baixa el que encara falta de cada indicador",
+        "baixa les dades d'ESIOS",
         None,
     ),
     "dataset": Command(
