@@ -6,12 +6,12 @@ Cada figura té un tauler per paràmetre.
 from epf.contract import figure
 
 
-def draw(folder, seeds):
-    """Dibuixa les figures d'una família a `folder`, dels seus models desats, `seeds`.
+def draw(folder, models):
+    """Dibuixa les figures d'una família a `folder`, dels seus models ajustats.
 
     La importància i la dependència.
     """
-    figure.importance(folder, seeds)
-    present = figure.present(seeds[0])
+    figure.importance(folder, models)
+    present = figure.present(models[0])
     if present:
-        figure.dependence(folder, seeds, present)
+        figure.dependence(folder, models, present)

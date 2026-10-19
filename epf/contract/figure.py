@@ -1,6 +1,6 @@
 """L'aspecte de les figures, i les que dibuixen igual tots els models explicats.
 
-Les dels models explicats es dibuixen del que la passada va desar, un fitxer per model.
+Les dels models explicats es dibuixen dels models ajustats que la passada va desar.
 """
 
 import matplotlib
@@ -108,8 +108,8 @@ SHOWN = 20
 PER_GW = 1000
 
 
-def seeds(folder):
-    """Torna els models desats d'una família, en ordre de llavor i de configuració.
+def saved(folder):
+    """Torna els models ajustats d'una família, en ordre de llavor i de configuració.
 
     El primer és la millor configuració de la primera llavor.
     """
@@ -120,18 +120,18 @@ def seeds(folder):
     return [np.load(path) for path in paths]
 
 
-def outputs(seed):
+def outputs(model):
     """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
 
     L'arbre i la xarxa elàstica en tenen una per fila. La xarxa distribucional en té una
     per paràmetre, amb una fila per dia i hora.
     """
-    values = seed["values"]
+    values = model["values"]
     if values.ndim == 2:
         return {"": values}
     return {
         str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
-        for number, name in enumerate(seed["names"])
+        for number, name in enumerate(model["names"])
     }
 
 
@@ -151,14 +151,14 @@ def shares(values, groups):
     )
 
 
-def importance(folder, seeds):
-    """Dibuixa la importància de les columnes i dels grups, amb cada model desat.
+def importance(folder, models):
+    """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
     De les columnes, les `SHOWN` que més pesen.
     """
-    explained = list(outputs(seeds[0]))
-    groups = seeds[0]["groups"]
-    columns = seeds[0]["columns"]
+    explained = list(outputs(models[0]))
+    groups = models[0]["groups"]
+    columns = models[0]["columns"]
     for kind in ("columns", "groups"):
         panels, axes = plt.subplots(
             1,
@@ -168,7 +168,7 @@ def importance(folder, seeds):
             squeeze=False,
         )
         for axis, output in zip(axes[0], explained, strict=True):
-            found = [shares(outputs(seed)[output], groups) for seed in seeds]
+            found = [shares(outputs(model)[output], groups) for model in models]
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
                 order = np.argsort(table.mean(axis=0))[-SHOWN:]
@@ -186,35 +186,35 @@ def importance(folder, seeds):
                 axis.plot(row, positions, "o", color=INK, markersize=2)
             axis.set_yticks(positions, names, fontsize=7)
             axis.set_xlabel("part de la importància", color=MUTED_INK)
-            style(axis, f"{OUTPUT_LABELS[output]}, models: {len(seeds)}")
+            style(axis, f"{OUTPUT_LABELS[output]}, models: {len(models)}")
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
-def present(seed):
-    """Torna les sèries de `DEPENDENCE` que porta el fitxer d'un model."""
-    names = set(seed["groups"])
+def present(model):
+    """Torna les sèries de `DEPENDENCE` que porta un model ajustat."""
+    names = set(model["groups"])
     return [name for name in DEPENDENCE if name in names]
 
 
-def members(seed, name):
-    """Torna les posicions de les columnes de la sèrie `name` al fitxer d'un model.
+def members(model, name):
+    """Torna les posicions de les columnes de la sèrie `name` en un model ajustat.
 
     Les troba pel grup que la passada hi va desar: una a la matriu per hora, la de
     l'hora de la fila, i les 24 de la diària en ordre d'hora.
     """
-    members = np.flatnonzero(seed["groups"] == name)
+    members = np.flatnonzero(model["groups"] == name)
     if len(members) == 1:
         return members
     hour = {column: number for number, column in enumerate(HOUR_COLUMNS)}
     return np.array(
-        sorted(members, key=lambda j: hour[str(seed["columns"][j]).rsplit("_", 1)[1]])
+        sorted(members, key=lambda j: hour[str(model["columns"][j]).rsplit("_", 1)[1]])
     )
 
 
-def pairs(seed, values, name):
+def pairs(model, values, name):
     """Torna el valor de la sèrie `name` i la seva contribució a l'hora de cada fila."""
-    inputs = seed["inputs"]
-    found = members(seed, name)
+    inputs = model["inputs"]
+    found = members(model, name)
     if len(found) == 1:
         return inputs[:, found[0]], values[:, found[0]]
     # La xarxa distribucional: a la fila del dia d i l'hora h, la columna de l'hora h.
@@ -225,14 +225,14 @@ def pairs(seed, values, name):
     return x.ravel(), y.ravel()
 
 
-def dependence(folder, seeds, present):
+def dependence(folder, models, present):
     """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
 
-    Al millor model de la primera llavor, amb la recta ajustada, i el pendent de tots
-    els models, que és el que llegeixen Trebbien et al. (2023).
+    Al millor model ajustat de la primera llavor, amb la recta ajustada, i el pendent de
+    tots, que és el que llegeixen Trebbien et al. (2023).
     """
-    explained = list(outputs(seeds[0]))
-    units = dict(zip(explained, seeds[0]["units"], strict=True))
+    explained = list(outputs(models[0]))
+    units = dict(zip(explained, models[0]["units"], strict=True))
     panels, axes = plt.subplots(
         len(present),
         len(explained),
@@ -243,8 +243,8 @@ def dependence(folder, seeds, present):
     for row, name in zip(axes, present, strict=True):
         for axis, output in zip(row, explained, strict=True):
             slopes = []
-            for number, seed in enumerate(seeds):
-                x, y = pairs(seed, outputs(seed)[output], name)
+            for number, model in enumerate(models):
+                x, y = pairs(model, outputs(model)[output], name)
                 slope, intercept = np.polyfit(x / PER_GW, y, 1)
                 slopes.append(slope)
                 if number == 0:

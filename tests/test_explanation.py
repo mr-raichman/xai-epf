@@ -17,7 +17,7 @@ EXPLAINED = TEST_DAYS[:2]
 
 
 def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED):
-    """Desa un model amb `arrays` i `predicted` com la passada, i en torna el camí."""
+    """Desa un model ajustat amb `arrays` i `predicted`, i en torna el camí."""
     none = TEST_DAYS[:0]
     path = tmp_path / "seed_0_0.npz"
     fitted = Fitted(predicted, predicted, arrays, 0.0, TOLERANCE, stored=stored)

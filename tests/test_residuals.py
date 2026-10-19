@@ -31,7 +31,7 @@ def test_a_missing_day_is_left_out_of_its_pairs_as_r_does():
 
 
 def _model(seed_days, offset, rank=0):
-    """Torna un model dels dies `seed_days` amb un error `offset` a cada hora."""
+    """Torna un model ajustat dels dies `seed_days` amb un error `offset` per hora."""
     days = np.array(seed_days, dtype="datetime64[D]")
     actual = np.zeros(len(days) * 24)
     return {

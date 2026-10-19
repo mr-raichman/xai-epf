@@ -23,14 +23,14 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
         for h in range(24):
             values[:, k + 1, h, 0] = 100 * k + h + 1000 * np.arange(days)
     inputs = np.arange(days * len(columns), dtype=float).reshape(days, len(columns))
-    seed = {
+    model = {
         "values": values,
         "names": np.array(["location"]),
         "columns": np.array(columns),
         "inputs": inputs,
         "groups": np.array(["other"] + ["demand_fcst"] * len(HOUR_COLUMNS)),
     }
-    x, y = pairs(seed, outputs(seed)["location"], "demand_fcst")
+    x, y = pairs(model, outputs(model)["location"], "demand_fcst")
     expected_y = [101 * h + 1000 * d for d in range(days) for h in range(24)]
     expected_x = [inputs[d, h + 1] for d in range(days) for h in range(24)]
     assert np.array_equal(y, expected_y)

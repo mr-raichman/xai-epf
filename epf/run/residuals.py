@@ -27,8 +27,8 @@ RESIDUALS = "residuals.csv"
 def daily_errors(models):
     """Torna l'error mitjà de cada dia, del primer al darrer dia de prova.
 
-    `models` són els fitxers d'una família, en ordre de llavor. Cada dia pren l'error
-    del millor model de la primera llavor que el prova, i un dia que cap no prova val
+    `models` són els models ajustats d'una família, en ordre de llavor. Cada dia pren
+    l'error del millor de la primera llavor que el prova, i un dia que cap no prova val
     `NaN`. Falla si les files d'un fitxer no són les dels dies de prova que diu.
     """
     found = {}

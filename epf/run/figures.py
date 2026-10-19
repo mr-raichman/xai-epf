@@ -50,9 +50,9 @@ def _performance(where, described):
         for position, family in enumerate(families):
             for best, size in ((False, 2), (True, 4)):
                 found = [
-                    float(seed[metric])
-                    for seed in described[family]
-                    if (int(seed["rank"]) == 0) == best
+                    float(model[metric])
+                    for model in described[family]
+                    if (int(model["rank"]) == 0) == best
                 ]
                 axis.plot(
                     [position] * len(found),
@@ -73,12 +73,12 @@ def draw(where):
     """Dibuixa totes les figures d'una passada, `where`, del que hi ha desat."""
     described = {}
     for folder in sorted(path for path in where.iterdir() if path.is_dir()):
-        seeds = figure.seeds(folder)
-        if not seeds:
+        models = figure.saved(folder)
+        if not models:
             continue
-        described[folder.name] = seeds
+        described[folder.name] = models
         if FIGURES[folder.name] is not None:
-            importlib.import_module(FIGURES[folder.name]).draw(folder, seeds)
+            importlib.import_module(FIGURES[folder.name]).draw(folder, models)
     if described:
         _performance(where, described)
         residuals.report(where, described)

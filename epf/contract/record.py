@@ -1,4 +1,4 @@
-"""Els registres de les cerques i de les passades, i el fitxer de cada model."""
+"""Els registres de les cerques i de les passades, i el fitxer de cada model ajustat."""
 
 import collections
 import datetime
@@ -91,10 +91,10 @@ def _days(index):
 def save_model(path, parts, explained, fitted, scores, rank):
     """Desa un model ajustat, `fitted`, amb la seva partició i les seves puntuacions.
 
-    Un fitxer amb nom és sempre un model sencer i, d'un model explicat, un que torna el
-    que explica: les sumes de l'explicació es tornen a fer sobre el que s'ha escrit, i
-    un model que no les passa es refusa. Les taules de més d'una dimensió es desen en
-    `float32`. `rank` és el lloc de la configuració.
+    Un fitxer amb nom és sempre un model ajustat sencer i, d'una família explicada, un
+    que torna el que explica: les sumes de l'explicació es tornen a fer sobre el que
+    s'ha escrit, i un que no les passa es refusa. Les taules de més d'una dimensió es
+    desen en `float32`. `rank` és el lloc de la configuració.
     """
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
     arrays |= {

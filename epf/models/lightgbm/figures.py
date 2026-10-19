@@ -10,17 +10,17 @@ from epf.contract.figure import plt
 PARTNERS = 3
 
 
-def _interactions(folder, seed, present):
-    """Dibuixa les interaccions de cada sèrie al millor model de la primera llavor.
+def _interactions(folder, model, present):
+    """Dibuixa les interaccions de cada sèrie al millor model ajustat, `model`.
 
-    Aquest model és `seed`. Per sèrie de `present`, la dependència sencera, l'efecte
+    És el de la primera llavor. Per sèrie de `present`, la dependència sencera, l'efecte
     sense interaccions i la interacció amb els `PARTNERS` socis més forts, amb el color
     del valor de cada soci.
     """
-    columns = list(seed["columns"])
-    rows = seed["interaction_rows"]
-    inputs, interactions = seed["inputs"][rows], seed["interactions"]
-    values = seed["values"][rows]
+    columns = list(model["columns"])
+    rows = model["interaction_rows"]
+    inputs, interactions = model["inputs"][rows], model["interactions"]
+    values = model["values"][rows]
     panels, axes = plt.subplots(
         len(present),
         2 + PARTNERS,
@@ -29,7 +29,7 @@ def _interactions(folder, seed, present):
         squeeze=False,
     )
     for row, name in zip(axes, present, strict=True):
-        (j,) = figure.members(seed, name)
+        (j,) = figure.members(model, name)
         x = inputs[:, j] / figure.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
         strength[j] = -np.inf
@@ -53,14 +53,14 @@ def _interactions(folder, seed, present):
     figure.save(panels, folder, "interactions")
 
 
-def draw(folder, seeds):
-    """Dibuixa les figures d'una família a `folder`, dels seus models desats, `seeds`.
+def draw(folder, models):
+    """Dibuixa les figures d'una família a `folder`, dels seus models ajustats.
 
     La importància, la dependència i, si el fitxer en porta, les interaccions.
     """
-    figure.importance(folder, seeds)
-    present = figure.present(seeds[0])
+    figure.importance(folder, models)
+    present = figure.present(models[0])
     if present:
-        figure.dependence(folder, seeds, present)
-        if "interactions" in seeds[0].files:
-            _interactions(folder, seeds[0], present)
+        figure.dependence(folder, models, present)
+        if "interactions" in models[0].files:
+            _interactions(folder, models[0], present)

@@ -24,10 +24,10 @@ DATA_FIGURES = DATA / "figures"
 
 RUNS = ROOT / "runs"
 
-# Els fitxers d'una passada: el model d'una llavor i d'una configuració, pel lloc de la
-# configuració a la cerca de la llavor, 0 la millor; el registre de la família, al
-# costat; i cada matriu que hi van llegir els models, la diària i la per hora, a dalt de
-# la passada.
+# Els fitxers d'una passada: el model ajustat d'una llavor i d'una configuració, pel
+# lloc de la configuració a la cerca de la llavor, 0 la millor; el registre de la
+# família, al costat; i cada matriu que hi van llegir els models, la diària i la per
+# hora, a dalt de la passada.
 SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
