@@ -193,7 +193,7 @@ def test_with_no_seed_searched_each_seed_fits_the_placeholders_marked(
     tmp_path, monkeypatch
 ):
     columns = _searched(tmp_path, monkeypatch, [])
-    found = configurations(True, FAKE, columns, (0, 1), 4, 10)
+    found = configurations(True, FAKE, columns, (0, 1), 10)
     assert found == {
         seed: [{"rank": 0, "numbers": {"value": 0}, "unsearched": True}]
         for seed in (0, 1)
@@ -204,7 +204,7 @@ def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_firs
     tmp_path, monkeypatch
 ):
     columns = _searched(tmp_path, monkeypatch, (0, 1))
-    found = configurations(True, FAKE, columns, (0, 1), 4, 10)
+    found = configurations(True, FAKE, columns, (0, 1), 10)
     for seed in (0, 1):
         assert [one["rank"] for one in found[seed]] == [0, 1, 2]
         assert [one["numbers"]["value"] for one in found[seed]] == [1, 2, 3]
@@ -212,40 +212,31 @@ def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_firs
     # La sonda de datació en guarda una, la millor, de la cerca d'una altra família: amb
     # més, no seria la sonda que diu.
     probe = {"fixed": {}, "placeholder": None, "kept": 1, "searched_as": "fake"}
-    alone = configurations(True, probe, columns, (0, 1), 4, 10)
+    alone = configurations(True, probe, columns, (0, 1), 10)
     assert {
         seed: [one["numbers"]["value"] for one in ones] for seed, ones in alone.items()
     } == {0: [1], 1: [1]}
 
 
-def test_the_tree_keeps_the_commands_BEST_from_a_search_of_its_TRIALS(
-    tmp_path, monkeypatch
-):
-    """Un assaig amb `BEST` a 1 ajustava les deu millors, el `BEST` de la mesura.
-
-    I amb `TRIALS` a 1 sobre cerques de deu trials, el registre de la passada deia 1.
-    """
+def test_the_tree_keeps_the_commands_BEST(tmp_path, monkeypatch):
+    """Un assaig amb `BEST` a 1 ajustava les deu millors, el `BEST` de la mesura."""
     columns = _searched(tmp_path, monkeypatch, (0, 1))
-    tree = FAKE | {"kept": "BEST"}
-    found = configurations(True, tree, columns, (0, 1), 4, 2)
+    found = configurations(True, FAKE | {"kept": "BEST"}, columns, (0, 1), 2)
     assert {
         seed: [one["numbers"]["value"] for one in ones] for seed, ones in found.items()
     } == {0: [1, 2], 1: [1, 2]}
-    for trials in (1, 5):
-        with pytest.raises(ValueError):
-            configurations(True, tree, columns, (0, 1), trials, 2)
 
 
 def test_a_search_of_some_seeds_only_is_refused(tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, (0,))
     with pytest.raises(ValueError):
-        configurations(True, FAKE, columns, (0, 1), 4, 10)
+        configurations(True, FAKE, columns, (0, 1), 10)
 
 
 def test_a_family_never_searched_fits_once_with_no_numbers(tmp_path, monkeypatch):
     columns = _searched(tmp_path, monkeypatch, (0,))
     never = FAKE | {"placeholder": None, "kept": 0}
-    assert configurations(True, never, columns, (0, 1), 4, 10) == {
+    assert configurations(True, never, columns, (0, 1), 10) == {
         0: [{"rank": 0}],
         1: [{"rank": 0}],
     }

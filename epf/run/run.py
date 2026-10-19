@@ -112,7 +112,6 @@ def main(arguments):
             plan,
             columns,
             values["SEEDS"],
-            values["TRIALS"],
             values["BEST"],
         )
     where.mkdir(parents=True, exist_ok=True)
@@ -130,7 +129,10 @@ def main(arguments):
                 "configurations": planned,
                 "described_now": None,
                 "seconds_now": None,
-                "parameters": values,
+                # Els trials són els de la cerca, que porta cada configuració.
+                "parameters": {
+                    name: value for name, value in values.items() if name != "TRIALS"
+                },
             },
         )
     # Cada ajust, el primer també, llegeix el pla del registre.

@@ -230,7 +230,7 @@ def searched(smoke, family, seed, columns):
     return found
 
 
-def configurations(smoke, plan, columns, seeds, trials, best):
+def configurations(smoke, plan, columns, seeds, best):
     """Torna les configuracions que s'ajusten a cada seed, de la millor a la pitjor.
 
     Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
@@ -238,11 +238,9 @@ def configurations(smoke, plan, columns, seeds, trials, best):
     del mateix tipus, o les `best` millors si `kept` és `"BEST"`, si totes les seeds en
     tenen; els números de lloc, `placeholder`, marcats, si cap seed no en té; i una sola
     sense números per a una família que no es cerca, `kept` zero. `columns` són les de
-    la matriu sobre la qual es cerca, que la cerca compara amb les seves. `trials` i
-    `best` són els valors de `TRIALS` i `BEST` de la comanda. Refusa una cerca que
-    només té algunes seeds: la dispersió barrejaria seeds cercades i sense cercar, i res
-    no ho diria. Refusa també una seed cercada amb uns altres trials que `trials`: el
-    registre de la passada diria uns trials que la cerca no té.
+    la matriu sobre la qual es cerca, que la cerca compara amb les seves, i `best` el
+    `BEST` de la comanda. Refusa una cerca que només té algunes seeds: la dispersió
+    barrejaria seeds cercades i sense cercar, i res no ho diria.
     """
     if not plan["kept"]:
         return {seed: [{"rank": 0}] for seed in seeds}
@@ -264,18 +262,6 @@ def configurations(smoke, plan, columns, seeds, trials, best):
         raise Refusal(
             f'la cerca de {family} no té {asked}; acabar amb "uv run epf search"'
         )
-    for seed, record in found.items():
-        if record["trials"] != trials:
-            has = record["trials"]
-            what = (
-                'acabar amb "uv run epf search"'
-                if has < trials
-                else f"posar TRIALS a {has}"
-            )
-            raise Refusal(
-                f"la cerca de {family} seed {seed} té {has} "
-                f"{'trial' if has == 1 else 'trials'}, i TRIALS en diu {trials}; {what}"
-            )
     return {
         seed: [
             {
