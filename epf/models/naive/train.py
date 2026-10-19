@@ -1,11 +1,6 @@
-"""Les tres prediccions ingènues de Lago et al. (2021), el terra que hi ha sota la
-referència.
+"""Les tres prediccions ingènues de Lago et al. (2021), i la seva passada.
 
-No s'ajusta res: cada una copia les 24 hores d'un dia que ja es coneixia. Es copien de
-la sèrie del preu i no de la matriu, perquè la setmana anterior no és cap entrada, i als
-dies de prova que té la matriu diària, de manera que es puntuen sobre les files de totes
-les famílies. La del dia similar porta, a més, la distribució amb què Marcjasz et al.
-(2023) la fan probabilística. Es puntuen i no s'expliquen.
+No s'ajusta res: cada una copia un dia que ja es coneixia. Es puntuen i no s'expliquen.
 """
 
 import numpy as np
@@ -35,17 +30,17 @@ def _copied(price, days, lag):
 
 
 def previous_day(price, days):
-    """La mateixa hora del dia anterior, `(dies, hores)`."""
+    """Torna el preu de la mateixa hora del dia anterior, `(dies, hores)`."""
     return _copied(price, days, PREVIOUS_DAY)
 
 
 def previous_week(price, days):
-    """La mateixa hora de fa una setmana, `(dies, hores)`."""
+    """Torna el preu de la mateixa hora de fa una setmana, `(dies, hores)`."""
     return _copied(price, days, PREVIOUS_WEEK)
 
 
 def similar_day(price, days):
-    """El dia anterior de dimarts a divendres, i la setmana anterior la resta."""
+    """Torna el dia anterior de dimarts a divendres, i el de fa una setmana la resta."""
     yesterday = days.dayofweek.isin(WEEKDAYS_FROM_YESTERDAY)
     return np.where(
         yesterday[:, None], previous_day(price, days), previous_week(price, days)
@@ -53,14 +48,13 @@ def similar_day(price, days):
 
 
 def bootstrapped(copied, errors, probabilities):
-    """Els quantils de la còpia amb els seus errors dins la mostra, com Marcjasz et al.
-    (2023) fan probabilística la predicció ingènua, `(dies, hores, probabilitats)`.
+    """Torna els quantils de la còpia amb els seus errors dins la mostra.
 
-    L'article suma a la còpia els errors d'un dia sencer, trets a l'atzar amb
-    reemplaçament. A cada hora això és la distribució dels errors d'aquella hora, i aquí
-    se'n prenen els quantils exactes, la inversa de la seva distribució empírica, que és
-    on van a parar els de les mostres com més n'hi ha. `copied` és `(dies, hores)` i
-    `errors` `(dies de la mostra, hores)`.
+    `copied` és `(dies, hores)`, `errors` `(dies de la mostra, hores)` i el que torna
+    `(dies, hores, probabilitats)`. Marcjasz et al. (2023) sumen a la còpia els errors
+    d'un dia sencer, trets a l'atzar amb reemplaçament; aquí es prenen a cada hora els
+    quantils exactes dels seus errors, la inversa de la distribució empírica, on van a
+    parar els de les mostres com més n'hi ha.
     """
     spread = np.quantile(errors, probabilities, axis=0, method="inverted_cdf")
     return copied[:, :, None] + spread.T
@@ -84,8 +78,7 @@ FORECASTS = {
 # La que Marcjasz et al. (2023) fan probabilística, amb els errors de la mostra.
 BOOTSTRAPPED = "naive_similar_day"
 
-# Cada família, com la planifica una passada: els dies que copia, cap número de lloc ni
-# cap configuració de cap cerca, perquè no se'n cerca cap.
+# Cada família, com la planifica una passada: els dies que copia, i cap cerca.
 FAMILIES = {
     name: {
         "fixed": numbers
@@ -99,10 +92,13 @@ FAMILIES = {
 
 
 def _fitted(family, price, y, parts):
-    """La còpia de la família als dies de prova de la matriu, i, de la del dia similar,
-    la seva distribució puntuada, amb els errors dels dies de `IN_SAMPLE`, que es
-    desen."""
+    """Copia la predicció de la família als dies de prova de la matriu.
+
+    La del dia similar torna també la seva distribució puntuada, i els errors dels dies
+    de `IN_SAMPLE`, que es desen.
+    """
     forecast, _ = FORECASTS[family]
+    # Els dies de prova de la matriu, sobre els quals es puntuen totes les famílies.
     days = y.index[y.index.isin(parts.test)]
     copied = forecast(price, days)
     actual = y.loc[days]
@@ -121,9 +117,15 @@ def _fitted(family, price, y, parts):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada d'una família: per a cada llavor, la còpia puntuada i desada. Torna
-    les parelles `[llavor, configuració]` que ha desat ara."""
+    """Copia, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     series = matrix.series()
+    # El preu es copia de la sèrie, i no de la matriu, on la setmana anterior no és cap
+    # entrada.
     price, y = series[matrix.PRICE], matrix.matrices(series).actual
     done = []
     for seed, planned in configurations.items():
