@@ -1,6 +1,3 @@
-"""El registre d'una passada s'escriu a JSON sense perdre res en silenci, i l'empremta
-del codi que porta diu quin codi el va fer, a Windows igual que a Linux."""
-
 import json
 
 import pytest
@@ -14,8 +11,6 @@ def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
 
 
 def test_the_code_fingerprint_ignores_line_endings_and_sees_any_other_edit(tmp_path):
-    # Una còpia amb els finals de línia de Windows ha de donar l'empremta de la de
-    # Linux, i un comentari canviat, una altra.
     package = tmp_path / "epf"
     (package / "contract").mkdir(parents=True)
     (package / "cli.py").write_bytes(b"import os\n\nprint(os.sep)\n")
@@ -30,8 +25,7 @@ def test_the_code_fingerprint_ignores_line_endings_and_sees_any_other_edit(tmp_p
 def test_the_environment_fingerprint_ignores_line_endings_and_sees_a_version_change(
     tmp_path,
 ):
-    # L'entrada de LightGBM del `uv.lock` del projecte, llegida d'una còpia de Windows,
-    # i la mateixa amb una altra versió.
+    # L'entrada de LightGBM del `uv.lock` del projecte.
     entry = '[[package]]\nname = "lightgbm"\nversion = "{}"\n'
     lock = tmp_path / "uv.lock"
     lock.write_bytes(entry.format("4.7.0").encode())
