@@ -79,10 +79,12 @@ SERIES = {
 def download():
     """Baixa el que encara falta de cada indicador, la comanda `epf download`.
 
-    Escriu a stderr quants fitxers ha baixat de cada indicador i cada fitxer que ESIOS
-    ha refusat, i torna 1 si n'hi ha cap, i 0 si no.
+    Escriu a stderr un encapçalament, quants fitxers ha baixat de cada indicador i cada
+    fitxer que ESIOS ha refusat, i torna 1 si n'hi ha cap, i 0 si no.
     """
     session = esios.session_for()
+    print("Baixant les dades d'ESIOS", file=sys.stderr)
+    print(file=sys.stderr)
     refused = []
     for name, indicator in INDICATORS.items():
         written, failed = esios.download(indicator, paths.DOWNLOADS / name, session)
