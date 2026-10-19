@@ -1,14 +1,3 @@
-"""Les dues distribucions de sortida i el CRPS que les puntua.
-
-El que pot anar malament en silenci és la correspondència entre els paràmetres i el
-que se'n llegeix. Una escala que surt sense desfer l'escalat, un quantil calculat amb
-l'asimetria i el pes de la cua canviats de lloc o un pinball amb el signe al revés
-donen un CRPS perfectament plausible i equivocat, i com que ningú no té un CRPS de
-referència per a aquest mercat, no hi hauria res que ho delatés. I una pèrdua que perdés
-precisió lluny de la localització faria aprendre la xarxa d'una densitat que no és la de
-l'article, sense cap error fins que es tornés infinita.
-"""
-
 import datetime
 
 import keras
@@ -26,6 +15,7 @@ DAYS = 40
 
 
 def frame_of(values):
+    """Torna `values` com a preus de `DAYS` dies des del 2024-01-01."""
     index = pd.DatetimeIndex(
         [
             datetime.date(2024, 1, 1) + datetime.timedelta(days=day)
@@ -52,9 +42,8 @@ def test_the_normals_median_is_its_location():
 
 
 def test_a_symmetric_johnson_su_has_its_location_as_median():
-    # Amb asimetria zero la de Johnson SU és simètrica al voltant de la localització,
-    # de manera que la mediana hi cau. Si l'asimetria i el pes de la cua estiguessin
-    # canviats de lloc, això fallaria i res més no se n'adonaria.
+    """Amb l'asimetria i el pes de la cua canviats de lloc, res més no se n'adonaria."""
+    # Amb asimetria zero, la de Johnson SU és simètrica al voltant de la localització.
     parameters = np.stack(
         [
             np.full((DAYS, 24), 60.0),
@@ -91,8 +80,10 @@ def test_the_quantiles_come_out_in_order_and_straddle_the_median():
 
 
 def test_a_sharper_distribution_scores_better_when_it_is_centred_right():
-    # La mesura pròpia d'una predicció distribucional: encertar el centre no n'hi ha
-    # prou, i dir-ho amb més confiança quan es té raó ha de puntuar millor.
+    """Un pinball amb el signe al revés donaria un CRPS plausible i equivocat.
+
+    Cap CRPS de referència per a aquest mercat no ho delataria.
+    """
     actual = frame_of(60.0)
     sharp = crps(actual, NORMAL.quantiles(normal_parameters(60.0, 1.0), PERCENTILES))
     wide = crps(actual, NORMAL.quantiles(normal_parameters(60.0, 20.0), PERCENTILES))
@@ -100,8 +91,7 @@ def test_a_sharper_distribution_scores_better_when_it_is_centred_right():
 
 
 def test_a_sharper_distribution_scores_worse_when_it_is_centred_wrong():
-    # I l'altra meitat, que és la que fa del CRPS una mesura i no un premi a la
-    # confiança: equivocar-se amb seguretat ha de costar més que equivocar-se amb dubte.
+    """La meitat que fa del CRPS una mesura, i no un premi a la confiança."""
     actual = frame_of(60.0)
     sharp = crps(actual, NORMAL.quantiles(normal_parameters(90.0, 1.0), PERCENTILES))
     wide = crps(actual, NORMAL.quantiles(normal_parameters(90.0, 20.0), PERCENTILES))
@@ -109,8 +99,6 @@ def test_a_sharper_distribution_scores_worse_when_it_is_centred_wrong():
 
 
 def test_the_best_scale_is_the_one_the_prices_really_have():
-    # Amb preus normals de desviació coneguda, el CRPS ha de ser mínim a prop d'aquella
-    # desviació i no a zero ni a l'infinit.
     rng = np.random.default_rng(0)
     actual = frame_of(rng.normal(60.0, 8.0, size=(DAYS, len(HOUR_COLUMNS))))
     scores = {
@@ -131,16 +119,18 @@ def test_a_non_finite_quantile_is_refused_rather_than_averaged_away():
 
 
 def test_the_johnson_su_loss_is_its_density_far_below_the_location():
-    # Mesurat el 2026-10-13: amb asinh escrit com a `log(z + sqrt(1 + z^2))`, en float32
-    # la pèrdua es desviava a z = -1000, a z = -4097 hi faltava més d'una unitat sencera
-    # d'asinh, i a z = -10000 era infinita. La de l'article és la densitat de TFP.
+    """Amb asinh com a `log(z + sqrt(1 + z^2))`, en float32 la pèrdua es desviava.
+
+    Ho feia a z = -1000; a z = -4097 hi faltava més d'una unitat sencera d'asinh, i a
+    z = -10000 era infinita. La de l'article és la densitat de TFP.
+    """
     z = np.array([-1000.0, -4097.0, -10000.0], dtype="float32")[:, None]
     raw = np.zeros((len(z), len(JOHNSON_SU.names) * len(HOUR_COLUMNS)), dtype="float32")
     raw[:, len(HOUR_COLUMNS) : 2 * len(HOUR_COLUMNS)] = -5.0
     location, scale, skew, tail = np.moveaxis(parameters(JOHNSON_SU, raw), -1, 0)
     target = (location + z * scale).astype("float32")
     loss = keras.ops.convert_to_numpy(JOHNSON_SU.loss(target, raw))
-    # La pèrdua deixa fora la constant de la normal, que no mou cap gradient.
+    # La pèrdua deixa fora la constant de la normal.
     density = stats.johnsonsu.logpdf(
         target.astype(float), skew, tail, loc=location, scale=scale
     )
