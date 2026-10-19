@@ -1,6 +1,3 @@
-"""El nom de la passada següent: res no peta si se n'equivoca, i una passada que es
-digués com una de més vella no seria l'última que es continua."""
-
 import datetime
 
 from epf import paths
@@ -9,6 +6,7 @@ from epf import paths
 def test_the_next_run_counts_on_from_the_days_highest_and_smoke_apart(
     tmp_path, monkeypatch
 ):
+    """Un nom equivocat no fallaria: faria continuar una altra passada."""
     # Un assaig no compta per a la mesura, ni un altre dia per a aquest, i una passada
     # esborrada a mà, la primera del dia, no fa tornar enrere el comptador.
     monkeypatch.setattr(paths, "RUNS", tmp_path)
