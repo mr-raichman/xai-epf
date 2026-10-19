@@ -1,6 +1,3 @@
-"""Valors d'ESIOS: canvis d'hora i la seva reparació, un valor fora de l'hora, un
-instant repetit i hores absents."""
-
 import datetime
 
 import pandas as pd
@@ -49,9 +46,8 @@ SPRING = [
     {"datetime": "2025-03-30T03:00:00.000+02:00", "value": 20130.58},
 ]
 
-# 2025-10-01, preu espanyol (600) demanat sense `time_trunc`: ESIOS el serveix per
-# quarts d'hora, i la graella d'hores en deixaria tres de cada quatre fora sense dir-ho.
-# La seva mitjana, 103.405, és el que es desa de l'hora.
+# 2025-10-01, preu espanyol (600) demanat sense `time_trunc`, que ESIOS serveix per
+# quarts d'hora.
 QUARTERS = [
     {"datetime": "2025-10-01T00:00:00.000+02:00", "value": 105.1},
     {"datetime": "2025-10-01T00:15:00.000+02:00", "value": 104.24},
@@ -65,8 +61,7 @@ NUCLEAR = [{"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}]
 
 
 def hours_of(*days):
-    """Els instants, en UTC, de totes les hores locals dels dies donats: el que publica
-    una àncora un dia sencer."""
+    """Torna en UTC les hores locals de `days`, les que publica una àncora."""
     return {
         instant.tz_convert("UTC")
         for day in days
@@ -118,9 +113,6 @@ def test_a_value_off_the_hour_is_refused_rather_than_dropped():
 
 
 def test_two_values_at_one_instant_are_refused_rather_than_summed():
-    # Mentre es llegien les províncies, `hourly` sumava els valors d'un instant. D'una
-    # sola geografia, dos valors són una hora repetida, i sumats la doblarien sense
-    # dir-ho.
     repeated = NUCLEAR + [
         {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}
     ]
@@ -129,8 +121,7 @@ def test_two_values_at_one_instant_are_refused_rather_than_summed():
 
 
 def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
-    # El 2025-04-28 l'àncora del PBF va publicar fins a les 11:00 i prou, l'apagada: per
-    # dies, la tarda de cada sèrie del programa hi valia zero.
+    """Les hores de l'apagada, que l'àncora no va publicar, valien zero al programa."""
     anchor = hours_of("2024-03-09")
     assert hourly(NUCLEAR, anchor).iloc[0]["h05"] == 0.0
     morning = {
@@ -142,8 +133,7 @@ def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
 
 
 def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_before():
-    # El carbó del programa va deixar de publicar-se mentre l'àncora seguia: després del
-    # seu últim dia val zero, i abans del primer no es toca.
+    """El carbó del programa va deixar de publicar-se mentre l'àncora seguia."""
     anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
     frame = hourly(NUCLEAR, anchor)
     assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
