@@ -7,7 +7,7 @@ tots al registre de cada família.
 import datetime
 
 
-# Calendari
+### Calendari ###
 
 DAYS_PER_WEEK = 7
 
@@ -16,7 +16,7 @@ HOURS_PER_DAY = 24
 HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 
 
-# Període i partició
+### Període i partició ###
 
 # El període que es descriu, del primer dia de les previsions D+1 a l'últim dilluns de
 # les dades baixades, en setmanes de dimarts a dilluns. Totes les tries s'hi fan.
@@ -40,7 +40,7 @@ GAP = 1
 SEEDS = tuple(range(10))
 
 
-# Information set
+### Information set ###
 
 # Retards de preu de l'information set: el dia abans, les seves 24 hores.
 PREVIOUS_DAY = (1,)
@@ -52,7 +52,7 @@ FORECAST_LAG = 0
 SCHEDULE_LAG = 1
 
 
-# Ajust i cerca
+### Ajust i cerca ###
 
 # Seed de tota família que en faci servir.
 PROJECT_SEED = 0
@@ -64,7 +64,7 @@ TRIALS = 50
 BEST = 10
 
 
-# Explicació
+### Explicació ###
 
 # Dies de prova que s'expliquen de cada seed, comptats des del primer. `None` vol dir
 # tots, el protocol sencer.
@@ -75,7 +75,7 @@ EXPLAINED_DAYS = None
 INTERACTION_ROWS = 1000
 
 
-# Processos
+### Processos ###
 
 # Quants processos fan alhora els ajustos d'una cerca o d'una passada.
 WORKERS = 4
@@ -86,7 +86,7 @@ WORKERS = 4
 THREADS = 4
 
 
-# Assaig
+### Assaig ###
 
 # El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants:
 # `SMOKE`, i `SMOKE_1`, que no fixa els dies explicats i n'explica tots els de prova. La
