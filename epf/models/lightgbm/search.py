@@ -13,8 +13,8 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
 
-# La graella del codi de Kruse, Schäfer i Witthaut per a l'activació de la reserva
-# secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`.
+# La graella del codi de Kruse, Schäfer i Witthaut (2022) per a l'activació de la
+# reserva secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`.
 GRID = {
     "num_leaves": (10, 30, 200, 900),
     "max_depth": (10, 5),
