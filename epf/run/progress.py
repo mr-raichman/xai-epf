@@ -1,10 +1,4 @@
-"""El bloc que mostra una cerca o una passada mentre es fa: una línia per família amb
-les llavors acabades, les fallades a sota i el temps transcorregut.
-
-En un terminal el bloc es reescriu al seu lloc amb els codis del cursor, cada línia
-tallada a l'amplada del terminal fins que es tanca; sense, o a una consola de Windows
-que no admet el mode VT, s'escriu una línia per llavor acabada.
-"""
+"""El bloc que mostra una cerca o una passada mentre es fa."""
 
 import os
 import sys
@@ -31,7 +25,8 @@ def _live(stream):
     import ctypes
 
     kernel32 = ctypes.windll.kernel32
-    handle = kernel32.GetStdHandle(-12)  # STD_ERROR_HANDLE
+    # La sortida d'errors, STD_ERROR_HANDLE.
+    handle = kernel32.GetStdHandle(-12)
     mode = ctypes.c_uint32()
     if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
         return False
@@ -60,8 +55,11 @@ def elapsed(seconds):
 
 
 def counted(failed, order):
-    """Compta les llavors fallades, `(família, llavor)`, i en nomena la primera en
-    l'ordre de les famílies, `order`."""
+    """Torna `2 llavors han fallat, la primera lightgbm llavor 3`.
+
+    `failed` són les llavors fallades, `(família, llavor)`, i la primera és en l'ordre
+    de les famílies, `order`.
+    """
     family, seed = min(failed, key=lambda one: (order.index(one[0]), one[1]))
     first = f"{family} llavor {seed}"
     if len(failed) == 1:
@@ -70,10 +68,10 @@ def counted(failed, order):
 
 
 class Block:
-    """El bloc d'una ordre: `title` a la primera línia, les llavors que planifica cada
-    família, `totals`, i les que ja tenia acabades, `done`.
+    """El bloc d'una ordre, que escriu a stderr.
 
-    Escriu a stderr.
+    `title` va a la primera línia, `totals` són les llavors que planifica cada família,
+    i `done` les que ja tenia acabades.
     """
 
     def __init__(self, title, totals, done=None):
@@ -153,8 +151,10 @@ class Block:
         return lines
 
     def _draw(self, whole=False):
-        """Torna a escriure el bloc al seu lloc, cada línia en una fila de la pantalla,
-        o sencera si `whole`, quan ja no s'ha de tornar a escriure."""
+        """Torna a escriure el bloc al seu lloc, cada línia tallada a una fila.
+
+        Amb `whole`, quan ja no s'ha de tornar a escriure, les línies van senceres.
+        """
         lines = self._lines()
         if not whole:
             # Una línia que es partís en dues files faria pujar el cursor massa poc, i
