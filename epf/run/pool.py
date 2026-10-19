@@ -1,12 +1,7 @@
 """Els processos que fan les tasques d'una cerca o d'una passada, uns quants alhora.
 
-Cada procés és un intèrpret nou, engegat amb `spawn`, que llegeix el límit de fils de
-l'entorn quan carrega numpy, LightGBM i TensorFlow, i el pare l'hi posa abans
-d'engegar-ne cap. Amb uns altres fils un ajust dóna uns altres números, de manera que el
-límit és el mateix a tots els processos, quan n'hi ha un de sol també.
-
-Només el pare escriu al terminal: la sortida de cada procés va al fitxer dels processos,
-que el bloc no podria tornar a escriure si hi caigués una línia d'un altre procés.
+Només el pare escriu al terminal, on el bloc no es podria tornar a escriure si hi
+caigués una línia d'un procés.
 """
 
 import concurrent.futures
@@ -18,8 +13,10 @@ from epf import Refusal
 
 
 class Failure(Exception):
-    """La fallada d'una tasca que no és un refús: la classe i el missatge de l'error, i
-    la traça del procés on va passar."""
+    """La fallada d'una tasca que no és un refús, amb la traça del seu procés.
+
+    `line` és la classe i el missatge de l'error.
+    """
 
     def __init__(self, line, trace):
         super().__init__(line, trace)
@@ -27,9 +24,10 @@ class Failure(Exception):
 
 
 def environment(threads):
-    """El límit de fils de cada procés, amb els noms amb què el llegeixen les
-    biblioteques. Un sol fil entre operacions de TensorFlow, el valor amb què es va
-    mesurar el límit."""
+    """Torna les variables d'entorn que limiten els fils de cada procés a `threads`.
+
+    Entre operacions de TensorFlow, un sol fil, el valor amb què es va mesurar el límit.
+    """
     return {
         "OMP_NUM_THREADS": str(threads),
         "TF_NUM_INTRAOP_THREADS": str(threads),
@@ -38,15 +36,17 @@ def environment(threads):
 
 
 def _silenced(log):
-    """Afegeix la sortida i els errors d'aquest procés al fitxer `log`, als descriptors,
-    de manera que hi va també el que escriu una biblioteca de C."""
+    """Afegeix la sortida i els errors d'aquest procés al fitxer `log`.
+
+    Ho fa als descriptors, de manera que hi va també el que escriu una biblioteca de C.
+    """
     with open(log, "a", encoding="utf-8") as handle:
         os.dup2(handle.fileno(), 1)
         os.dup2(handle.fileno(), 2)
 
 
 def _task(function, *arguments):
-    """Fa una tasca; una fallada que no és un refús torna amb la traça del procés."""
+    """Fa una tasca, i una fallada que no és un refús en surt com a `Failure`."""
     try:
         return function(*arguments)
     except Refusal:
@@ -57,15 +57,17 @@ def _task(function, *arguments):
 
 
 def done(tasks, workers, threads, log, block):
-    """Fa cada tasca, `((família, llavor), funció, arguments)`, en `workers`
-    processos de `threads` fils cada un, i en torna el resultat de cada etiqueta i les
-    etiquetes de les que han fallat.
+    """Fa les tasques en `workers` processos de `threads` fils cada un.
 
-    Una tasca que falla no atura les altres. `block` mostra cada llavor acabada o
-    fallada, i el temps cada segon, i es tanca en acabar. La sortida dels processos
-    s'afegeix a `log`, i la traça de cada fallada que no és un refús també. La funció
-    ha de viure en un mòdul, perquè un procés nou la importa pel seu nom.
+    Cada tasca és `((família, llavor), funció, arguments)`, i la funció ha de viure en
+    un mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
+    etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
+    altres. `block` mostra cada llavor acabada o fallada, i el temps cada segon, i es
+    tanca en acabar. La sortida dels processos s'afegeix a `log`, i la traça de cada
+    fallada que no és un refús també. Deixa el límit de fils a l'entorn d'aquest procés.
     """
+    # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
+    # el límit en carregar numpy, LightGBM i TensorFlow.
     os.environ.update(environment(threads))
     log.parent.mkdir(parents=True, exist_ok=True)
     results, failed = {}, []
