@@ -13,11 +13,11 @@ from epf.run import families, pool, progress
 # Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
 # model, que s'importa quan la família es cerca o es planifica.
 SEARCHERS = {
-    "lightgbm": "epf.models.lightgbm.search",
     "elastic_net": "epf.models.elastic_net.search",
+    "lightgbm": "epf.models.lightgbm.search",
+    "dnn": "epf.models.nn.search",
     "ddnn_normal": "epf.models.nn.search",
     "ddnn_jsu": "epf.models.nn.search",
-    "dnn": "epf.models.nn.search",
 }
 
 

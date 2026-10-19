@@ -4,20 +4,21 @@ import json
 
 from epf import Refusal, paths
 
-# Cada model amb les seves famílies. Les xarxes són un model, `nn`, i cada una de les
-# seves dues carpetes, `dnn` i `ddnn`, també.
+# Cada model amb les seves famílies, en l'ordre en què es fan, es mostren i s'escriuen a
+# tot arreu. Les xarxes són un model, `nn`, i cada una de les seves dues carpetes, `dnn`
+# i `ddnn`, també.
 MODELS = {
-    "lightgbm": ("lightgbm", "date_probe"),
+    "naive": ("naive_previous_day", "naive_previous_week", "naive_similar_day"),
+    "floor": ("floor",),
     "elastic_net": ("elastic_net",),
+    "lightgbm": ("date_probe", "lightgbm"),
     "nn": ("dnn", "ddnn_normal", "ddnn_jsu"),
     "dnn": ("dnn",),
     "ddnn": ("ddnn_normal", "ddnn_jsu"),
-    "floor": ("floor",),
-    "naive": ("naive_previous_day", "naive_previous_week", "naive_similar_day"),
 }
 
-# Totes les famílies, de tots els models.
-EVERY = frozenset(family for model in MODELS.values() for family in model)
+# Totes les famílies, de tots els models, en l'ordre de `MODELS`.
+EVERY = tuple(dict.fromkeys(family for model in MODELS.values() for family in model))
 
 
 def named(names, among):
@@ -36,7 +37,7 @@ def named(names, among):
         verb = "és" if len(unknown) == 1 else "són"
         raise Refusal(
             f"{quoted} no {verb} cap família ni cap model; les famílies: "
-            f"{', '.join(sorted(EVERY))}; els models: {', '.join(sorted(MODELS))}"
+            f"{', '.join(EVERY)}; els models: {', '.join(MODELS)}"
         )
     wanted = {family for name in names for family in MODELS.get(name, (name,))}
     return [family for family in among if family in wanted]

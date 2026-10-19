@@ -12,6 +12,7 @@ from epf.contract import figure
 from epf.contract.figure import plt
 from epf.models.naive.train import FAMILIES as COPIES
 from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
+from epf.run import families
 
 # Retards del test, dues vegades el període setmanal, com aconsellen Hyndman i
 # Athanasopoulos (2021) per a una sèrie estacional.
@@ -81,7 +82,11 @@ def report(where, described):
     El test va a `residuals.csv`, i el correlograma marca la distància de la partició i
     la setmana.
     """
-    fitted = [family for family in sorted(described) if family not in COPIES]
+    fitted = [
+        family
+        for family in families.EVERY
+        if family in described and family not in COPIES
+    ]
     if not fitted:
         return
     rows = -(-len(fitted) // PANELS_PER_ROW)

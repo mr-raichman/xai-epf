@@ -23,16 +23,16 @@ DIFFERENT = {
 # Cada família, en l'ordre en què una passada les ajusta, amb el mòdul del seu model que
 # l'ajusta, que s'importa quan es tria la família.
 TRAINERS = {
-    "lightgbm": "epf.models.lightgbm.train",
-    "date_probe": "epf.models.lightgbm.date_probe",
-    "elastic_net": "epf.models.elastic_net.train",
-    "ddnn_normal": "epf.models.nn.ddnn.train",
-    "ddnn_jsu": "epf.models.nn.ddnn.train",
-    "dnn": "epf.models.nn.dnn.train",
-    "floor": "epf.models.floor.train",
     "naive_previous_day": "epf.models.naive.train",
     "naive_previous_week": "epf.models.naive.train",
     "naive_similar_day": "epf.models.naive.train",
+    "floor": "epf.models.floor.train",
+    "elastic_net": "epf.models.elastic_net.train",
+    "date_probe": "epf.models.lightgbm.date_probe",
+    "lightgbm": "epf.models.lightgbm.train",
+    "dnn": "epf.models.nn.dnn.train",
+    "ddnn_normal": "epf.models.nn.ddnn.train",
+    "ddnn_jsu": "epf.models.nn.ddnn.train",
 }
 
 

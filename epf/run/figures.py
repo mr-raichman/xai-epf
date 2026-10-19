@@ -15,16 +15,16 @@ from epf.run import families, residuals
 # totes: una carpeta d'una família que no hi és fa fallar el dibuix, en lloc de
 # quedar-se sense figures sense dir-ho.
 FIGURES = {
-    "lightgbm": "epf.models.lightgbm.figures",
-    "date_probe": "epf.models.lightgbm.figures",
-    "elastic_net": "epf.models.elastic_net.figures",
-    "ddnn_normal": "epf.models.nn.ddnn.figures",
-    "ddnn_jsu": "epf.models.nn.ddnn.figures",
-    "dnn": None,
-    "floor": "epf.models.floor.figures",
     "naive_previous_day": None,
     "naive_previous_week": None,
     "naive_similar_day": None,
+    "floor": "epf.models.floor.figures",
+    "elastic_net": "epf.models.elastic_net.figures",
+    "date_probe": "epf.models.lightgbm.figures",
+    "lightgbm": "epf.models.lightgbm.figures",
+    "dnn": None,
+    "ddnn_normal": "epf.models.nn.ddnn.figures",
+    "ddnn_jsu": "epf.models.nn.ddnn.figures",
 }
 
 
@@ -35,19 +35,17 @@ def _performance(where, described):
     grisa al darrere. Només les famílies explicades tenen color; els bancs de
     comparació, que no desen cap contribució, van en gris.
     """
-    families = sorted(described)
-    explained = [
-        family for family in families if "values" in described[family][0].files
-    ]
+    shown = [family for family in families.EVERY if family in described]
+    explained = [family for family in shown if "values" in described[family][0].files]
     colour = {name: hue for hue, name in figure.colours(explained)}
     panels, axes = plt.subplots(
-        1, 2, figsize=(max(8, 1.1 * len(families)), 5), facecolor=figure.SURFACE
+        1, 2, figsize=(max(8, 1.1 * len(shown)), 5), facecolor=figure.SURFACE
     )
     for axis, metric, label in (
         (axes[0], "r2", "R²"),
         (axes[1], "mae", "MAE, EUR/MWh"),
     ):
-        for position, family in enumerate(families):
+        for position, family in enumerate(shown):
             for best, size in ((False, 2), (True, 4)):
                 found = [
                     float(model[metric])
@@ -63,7 +61,7 @@ def _performance(where, described):
                     if best
                     else figure.MUTED_INK,
                 )
-        axis.set_xticks(range(len(families)), families, fontsize=6, rotation=90)
+        axis.set_xticks(range(len(shown)), shown, fontsize=6, rotation=90)
         axis.set_ylabel(label, color=figure.MUTED_INK)
         figure.style(axis, f"{label} a les setmanes de prova, la millor de cada seed")
     figure.save(panels, where, "performance")

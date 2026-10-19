@@ -46,7 +46,7 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(
         run, "TRAINERS", {"first": "fake_trainer", "second": "fake_trainer"}
     )
-    monkeypatch.setattr(families, "EVERY", frozenset({"first", "second"}))
+    monkeypatch.setattr(families, "EVERY", ("first", "second"))
     monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
     monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")
     built = types.SimpleNamespace(daily=(pd.DataFrame({"x": [0.0]}), None))
