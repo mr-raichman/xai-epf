@@ -1,7 +1,3 @@
-"""La xarxa elàstica: cada hora amb les seves files, la solar de nit i dels vespres,
-l'atribució que torna la predicció, i la transformació, per columna, d'anada i tornada,
-i què fa amb una columna sense MAD."""
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -22,7 +18,7 @@ NIGHT, EVENING = (0, 1, 2, 3, 4, 5, 23), 20
 
 
 def per_hour_table(days=120, seed=0):
-    """La matriu per hora del conjunt, sobre sèries sintètiques."""
+    """Torna la matriu per hora d'unes sèries sintètiques."""
     rng = np.random.default_rng(seed)
     index = pd.date_range("2021-01-01", periods=days, freq="D", name="day")
 
@@ -70,9 +66,11 @@ def test_solar_leaves_the_night_hours_and_keeps_its_evening_without_mad():
 
 
 def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
-    # La propietat que en fa valors de SHAP: el centre és la mitjana de les files
-    # d'ajust de l'hora, i per això la base és la predicció mitjana d'aquelles files. La
-    # suma de sota es compleix amb qualsevol centre i no ho podria veure.
+    """La propietat que en fa valors de SHAP, que la suma no podria veure.
+
+    El centre és la mitjana de les files d'ajust de l'hora, i per això la base és la
+    predicció mitjana d'aquelles files; la suma es compleix amb qualsevol centre.
+    """
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)
     explained = attribute_rows(model, X)
@@ -85,9 +83,11 @@ def test_over_the_rows_it_was_fitted_on_each_contribution_averages_zero():
 
 
 def test_moving_one_column_of_a_row_moves_only_its_own_contribution():
-    # L'ordre de la matriu del model, les escalades i després els indicadors, no és el
-    # de la matriu per hora: una contribució escrita a la columna que no toca sumaria
-    # igual i tindria la mateixa mitjana.
+    """Una contribució a una altra columna sumaria igual, amb la mateixa mitjana.
+
+    L'ordre de la matriu del model, les escalades i després els indicadors, no és el de
+    la matriu per hora.
+    """
     X, y = per_hour_table()
     model = fit_rows(X, y, PENALTY, MIXING)
     before = attribute_rows(model, X).values
@@ -116,13 +116,13 @@ def test_the_base_and_the_contributions_return_the_rows_own_prediction():
 
 
 def test_each_sequence_starts_at_the_smallest_penalty_that_empties_every_hour():
-    # La seqüència de `lasso.m` comença al càstig més petit que deixa a zero tots els
-    # coeficients. Una escala equivocada, sense centrar o d'una sola hora, començaria
-    # lluny del model buit o ja a dins seu, i la graella semblaria igual de bona. Que
-    # una mica per sota el model ja no sigui buit no es pot comprovar ajustant: el
-    # solucionador torna el model buit mentre la diferència li cap a la tolerància. El
-    # que es compara és el valor de scikit-learn mateix, el primer de la seqüència de
-    # `ElasticNetCV`, hora per hora.
+    """Mal escalada, la seqüència començaria lluny del model buit, o a dins seu.
+
+    Com una escala sense centrar o d'una sola hora; la graella semblaria igual de bona.
+    """
+    # Que una mica per sota el model ja no sigui buit no es pot comprovar ajustant: el
+    # solucionador torna el model buit mentre la diferència li cap a la tolerància. Es
+    # compara amb el primer càstig de `ElasticNetCV`, hora per hora.
     X, y = per_hour_table()
     for mixing, steps in penalties(X, y).items():
         theirs = [
