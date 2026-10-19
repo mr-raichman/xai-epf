@@ -1,11 +1,7 @@
-"""La comprovació dels residus d'una passada: si l'error de prova de cada família
-ajustada està correlacionat d'un dia a l'altre, el test que Bergmeir, Hyndman i Koo
-(2018) fan a la validació creuada, el de Ljung-Box, calculat com el calcula R.
+"""La comprovació dels residus d'una passada, el test de Ljung-Box.
 
-Les setmanes de prova de les llavors es cusen en una sola sèrie, cada dia de la primera
-llavor que el prova i del millor model d'aquella llavor, i un dia que cap llavor no
-prova queda buit. Un residu per dia, l'error mitjà de les seves hores. Les còpies
-ingènues no es comproven.
+Diu si l'error de prova de cada família ajustada està correlacionat d'un dia a l'altre,
+el test que Bergmeir, Hyndman i Koo (2018) fan a la validació creuada.
 """
 
 import numpy as np
@@ -29,9 +25,12 @@ RESIDUALS = "residuals.csv"
 
 
 def daily_errors(models):
-    """La sèrie de l'error mitjà de cada dia, del primer al darrer dia de prova, amb els
-    dies de prova de cada llavor del seu millor model, el primer que el prova, i `NaN`
-    on no en prova cap. `models` són els fitxers d'una família, en ordre de llavor."""
+    """Torna l'error mitjà de cada dia, del primer al darrer dia de prova.
+
+    `models` són els fitxers d'una família, en ordre de llavor. Cada dia pren l'error
+    del millor model de la primera llavor que el prova, i un dia que cap no prova val
+    `NaN`. Falla si les files d'un fitxer no són les dels dies de prova que diu.
+    """
     found = {}
     for model in models:
         if int(model["rank"]):
@@ -52,14 +51,11 @@ def daily_errors(models):
 
 
 def ljung_box(series, lags=LAGS):
-    """La Q de Ljung-Box, el seu valor p i les autocorrelacions, com `Box.test` de R amb
-    els dies buits passats a `acf`.
+    """Torna la Q de Ljung-Box, el seu valor p i les autocorrelacions d'una sèrie.
 
-    La sèrie es centra amb la mitjana dels dies presents; l'autocovariància de cada
-    retard suma els parells on hi són tots dos dies i la divideix pel seu nombre més el
-    retard; `n` són els dies presents; i `Q = n (n + 2) sum r_k^2 / (n - k)` es llegeix
-    contra una khi quadrat de `lags` graus, sense restar-ne cap, perquè els residus són
-    de fora de la mostra. Sense cap dia buit és l'estimador de sempre.
+    Com `Box.test` de R, amb els dies buits passats a `acf`; sense cap dia buit és
+    l'estimador de sempre. El valor p és el d'una khi quadrat de `lags` graus, sense
+    restar-ne cap, perquè els residus són de fora de la mostra.
     """
     x = np.asarray(series, dtype=float) - np.nanmean(series)
     present = int((~np.isnan(x)).sum())
@@ -67,6 +63,8 @@ def ljung_box(series, lags=LAGS):
     for lag in range(lags + 1):
         products = x[lag:] * x[: len(x) - lag]
         pairs = ~np.isnan(products)
+        # Entre els parells més el retard, com `acf` de R, que sense cap dia buit és la
+        # llargada de la sèrie.
         covariances.append(products[pairs].sum() / (pairs.sum() + lag))
     correlations = np.clip(np.array(covariances[1:]) / covariances[0], -1, 1)
     statistic = (
@@ -78,8 +76,11 @@ def ljung_box(series, lags=LAGS):
 
 
 def report(where, described):
-    """Dibuixa el correlograma de cada família ajustada, amb la distància de la partició
-    i la setmana marcades, i desa el test de cada una a `residuals.csv`."""
+    """Dibuixa el correlograma de cada família ajustada i en desa el test.
+
+    El test va a `residuals.csv`, i el correlograma marca la distància de la partició i
+    la setmana.
+    """
     fitted = [family for family in sorted(described) if family not in COPIES]
     if not fitted:
         return
