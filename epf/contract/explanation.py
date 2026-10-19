@@ -1,7 +1,7 @@
 """El que comparteixen les explicacions de tots els models.
 
 La comprovació que la base més les contribucions torna la predicció es fa dues vegades:
-a la memòria, abans de desar, contra el marge del seu espai, i sobre el fitxer desat,
+a la passada, abans de desar, contra el marge del seu espai, i sobre el fitxer desat,
 amb el mateix marge més el que hi pot haver mogut l'arrodoniment a `float32`.
 """
 
@@ -70,8 +70,8 @@ def explained_rows(found, per_day):
     """Torna les files de prova d'un fitxer, `found`, que són dels dies explicats.
 
     Són les primeres, `per_day` per dia, perquè la partició dona els dies de cada part
-    en ordre de data i s'expliquen els primers dies de prova; el fitxer ho ha de
-    confirmar, amb els seus dies explicats al començament dels seus dies de prova.
+    en ordre de data i s'expliquen els primers dies de prova. Falla si els dies
+    explicats del fitxer no són els primers dels seus dies de prova.
     """
     explained, test = found["days_explained"], found["days_test"]
     if not np.array_equal(explained, test[: len(explained)]):

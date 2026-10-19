@@ -59,7 +59,8 @@ def build(series, information):
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les. `series`
     són les sèries per nom, cada una amb les 24 hores de cada dia, i `information` diu
-    quines entren i a quins retards, com `INFORMATION`.
+    quines entren i a quins retards, com `INFORMATION`. Falla si el preu no té les
+    columnes `HOUR_COLUMNS`.
     """
     price = series[PRICE]
     if list(price.columns) != HOUR_COLUMNS:

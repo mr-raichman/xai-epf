@@ -188,8 +188,9 @@ def published_instants(values):
 def repair_dst(hours):
     """Torna sempre 24 hores, corregint els dies de canvi d'hora amb mitjanes.
 
-    El dia de 23 hores rep la mitjana de les dues veïnes a l'hora que falta, i el
-    de 25 fusiona les dues hores repetides en la seva mitjana.
+    El dia de 23 hores rep la mitjana de les dues veïnes a l'hora que falta, i el de 25
+    fusiona les dues hores repetides en la seva mitjana. Falla amb un dia de qualsevol
+    altre nombre d'hores.
     """
     if len(hours) == HOURS_PER_DAY:
         return hours
