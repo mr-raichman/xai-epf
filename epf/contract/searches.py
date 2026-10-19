@@ -187,7 +187,7 @@ def record(study, family, seed, smoke):
         "trials": len(done),
         "made_on": study.user_attrs["made_on"],
         "PROJECT_SEED": study.user_attrs["PROJECT_SEED"],
-        "ranked": [
+        "best": [
             {
                 "numbers": one.user_attrs["numbers"],
                 "score": one.value,
@@ -271,7 +271,7 @@ def configurations(smoke, plan, columns, seeds, best):
                 "trial": one["trial"],
                 "trials": record["trials"],
             }
-            for rank, one in enumerate(record["ranked"][:kept])
+            for rank, one in enumerate(record["best"][:kept])
         ]
         for seed, record in found.items()
     }

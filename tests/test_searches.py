@@ -118,8 +118,8 @@ def test_a_saved_search_is_read_for_its_own_family_and_seed_alone(
     X, y = _table()
     found = _saved(tmp_path, monkeypatch, X, y)
     assert searched(True, "fake", 0, X.columns) == found
-    assert [one["score"] for one in found["ranked"]] == sorted(
-        one["score"] for one in found["ranked"]
+    assert [one["score"] for one in found["best"]] == sorted(
+        one["score"] for one in found["best"]
     )
     assert searched(True, "fake", 1, X.columns) is None
     assert searched(True, "other", 0, X.columns) is None
