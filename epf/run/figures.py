@@ -15,16 +15,16 @@ from epf.run import families, residuals
 # totes: una carpeta d'una família que no hi és fa fallar el dibuix, en lloc de
 # quedar-se sense figures sense dir-ho.
 FIGURES = {
-    "naive_previous_day": None,
-    "naive_previous_week": None,
-    "naive_similar_day": None,
-    "floor": "epf.models.floor.figures",
-    "elastic_net": "epf.models.elastic_net.figures",
-    "date_probe": "epf.models.lightgbm.figures",
-    "lightgbm": "epf.models.lightgbm.figures",
-    "dnn": None,
-    "ddnn_normal": "epf.models.nn.ddnn.figures",
     "ddnn_jsu": "epf.models.nn.ddnn.figures",
+    "ddnn_normal": "epf.models.nn.ddnn.figures",
+    "dnn": None,
+    "lightgbm": "epf.models.lightgbm.figures",
+    "date_probe": "epf.models.lightgbm.figures",
+    "elastic_net": "epf.models.elastic_net.figures",
+    "floor": "epf.models.floor.figures",
+    "naive_similar_day": None,
+    "naive_previous_week": None,
+    "naive_previous_day": None,
 }
 
 
@@ -70,7 +70,9 @@ def _performance(where, described):
 def draw(where):
     """Dibuixa totes les figures d'una passada, `where`, del que hi ha desat."""
     described = {}
-    for folder in sorted(path for path in where.iterdir() if path.is_dir()):
+    folders = [path for path in where.iterdir() if path.is_dir()]
+    # En l'ordre de les famílies.
+    for folder in sorted(folders, key=lambda path: list(FIGURES).index(path.name)):
         models = figure.saved(folder)
         if not models:
             continue

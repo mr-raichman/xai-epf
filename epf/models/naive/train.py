@@ -63,8 +63,6 @@ def bootstrapped(copied, errors, probabilities):
 # Cada predicció és una família, amb la funció que copia i els dies que copia, que és el
 # que en diu el registre.
 FORECASTS = {
-    "naive_previous_day": (previous_day, {"lag": PREVIOUS_DAY}),
-    "naive_previous_week": (previous_week, {"lag": PREVIOUS_WEEK}),
     "naive_similar_day": (
         similar_day,
         {
@@ -73,6 +71,8 @@ FORECASTS = {
             "lag_otherwise": PREVIOUS_WEEK,
         },
     ),
+    "naive_previous_week": (previous_week, {"lag": PREVIOUS_WEEK}),
+    "naive_previous_day": (previous_day, {"lag": PREVIOUS_DAY}),
 }
 
 # La que Marcjasz et al. (2023) fan probabilística, amb els errors de la mostra.

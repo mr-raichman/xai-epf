@@ -123,8 +123,8 @@ def saved(folder):
 def outputs(model):
     """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
 
-    L'arbre i l'elastic net en tenen una per fila. La xarxa distribucional en té una per
-    paràmetre, amb una fila per dia i hora.
+    La xarxa distribucional en té una per paràmetre, amb una fila per dia i hora, i
+    l'arbre i l'elastic net, una per fila.
     """
     values = model["values"]
     if values.ndim == 2:

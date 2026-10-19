@@ -5,16 +5,16 @@ import json
 from epf import Refusal, paths
 
 # Cada model amb les seves famílies, en l'ordre en què es fan, es mostren i s'escriuen a
-# tot arreu. Les xarxes són un model, `nn`, i cada una de les seves dues carpetes, `dnn`
-# i `ddnn`, també.
+# tot arreu. Les xarxes són un model, `nn`, i cada una de les seves dues carpetes,
+# `ddnn` i `dnn`, també.
 MODELS = {
-    "naive": ("naive_previous_day", "naive_previous_week", "naive_similar_day"),
-    "floor": ("floor",),
-    "elastic_net": ("elastic_net",),
-    "lightgbm": ("date_probe", "lightgbm"),
-    "nn": ("dnn", "ddnn_normal", "ddnn_jsu"),
+    "ddnn": ("ddnn_jsu", "ddnn_normal"),
     "dnn": ("dnn",),
-    "ddnn": ("ddnn_normal", "ddnn_jsu"),
+    "nn": ("ddnn_jsu", "ddnn_normal", "dnn"),
+    "lightgbm": ("lightgbm", "date_probe"),
+    "elastic_net": ("elastic_net",),
+    "floor": ("floor",),
+    "naive": ("naive_similar_day", "naive_previous_week", "naive_previous_day"),
 }
 
 # Totes les famílies, de tots els models, en l'ordre de `MODELS`.

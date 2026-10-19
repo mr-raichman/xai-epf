@@ -97,4 +97,4 @@ JOHNSON_SU = Distribution(
 )
 
 # Com es diu cada família i quina distribució treu.
-DISTRIBUTIONS = {"ddnn_normal": NORMAL, "ddnn_jsu": JOHNSON_SU}
+DISTRIBUTIONS = {"ddnn_jsu": JOHNSON_SU, "ddnn_normal": NORMAL}
