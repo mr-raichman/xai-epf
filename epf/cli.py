@@ -107,7 +107,7 @@ COMMANDS = {
 def main():
     """Executa la subcomanda i en torna l'estat de sortida, o 1 si es refusa.
 
-    Si acaba bé, escriu `Acabat`.
+    Si acaba bé, escriu `Finalitzat`.
     """
     # El títol del treball, la `description` de `pyproject.toml`.
     title = importlib.metadata.metadata("epf")["Summary"]
@@ -131,5 +131,5 @@ def main():
         print(f"error: {refusal}", file=sys.stderr)
         return 1
     if not status:
-        print("Acabat", file=sys.stderr)
+        print("Finalitzat", file=sys.stderr)
     return status
