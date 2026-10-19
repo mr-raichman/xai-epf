@@ -1,6 +1,6 @@
-"""La passada de la xarxa de punt de Marcjasz et al. (2023), de la matriu diària als
-seus fitxers: la distribucional amb la sortida canviada, ajustada sobre les mateixes
-files i aturada igual. Es puntua i no s'explica.
+"""La passada de la xarxa de punt de Marcjasz et al. (2023).
+
+Es puntua i no s'explica.
 """
 
 import keras
@@ -16,7 +16,7 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
 # absolut, la pèrdua `'mae'` del seu codi. No és cap distribució, però la xarxa la
-# construeix i l'ajusta igual que les altres dues, i no té quantils.
+# construeix i l'ajusta igual que les altres dues.
 POINT = network.Distribution(
     names=("price",),
     loss=keras.losses.mean_absolute_error,
@@ -25,7 +25,6 @@ POINT = network.Distribution(
     quantiles=None,
 )
 
-# Com es diu la família de la xarxa de punt.
 POINT_FAMILY = "dnn"
 
 # La família, com la planifica una passada: els números de les xarxes que no es cerquen,
@@ -42,7 +41,7 @@ FAMILIES = {
 
 
 def _fitted(X, y, parts, numbers):
-    """La xarxa de punt d'una configuració i el seu preu a les setmanes de prova."""
+    """Ajusta la xarxa d'una configuració i en prediu les setmanes de prova."""
     training, validation, test = (X.index.isin(days) for days in parts)
     fitted = network.fit_rows(
         POINT, (X[training], y[training]), (X[validation], y[validation]), numbers
@@ -55,8 +54,12 @@ def _fitted(X, y, parts, numbers):
 
 
 def train(family, folder, configurations, explained_days):
-    """La passada de la família: cada llavor ajustada, puntuada i desada. Torna les
-    parelles `[llavor, configuració]` que ha desat ara."""
+    """Ajusta, puntua i desa cada configuració del pla que encara no hi és.
+
+    `configurations` és el pla de la família per llavor, i `explained_days` els dies de
+    prova que s'expliquen de cada llavor, tots amb `None`. Torna les parelles `[llavor,
+    configuració]` que ha desat ara.
+    """
     X, y = matrix.matrices(matrix.series()).daily
     done = []
     for seed, planned in configurations.items():
