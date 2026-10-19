@@ -1,6 +1,3 @@
-"""Alineació dels retards per data de lliurament, la lectura del conjunt de dades, i les
-matrius que una passada desa."""
-
 import datetime
 
 import numpy as np
@@ -27,7 +24,7 @@ PRICE_ONLY = {PRICE: PREVIOUS_DAY}
 
 
 def frame_of(days, start=datetime.date(2020, 1, 1)):
-    """Preus sintètics on cada valor és dia * 100 + hora."""
+    """Torna uns preus sintètics on cada valor és dia * 100 + hora."""
     index = pd.DatetimeIndex(
         [start + datetime.timedelta(days=d) for d in days], name="day"
     )
@@ -36,8 +33,7 @@ def frame_of(days, start=datetime.date(2020, 1, 1)):
 
 
 def every_series(days=range(30)):
-    """Cada sèrie del conjunt d'informació: el preu, i cada altra el preu per un nombre
-    diferent."""
+    """Torna cada sèrie del conjunt d'informació, el preu per un nombre diferent."""
     return {
         name: frame_of(days) * (number + 1) for number, name in enumerate(INFORMATION)
     }
@@ -111,8 +107,10 @@ def test_the_per_hour_row_carries_its_day_and_its_own_hour():
 
 
 def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
-    # Es publiquen el dia abans i són del dia que es lliura: desplaçades un dia, cada
-    # fila llegiria la previsió d'ahir, que és plausible i equivocada.
+    """Una previsió D+1 és del dia que es lliura, i es publica el dia abans.
+
+    Desplaçada un dia, cada fila llegiria la d'ahir, plausible i equivocada.
+    """
     series = every_series()
     price, demand = series[PRICE], series["demand_fcst"]
     found = matrices(series)
@@ -131,8 +129,10 @@ def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
 
 
 def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
-    # El programa del dia abans és el que es té a l'hora del tancament: el del mateix
-    # dia és el resultat de la subhasta que es vol descriure, plausible i fora d'abast.
+    """El programa del mateix dia és el resultat de la subhasta que es descriu.
+
+    Plausible i fora d'abast: a l'hora del tancament només es té el del dia abans.
+    """
     series = every_series()
     nuclear = series["nuclear_sched"]
     found = matrices(series)
@@ -150,8 +150,10 @@ def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
 
 @pytest.fixture
 def downloaded(tmp_path, monkeypatch):
-    """Un conjunt de dades escrit com l'escriu `epf dataset`, d'un preu de tres dies que
-    val `0.1 + 0.2` a la primera hora, sobre un fitxer baixat, que es torna."""
+    """Escriu un conjunt de dades com `epf dataset`, i torna el fitxer baixat.
+
+    El conjunt és un preu de tres dies que val `0.1 + 0.2` a la primera hora.
+    """
     monkeypatch.setattr(paths, "DOWNLOADS", tmp_path / "downloads")
     monkeypatch.setattr(paths, "DATA", tmp_path / "data")
     monkeypatch.setattr(paths, "DATASET", tmp_path / "data" / "dataset.csv")
@@ -166,8 +168,7 @@ def downloaded(tmp_path, monkeypatch):
 
 
 def test_the_dataset_reads_back_exactly_what_was_written(downloaded):
-    # El lector de pandas per defecte torna 0.3, que és plausible i no és el que es va
-    # escriure.
+    """Per defecte, pandas hi llegeix 0.3, plausible i no el que es va escriure."""
     assert matrix.series()[PRICE].iloc[0, 0] == 0.1 + 0.2
 
 
@@ -186,8 +187,8 @@ def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
 
 
 def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
-    # Valors amb tots els decimals d'un float, com els del conjunt de dades: una matriu
-    # desada que no tornés exactament el que van llegir els models no ho diria.
+    """Una matriu desada que tornés uns altres decimals no ho diria."""
+    # Valors amb tots els decimals d'un float, com els del conjunt de dades.
     found = matrices({name: frame / 7 for name, frame in every_series().items()})
     matrix.write(found, tmp_path)
     for name, (X, y), target in (
