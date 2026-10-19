@@ -1,26 +1,19 @@
-"""Els números de les dues xarxes distribucionals i de la xarxa de punt.
+"""Els números de les xarxes."""
 
-**Encara no s'han cercat**: mentre no, cada família fa servir el millor conjunt de les
-cerques que Marcjasz et al. (2023) van publicar per al mercat alemany, copiat aquí i
-marcat. Es van triar amb les dades d'un altre mercat, de manera que **cap xifra
-d'aquestes famílies no diu res fins que tinguin la seva pròpia cerca**.
-
-Els que hi són a més són els que ningú no cerca, tots del codi de l'article: el lot, el
-sostre d'èpoques i la paciència.
-"""
-
-# Mida del lot, sostre d'èpoques i paciència de l'aturada: els del codi de l'article.
+# Mida del lot, sostre d'èpoques i paciència de l'aturada: els del codi de Marcjasz et
+# al. (2023).
 BATCH = 32
 EPOCHS = 1500
 PATIENCE = 50
 
-# Els números de cada família mentre no s'ha cercat: de les quatre cerques de 2048
-# intents que l'article va publicar per distribució, i per a la xarxa de punt, la de
-# millor puntuació pròpia, el fitxer `COPIED_FROM` del seu repositori. Els blocs
-# d'entrada que aquella cerca va triar no hi són: la xarxa llegeix totes les columnes.
-# L'L1 dels paràmetres va en l'ordre de `distributions`, i no en el del codi de
-# l'article, que posa el pes de la cua de Johnson SU abans de l'asimetria; la xarxa de
-# punt no en té cap a la sortida, i el seu zero és una L1 que no fa res.
+# Els números de cada família mentre no s'ha cercat: de les quatre cerques de
+# `COPIED_TRIALS` intents que l'article va publicar per al mercat alemany, per a cada
+# distribució i per a la xarxa de punt, la de millor puntuació pròpia, el fitxer
+# `COPIED_FROM` del seu repositori. Sense els blocs d'entrada que aquella cerca va
+# triar: la xarxa llegeix totes les columnes. L'L1 dels paràmetres va en l'ordre de
+# `distributions`, i no en el del codi de l'article, que posa el pes de la cua de
+# Johnson SU abans de l'asimetria; la xarxa de punt no en té cap a la sortida, i el seu
+# zero és una L1 que no fa res.
 COPIED = {
     "ddnn_jsu": {
         "hidden": [243, 895],
@@ -62,7 +55,7 @@ FIXED = {"batch": BATCH, "epochs": EPOCHS, "patience": PATIENCE}
 
 
 def copied(name):
-    """Els números d'una xarxa mentre no s'ha cercat, i d'on es van copiar."""
+    """Torna els números d'una família mentre no s'ha cercat, i d'on es van copiar."""
     return COPIED[name] | {
         "copied_from": COPIED_FROM[name],
         "copied_trials": COPIED_TRIALS,
