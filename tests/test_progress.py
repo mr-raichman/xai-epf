@@ -11,7 +11,7 @@ def test_the_failed_seeds_are_counted_and_the_first_named_in_the_families_order(
 
 
 def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
-    # Una família d'una sola llavor, com amb `--seed 3`, en deia `1 de 1 llavors`.
+    """Una família d'una sola llavor, com amb `--seed 3`, en deia `1 de 1 llavors`."""
     block = progress.Block("Cerca", {"lightgbm": 2, "dnn": 1, "floor": 2}, {"floor": 1})
     block.finish("lightgbm")
     block.finish("dnn")
@@ -31,8 +31,10 @@ def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
 
 
 def test_a_live_line_is_cut_to_one_row_of_the_terminal():
-    # Una línia més ampla que el terminal es partia en dues files, i el cursor, que en
-    # pujava una per línia, deixava a la pantalla la part de dalt del bloc d'abans.
+    """Una línia més ampla que el terminal deixava restes del bloc d'abans.
+
+    Es partia en dues files, i el cursor en pujava una per línia.
+    """
     line = "error: lightgbm llavor 3 ha fallat: " + "x" * 100
     assert progress._cut(line, 80) == line[:76] + "..."
     assert len(progress._cut(line, 80)) == 79
