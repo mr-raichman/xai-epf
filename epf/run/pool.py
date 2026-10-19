@@ -93,9 +93,9 @@ def done(tasks, workers, threads, log, block):
     mòdul, perquè un procés nou la importa pel seu nom. Torna el resultat de cada
     etiqueta i les etiquetes de les que han fallat. Una tasca que falla no atura les
     altres. `block` mostra cada seed acabada o fallada, cada unitat que una tasca diu
-    amb `tell`, i el temps cada segon, i es tanca en acabar. La sortida dels processos
-    s'afegeix a `log`, i el traceback de cada fallada que no és un refús també. Deixa el
-    límit de fils a l'entorn d'aquest procés.
+    amb `tell`, i es tanca en acabar. La sortida dels processos s'afegeix a `log`, i el
+    traceback de cada fallada que no és un refús també. Deixa el límit de fils a
+    l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
     # el límit en carregar NumPy, LightGBM i TensorFlow.
@@ -141,7 +141,6 @@ def done(tasks, workers, threads, log, block):
                 if trace:
                     with open(log, "a", encoding="utf-8") as handle:
                         handle.write(f"{family} seed {seed} ha fallat:\n{trace}")
-            block.tick()
     # Els que un procés va posar a la cua just abans d'acabar la seva última tasca.
     _drain(events, block)
     block.close()

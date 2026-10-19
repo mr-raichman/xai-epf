@@ -27,9 +27,6 @@ class Shown:
     def fail(self, family, seed, message):
         self.failed.append((family, seed, message))
 
-    def tick(self):
-        pass
-
     def close(self):
         self.closed = True
 

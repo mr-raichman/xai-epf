@@ -1,7 +1,6 @@
 """La comanda `epf search`, la cerca de Trebbien et al. (2023)."""
 
 import importlib
-import sys
 
 import optuna
 
@@ -57,11 +56,11 @@ def _search(family, seed, smoke, trials, fingerprints):
 
 
 def main(arguments):
-    """Fa una cerca, la comanda `epf search`, i torna 0, o 1 si alguna seed ha fallat.
+    """Fa una cerca, la comanda `epf search`.
 
     Fa la cerca de cada família triada a cada seed, o a les de `--seed`, unes quantes
-    alhora, i en desa el study i el registre. Tot el que refusa, ho refusa abans de
-    cercar res.
+    alhora, i en desa el study i el registre. Refusa abans de cercar res el que no pot
+    fer, i acaba amb un refús si alguna seed ha fallat.
     """
     values = parameters.chosen(arguments.smoke)
     seeds = values["SEEDS"]
@@ -120,7 +119,4 @@ def main(arguments):
     log = paths.SEARCHES / f"{prefix}{paths.WORKERS_LOG}"
     _, failed = pool.done(tasks, values["WORKERS"], values["THREADS"], log, block)
     if failed:
-        counted = progress.counted(failed, chosen)
-        print(f"error: la cerca no és acabada: {counted}", file=sys.stderr)
-        return 1
-    return 0
+        raise Refusal(f"la cerca no és acabada: {progress.counted(failed, chosen)}")

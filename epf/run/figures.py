@@ -85,7 +85,7 @@ def draw(where):
 
 
 def main(arguments):
-    """Dibuixa de nou les figures d'una passada, la comanda `epf figures`, i torna 0.
+    """Dibuixa de nou les figures d'una passada, la comanda `epf figures`.
 
     La passada és la que es nomeni o, sense nom, l'última acabada del seu tipus, de
     mesura si no és `--smoke`. Refusa un nom que no és cap passada i, sense nom, que no
@@ -112,4 +112,3 @@ def main(arguments):
         where = found[arguments.run]
     print(f"Passada {where.name}\n", file=sys.stderr)
     draw(where)
-    return 0

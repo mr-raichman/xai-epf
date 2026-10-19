@@ -3,9 +3,10 @@ espanyol mitjançant aprenentatge automàtic."""
 
 
 class Refusal(ValueError):
-    """El refús d'una comanda que no pot continuar, amb el motiu al missatge.
+    """El refús d'una comanda que no pot continuar, o que acaba amb tasques fallades.
 
-    El causen les dades, els paràmetres o el que s'ha teclejat. La línia de comandes
-    l'escriu com a `error: <missatge>`; qualsevol altra excepció és un error del codi, i
-    en mostra el traceback.
+    El motiu va al missatge, i el causen les dades, els paràmetres, el que s'ha teclejat
+    o les fallades, que ja s'han mostrat. La línia de comandes l'escriu com a `error:
+    <missatge>`; qualsevol altra excepció és un error del codi, i en mostra el
+    traceback.
     """

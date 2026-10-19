@@ -2,36 +2,15 @@
 
 import os
 import sys
-import time
+
+from epf.terminal import ERASE_BELOW, UP, live
 
 # Les fallades que el bloc mostra; la resta es compten en una línia, perquè el bloc no
 # passi de la pantalla, per sobre de la qual el cursor no pot tornar.
 SHOWN_FAILURES = 5
 
-# Puja el cursor n línies, i esborra del cursor al final de la pantalla.
-UP = "\x1b[{}A"
-ERASE_BELOW = "\x1b[J"
-
 # El final d'una línia tallada.
 MORE = "..."
-
-
-def _live(stream):
-    """Diu si `stream` és un terminal que actua sobre els codis del cursor."""
-    if not stream.isatty():
-        return False
-    if os.name != "nt":
-        return True
-    import ctypes
-
-    kernel32 = ctypes.windll.kernel32
-    # La sortida d'errors, STD_ERROR_HANDLE.
-    handle = kernel32.GetStdHandle(-12)
-    mode = ctypes.c_uint32()
-    if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
-        return False
-    # ENABLE_VIRTUAL_TERMINAL_PROCESSING; zero vol dir que la consola no l'admet.
-    return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
 
 
 def _cut(line, columns):
@@ -46,12 +25,6 @@ def _cut(line, columns):
     if len(first) <= room and not newline:
         return first
     return first[: max(room - len(MORE), 0)] + MORE
-
-
-def elapsed(seconds):
-    """Torna una durada com `h:mm:ss`."""
-    hours, rest = divmod(int(seconds), 3600)
-    return f"{hours}:{rest // 60:02d}:{rest % 60:02d}"
 
 
 def counted(failed, order):
@@ -82,9 +55,8 @@ class Block:
         self.done = {family: list(done[family]) for family in self.totals}
         self.failed = {family: 0 for family in self.totals}
         self.failures = []
-        self.started = time.monotonic()
         self.stream = sys.stderr
-        self.live = _live(self.stream)
+        self.live = live(self.stream)
         self.shown = 0
         if self.live:
             self._draw()
@@ -115,18 +87,10 @@ class Block:
         else:
             self._write(line + "\n")
 
-    def tick(self):
-        """Posa al dia el temps transcorregut."""
-        if self.live:
-            self._draw()
-
     def close(self):
-        """Deixa l'estat final i la línia en blanc que va abans de la de tancament."""
+        """Deixa l'estat final, amb les línies senceres en un terminal."""
         if self.live:
             self._draw(whole=True)
-            self._write("\n")
-        else:
-            self._write(f"\n{self._time()}\n\n")
 
     def _count(self, family, widths=(0, 0, 0)):
         """Torna `3/10 seeds    27/100 trials` d'una família.
@@ -145,9 +109,6 @@ class Block:
         unit_count = f"{done_units:>{unit_width}}/{units:<{unit_width}}"
         return f"{seed_count} {seed_word:<{word_width}}    {unit_count} {unit_word}"
 
-    def _time(self):
-        return f"Temps transcorregut: {elapsed(time.monotonic() - self.started)}"
-
     def _lines(self):
         width = max(len(family) for family in self.totals)
         seeds = [seeds for seeds, _ in self.totals.values()]
@@ -163,16 +124,14 @@ class Block:
             if count:
                 line += f", {count} {'ha' if count == 1 else 'han'} fallat"
             lines.append(line)
-        lines.append("")
         if self.failures:
+            lines.append("")
             lines += self.failures[:SHOWN_FAILURES]
             hidden = len(self.failures) - SHOWN_FAILURES
             if hidden == 1:
                 lines.append("i 1 seed més ha fallat")
             elif hidden > 1:
                 lines.append(f"i {hidden} seeds més han fallat")
-            lines.append("")
-        lines.append(self._time())
         return lines
 
     def _draw(self, whole=False):

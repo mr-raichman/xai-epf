@@ -25,8 +25,8 @@ def test_with_no_name_the_latest_finished_run_of_its_kind_is_drawn(
     monkeypatch.setattr(families, "finished", lambda where: where.name in done)
     drawn = []
     monkeypatch.setattr(figures, "draw", lambda where: drawn.append(where.name))
-    assert figures.main(types.SimpleNamespace(run=None, smoke=False)) == 0
-    assert figures.main(types.SimpleNamespace(run=None, smoke=True)) == 0
+    figures.main(types.SimpleNamespace(run=None, smoke=False))
+    figures.main(types.SimpleNamespace(run=None, smoke=True))
     assert drawn == ["2026-10-15_01", f"{smoke}2026-10-15_03"]
 
 

@@ -10,7 +10,7 @@ def test_the_failed_seeds_are_counted_and_the_first_named_in_the_families_order(
     )
 
 
-def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
+def test_without_a_terminal_each_seed_is_a_line(capsys):
     """Una família d'una sola seed, com amb `--seed 3`, la deia en plural."""
     block = progress.Block(
         "Cerca",
@@ -24,17 +24,13 @@ def test_without_a_terminal_each_seed_is_a_line_and_the_time_comes_last(capsys):
     block.finish("dnn")
     block.fail("floor", 1, "<el missatge>")
     block.close()
-    lines = capsys.readouterr().err.splitlines()
-    assert lines[:6] == [
+    assert capsys.readouterr().err.splitlines() == [
         "Cerca",
         "",
         "lightgbm: 1/2 seeds    10/20 trials",
         "dnn: 1/1 seed    0/10 trials",
         "error: floor seed 1 ha fallat: <el missatge>",
-        "",
     ]
-    assert lines[6].startswith("Temps transcorregut: 0:00:0")
-    assert lines[7:] == [""]
 
 
 def test_a_live_line_is_cut_to_one_row_of_the_terminal():

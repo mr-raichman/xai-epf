@@ -7,6 +7,7 @@ import importlib.metadata
 import sys
 
 import epf
+from epf import terminal
 
 # Una subcomanda: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
 # declara els arguments, `None` si no en pren cap i la funció es crida sense res. El
@@ -105,9 +106,10 @@ COMMANDS = {
 
 
 def main():
-    """Executa la subcomanda i en torna l'estat de sortida, o 1 si es refusa.
+    """Executa la subcomanda i torna 0, o 1 si es refusa.
 
-    Si acaba bé, escriu `Finalitzat`.
+    N'escriu el temps transcorregut mentre es fa i en acabar, i després `Finalitzat` o
+    el refús.
     """
     # El títol del treball, la `description` de `pyproject.toml`.
     title = importlib.metadata.metadata("epf")["Summary"]
@@ -124,12 +126,17 @@ def main():
 
     arguments = parser.parse_args()
     command = COMMANDS[arguments.command]
-    function = getattr(importlib.import_module(command.module), command.function)
     try:
-        status = function() if command.arguments is None else function(arguments)
+        # Abans d'importar el mòdul de la subcomanda, que pot trigar uns segons.
+        with terminal.Clock():
+            module = importlib.import_module(command.module)
+            function = getattr(module, command.function)
+            if command.arguments is None:
+                function()
+            else:
+                function(arguments)
     except epf.Refusal as refusal:
         print(f"error: {refusal}", file=sys.stderr)
         return 1
-    if not status:
-        print("Finalitzat", file=sys.stderr)
-    return status
+    print("Finalitzat", file=sys.stderr)
+    return 0

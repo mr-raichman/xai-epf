@@ -80,7 +80,7 @@ def download():
     """Baixa el que encara falta de cada indicador, la comanda `epf download`.
 
     Escriu a stderr un encapçalament, quants fitxers ha baixat de cada indicador i cada
-    fitxer que ESIOS ha refusat, i torna 1 si n'hi ha cap, i 0 si no.
+    fitxer que ESIOS ha refusat. Si n'hi ha cap, acaba amb un refús que els compta.
     """
     session = esios.session_for()
     print("Baixant les dades d'ESIOS", file=sys.stderr)
@@ -96,18 +96,13 @@ def download():
         files = "fitxer baixat" if written == 1 else "fitxers baixats"
         print(f"{name}: {written} {files}", file=sys.stderr)
         refused += [path for path, _ in failed]
-    print(file=sys.stderr)
-    if not refused:
-        return 0
-    first = paths.relative(refused[0])
-    if len(refused) == 1:
-        print(f"error: no s'ha pogut baixar 1 fitxer, {first}", file=sys.stderr)
-    else:
-        print(
-            f"error: no s'han pogut baixar {len(refused)} fitxers, el primer {first}",
-            file=sys.stderr,
+    if refused:
+        first = paths.relative(refused[0])
+        raise Refusal(
+            f"no s'ha pogut baixar 1 fitxer, {first}"
+            if len(refused) == 1
+            else f"no s'han pogut baixar {len(refused)} fitxers, el primer {first}"
         )
-    return 1
 
 
 def indicators(directory):
@@ -214,7 +209,7 @@ def write(rows, read):
 
 
 def main():
-    """Fa el dataset, la comanda `epf dataset`, i torna 0.
+    """Fa el dataset, la comanda `epf dataset`.
 
     El comprova i l'escriu, i en desa les figures i l'estudi d'outliers de cada sèrie.
     Refusa el que refusen el lector d'ESIOS o les comprovacions.
@@ -226,4 +221,3 @@ def main():
         (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
         figures.draw(name, frame)
         outliers.draw(name, frame, *outliers.report(name, frame))
-    return 0

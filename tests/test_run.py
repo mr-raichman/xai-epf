@@ -89,10 +89,11 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     # La segona família falla la primera vegada, i el seu número de lloc canvia abans de
     # continuar; la primera, ja sencera, no es torna a ajustar.
     fake.failing = {"second"}
-    assert fake.main() == 1
+    with pytest.raises(Refusal, match="no és acabada: 1 seed ha fallat"):
+        fake.main()
     fake.failing = set()
     fake.module.FAMILIES["second"]["placeholder"] = {"value": 2}
-    assert fake.main() == 0
+    fake.main()
     assert [family for family, _ in fake.calls] == ["first", "second", "second"]
     assert fake.calls[-1][1] == {
         0: [{"rank": 0, "numbers": {"value": 1}, "unsearched": True}]
@@ -104,15 +105,16 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
 
 def test_a_finished_run_is_never_continued(fake, capsys):
     """Una passada acabada que es continués en barrejaria dues."""
-    assert fake.main() == 0
-    assert fake.main() == 0
+    fake.main()
+    fake.main()
     shown = capsys.readouterr().err
     assert f"Passada {_name(1)}\n" in shown and f"Passada {_name(2)}\n" in shown
 
 
 def test_a_run_made_by_other_code_is_refused_and_not_continued(fake):
     fake.failing = {"second"}
-    assert fake.main() == 1
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
     fake.failing = set()
     fake.fingerprints["code"] = "un altre codi"
     calls = len(fake.calls)

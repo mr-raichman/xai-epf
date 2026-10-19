@@ -3,7 +3,6 @@
 import datetime
 import importlib
 import json
-import sys
 import time
 
 from epf import Refusal, parameters, paths
@@ -85,14 +84,14 @@ def _train(module, family, folder, seed, planned, explained_days):
 
 
 def main(arguments):
-    """Fa una passada, la comanda `epf run`, i torna 0, o 1 si alguna seed ha fallat.
+    """Fa una passada, la comanda `epf run`.
 
     Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
     hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors
     configuracions de la cerca de cada seed o, sense cerca, uns números que no s'han
     cercat. Ajusta cada seed a la qual falta algun fitxer, unes quantes alhora, i
-    dibuixa les figures si cap no ha fallat. Tot el que refusa, ho refusa abans
-    d'escriure res.
+    dibuixa les figures si cap no ha fallat. Refusa abans d'escriure res el que no pot
+    fer, i acaba amb un refús si alguna seed ha fallat.
     """
     values = parameters.chosen(arguments.smoke)
     chosen = families.named(arguments.family, TRAINERS)
@@ -193,9 +192,5 @@ def main(arguments):
         )
     if failed:
         counted = progress.counted(failed, chosen)
-        print(
-            f"error: la passada {where.name} no és acabada: {counted}", file=sys.stderr
-        )
-        return 1
+        raise Refusal(f"la passada {where.name} no és acabada: {counted}")
     figures.draw(where)
-    return 0
