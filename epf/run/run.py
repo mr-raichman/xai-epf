@@ -1,19 +1,4 @@
-"""El protocol de Trebbien et al. (2023) sobre el període que es descriu, amb la
-partició de `contract/split.py`.
-
-`epf run` fa de cada família triada, a cada llavor a la qual falta algun fitxer, una
-tasca de `run/pool.py`, que en fa unes quantes alhora: el `train.py` del model de la
-família l'ajusta en aquella llavor, la puntua sobre les setmanes de prova i n'explica
-les files de prova si el model s'explica. Si alguna tasca peta, les altres acaben, la
-passada queda a mitges i les figures no es dibuixen. Continua l'última passada del seu
-tipus mentre no és acabada, amb totes les famílies, i si ho és en comença una altra; en
-diu el nom primer. Abans d'ajustar-ne cap, planifica amb `contract/searches.py` les
-famílies triades que encara no hi tenen pla: les millors configuracions de la cerca de
-cada llavor o, mentre la cerca no s'ha fet, uns números que no s'han cercat. El pla
-queda al registre de la família i ja no canvia, i cada ajust, el primer també, el
-llegeix d'allà. Tot es desa per llavor, i les figures es dibuixen del que hi ha al
-disc.
-"""
+"""L'ordre `epf run`, la passada del protocol de Trebbien et al. (2023)."""
 
 import datetime
 import importlib
@@ -53,10 +38,12 @@ TRAINERS = {
 
 
 def _where(smoke, fingerprints):
-    """La passada on s'escriu: l'última del tipus si no és acabada, i si no la següent
-    d'avui. Continuar-ne una que han fet un altre codi, un altre conjunt de dades o unes
-    altres biblioteques es refusa, perquè les seves famílies no es podrien comparar. Un
-    registre sense una de les empremtes d'ara és d'un altre codi."""
+    """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
+
+    Refusa continuar-ne una que van començar un altre codi, un altre conjunt de dades o
+    unes altres biblioteques, perquè les seves famílies no es podrien comparar. Un
+    registre sense una de les empremtes d'ara és d'un altre codi.
+    """
     found = paths.runs(smoke)
     if not found or families.finished(found[-1]):
         return paths.next_run(smoke, datetime.date.today())
@@ -79,9 +66,11 @@ def _where(smoke, fingerprints):
 
 
 def _train(module, family, folder, seed, planned, explained_days):
-    """L'ajust d'una família en una llavor, una tasca de `pool`: el `train.py` del seu
-    model, `module`, amb el pla d'aquesta llavor sola. Torna què ha desat i quant ha
-    trigat."""
+    """Ajusta una família en una llavor, una tasca de `pool`.
+
+    Crida el `train` del mòdul del model, `module`, amb el pla d'aquesta llavor sola,
+    `planned`. Torna què ha desat i quant ha trigat.
+    """
     started = time.time()
     described = importlib.import_module(module).train(
         family, folder, {seed: planned}, explained_days
@@ -95,14 +84,19 @@ def _train(module, family, folder, seed, planned, explained_days):
 
 
 def main(arguments):
+    """Fa una passada, l'ordre `epf run`, i torna 0, o 1 si alguna llavor ha fallat.
+
+    Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
+    hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors
+    configuracions de la cerca de cada llavor o, sense cerca, uns números que no s'han
+    cercat. Ajusta cada llavor a la qual falta algun fitxer, unes quantes alhora, i
+    dibuixa les figures si cap no ha fallat. Tot el que refusa, ho refusa abans
+    d'escriure res.
+    """
     values = parameters.chosen(arguments.smoke)
-    # Tot el que es pot refusar, abans d'escriure res: les famílies, el conjunt de
-    # dades, la partició, la passada, i el pla de cada família que encara no en té, de
-    # manera que una cerca a mitges o feta sobre unes altres files es refusa abans de
-    # gastar-hi res. Una cerca es compara amb les columnes de la matriu que llegeix la
-    # seva.
     chosen = families.named(arguments.family, TRAINERS)
     matrices = matrix.matrices(matrix.series())
+    # La partició i les parts de validació, només per refusar-les abans d'escriure res.
     split(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     fingerprints = record.fingerprints()
@@ -115,6 +109,7 @@ def main(arguments):
             continue
         plan = trainers[family].FAMILIES[family]
         columns = None
+        # La cerca es compara amb les columnes de la matriu del seu `search.py`.
         if plan["kept"]:
             X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
             columns = X.columns
@@ -137,8 +132,7 @@ def main(arguments):
                 "parameters": values,
             },
         )
-    # Una llavor que ja hi té tots els fitxers no s'ajusta, i el registre de la seva
-    # família guarda el que va desar i va trigar cada llavor l'última vegada.
+    # Cada ajust, el primer també, llegeix el pla del registre.
     missing = {family: families.missing(where / family) for family in chosen}
     tasks = [
         (
