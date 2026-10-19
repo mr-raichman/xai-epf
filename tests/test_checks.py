@@ -1,11 +1,3 @@
-"""Les comprovacions del conjunt de dades, les mateixes per a totes les sèries.
-
-Cadascuna és d'un error que produiria un número plausible més endavant en lloc de petar:
-un dia i una hora repetits doblen el seu pes al calibratge, unes files fora d'ordre o un
-dia que falta desplacen els retards cap a un dia que no és el que toca, un dia sense les
-seves 24 hores desalinea les hores, i un valor absent es propaga al model.
-"""
-
 import pandas as pd
 import pytest
 
@@ -16,7 +8,7 @@ NONE = pd.DatetimeIndex([])
 
 
 def table_of(days=DAYS, names=("price",)):
-    """Un conjunt de dades coherent, de `days` dies des del 2024-01-01."""
+    """Torna un conjunt de dades coherent, de `days` dies des del 2024-01-01."""
     index = pd.MultiIndex.from_tuples(
         [
             (day.strftime("%Y-%m-%d"), hour)
@@ -65,14 +57,13 @@ def test_one_absent_value_is_refused_and_its_series_named():
 
 
 def test_only_the_declared_gap_may_be_absent():
-    # Les hores de l'apagada, que ESIOS no publica al programa, s'admeten perquè la
-    # sèrie les declara; una hora absent a qualsevol altre lloc segueix refusada, també
-    # al costat.
+    # Un buit com el de l'apagada, que ESIOS no publica al programa.
     table = table_of()
     gap = pd.date_range("2024-01-03 12:00", "2024-01-04 23:00", freq="h")
     table.loc[("2024-01-03", slice(12, 23)), "price"] = None
     table.loc[("2024-01-04", slice(None)), "price"] = None
     check(table, {"price": gap})
+    # Just al costat del buit, una hora absent segueix refusada.
     table.loc[("2024-01-03", 11), "price"] = None
     with pytest.raises(ValueError, match="2024-01-03 11:00"):
         check(table, {"price": gap})
