@@ -1,11 +1,4 @@
-"""Les famílies: els noms que pren `--family`, cada família pel seu i cada model, una
-carpeta de `models/`, per totes les seves, i si una passada les té totes. On un model i
-una família es diuen igual, el nom és el del model, de manera que `lightgbm` vol dir
-l'arbre i la seva sonda de datació.
-
-Que una passada sigui acabada es llegeix del pla de cada família i dels fitxers que hi
-ha, i no es desa enlloc.
-"""
+"""Les famílies, pels noms que pren `--family`, i quan una passada és acabada."""
 
 import json
 
@@ -28,9 +21,13 @@ EVERY = frozenset(family for model in MODELS.values() for family in model)
 
 
 def named(names, among):
-    """Torna les famílies d'`among` que diu `names`, en l'ordre d'`among`, i totes si
-    `names` és `None`; cap, si cap no hi és. Refusa un nom que no és cap família ni cap
-    model."""
+    """Torna les famílies d'`among` que diu `names`, en l'ordre d'`among`.
+
+    Totes si `names` és `None`, i cap si cap no hi és. Un model diu totes les seves
+    famílies, i on un model i una família es diuen igual, el nom és el del model:
+    `lightgbm` vol dir l'arbre i la seva sonda de datació. Refusa un nom que no és cap
+    família ni cap model.
+    """
     if names is None:
         return list(among)
     unknown = [name for name in names if name not in MODELS and name not in EVERY]
@@ -46,8 +43,10 @@ def named(names, among):
 
 
 def recorded(folder):
-    """Les configuracions de cada llavor que desa el registre d'una família d'una
-    passada, el seu pla, o `None` si encara no en té."""
+    """Torna el pla del registre d'una família, o `None` si encara no en té.
+
+    El pla són les configuracions de cada llavor.
+    """
     path = folder / paths.SEED_RECORD
     if not path.exists():
         return None
@@ -57,8 +56,7 @@ def recorded(folder):
 
 
 def missing(folder):
-    """Les llavors del pla d'una família a les quals falta algun fitxer, cada una amb
-    les seves configuracions."""
+    """Torna les llavors a les quals falta algun fitxer, cada una amb el seu pla."""
     return {
         seed: planned
         for seed, planned in recorded(folder).items()
@@ -70,10 +68,14 @@ def missing(folder):
 
 
 def complete(folder):
-    """Si una família té pla i hi té tots els fitxers que diu."""
+    """Diu si una família té pla i tots els fitxers que el pla diu."""
     return recorded(folder) is not None and not missing(folder)
 
 
 def finished(where):
-    """Si una passada és acabada: si cada família hi té tots els fitxers del seu pla."""
+    """Diu si una passada és acabada, amb tots els fitxers del pla de cada família.
+
+    Les famílies són les de tots els models. Es llegeix dels fitxers cada vegada, i no
+    es desa enlloc.
+    """
     return all(complete(where / family) for family in EVERY)
