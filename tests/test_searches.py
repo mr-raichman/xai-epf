@@ -149,6 +149,28 @@ def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
         )
 
 
+def test_a_search_made_with_another_SEED_is_neither_read_nor_continued(
+    tmp_path, monkeypatch
+):
+    X, y = _table()
+    _saved(tmp_path, monkeypatch, X, y)
+    monkeypatch.setattr("epf.contract.searches.SEED", 1)
+    with pytest.raises(ValueError):
+        searched(True, "fake", 0, X.columns)
+    with pytest.raises(ValueError):
+        run(
+            folder(True, "fake") / "seed_0.db",
+            "fake",
+            _searcher({"value": (3, 1, 2)}, []),
+            X,
+            y,
+            split(0, PERIOD, DELETED),
+            0,
+            3,
+            FINGERPRINTS,
+        )
+
+
 # Una família que es cerca i se n'ajusten les tres millors configuracions de cada seed.
 FAKE = {"fixed": {}, "placeholder": {"value": 0}, "kept": 3, "searched_as": "fake"}
 

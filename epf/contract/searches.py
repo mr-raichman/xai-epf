@@ -3,9 +3,10 @@
 Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
 on era. Quan una seed té tots els seus trials, el seu registre en desa els millors, en
 la forma en què els pren l'ajust, i sobre quines files es van fer: les columnes de la
-matriu i la partició. Una cerca continua sobre un altre codi, un altre dataset o unes
-altres biblioteques, i cada trial en desa les empremtes, però no sobre unes altres
-files; i una passada no llegeix un registre fet sobre unes altres files.
+matriu i la partició, i amb quina `SEED`. Una cerca continua sobre un altre codi, un
+altre dataset o unes altres biblioteques, i cada trial en desa les empremtes, però no
+sobre unes altres files ni amb una altra `SEED`; i una passada no llegeix un registre
+fet així.
 """
 
 import json
@@ -45,6 +46,19 @@ def completed(study):
     return [
         one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE
     ]
+
+
+def _different(made, now):
+    """Torna en què es va fer diferent una cerca, `made`, o `None` si no ho va fer.
+
+    `now` són les files d'ara. Una cerca que no diu la seva `SEED` es va fer amb una
+    altra.
+    """
+    if made.get("made_on") != now:
+        return "sobre altres files"
+    if made.get("SEED") != SEED:
+        return "amb una altra SEED"
+    return None
 
 
 def _seed(*parts):
@@ -120,10 +134,10 @@ def run(
     now = made_on(X.columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
-    elif study.user_attrs.get("made_on") != now:
-        raise Refusal(
-            f"el study es va fer sobre altres files; esborrar {paths.relative(store)}"
-        )
+        study.set_user_attr("SEED", SEED)
+    why = _different(study.user_attrs, now)
+    if why:
+        raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
     study.sampler = _sampler(searcher, family, seed, study)
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
 
@@ -163,6 +177,7 @@ def record(study, family, seed, smoke):
         "seed": seed,
         "trials": len(done),
         "made_on": study.user_attrs["made_on"],
+        "SEED": study.user_attrs["SEED"],
         "best": [
             {
                 "numbers": one.user_attrs["numbers"],
@@ -187,17 +202,19 @@ def save(found, smoke):
 def searched(smoke, family, seed, columns):
     """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
 
-    Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició:
-    els seus números s'haurien triat per unes altres files, i res no ho diria.
+    Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició,
+    o amb una altra `SEED`: els seus números s'haurien triat per unes altres files o amb
+    uns altres trials, i res no ho diria.
     """
     path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
         return None
     found = json.loads(path.read_text(encoding="utf-8"))
-    if found["made_on"] != made_on(columns):
+    why = _different(found, made_on(columns))
+    if why:
         study = path.with_name(STUDY.format(seed=seed))
         raise Refusal(
-            f"la cerca de {family} seed {seed} es va fer sobre altres files; "
+            f"la cerca de {family} seed {seed} es va fer {why}; "
             f"esborrar {paths.relative(path)} i {paths.relative(study)}, cercar amb "
             f'"uv run epf search"'
         )
