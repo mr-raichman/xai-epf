@@ -10,11 +10,12 @@ MATRIX = "daily"
 # Sense graella: l'espai es mostreja a l'atzar.
 GRID = None
 
-# L'espai de `nn.py`, sense els seus selectors de blocs d'entrada: cada xarxa llegeix
-# totes les columnes.
+# L'espai de `nn.py`, sense els seus selectors de blocs d'entrada, perquè cada xarxa
+# llegeix totes les columnes, ni `softmax`, a través de la qual l'explicació de
+# DeepExplainer no torna la predicció.
 LAYERS = 2
 NEURONS = (16, 1024)
-ACTIVATIONS = ("sigmoid", "relu", "elu", "tanh", "softplus", "softmax")
+ACTIVATIONS = ("sigmoid", "relu", "elu", "tanh", "softplus")
 DROPOUT = (0.0, 1.0)
 L1 = (1e-5, 10.0)
 LEARNING_RATE = (1e-5, 0.1)
