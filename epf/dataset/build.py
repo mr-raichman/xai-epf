@@ -1,5 +1,6 @@
-"""El dataset, `data/dataset.csv`, fet dels fitxers d'ESIOS de `downloads/`."""
+"""El dataset, `output/data/dataset.csv`, fet dels fitxers d'ESIOS baixats."""
 
+import datetime
 import hashlib
 import json
 import sys
@@ -11,25 +12,31 @@ from epf import Refusal, paths
 from epf.dataset import esios, figures
 from epf.dataset.check import checks, outliers
 from epf.dataset.esios import Indicator
-from epf.parameters import HOURS_PER_DAY
+from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOURS_PER_DAY
 
 # Les dues columnes que diuen de quin dia local i de quina hora és cada fila.
 DAY, HOUR = "day", "hour"
+
+# El primer i l'últim dia que es baixen i que té el dataset: el període i, abans, la
+# setmana que en llegeix el retard més llarg, el de les prediccions ingènues que copien
+# la setmana anterior.
+SPAN = (DEVELOPMENT[0] - datetime.timedelta(days=DAYS_PER_WEEK), DEVELOPMENT[1])
 
 # Les hores de l'apagada, que ESIOS no publica en cap indicador del programa, l'àncora
 # inclosa. És l'única llacuna que es declara, i no s'omple.
 BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 
-# Cada indicador, pel nom de la seva carpeta a `downloads/`, i com el serveix ESIOS. El
-# preu, el del mercat diari en EUR/MWh, es tria entre les sis geografies que porta el
-# seu fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són de Red
-# Eléctrica, i la solar és només la fotovoltaica. El programa base de funcionament
-# (PBF), en MWh per hora, es demana com la suma de cada hora: des del 2025-10-01 ESIOS
-# el serveix com a energia per quart d'hora, i la mitjana en seria la quarta part.
-# L'eòlica programada, que no val mai zero, és l'àncora de la resta del programa: una
-# hora que l'àncora publica i un altre indicador no, hi val zero, també passat l'últim
-# dia de l'indicador. L'hidràulica és la de les unitats de gestió hidràulica (UGH) i la
-# de fora d'elles, i el bombeig, el seu turbinatge.
+# Cada indicador, pel nom de la seva carpeta a `output/downloads/`, i com el serveix
+# ESIOS. El preu, el del mercat diari en EUR/MWh, es tria entre les sis geografies que
+# porta el seu fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són
+# de Red Eléctrica, i la solar és només la fotovoltaica. El programa base de
+# funcionament (PBF), en MWh per hora, es demana com la suma de cada hora: des del
+# 2025-10-01 ESIOS el serveix com a energia per quart d'hora, i la mitjana en seria la
+# quarta part. L'eòlica programada, que no val mai zero, és l'àncora de la resta del
+# programa: una hora que l'àncora publica i un altre indicador no, hi val zero, també
+# abans del primer dia de l'indicador i passat l'últim. L'hidràulica és la de les
+# unitats de gestió hidràulica (UGH) i la de fora d'elles, i el bombeig, el seu
+# turbinatge.
 INDICATORS = {
     "price": Indicator(600, "average", "España", False, None, ()),
     "demand_fcst": Indicator(1775, "average", "Península", True, None, ()),
@@ -79,15 +86,25 @@ SERIES = {
 def download():
     """Baixa el que encara falta de cada indicador, la comanda `epf download`.
 
-    Escriu a stderr un encapçalament, quants fitxers ha baixat de cada indicador i cada
-    fitxer que ESIOS ha refusat. Si n'hi ha cap, acaba amb un refús que els compta.
+    Si no falta res, ho diu en una línia sense llegir la clau ni demanar res a ESIOS. Si
+    no, escriu a stderr un encapçalament, quants fitxers ha baixat de cada indicador i
+    cada fitxer que ESIOS ha refusat. Si n'hi ha cap, acaba amb un refús que els compta.
     """
+    if not any(esios.missing(paths.DOWNLOADS / name, SPAN) for name in INDICATORS):
+        print(
+            f"Els {len(INDICATORS)} indicadors ja estan baixats de {SPAN[0]} a "
+            f"{SPAN[1]}",
+            file=sys.stderr,
+        )
+        return
     session = esios.session_for()
     print("Baixant les dades d'ESIOS", file=sys.stderr)
     print(file=sys.stderr)
     refused = []
     for name, indicator in INDICATORS.items():
-        written, failed = esios.download(indicator, paths.DOWNLOADS / name, session)
+        written, failed = esios.download(
+            indicator, paths.DOWNLOADS / name, SPAN, session
+        )
         for path, status in failed:
             print(
                 f"error: no s'ha pogut baixar {paths.relative(path)}: HTTP {status}",
@@ -115,7 +132,7 @@ def indicators(directory):
     anchors = {indicator.anchor for indicator in INDICATORS.values()} - {None}
     published, frames, read = {}, {}, []
     for name, indicator in INDICATORS.items():
-        found = esios.files(directory / name)
+        found = esios.files(directory / name, SPAN)
         try:
             values = esios.admissible(esios.values(found), indicator)
             if name in anchors:
@@ -131,12 +148,13 @@ def indicators(directory):
 def series(frames):
     """Torna cada sèrie de `SERIES`, la suma dels seus indicadors, en dies per hores.
 
-    Va del seu primer dia a l'últim sense cap dia que falti: un dia que cap dels seus
-    indicadors va publicar, com el de l'apagada, hi queda buit.
+    Va del seu primer dia dins de `SPAN` a l'últim sense cap dia que falti: un dia que
+    cap dels seus indicadors va publicar, com el de l'apagada, hi queda buit.
     """
     found = {}
     for name, parts in SERIES.items():
         total = sum((frames[part] for part in parts[1:]), frames[parts[0]])
+        total = total.loc[pd.Timestamp(SPAN[0]) : pd.Timestamp(SPAN[1])]
         found[name] = total.reindex(
             pd.date_range(total.index[0], total.index[-1], freq="D", name="day")
         )
@@ -182,10 +200,10 @@ def write(rows, read):
 
     Es comprova el fitxer escrit, llegit com el llegeixen els models, abans que porti el
     seu nom, de manera que un dataset refusat deixa l'anterior com era. El registre
-    porta l'empremta de cada fitxer de `read`, pel seu camí sota `downloads/`, i la del
-    dataset.
+    porta l'empremta de cada fitxer de `read`, pel seu camí sota `output/downloads/`, i
+    la del dataset.
     """
-    paths.DATA.mkdir(exist_ok=True)
+    paths.DATA.mkdir(parents=True, exist_ok=True)
     partial = paths.DATASET.with_suffix(".part")
     rows.to_csv(partial, index=False, lineterminator="\n", encoding="utf-8")
     checks.check(

@@ -1,7 +1,4 @@
 api-keys
 .venv/
 __pycache__/
-/downloads/
-/runs/
-/searches/
-/data/
+/output/

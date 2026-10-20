@@ -117,8 +117,8 @@ def _refuse_stale():
     """Refusa un dataset que no hi és o que no és el dels fitxers d'ara.
 
     Els fitxers que va llegir han de ser com eren, i `dataset.csv` com es va escriure.
-    Una baixada torna a escriure sempre el fitxer de l'any en curs, de manera que una
-    baixada que no s'ha seguit d'`epf dataset` també es refusa.
+    Una baixada torna a escriure el fitxer de cada any que encara no és complet, de
+    manera que una baixada que no s'ha seguit d'`epf dataset` també es refusa.
     """
     again = 'recrear amb "uv run epf dataset"'
     if not (paths.DATASET.is_file() and paths.DATASET_RECORD.is_file()):

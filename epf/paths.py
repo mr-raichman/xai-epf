@@ -11,19 +11,22 @@ KEYS = ROOT / "api-keys"
 # La versió exacta de cada biblioteca, que `uv run` instal·la abans de cada comanda.
 LOCK = ROOT / "uv.lock"
 
+# Tot el que escriuen les comandes, que git deixa fora.
+OUTPUT = ROOT / "output"
+
 # Els fitxers tal com els serveix ESIOS, on només escriu la baixada: una carpeta per
-# indicador, `downloads/<indicador>/<any>.json`.
-DOWNLOADS = ROOT / "downloads"
+# indicador, `output/downloads/<indicador>/<any>.json`.
+DOWNLOADS = OUTPUT / "downloads"
 
 # El dataset, el registre dels fitxers baixats d'on es va fer, i les figures que el
 # descriuen, una carpeta per sèrie.
-DATA = ROOT / "data"
+DATA = OUTPUT / "data"
 DATASET = DATA / "dataset.csv"
 DATASET_RECORD = DATA / "dataset.json"
 DATA_FIGURES = DATA / "figures"
 
-RUNS = ROOT / "runs"
-SEARCHES = ROOT / "searches"
+RUNS = OUTPUT / "runs"
+SEARCHES = OUTPUT / "searches"
 
 # Els fitxers d'una passada: el model ajustat d'una seed i d'una configuració, pel lloc
 # de la configuració a la cerca de la seed, 0 la millor; el registre de la família, al

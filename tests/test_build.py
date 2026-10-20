@@ -23,11 +23,12 @@ def test_each_series_is_the_sum_of_its_indicators():
 def test_every_schedule_indicator_is_asked_for_the_hours_sum(monkeypatch):
     # Un indicador del programa es diu pel seu tipus al darrere, `_sched`.
     asked = {}
+    monkeypatch.setattr(esios, "missing", lambda folder, span: [folder])
     monkeypatch.setattr(esios, "session_for", lambda: None)
     monkeypatch.setattr(
         esios,
         "download",
-        lambda indicator, folder, session: (
+        lambda indicator, folder, span, session: (
             asked.__setitem__(folder.name, indicator.aggregation) or (0, [])
         ),
     )

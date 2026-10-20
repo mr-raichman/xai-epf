@@ -23,11 +23,8 @@ DST_HOUR = 2
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 
-# Primer any que es demana, més enrere del que la font arriba a servir: una resposta
-# buida es desa igual i no es torna a demanar mai més.
-FIRST_YEAR = 2010
-
-# Temps després de tancar un any a partir del qual el seu fitxer es dona per complet.
+# Temps després de l'últim dia que es llegeix d'un any a partir del qual el seu fitxer
+# es dona per complet.
 PUBLICATION_MARGIN = datetime.timedelta(days=2)
 
 # Com serveix ESIOS un indicador: el seu número; com n'agrega el servidor cada hora,
@@ -40,18 +37,24 @@ Indicator = collections.namedtuple(
 )
 
 
-def periods(today):
-    """Dona, de cada any fins al de `today`, el nom del fitxer, el primer dia i l'últim.
+def years(span):
+    """Torna els anys que toca `span`, el primer i l'últim dia que es llegeixen."""
+    return range(span[0].year, span[1].year + 1)
 
-    L'any en curs es demana sencer: el que ESIOS publica per endavant, com les
-    previsions de l'endemà, hi arriba igual.
+
+def periods(span):
+    """Dona, de cada any de `span`, el nom del fitxer, el primer dia i l'últim.
+
+    Dona també l'últim dia que se'n llegeix, el de l'any o el de `span`. Cada any es
+    demana sencer.
     """
-    for year in range(FIRST_YEAR, today.year + 1):
-        yield str(year), datetime.date(year, 1, 1), datetime.date(year, 12, 31)
+    for year in years(span):
+        last = datetime.date(year, 12, 31)
+        yield str(year), datetime.date(year, 1, 1), last, min(last, span[1])
 
 
 def _is_complete(path, last):
-    """Diu si `path` es va baixar prou després de l'últim dia del seu any, `last`."""
+    """Diu si `path` es va baixar prou després de l'últim dia que es llegeix, `last`."""
     if not path.exists():
         return False
     closed = (
@@ -100,20 +103,32 @@ def session_for(key=None):
     return session
 
 
-def download(indicator, folder, session=None):
-    """Baixa a `folder` cada any d'un indicador que encara no hi té un fitxer complet.
+def missing(folder, span):
+    """Torna cada any de `span` que `folder` no té complet, sense demanar res a ESIOS.
 
-    Desa la resposta tal com arriba, amb l'agregació de les hores que l'indicador
-    demana. Torna quants fitxers ha escrit i, de cada any que ESIOS ha refusat, el camí
-    i l'estat HTTP.
+    De cada un, el nom del fitxer, el primer dia i l'últim. `span` és el primer i
+    l'últim dia que es llegeixen.
+    """
+    return [
+        (name, first, last)
+        for name, first, last, read in periods(span)
+        if not _is_complete(pathlib.Path(folder) / f"{name}.json", read)
+    ]
+
+
+def download(indicator, folder, span, session=None):
+    """Baixa a `folder` cada any d'un indicador que no hi té un fitxer complet.
+
+    Els anys són els de `span`, el primer i l'últim dia que es llegeixen. Desa la
+    resposta tal com arriba, amb l'agregació de les hores que l'indicador demana. Torna
+    quants fitxers ha escrit i, de cada any que ESIOS ha refusat, el camí i l'estat
+    HTTP.
     """
     session = session or session_for()
     folder = pathlib.Path(folder)
     written, refused = 0, []
-    for name, first, last in periods(datetime.date.today()):
+    for name, first, last in missing(folder, span):
         path = folder / f"{name}.json"
-        if _is_complete(path, last):
-            continue
         # ESIOS interpreta les dates en hora local.
         response = session.get(
             URL + str(indicator.id),
@@ -134,13 +149,17 @@ def download(indicator, folder, session=None):
     return written, refused
 
 
-def files(folder):
-    """Torna els fitxers baixats d'un indicador, un per any, en ordre.
+def files(folder, span):
+    """Torna els fitxers baixats d'un indicador, un per any de `span`, en ordre.
 
     Només els `<any>.json`, i no el `.part` que hi hagi deixat una baixada interrompuda.
     Refusa una carpeta que no en té cap.
     """
-    paths = sorted(pathlib.Path(folder).glob("????.json"))
+    paths = [
+        path
+        for path in sorted(pathlib.Path(folder).glob("????.json"))
+        if int(path.stem) in years(span)
+    ]
     if not paths:
         raise Refusal(
             f'no hi ha cap any baixat a {relative(folder)}/; baixar amb "uv run epf '
@@ -218,8 +237,8 @@ def hourly(values, anchor=None):
     """Torna uns valors d'ESIOS com a dies per hores.
 
     `anchor` són els instants que va publicar l'àncora de l'indicador: una hora absent
-    que l'àncora va publicar hi val zero, del primer dia publicat de l'indicador a
-    l'últim de l'àncora, també passat l'últim de l'indicador. Refusa un valor fora de
+    que l'àncora va publicar hi val zero, també abans del primer dia publicat de
+    l'indicador i passat l'últim. Sense cap valor, torna buit. Refusa un valor fora de
     l'hora en punt, que la graella deixaria fora sense dir-ho, com tres de cada quatre
     d'un indicador servit per quarts d'hora; i dos valors al mateix instant, que d'una
     sola geografia són una hora repetida i sumats la doblarien.
@@ -252,9 +271,8 @@ def hourly(values, anchor=None):
     published = set(series.index.tz_convert(MARKET_TIMEZONE).date)
     first, last = min(published), max(published)
     if anchor:
-        last = max(
-            last, max(pd.DatetimeIndex(list(anchor)).tz_convert(MARKET_TIMEZONE).date)
-        )
+        anchored = pd.DatetimeIndex(list(anchor)).tz_convert(MARKET_TIMEZONE).date
+        first, last = min(first, min(anchored)), max(last, max(anchored))
 
     start = pd.Timestamp(first).tz_localize(MARKET_TIMEZONE)
     end = pd.Timestamp(last).tz_localize(MARKET_TIMEZONE) + pd.DateOffset(days=1)

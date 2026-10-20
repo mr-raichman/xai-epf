@@ -132,11 +132,14 @@ def test_an_absent_hour_is_zero_only_where_the_anchor_published_it():
     assert pd.isna(hourly(NUCLEAR).iloc[0]["h05"])
 
 
-def test_past_its_last_day_a_series_is_zero_where_the_anchor_published_and_not_before():
-    """El carbó del programa va deixar de publicar-se mentre l'àncora seguia."""
+def test_before_and_past_its_days_a_series_is_zero_where_the_anchor_published():
+    """El carbó del programa va deixar de publicar-se mentre l'àncora seguia, i el gas
+    amb turbina de vapor no hi té cap valor del 2016-02-11 al 2025-10-15.
+    """
     anchor = hours_of("2024-03-08", "2024-03-09", "2024-03-10")
     frame = hourly(NUCLEAR, anchor)
-    assert list(frame.index) == [pd.Timestamp("2024-03-09"), pd.Timestamp("2024-03-10")]
+    assert list(frame.index) == list(pd.date_range("2024-03-08", periods=3, name="day"))
+    assert (frame.loc["2024-03-08"] == 0.0).all()
     assert (frame.loc["2024-03-10"] == 0.0).all()
 
 
