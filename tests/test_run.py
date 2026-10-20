@@ -77,7 +77,7 @@ def fake(tmp_path, monkeypatch):
         parameters, "chosen", lambda smoke: real(smoke) | {"SEEDS": (0,)}
     )
     state.module = module
-    state.main = lambda: run.main(types.SimpleNamespace(smoke=True, family=None))
+    state.main = lambda: run.main(types.SimpleNamespace(smoke="SMOKE", family=None))
     return state
 
 
@@ -122,4 +122,16 @@ def test_a_run_made_by_other_code_is_refused_and_not_continued(fake):
     calls = len(fake.calls)
     with pytest.raises(Refusal, match=f"la passada {_name(1)} .* un altre codi;"):
         fake.main()
+    assert len(fake.calls) == calls
+
+
+def test_a_smoke_run_is_never_continued_under_another_variant(fake):
+    """Triar la variant editant `parameters.py` canviava el codi, que ho refusava."""
+    fake.failing = {"second"}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = set()
+    calls = len(fake.calls)
+    with pytest.raises(Refusal, match='començar amb "--smoke"; continuar amb "uv run'):
+        run.main(types.SimpleNamespace(smoke="SMOKE_1", family=None))
     assert len(fake.calls) == calls

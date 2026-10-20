@@ -88,19 +88,31 @@ THREADS = 4
 
 ### Assaig ###
 
-# El que `--smoke` posa en lloc dels valors de la mesura, i res més, en dues variants:
-# `SMOKE`, i `SMOKE_1`, que no fixa els dies explicats i n'explica tots els de prova. La
-# que fa servir un assaig la tria `chosen`, i es canvia editant-la.
+# El que un assaig posa en lloc dels valors de la mesura, i res més, en variants: cada
+# diccionari que es diu `SMOKE`, o `SMOKE_` i un número, el tria l'opció del seu nom,
+# `--smoke` o `--smoke1`.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(2)), "TRIALS": 1, "BEST": 1}
 SMOKE_2 = {"SEEDS": tuple(range(5)), "TRIALS": 10, "BEST": 1}
 
 
+def variants():
+    """Torna cada variant d'assaig per l'opció que la tria: `--smoke1`, `SMOKE_1`."""
+    return {
+        f"--{name.lower().replace('_', '')}": name
+        for name in globals()
+        if name == "SMOKE" or name.startswith("SMOKE_")
+    }
+
+
 def chosen(smoke):
-    """Torna cada valor d'aquest fitxer pel seu nom, els d'assaig si `smoke`."""
+    """Torna cada valor d'aquest fitxer pel seu nom, els de la variant d'assaig `smoke`.
+
+    `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura.
+    """
     found = {
         name: value
         for name, value in globals().items()
         if name.isupper() and not name.startswith("SMOKE")
     }
-    return (found | SMOKE) if smoke else found
+    return (found | globals()[smoke]) if smoke else found

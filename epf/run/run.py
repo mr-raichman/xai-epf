@@ -40,19 +40,21 @@ def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
 
     Refusa continuar-ne una que van començar un altre codi, un altre dataset o unes
-    altres biblioteques, perquè les seves famílies no es podrien comparar. Un registre
-    sense una de les empremtes d'ara és d'un altre codi.
+    altres biblioteques, perquè les seves famílies no es podrien comparar, i una
+    d'assaig començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria
+    els valors de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
     """
     found = paths.runs(smoke)
     if not found or families.finished(found[-1]):
         return paths.next_run(smoke, datetime.date.today())
     latest = found[-1]
-    differ = set()
+    differ, begun = set(), set()
     for path in sorted(latest.glob(f"*/{paths.SEED_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
         differ |= {
             name for name, value in fingerprints.items() if made.get(name) != value
         }
+        begun.add(made.get("smoke"))
     if differ:
         then = [DIFFERENT[name] for name in DIFFERENT if name in differ]
         raise Refusal(
@@ -60,6 +62,14 @@ def _where(smoke, fingerprints):
             f"{' i '.join(other for other, _ in then)}; continuar amb "
             f"{' i '.join(that for _, that in then)}, o esborrar "
             f"{paths.relative(latest)}/"
+        )
+    variants = sorted(map(str, begun - {smoke}))
+    if variants:
+        flags = {name: flag for flag, name in parameters.variants().items()}
+        flag = flags.get(variants[0], variants[0])
+        raise Refusal(
+            f'la passada {latest.name} es va començar amb "{flag}"; continuar amb '
+            f'"uv run epf run {flag}", o esborrar {paths.relative(latest)}/'
         )
     return latest
 

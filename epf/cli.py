@@ -4,12 +4,15 @@ import argparse
 import collections
 import importlib
 import importlib.metadata
+import os
+import shlex
 import signal
+import subprocess
 import sys
 import time
 
 import epf
-from epf import terminal
+from epf import parameters, terminal
 
 # Una subcomanda: quina funció de quin mòdul l'executa, què en diu `epf --help` i qui li
 # declara els arguments, `None` si no en pren cap i la funció es crida sense res. El
@@ -21,17 +24,30 @@ Command = collections.namedtuple("Command", "module function help arguments")
 SEQUENCE = ("download", "dataset", "search", "run")
 PAUSE = 5
 
+# La variable d'entorn que nomena un programa, amb els seus arguments, que `epf start`
+# executa amb el nom de cada subcomanda que acaba, llevat de l'última, amb la qual acaba
+# la comanda. Sense, no s'executa res.
+NOTIFY = "EPF_NOTIFY"
+
 
 # Els arguments es declaren aquí, i no al mòdul de cada subcomanda: `argparse`
 # construeix totes les subcomandes abans de llegir-ne cap, i els importaria tots.
 def start_arguments(parser):
-    """Declara a `parser` l'argument `--smoke` d'una passada, i el torna."""
-    parser.add_argument(
-        "--smoke",
-        action="store_true",
-        help="un assaig: els valors d'assaig de parameters.py en lloc dels de la "
-        "mesura",
-    )
+    """Declara a `parser` una opció per variant d'assaig, i el torna.
+
+    Totes desen a `smoke` el nom de la seva variant, i se'n pot donar una o cap.
+    """
+    smoke = parser.add_mutually_exclusive_group()
+    for flag, name in parameters.variants().items():
+        smoke.add_argument(
+            flag,
+            dest="smoke",
+            action="store_const",
+            const=name,
+            default=False,
+            help=f"un assaig: els valors de {name} de parameters.py en lloc dels de la "
+            "mesura",
+        )
     return parser
 
 
@@ -127,9 +143,11 @@ def start(arguments):
     """Fa cada subcomanda de `SEQUENCE`, la comanda `epf start`.
 
     Les fa en ordre, amb `PAUSE` segons entre l'una i l'altra, i s'atura a la primera
-    que es refusa. Cada una rep els seus arguments per defecte, amb `--smoke` si se li
-    ha donat a `epf start` i ella el pren.
+    que es refusa. Cada una rep els seus arguments per defecte, amb l'opció d'assaig
+    donada a `epf start` si ella en pren. Si l'entorn té `NOTIFY`, n'executa el programa
+    en acabar cada una menys l'última, i un programa que no es pot executar es diu.
     """
+    flags = {variant: flag for flag, variant in parameters.variants().items()}
     for position, name in enumerate(SEQUENCE):
         if position:
             time.sleep(PAUSE)
@@ -138,8 +156,22 @@ def start(arguments):
         if command.arguments is None:
             function()
         else:
-            given = ["--smoke"] if arguments.smoke else []
+            given = [flags[arguments.smoke]] if arguments.smoke else []
             function(command.arguments(argparse.ArgumentParser()).parse_args(given))
+        if position < len(SEQUENCE) - 1 and NOTIFY in os.environ:
+            # Res del programa no arriba al terminal, on trencaria el rellotge.
+            try:
+                subprocess.run(
+                    [*shlex.split(os.environ[NOTIFY]), name],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except OSError as error:
+                print(
+                    f"error: no s'ha pogut avisar del final de {name}: {error}",
+                    file=sys.stderr,
+                )
 
 
 def _stopped(signum, frame):
