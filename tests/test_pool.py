@@ -58,7 +58,9 @@ def test_a_refusal_in_a_task_is_its_message_alone(tmp_path):
     block, log = Shown(), tmp_path / "workers.log"
     pool.done([(("x", 0, 0), families.named, (["cap"], {}))], 1, 1, log, block)
     assert block.failed[0][2].startswith('"cap" no és cap família')
-    assert "ha fallat" not in log.read_text(encoding="utf-8")
+    written = log.read_text(encoding="utf-8")
+    assert 'x seed 0 fit 0 ha fallat: "cap" no és cap família' in written
+    assert "Traceback" not in written
 
 
 def test_what_a_worker_writes_goes_to_the_file_and_not_to_the_terminal(tmp_path, capfd):

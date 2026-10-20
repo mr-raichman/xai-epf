@@ -101,9 +101,9 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
     `on_return` o de `on_failure`. Cada tasca es compta a `block` quan comença; cada una
     tornada crida `on_return(etiqueta, resultat)` i s'hi compta, i cada una fallada
     crida `on_failure(etiqueta)` i hi compta la seed com a fallada; el bloc es tanca en
-    acabar. La sortida dels
-    processos s'afegeix a `log`, i el traceback de cada fallada que no és un refús
-    també. Deixa el límit de fils a l'entorn d'aquest procés.
+    acabar. La sortida dels processos s'afegeix a `log`, i cada fallada també, un refús
+    pel seu missatge i qualsevol altra pel seu traceback. Deixa el límit de fils a
+    l'entorn d'aquest procés.
     """
     # Abans d'engegar cap procés: cada un, amb `spawn`, és un intèrpret nou que llegeix
     # el límit en carregar NumPy, LightGBM i TensorFlow.
@@ -145,12 +145,13 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
                         block.advance(family, seed)
                         _fed(pool, running, tasks, block)
                         continue
-                    if trace:
-                        with open(log, "a", encoding="utf-8") as handle:
-                            handle.write(
-                                f"{family} seed {seed} {block.unit} {unit} ha fallat:\n"
-                                f"{trace}"
-                            )
+                    # Un refús, pel seu missatge, que el bloc talla a l'amplada del
+                    # terminal; qualsevol altra fallada, pel seu traceback.
+                    with open(log, "a", encoding="utf-8") as handle:
+                        handle.write(
+                            f"{family} seed {seed} {block.unit} {unit} ha fallat:"
+                            + (f" {message}\n" if trace is None else f"\n{trace}")
+                        )
                     if on_failure is not None:
                         on_failure(label)
                     block.fail(family, seed, message)
