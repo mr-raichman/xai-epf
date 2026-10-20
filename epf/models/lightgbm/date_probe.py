@@ -65,7 +65,9 @@ def train(family, folder, configurations, explained_days):
                 explained,
                 seed,
                 configuration["numbers"],
-                best=rank == 0,
+                # Sense interaccions: la lectura de la sonda és la part del comptador i
+                # el seu error.
+                best=False,
             )
             check(found, rank)
             scores = scored(found.predicted, found.actual)
