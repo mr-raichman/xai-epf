@@ -126,6 +126,10 @@ def main(arguments):
         )
     where.mkdir(parents=True, exist_ok=True)
     matrix.write(matrices, where)
+    # Els trials són els de la cerca, que porta cada configuració, i el calendari no
+    # canvia mai.
+    left_out = {"TRIALS", "DAYS_PER_WEEK", "HOURS_PER_DAY", "HOUR_COLUMNS"}
+    written = {name: value for name, value in values.items() if name not in left_out}
     for family, planned in plans.items():
         record.write_record(
             where / family / paths.SEED_RECORD,
@@ -139,10 +143,7 @@ def main(arguments):
                 "configurations": planned,
                 "described_now": None,
                 "seconds_now": None,
-                # Els trials són els de la cerca, que porta cada configuració.
-                "parameters": {
-                    name: value for name, value in values.items() if name != "TRIALS"
-                },
+                "parameters": written,
             },
         )
     # Cada ajust, el primer també, llegeix el pla del registre.
