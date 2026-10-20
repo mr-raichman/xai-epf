@@ -6,6 +6,7 @@ import importlib
 import importlib.metadata
 import signal
 import sys
+import time
 
 import epf
 from epf import terminal
@@ -16,17 +17,27 @@ from epf import terminal
 # un segon llarg, i el pagaria fins i tot `epf --help`.
 Command = collections.namedtuple("Command", "module function help arguments")
 
+# Les subcomandes que fa `epf start`, en ordre, i els segons entre l'una i l'altra.
+SEQUENCE = ("download", "dataset", "search", "run")
+PAUSE = 5
+
 
 # Els arguments es declaren aquí, i no al mòdul de cada subcomanda: `argparse`
 # construeix totes les subcomandes abans de llegir-ne cap, i els importaria tots.
-def run_arguments(parser):
-    """Declara a `parser` els arguments d'una passada, i el torna."""
+def start_arguments(parser):
+    """Declara a `parser` l'argument `--smoke` d'una passada, i el torna."""
     parser.add_argument(
         "--smoke",
         action="store_true",
         help="un assaig: els valors d'assaig de parameters.py en lloc dels de la "
         "mesura",
     )
+    return parser
+
+
+def run_arguments(parser):
+    """Declara a `parser` els arguments d'una passada, i el torna."""
+    start_arguments(parser)
     parser.add_argument(
         "--family",
         nargs="+",
@@ -103,7 +114,32 @@ COMMANDS = {
         "torna a dibuixar les figures",
         figures_arguments,
     ),
+    "start": Command(
+        "epf.cli",
+        "start",
+        "executa tot el mecanisme de manera seqüencial",
+        start_arguments,
+    ),
 }
+
+
+def start(arguments):
+    """Fa cada subcomanda de `SEQUENCE`, la comanda `epf start`.
+
+    Les fa en ordre, amb `PAUSE` segons entre l'una i l'altra, i s'atura a la primera
+    que es refusa. Cada una rep els seus arguments per defecte, amb `--smoke` si se li
+    ha donat a `epf start` i ella el pren.
+    """
+    for position, name in enumerate(SEQUENCE):
+        if position:
+            time.sleep(PAUSE)
+        command = COMMANDS[name]
+        function = getattr(importlib.import_module(command.module), command.function)
+        if command.arguments is None:
+            function()
+        else:
+            given = ["--smoke"] if arguments.smoke else []
+            function(command.arguments(argparse.ArgumentParser()).parse_args(given))
 
 
 def _stopped(signum, frame):
