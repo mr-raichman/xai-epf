@@ -45,7 +45,8 @@ def _fitted(distribution, X, y, parts, explained, numbers):
         distribution, fitted, X[shown], background=X[training]
     )
     # La base més les contribucions torna cada paràmetre, i la base és la mitjana de
-    # cada paràmetre sobre tots els dies d'entrenament.
+    # cada paràmetre sobre tots els dies d'entrenament. La mitjana, en `float64`: en
+    # `float32`, la dels paràmetres d'un miler de dies se'n va més que el marge.
     gap = max(
         np.abs(
             explanation.base
@@ -54,7 +55,9 @@ def _fitted(distribution, X, y, parts, explained, numbers):
         ).max(),
         np.abs(
             explanation.base
-            - network.parameters_rows(distribution, fitted, X[training]).mean(axis=0)
+            - network.parameters_rows(distribution, fitted, X[training]).mean(
+                axis=0, dtype=np.float64
+            )
         ).max(),
     )
     found = network.parameters_rows(distribution, fitted, X[test])
