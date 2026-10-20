@@ -1,5 +1,6 @@
 """Els camins de cada fitxer i carpeta del projecte."""
 
+import hashlib
 import pathlib
 
 # L'arrel del repositori, de la qual surt cada camí: la carpeta que conté el paquet,
@@ -73,12 +74,22 @@ def relative(path):
     return pathlib.Path(path).relative_to(ROOT, walk_up=True).as_posix()
 
 
+def digest(path):
+    """Torna la SHA-256 d'un fitxer, en hexadecimal."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def partial(path):
+    """Torna on s'escriu un fitxer abans de portar el seu nom, `<nom>.part`."""
+    return path.with_name(path.name + ".part")
+
+
 def write_whole(path, text):
     """Escriu un text en UTF-8 sense deixar mai el fitxer a mitges.
 
     Un procés que s'atura mentre escriu deixa el fitxer com era, i `<nom>.part` al
     costat.
     """
-    partial = path.with_name(path.name + ".part")
-    partial.write_text(text, encoding="utf-8")
-    partial.replace(path)
+    unfinished = partial(path)
+    unfinished.write_text(text, encoding="utf-8")
+    unfinished.replace(path)

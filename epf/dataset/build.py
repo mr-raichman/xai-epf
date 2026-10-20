@@ -1,7 +1,6 @@
 """El dataset, `output/data/dataset.csv`, fet dels fitxers d'ESIOS baixats."""
 
 import datetime
-import hashlib
 import json
 import sys
 
@@ -190,11 +189,6 @@ def table(found):
     return rows
 
 
-def _digest(path):
-    """Torna la SHA-256 d'un fitxer, en hexadecimal."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def write(rows, read):
     """Escriu el dataset i el seu registre, si passa les comprovacions.
 
@@ -204,7 +198,7 @@ def write(rows, read):
     la del dataset.
     """
     paths.DATA.mkdir(parents=True, exist_ok=True)
-    partial = paths.DATASET.with_suffix(".part")
+    partial = paths.partial(paths.DATASET)
     rows.to_csv(partial, index=False, lineterminator="\n", encoding="utf-8")
     checks.check(
         pd.read_csv(
@@ -218,10 +212,10 @@ def write(rows, read):
     partial.replace(paths.DATASET)
     record = {
         "files": {
-            path.relative_to(paths.DOWNLOADS).as_posix(): _digest(path)
+            path.relative_to(paths.DOWNLOADS).as_posix(): paths.digest(path)
             for path in sorted(read)
         },
-        "dataset": _digest(paths.DATASET),
+        "dataset": paths.digest(paths.DATASET),
     }
     paths.write_whole(paths.DATASET_RECORD, json.dumps(record, indent=2))
 

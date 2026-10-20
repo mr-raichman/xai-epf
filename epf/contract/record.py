@@ -116,7 +116,7 @@ def save_model(path, parts, explained, fitted, scores, rank):
             else value
         )
     path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_suffix(".part")
+    partial = paths.partial(path)
     with open(partial, "wb") as handle:
         np.savez(handle, **arrays)
     if fitted.stored is not None:

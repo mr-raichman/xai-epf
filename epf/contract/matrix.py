@@ -6,7 +6,6 @@ encara que es publiqui més tard.
 """
 
 import collections
-import hashlib
 import json
 
 import numpy as np
@@ -108,11 +107,6 @@ def per_hour(X, y, at_the_hour=()):
     return rows, pd.Series(y.to_numpy().reshape(-1), index=rows.index, name=PRICE)
 
 
-def _digest(path):
-    """Torna la SHA-256 d'un fitxer, en hexadecimal."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def _refuse_stale():
     """Refusa un dataset que no hi és o que no és el dels fitxers d'ara.
 
@@ -131,7 +125,7 @@ def _refuse_stale():
         name
         for name, digest in record["files"].items()
         if not (paths.DOWNLOADS / name).is_file()
-        or _digest(paths.DOWNLOADS / name) != digest
+        or paths.digest(paths.DOWNLOADS / name) != digest
     ]
     if changed:
         first = paths.relative(paths.DOWNLOADS / changed[0])
@@ -142,7 +136,7 @@ def _refuse_stale():
             f"hi són, el primer {first}"
         )
         raise Refusal(f"el dataset és desfasat: {counted}; {again}")
-    if _digest(paths.DATASET) != record["dataset"]:
+    if paths.digest(paths.DATASET) != record["dataset"]:
         raise Refusal(
             f"{paths.relative(paths.DATASET)} ha canviat des que es va fer; {again}"
         )
