@@ -119,9 +119,9 @@ def _fitted(family, price, y, parts):
 def train(family, folder, configurations, explained_days):
     """Copia, puntua i desa cada configuració del pla que encara no hi és.
 
-    `configurations` és el pla de la família per seed, i `explained_days` els dies de
-    prova que s'expliquen de cada seed, tots amb `None`. Torna les parelles `[seed,
-    configuració]` que ha desat ara.
+    `configurations` és el pla de la família per seed, i `explained_days` no hi fa res,
+    perquè la família no explica res. Torna les parelles `[seed, configuració]` que ha
+    desat ara.
     """
     series = matrix.series()
     # El preu es copia de la sèrie, i no de la matriu, on la setmana anterior no és cap
@@ -130,9 +130,6 @@ def train(family, folder, configurations, explained_days):
     done = []
     for seed, planned in configurations.items():
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
-        explained = (
-            parts.test if explained_days is None else parts.test[:explained_days]
-        )
         for configuration in planned:
             rank = configuration["rank"]
             path = folder / paths.SEED.format(seed=seed, rank=rank)
@@ -140,6 +137,6 @@ def train(family, folder, configurations, explained_days):
                 continue
             fitted = _fitted(family, price, y, parts)
             scores = scored(fitted.predicted, fitted.actual) | (fitted.scores or {})
-            save_model(path, parts, explained, fitted, scores, rank)
+            save_model(path, parts, None, fitted, scores, rank)
             done.append([seed, rank])
     return done

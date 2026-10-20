@@ -93,14 +93,17 @@ def save_model(path, parts, explained, fitted, scores, rank):
 
     Un fitxer amb nom és sempre un model ajustat sencer i, d'una família explicada, un
     que torna el que explica: les sumes de l'explicació es tornen a fer sobre el que
-    s'ha escrit, i un que no les passa es refusa. Les taules de més d'una dimensió es
-    desen en `float32`. `rank` és el lloc de la configuració.
+    s'ha escrit, i un que no les passa es refusa. `explained` són els dies explicats, i
+    `None` en una família que no explica res, que no en desa cap. Les taules de més
+    d'una dimensió es desen en `float32`. `rank` és el lloc de la configuració.
     """
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
+    if explained is not None:
+        arrays["days_explained"] = _days(explained)
     arrays |= {
         "rank": rank,
-        "days_explained": _days(explained),
-        "predicted": fitted.predicted,
+        # Les xarxes la donen en `float32`: un sol tipus a totes les famílies.
+        "predicted": np.asarray(fitted.predicted, dtype=np.float64),
         "actual": fitted.actual,
         "gap": fitted.gap,
         **scores,
