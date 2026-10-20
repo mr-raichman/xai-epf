@@ -21,9 +21,9 @@ UNITLESS = "sense unitats"
 # diferència que vulgui dir res en un preu.
 TOLERANCE = 1e-3
 
-# Marge de l'additivitat a l'espai transformat, en les seves unitats: en EUR/MWh val
-# tant com el de dalt, perquè a prop d'1 la derivada de `sinh` és d'1.5 i la MAD de les
-# files d'ajust va en desenes d'euros.
+# Marge de l'additivitat a l'espai transformat, en les seves unitats. En EUR/MWh val
+# aquest marge per l'escala del preu de l'hora, desenes d'euros, i per la derivada de
+# `sinh`, d'1 a 1.5 a prop de zero: de cinc a onze vegades el de dalt.
 TRANSFORMED_TOLERANCE = 1e-4
 
 # El que es pot moure un nombre, en relatiu, en desar-lo a `float32`, que és com es

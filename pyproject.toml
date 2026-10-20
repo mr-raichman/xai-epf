@@ -25,7 +25,7 @@ dependencies = [
     "scipy==1.18.1",
 ]
 
-# Tot el que es tecleja a mà, en una sola ordre: `epf --help` és la llista.
+# Tot el que es tecleja a mà, en una sola comanda: `epf --help` és la llista.
 [project.scripts]
 epf = "epf.cli:main"
 
