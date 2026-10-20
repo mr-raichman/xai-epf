@@ -12,7 +12,7 @@ KEYS = ROOT / "api-keys"
 # La versió exacta de cada biblioteca, que `uv run` instal·la abans de cada comanda.
 LOCK = ROOT / "uv.lock"
 
-# Tot el que escriuen les comandes, que git deixa fora.
+# Tot el que escriuen les comandes.
 OUTPUT = ROOT / "output"
 
 # Els fitxers tal com els serveix ESIOS, on només escriu la baixada: una carpeta per
