@@ -6,6 +6,8 @@ tots al registre de cada família.
 
 import datetime
 
+from epf import Refusal
+
 
 ### Calendari ###
 
@@ -108,11 +110,29 @@ def variants():
 def chosen(smoke):
     """Torna cada valor d'aquest fitxer pel seu nom, els de la variant d'assaig `smoke`.
 
-    `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura.
+    `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura. Refusa una
+    variant que canvia un valor que cap comanda no llegeix d'aquí: no canviaria res, i
+    el registre de la passada el diria canviat.
     """
     found = {
         name: value
         for name, value in globals().items()
         if name.isupper() and not name.startswith("SMOKE")
     }
-    return (found | globals()[smoke]) if smoke else found
+    if not smoke:
+        return found
+    # Els que les comandes llegeixen del que torna aquesta funció; la resta s'importen
+    # on es fan servir.
+    read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS", "WORKERS", "THREADS")
+    unread = [name for name in globals()[smoke] if name not in read]
+    if unread:
+        changed = (
+            f"{unread[0]}, que cap comanda no llegeix d'una variant"
+            if len(unread) == 1
+            else f"{len(unread)} valors que cap comanda no llegeix d'una variant, el "
+            f"primer {unread[0]}"
+        )
+        raise Refusal(
+            f"{smoke} canvia {changed}; els que en llegeixen: {', '.join(read)}"
+        )
+    return found | globals()[smoke]
