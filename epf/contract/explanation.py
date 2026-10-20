@@ -23,8 +23,8 @@ TOLERANCE = 1e-3
 
 # Marge de l'additivitat a l'espai transformat, en les seves unitats. En EUR/MWh val
 # aquest marge per l'escala del preu de l'hora, desenes d'euros, i per la derivada de
-# `sinh`, d'1 a 1.5 a prop de zero: de cinc a onze vegades el de dalt.
-TRANSFORMED_TOLERANCE = 1e-4
+# `sinh`, d'1 a 1.5 a prop de zero: l'ordre del de dalt.
+TRANSFORMED_TOLERANCE = 1e-5
 
 # El que es pot moure un nombre, en relatiu, en desar-lo a `float32`, que és com es
 # desen les taules de més d'una dimensió: la meitat de l'èpsilon del format.
