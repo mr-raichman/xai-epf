@@ -1,5 +1,8 @@
+import warnings
+
 import numpy as np
 
+from epf.contract import figure
 from epf.contract.figure import outputs, pairs, shares
 from epf.parameters import HOUR_COLUMNS
 
@@ -35,3 +38,19 @@ def test_a_distributional_networks_forecast_is_paired_with_its_own_hour():
     expected_x = [inputs[d, h + 1] for d in range(days) for h in range(24)]
     assert np.array_equal(y, expected_y)
     assert np.array_equal(x, expected_x)
+
+
+def test_a_model_with_no_contribution_is_left_out_of_the_importance(tmp_path):
+    """Una xarxa amb tots els pesos d'entrada a zero ho prediu tot igual."""
+    groups = np.array(["price", "price", "calendar"])
+    model = {
+        "values": np.array([[1.0, -1.0, 2.0]]),
+        "groups": groups,
+        "columns": np.array(["x", "y", "z"]),
+    }
+    constant = model | {"values": np.zeros((1, 3))}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        figure.importance(tmp_path, [model, constant])
+        figure.importance(tmp_path, [constant])
+    assert {path.stem for path in tmp_path.iterdir()} >= {"importance", "groups"}

@@ -154,7 +154,9 @@ def shares(values, groups):
 def importance(folder, models):
     """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
-    De les columnes, les `SHOWN` que més pesen.
+    De les columnes, les `SHOWN` que més pesen. Un model ajustat sense cap contribució
+    en una sortida, que no depèn de les entrades, no hi entra, i el títol diu quants
+    models hi entren de quants.
     """
     explained = list(outputs(models[0]))
     groups = models[0]["groups"]
@@ -168,7 +170,18 @@ def importance(folder, models):
             squeeze=False,
         )
         for axis, output in zip(axes[0], explained, strict=True):
-            found = [shares(outputs(model)[output], groups) for model in models]
+            # La seva part seria zero entre zero.
+            kept = [model for model in models if np.any(outputs(model)[output])]
+            counted = (
+                f"{len(kept)} de {len(models)}"
+                if len(kept) < len(models)
+                else len(kept)
+            )
+            title = f"{OUTPUT_LABELS[output]}, models: {counted}"
+            if not kept:
+                style(axis, title)
+                continue
+            found = [shares(outputs(model)[output], groups) for model in kept]
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
                 order = np.argsort(table.mean(axis=0))[-SHOWN:]
@@ -186,7 +199,7 @@ def importance(folder, models):
                 axis.plot(row, positions, "o", color=INK, markersize=2)
             axis.set_yticks(positions, names, fontsize=7)
             axis.set_xlabel("part de la importància", color=MUTED_INK)
-            style(axis, f"{OUTPUT_LABELS[output]}, models: {len(models)}")
+            style(axis, title)
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
