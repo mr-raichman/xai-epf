@@ -91,9 +91,28 @@ def mae(predicted, actual):
 
 
 def scored(predicted, actual):
-    """Torna l'R² i el MAE de totes les files juntes."""
-    error = np.asarray(predicted) - np.asarray(actual)
-    spread = np.asarray(actual) - np.mean(actual)
+    """Torna l'R² i el MAE de totes les files juntes.
+
+    Falla amb un preu real absent, i refusa una predicció que no és un número finit: un
+    sol NaN tornaria NaN totes dues puntuacions sense dir-ho.
+    """
+    predicted, actual = np.asarray(predicted), np.asarray(actual)
+    absent = int(np.isnan(actual).sum())
+    if absent:
+        raise ValueError(
+            "el preu real té 1 valor absent"
+            if absent == 1
+            else f"el preu real té {absent} valors absents"
+        )
+    wrong = int((~np.isfinite(predicted)).sum())
+    if wrong:
+        raise Refusal(
+            "la predicció té 1 valor no finit"
+            if wrong == 1
+            else f"la predicció té {wrong} valors no finits"
+        )
+    error = predicted - actual
+    spread = actual - np.mean(actual)
     return {
         "r2": float(1 - np.sum(error**2) / np.sum(spread**2)),
         "mae": float(np.mean(np.abs(error))),
