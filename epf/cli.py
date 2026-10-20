@@ -20,7 +20,8 @@ from epf import parameters, terminal
 # un segon llarg, i el pagaria fins i tot `epf --help`.
 Command = collections.namedtuple("Command", "module function help arguments")
 
-# Les subcomandes que fa `epf start`, en ordre, i els segons entre l'una i l'altra.
+# Les subcomandes que fa `epf start`, en ordre, i els segons entre l'una i l'altra, un
+# marge arbitrari.
 SEQUENCE = ("download", "dataset", "search", "run")
 PAUSE = 5
 
@@ -81,6 +82,8 @@ def search_arguments(parser):
 
 def figures_arguments(parser):
     """Declara a `parser` els arguments de `epf figures`, i el torna."""
+    # Una sola opció d'assaig, i no una per variant: les passades d'assaig de totes les
+    # variants porten el mateix prefix.
     parser.add_argument(
         "--smoke",
         action="store_true",
