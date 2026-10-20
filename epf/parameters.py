@@ -93,7 +93,7 @@ THREADS = 4
 # `--smoke` o `--smoke1`.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(2)), "TRIALS": 1, "BEST": 1}
-SMOKE_2 = {"SEEDS": tuple(range(5)), "TRIALS": 10, "BEST": 1}
+SMOKE_2 = {"SEEDS": tuple(range(2)), "TRIALS": 10}
 
 
 def variants():
