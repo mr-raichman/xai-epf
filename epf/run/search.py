@@ -89,6 +89,7 @@ def main(arguments):
                 module,
                 seed,
                 X.columns,
+                fingerprints["dataset"],
             )
     done = {
         key: min(len(searches.completed(study)), trials)
