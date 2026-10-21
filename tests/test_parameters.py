@@ -15,11 +15,11 @@ def test_a_run_s_values_hold_no_smoke_variant():
         ]
 
 
-def test_a_variant_changing_a_value_no_command_reads_is_refused(monkeypatch):
-    monkeypatch.setattr(
-        parameters, "SMOKE_9", {"SEEDS": (0,), "DEVELOPMENT": ()}, raising=False
-    )
-    with pytest.raises(Refusal, match="SMOKE_9 canvia DEVELOPMENT, que cap comanda"):
+@pytest.mark.parametrize("name", ["DEVELOPMENT", "THREADS"])
+def test_a_variant_changing_a_value_no_command_reads_is_refused(monkeypatch, name):
+    """Una variant canviava `THREADS` als processos, i no a l'arbre ni als studies."""
+    monkeypatch.setattr(parameters, "SMOKE_9", {"SEEDS": (0,), name: ()}, raising=False)
+    with pytest.raises(Refusal, match=f"SMOKE_9 canvia {name}, que cap comanda"):
         parameters.chosen("SMOKE_9")
 
 

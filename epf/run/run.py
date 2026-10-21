@@ -13,7 +13,7 @@ from epf import Refusal, parameters, paths
 from epf.contract import matrix, record
 from epf.contract.searches import configurations
 from epf.contract.split import split, validation_parts
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search
 
 # Com diu el refús d'una passada continuada cada empremta que no és la d'ara: la que la
@@ -303,8 +303,8 @@ def main(arguments):
 
     pool.done(
         tasks(),
-        values["WORKERS"],
-        values["THREADS"],
+        WORKERS,
+        THREADS,
         where / paths.WORKERS_LOG,
         block,
         returned,

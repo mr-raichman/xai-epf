@@ -40,7 +40,7 @@ def fake(tmp_path, monkeypatch):
         diverging=set(),
         opened=0,
         fingerprints={"code": "codi", "dataset": "conjunt", "environment": "llibres"},
-        values={"SEEDS": (0, 1), "TRIALS": 4, "BEST": 2, "WORKERS": 1},
+        values={"SEEDS": (0, 1), "TRIALS": 4, "BEST": 2},
     )
 
     def raised(family, seed, kind):
@@ -136,6 +136,7 @@ def fake(tmp_path, monkeypatch):
         block.close()
 
     monkeypatch.setattr(pool, "done", done)
+    monkeypatch.setattr(run, "WORKERS", 1)
     real = parameters.chosen
     monkeypatch.setattr(parameters, "chosen", lambda smoke: real(smoke) | state.values)
     state.module = trainer

@@ -140,7 +140,7 @@ def chosen(smoke):
         return found
     # Els que `run/run.py` llegeix del que torna aquesta funció; la resta s'importen on
     # es fan servir.
-    read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS", "WORKERS", "THREADS")
+    read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
     unread = [name for name in globals()[smoke] if name not in read]
     if unread:
         changed = (
