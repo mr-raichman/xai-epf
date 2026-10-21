@@ -3,17 +3,12 @@
 from keras import ops
 from scipy import stats
 
+from epf.models.nn.hyperparameters import SCALE_FLOOR, STRETCH, TAIL_FLOOR
 from epf.models.nn.network import Distribution, heads
-
-# Els mínims de l'escala i del pes de la cua, i el factor del softplus que s'hi suma,
-# els del codi de l'article: una escala de zero faria infinita la log-versemblança.
-FLOOR = 1e-3
-STRETCH = 3
-TAIL_FLOOR = 1
 
 
 def _scale(raw):
-    return FLOOR + STRETCH * ops.softplus(raw)
+    return SCALE_FLOOR + STRETCH * ops.softplus(raw)
 
 
 def _tail(raw):

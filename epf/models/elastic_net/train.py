@@ -13,13 +13,19 @@ from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.elastic_net import attribution, regression
 from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.models.elastic_net.scaling import NORMAL_CONSISTENCY
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS
 
-# La família, com la planifica una passada: el sostre d'iteracions, que no es cerca, i
-# les `BEST` millors de cada seed de la seva pròpia cerca.
+# La família, com la planifica una passada: tots els números fixos que llegeixen els
+# seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
+# cerca.
 FAMILIES = {
     NAME: {
-        "fixed": {"max_iter": MAX_ITER},
+        "fixed": {
+            "max_iter": MAX_ITER,
+            "normal_consistency": NORMAL_CONSISTENCY,
+            "threads": THREADS,
+        },
         "kept": "BEST",
         "searched_as": NAME,
     }

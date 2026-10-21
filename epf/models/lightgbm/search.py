@@ -5,15 +5,13 @@ graella és la del codi de dos dels seus autors per a un altre problema, amb Lig
 """
 
 from epf.contract.metrics import mae
-from epf.contract.split import VALIDATION_PARTS, validation_parts
+from epf.contract.split import validation_parts
 from epf.models.lightgbm.hyperparameters import (
-    MIN_CHILD_WEIGHT,
     MOST_TREES,
     NAME,
-    SUBSAMPLE_FREQ,
 )
 from epf.models.lightgbm.train import FAMILIES, fit_rows, predict_rows
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
@@ -28,15 +26,10 @@ GRID = {
     "min_child_samples": (50, 100, 500),
 }
 
-# Com es cerca, que el study desa i compara amb el d'ara: la graella, i tots els números
-# fixos que llegeixen els trials.
+# Com es cerca, que el study desa i compara amb el d'ara: la graella, i els números
+# fixos de la família.
 SPACE = GRID
-FIXED = FAMILIES[NAME]["fixed"] | {
-    "subsample_freq": SUBSAMPLE_FREQ,
-    "min_child_weight": MIN_CHILD_WEIGHT,
-    "validation_parts": VALIDATION_PARTS,
-    "threads": THREADS,
-}
+FIXED = FAMILIES[NAME]["fixed"]
 
 
 def drawn(family, optuna_trial):

@@ -10,7 +10,7 @@ from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group
 from epf.contract.record import Fitted, save_model
-from epf.contract.split import split, validation_parts
+from epf.contract.split import VALIDATION_PARTS, split, validation_parts
 from epf.models.lightgbm import attribution
 from epf.models.lightgbm.hyperparameters import (
     MIN_CHILD_WEIGHT,
@@ -27,11 +27,19 @@ from epf.parameters import (
     seeded,
 )
 
-# La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
-# cerquen, i les `BEST` millors de cada seed de la seva pròpia cerca.
+# La família, com la planifica una passada: tots els números fixos que llegeixen els
+# seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
+# cerca.
 FAMILIES = {
     NAME: {
-        "fixed": {"most_trees": MOST_TREES, "patience": PATIENCE},
+        "fixed": {
+            "most_trees": MOST_TREES,
+            "patience": PATIENCE,
+            "subsample_freq": SUBSAMPLE_FREQ,
+            "min_child_weight": MIN_CHILD_WEIGHT,
+            "validation_parts": VALIDATION_PARTS,
+            "threads": THREADS,
+        },
         "kept": "BEST",
         "searched_as": NAME,
     }
