@@ -315,9 +315,11 @@ def main(arguments):
     fitxer. Una seed d'una família que no es cerca rep el pla de seguida, i una d'una
     que es cerca, les millors configuracions de la seva cerca quan la té acabada; el
     pla queda al registre de la família i ja no canvia. Dibuixa les figures si cap seed
-    no ha fallat. Refusa abans d'escriure la passada el que no pot fer, i acaba amb un
-    refús si alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a
-    alguna família li falta el pla d'una seed o un fitxer.
+    no ha fallat. Refusa abans d'escriure la passada el que no pot fer; un study
+    refusat deixa a `output/searches/` els que s'han obert abans, nous i sense cap
+    trial, que la passada següent reinicia en obrir-los. Acaba amb un refús si alguna
+    seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a alguna família li
+    falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke, READ)
     chosen = families.named(arguments.family)
