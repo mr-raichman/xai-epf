@@ -4,13 +4,15 @@ Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda 
 on era. Només el procés pare hi escriu: en demana cada trial i en desa el resultat, i
 un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre els
 desa tots, del millor al pitjor, en la forma en què els pren l'ajust, sobre quines
-files es van fer, les columnes de la matriu i la partició, amb quina `PROJECT_SEED`, i
-sobre quin espai i amb quins números fixos. Una cerca continua sobre un altre codi o
+files es van fer, les columnes de la matriu, la partició i els seus dies, amb quina
+`PROJECT_SEED`, i sobre quin espai i amb quins números fixos. Una cerca continua sobre
+un altre codi o
 unes altres biblioteques, i cada trial en desa les empremtes, però no sobre un altre
 dataset, unes altres files, un altre espai o uns altres números fixos, ni amb una altra
 `PROJECT_SEED`; i una passada no llegeix un registre fet així.
 """
 
+import hashlib
 import json
 import os
 
@@ -18,6 +20,7 @@ import optuna
 
 from epf import Refusal, paths
 from epf.contract.record import plain, write_record
+from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES, seeded
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
@@ -30,8 +33,28 @@ def folder(smoke, family):
     return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
 
 
-def made_on(columns):
-    """Torna les files d'una cerca: les columnes de la matriu i la partició."""
+def _dealt(seed):
+    """Torna la SHA-256 dels dies que una seed reparteix a cada part, en ISO.
+
+    Les parts són l'entrenament, cada part de la validació en l'ordre de la seed, i la
+    prova.
+    """
+    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    every = [
+        parts.training,
+        *validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK),
+        parts.test,
+    ]
+    text = json.dumps([days.strftime("%Y-%m-%d").tolist() for days in every])
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def made_on(columns, seed):
+    """Torna les files de la cerca d'una seed.
+
+    Són les columnes de la matriu, `columns`, la partició i els dies que la seed hi
+    reparteix.
+    """
     return plain(
         {
             "columns": list(columns),
@@ -39,6 +62,9 @@ def made_on(columns):
             "deleted": BLACKOUT_WEEK,
             "shares": SHARES,
             "gap": GAP,
+            # Els dies mateixos: una altra derivació, o una altra versió de NumPy, en
+            # repartiria uns altres amb la mateixa seed.
+            "split": _dealt(seed),
         }
     )
 
@@ -124,7 +150,7 @@ def opened(store, family, searcher, seed, columns, dataset):
         storage=_storage(store),
         load_if_exists=True,
     )
-    now = made_on(columns)
+    now = made_on(columns, seed)
     if not study.trials:
         study.set_user_attr("made_on", now)
         study.set_user_attr("space", plain(searcher.SPACE))
@@ -216,17 +242,17 @@ def save(found, smoke):
 def searched(smoke, family, seed, columns, searcher, dataset):
     """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
 
-    Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició,
-    sobre un altre espai o amb uns altres números fixos que els de `searcher`, el
-    `search.py` d'ara, amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset
-    que el d'ara, `dataset`: els seus números s'haurien triat d'una altra manera, i res
-    no ho diria.
+    Refusa un registre fet sobre unes altres columnes, `columns`, una altra partició o
+    uns altres dies, sobre un altre espai o amb uns altres números fixos que els de
+    `searcher`, el `search.py` d'ara, amb una altra `PROJECT_SEED` o amb algun trial
+    d'un altre dataset que el d'ara, `dataset`: els seus números s'haurien triat d'una
+    altra manera, i res no ho diria.
     """
     path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
         return None
     found = json.loads(path.read_text(encoding="utf-8"))
-    why = _different(found, made_on(columns), searcher)
+    why = _different(found, made_on(columns, seed), searcher)
     if not why and {one["dataset"] for one in found["ranked"]} - {dataset}:
         why = "amb un altre dataset"
     if why:

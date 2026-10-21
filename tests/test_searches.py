@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from epf import paths
+from epf.contract import split as split_module
 from epf.contract.searches import (
     asked,
     completed,
@@ -215,6 +216,39 @@ def test_a_search_made_with_another_PROJECT_SEED_is_neither_read_nor_continued(
             FINGERPRINTS["dataset"],
         )
     with pytest.raises(ValueError):
+        opened(
+            folder(True, "fake") / "seed_0.db",
+            "fake",
+            _searcher({"value": (3, 1, 2)}, []),
+            0,
+            X.columns,
+            FINGERPRINTS["dataset"],
+        )
+
+
+def test_a_search_made_on_another_deal_is_neither_read_nor_continued(
+    tmp_path, monkeypatch
+):
+    """Les setmanes d'una seed canvien amb una altra derivació o una altra NumPy."""
+    X, y = _table()
+    _saved(tmp_path, monkeypatch, X, y)
+    real = split_module.seeded
+    # Una altra partició de la mateixa seed, i la mateixa `PROJECT_SEED`.
+    monkeypatch.setattr(
+        split_module,
+        "seeded",
+        lambda label, *parts: real(label, *parts, *([1] if label == "split" else [])),
+    )
+    with pytest.raises(ValueError, match="sobre altres files"):
+        searched(
+            True,
+            "fake",
+            0,
+            X.columns,
+            _searcher({"value": (3, 1, 2)}, []),
+            FINGERPRINTS["dataset"],
+        )
+    with pytest.raises(ValueError, match="sobre altres files"):
         opened(
             folder(True, "fake") / "seed_0.db",
             "fake",
