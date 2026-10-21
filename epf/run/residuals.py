@@ -19,7 +19,7 @@ from epf.run import families
 # Athanasopoulos (2021) per a una sèrie estacional.
 LAGS = 2 * DAYS_PER_WEEK
 
-# On cauen el 95 % de les autocorrelacions d'un soroll blanc: dins de ±1,96/√T, amb T la
+# On cauen el 95 % de les autocorrelacions d'un soroll blanc: dins de ±1.96/√T, amb T la
 # llargada de la sèrie, aquí els dies amb error (Hyndman i Athanasopoulos, 2021).
 WHITE_NOISE_Z = 1.96
 

@@ -106,10 +106,10 @@ def predict_rows(model, X):
 def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
-    L'early stopping l'atura quan qualsevol de les quatre parts de la validació deixa de
-    millorar. Amb `with_interactions`, explica també les interaccions d'una mostra de
-    `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna de `X`, i
-    `numbers` el punt de la configuració.
+    L'early stopping l'atura quan qualsevol de les `VALIDATION_PARTS` parts de la
+    validació deixa de millorar. Amb `with_interactions`, explica també les interaccions
+    d'una mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada
+    columna de `X`, i `numbers` el punt de la configuració.
     """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)

@@ -10,9 +10,10 @@ MATRIX = "daily"
 # Sense graella: l'espai es mostreja a l'atzar.
 GRID = None
 
-# L'espai de `nn.py`, sense els seus selectors de blocs d'entrada, perquè cada xarxa
-# llegeix totes les columnes, ni `softmax`, a través de la qual l'explicació de
-# DeepExplainer no torna la predicció.
+# L'espai de `Python/nn.py`, el fitxer de la cerca del codi de Marcjasz et al. (2023),
+# sense els seus selectors de blocs d'entrada, perquè cada xarxa llegeix totes les
+# columnes, ni `softmax`, a través de la qual l'explicació de DeepExplainer no torna la
+# predicció.
 LAYERS = 2
 NEURONS = (16, 1024)
 ACTIVATIONS = ("sigmoid", "relu", "elu", "tanh", "softplus")

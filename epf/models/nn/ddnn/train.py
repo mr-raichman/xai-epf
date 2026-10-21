@@ -17,8 +17,9 @@ from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
 from epf.models.nn.hyperparameters import FIXED
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-# Cada família, com la planifica una passada: el batch, les èpoques i la paciència, que
-# no es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
+# Cada família, com la planifica una passada: tots els números fixos que llegeixen els
+# seus trials i els seus ajustos, i la millor configuració de cada seed de la seva
+# pròpia cerca.
 FAMILIES = {
     name: {"fixed": FIXED, "kept": 1, "searched_as": name, "residuals_checked": True}
     for name in DISTRIBUTIONS

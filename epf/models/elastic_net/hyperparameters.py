@@ -4,5 +4,5 @@
 NAME = "elastic_net"
 
 # Sostre d'iteracions del descens de coordenades: el `MaxIter` per defecte de `lasso.m`,
-# l'eina amb què Uniejewski et al. (2016) ajusten les seves xarxes.
+# l'eina amb què Uniejewski et al. (2016) ajusten el seu lasso i cada elastic net.
 MAX_ITER = 100000

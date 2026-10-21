@@ -44,8 +44,8 @@ def trial(family, drawn, train, validate, seed):
     """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de tota la validació.
 
     S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan
-    qualsevol de les quatre parts de la validació, `validate`, deixa de millorar, com a
-    la passada. Torna el punt i la puntuació.
+    qualsevol de les `VALIDATION_PARTS` parts de la validació, `validate`, deixa de
+    millorar, com a la passada. Torna el punt i la puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
     weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)

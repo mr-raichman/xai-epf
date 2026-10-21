@@ -27,8 +27,9 @@ POINT = network.Distribution(
 # Nom del model i de la seva família.
 NAME = "dnn"
 
-# La família, com la planifica una passada: el batch, les èpoques i la paciència, que no
-# es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
+# La família, com la planifica una passada: tots els números fixos que llegeixen els
+# seus trials i els seus ajustos, i la millor configuració de cada seed de la seva
+# pròpia cerca.
 FAMILIES = {
     NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME, "residuals_checked": True}
 }
