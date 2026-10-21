@@ -252,7 +252,7 @@ def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
     ]
     assert study.trials[1].user_attrs["diverged"]
     found = json.loads(store.with_suffix(".json").read_text(encoding="utf-8"))
-    assert found["trials"] == 3 and len(found["ranked"]) == 3
+    assert found["trials"] == 4 and len(found["ranked"]) == 3
     assert len(_recorded("first")["configurations"]["0"]) == 2
     log = paths.RUNS / _name(1) / paths.WORKERS_LOG
     assert log.read_text(encoding="utf-8") == "first seed 0 trial 1 ha divergit: nan\n"

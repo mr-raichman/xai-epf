@@ -222,13 +222,16 @@ def abandoned(study, optuna_trial):
 
 
 def record(study, family, seed, smoke):
-    """Torna el registre d'una cerca acabada, amb tots els seus trials, del millor."""
+    """Torna el registre d'una cerca acabada, amb tots els seus trials, del millor.
+
+    Els seus `trials` compten també els que han divergit, com la cerca.
+    """
     done = sorted(completed(study), key=lambda one: one.value)
     return {
         "family": family,
         "smoke": smoke,
         "seed": seed,
-        "trials": len(done),
+        "trials": len(done) + len(diverged(study)),
         "made_on": study.user_attrs["made_on"],
         "space": study.user_attrs["space"],
         "fixed": study.user_attrs["fixed"],
