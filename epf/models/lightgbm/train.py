@@ -54,6 +54,8 @@ def lightgbm(point, trees, seed):
         subsample_freq=SUBSAMPLE_FREQ,
         min_child_samples=point["min_child_samples"],
         min_child_weight=MIN_CHILD_WEIGHT,
+        # LightGBM llegeix la seed en un `int` de C++, i una de 2^31 o més hi entra com
+        # ella menys 2^32.
         random_state=seeded("fit", seed),
         n_jobs=THREADS,
         verbose=-1,
