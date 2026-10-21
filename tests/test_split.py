@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import parameters, Refusal
+from epf import Refusal, parameters
 from epf.contract.split import _deal, split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, SEEDS, SHARES
 

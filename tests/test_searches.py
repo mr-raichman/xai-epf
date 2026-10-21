@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import paths, Refusal
+from epf import Refusal, paths
 from epf.contract import split as split_module
 from epf.contract.searches import (
     asked,
