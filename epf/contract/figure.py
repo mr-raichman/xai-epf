@@ -69,8 +69,8 @@ BACKGROUND = rgb(255, 255, 255)
 MODEL_COLOURS = {
     "ddnn": rgb(106, 66, 140),
     "dnn": rgb(12, 115, 208),
-    "lightgbm": rgb(171, 97, 37),
     "elastic_net": rgb(66, 131, 95),
+    "lightgbm": rgb(171, 97, 37),
     "floor": rgb(60, 60, 60),
     "naive": rgb(91, 91, 91),
 }

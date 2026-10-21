@@ -14,8 +14,8 @@ SEARCHERS = {
     "ddnn_jsu": "epf.models.nn.search",
     "ddnn_normal": "epf.models.nn.search",
     "dnn": "epf.models.nn.search",
-    "lightgbm": "epf.models.lightgbm.search",
     "elastic_net": "epf.models.elastic_net.search",
+    "lightgbm": "epf.models.lightgbm.search",
 }
 
 

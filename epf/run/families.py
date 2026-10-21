@@ -11,8 +11,8 @@ MODELS = {
     "ddnn": ("ddnn_jsu", "ddnn_normal"),
     "dnn": ("dnn",),
     "nn": ("ddnn_jsu", "ddnn_normal", "dnn"),
-    "lightgbm": ("lightgbm", "date_probe"),
     "elastic_net": ("elastic_net",),
+    "lightgbm": ("lightgbm", "date_probe"),
     "floor": ("floor",),
     "naive": ("naive_similar_day", "naive_previous_week", "naive_previous_day"),
 }
