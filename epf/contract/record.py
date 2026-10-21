@@ -23,6 +23,14 @@ Fitted = collections.namedtuple(
     defaults=(0.0, None, None, None),
 )
 
+# Com diu un refús cada empremta que no és la d'ara: la que va començar la passada i
+# aquella amb què s'ha d'acabar.
+DIFFERENT = {
+    "code": ("un altre codi", "aquell codi"),
+    "dataset": ("un altre dataset", "aquell dataset"),
+    "environment": ("unes altres biblioteques", "aquelles biblioteques"),
+}
+
 
 def code(package):
     """Torna l'empremta d'un paquet, la SHA-256 de tots els seus fitxers `.py`.
@@ -61,6 +69,20 @@ def fingerprints():
         "dataset": dataset,
         "environment": environment(paths.LOCK),
     }
+
+
+def refuse_changed(started):
+    """Refusa una tasca si el codi, el dataset o les biblioteques ja no són els d'abans.
+
+    `started` són les empremtes amb què va començar la passada. Una edició o un
+    dataset nou a mitja passada hi entraria mentre els registres diuen les d'abans.
+    """
+    now = fingerprints()
+    then = [
+        other for name, (other, _) in DIFFERENT.items() if now[name] != started[name]
+    ]
+    if then:
+        raise Refusal(f"la passada es va començar amb {' i '.join(then)}")
 
 
 def plain(value):

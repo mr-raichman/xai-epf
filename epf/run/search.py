@@ -4,7 +4,7 @@ import importlib
 
 import optuna
 
-from epf.contract import matrix, searches
+from epf.contract import matrix, record, searches
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 from epf.run import families
@@ -15,11 +15,13 @@ def searcher(family):
     return importlib.import_module(families.MODULES[family]["search"])
 
 
-def _trial(family, seed, drawn):
+def _trial(family, seed, drawn, fingerprints):
     """Ajusta els valors d'un trial d'una família en una seed, una tasca de `pool`.
 
-    Torna els números i la puntuació.
+    Torna els números i la puntuació. Refusa un codi, un dataset o unes biblioteques
+    que no són els de `fingerprints`, les empremtes de la passada.
     """
+    record.refuse_changed(fingerprints)
     module = searcher(family)
     X, y = getattr(matrix.matrices(matrix.series()), module.MATRIX)
     return searches.tried(
@@ -91,7 +93,7 @@ class Search:
             optuna_trial, drawn = searches.asked(study, searcher(family), family)
             label = (family, seed, "trial", optuna_trial.number)
             self.pending[label] = optuna_trial
-            return label, _trial, (family, seed, drawn)
+            return label, _trial, (family, seed, drawn, self.fingerprints)
         return None
 
     def in_flight(self):

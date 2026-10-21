@@ -16,14 +16,6 @@ from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search
 
-# Com diu el refús d'una passada continuada cada empremta que no és la d'ara: la que la
-# va començar i aquella amb què s'ha d'acabar.
-DIFFERENT = {
-    "code": ("un altre codi", "aquell codi"),
-    "dataset": ("un altre dataset", "aquell dataset"),
-    "environment": ("unes altres biblioteques", "aquelles biblioteques"),
-}
-
 
 def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
@@ -45,7 +37,7 @@ def _where(smoke, fingerprints):
         }
         begun.add(made.get("smoke"))
     if differ:
-        then = [DIFFERENT[name] for name in DIFFERENT if name in differ]
+        then = [record.DIFFERENT[name] for name in record.DIFFERENT if name in differ]
         raise Refusal(
             f"la passada {latest.name} es va començar amb "
             f"{' i '.join(other for other, _ in then)}; continuar amb "
@@ -63,12 +55,14 @@ def _where(smoke, fingerprints):
     return latest
 
 
-def _train(module, family, folder, seed, configuration, explained_days):
+def _train(module, family, folder, seed, configuration, explained_days, fingerprints):
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
     Crida el `train` del mòdul del model, `module`. Torna quants segons ha trigat, sense
-    importar-lo.
+    importar-lo. Refusa un codi, un dataset o unes biblioteques que no són els de
+    `fingerprints`, les empremtes de la passada.
     """
+    record.refuse_changed(fingerprints)
     train = importlib.import_module(module).train
     # Un procés l'importa a la seva primera tasca del model, i només en un assaig això
     # passa sovint en un ajust.
@@ -118,6 +112,7 @@ class Run:
         cada família que encara no en té, i el bloc es mostra des d'aquí.
         """
         self.where, self.values, self.chosen = where, values, chosen
+        self.fingerprints = fingerprints
         continued = where.exists()
         self.plans = {}
         for family in chosen:
@@ -260,6 +255,7 @@ class Run:
                         seed,
                         configuration,
                         self.values["EXPLAINED_DAYS"],
+                        self.fingerprints,
                     ),
                 )
                 continue

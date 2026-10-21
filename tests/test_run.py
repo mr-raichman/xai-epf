@@ -132,7 +132,7 @@ def fake(tmp_path, monkeypatch):
             family, seed, kind, _ = label
             try:
                 result = function(*arguments)
-            except RuntimeError as error:
+            except (RuntimeError, Refusal) as error:
                 if on_failure is not None:
                     on_failure(label)
                 block.fail(family, seed, str(error))
@@ -398,3 +398,19 @@ def test_a_fit_that_saves_no_file_is_not_taken_for_done(fake, monkeypatch):
     monkeypatch.setattr(fake.module, "train", lambda *arguments: None)
     with pytest.raises(RuntimeError, match="3 famílies no són completes, la primera"):
         fake.main()
+
+
+def test_a_task_after_an_edit_fails_its_seed(fake, monkeypatch, capsys):
+    """Una edició a mitja passada entrava a les tasques següents sense dir-ho."""
+    real = fake.module.train
+
+    def edited(*arguments):
+        real(*arguments)
+        fake.fingerprints["code"] = "editat"
+
+    monkeypatch.setattr(fake.module, "train", edited)
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    shown = capsys.readouterr().err
+    assert "ha fallat: la passada es va començar amb un altre codi" in shown
+    assert len([call for call in fake.calls if call[0] == "fit"]) == 1
