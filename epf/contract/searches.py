@@ -3,10 +3,11 @@
 Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda continua
 on era. Només el procés pare hi escriu: en demana cada trial i en desa el resultat, i
 un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre els
-desa tots, del millor al pitjor, en la forma en què els pren l'ajust, i sobre quines
-files es van fer: les columnes de la matriu i la partició, i amb quina `PROJECT_SEED`.
-Una cerca continua sobre un altre codi o unes altres biblioteques, i cada trial en desa
-les empremtes, però no sobre un altre dataset, unes altres files ni amb una altra
+desa tots, del millor al pitjor, en la forma en què els pren l'ajust, sobre quines
+files es van fer, les columnes de la matriu i la partició, amb quina `PROJECT_SEED`, i
+sobre quin espai i amb quins números fixos. Una cerca continua sobre un altre codi o
+unes altres biblioteques, i cada trial en desa les empremtes, però no sobre un altre
+dataset, unes altres files, un altre espai o uns altres números fixos, ni amb una altra
 `PROJECT_SEED`; i una passada no llegeix un registre fet així.
 """
 
@@ -49,14 +50,19 @@ def completed(study):
     ]
 
 
-def _different(made, now):
+def _different(made, now, searcher):
     """Torna en què es va fer diferent una cerca, `made`, o `None` si no ho va fer.
 
-    `now` són les files d'ara. Una cerca que no diu la seva `PROJECT_SEED` es va fer
-    amb una altra.
+    `now` són les files d'ara, i `searcher` el `search.py` d'ara, amb l'espai i els
+    números fixos. Una cerca que no diu la seva `PROJECT_SEED`, el seu espai o els seus
+    números fixos es va fer amb uns altres.
     """
     if made.get("made_on") != now:
         return "sobre altres files"
+    if made.get("space") != plain(searcher.SPACE):
+        return "sobre un altre espai"
+    if made.get("fixed") != plain(searcher.FIXED):
+        return "amb uns altres números fixos"
     if made.get("PROJECT_SEED") != PROJECT_SEED:
         return "amb una altra PROJECT_SEED"
     return None
@@ -118,9 +124,9 @@ def opened(store, family, searcher, seed, columns, dataset):
 
     `searcher` és el `search.py` del model de la família, `columns` les columnes de la
     matriu sobre la qual es cerca, i `dataset` l'empremta del dataset d'ara. Refusa un
-    study fet sobre unes altres files, amb una altra `PROJECT_SEED` o amb algun trial
-    d'un altre dataset, que puntuaria uns trials sobre unes dades i uns altres sobre
-    unes altres.
+    study fet sobre unes altres files, un altre espai o uns altres números fixos, amb
+    una altra `PROJECT_SEED` o amb algun trial d'un altre dataset: compararia trials
+    que no es poden comparar.
     """
     study = optuna.create_study(
         study_name=_name(family, seed),
@@ -131,8 +137,10 @@ def opened(store, family, searcher, seed, columns, dataset):
     now = made_on(columns)
     if not study.trials:
         study.set_user_attr("made_on", now)
+        study.set_user_attr("space", plain(searcher.SPACE))
+        study.set_user_attr("fixed", plain(searcher.FIXED))
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
-    why = _different(study.user_attrs, now)
+    why = _different(study.user_attrs, now, searcher)
     datasets = {one.user_attrs.get("dataset") for one in completed(study)}
     if not why and datasets - {dataset}:
         why = "amb un altre dataset"
@@ -191,6 +199,8 @@ def record(study, family, seed, smoke):
         "seed": seed,
         "trials": len(done),
         "made_on": study.user_attrs["made_on"],
+        "space": study.user_attrs["space"],
+        "fixed": study.user_attrs["fixed"],
         "PROJECT_SEED": study.user_attrs["PROJECT_SEED"],
         "ranked": [
             {
@@ -213,19 +223,20 @@ def save(found, smoke):
     )
 
 
-def searched(smoke, family, seed, columns, dataset):
+def searched(smoke, family, seed, columns, searcher, dataset):
     """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
 
     Refusa un registre fet sobre unes altres columnes, `columns`, o una altra partició,
-    amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset que el d'ara,
-    `dataset`: els seus números s'haurien triat per unes altres files, amb uns altres
-    trials o sobre unes altres dades, i res no ho diria.
+    sobre un altre espai o amb uns altres números fixos que els de `searcher`, el
+    `search.py` d'ara, amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset
+    que el d'ara, `dataset`: els seus números s'haurien triat d'una altra manera, i res
+    no ho diria.
     """
     path = folder(smoke, family) / RECORD.format(seed=seed)
     if not path.exists():
         return None
     found = json.loads(path.read_text(encoding="utf-8"))
-    why = _different(found, made_on(columns))
+    why = _different(found, made_on(columns), searcher)
     if not why and {one["dataset"] for one in found["ranked"]} - {dataset}:
         why = "amb un altre dataset"
     if why:
@@ -238,7 +249,7 @@ def searched(smoke, family, seed, columns, dataset):
     return found
 
 
-def configurations(smoke, plan, columns, seeds, best, dataset):
+def configurations(smoke, plan, columns, searcher, seeds, best, dataset):
     """Torna les configuracions que s'ajusten a cada seed, de la millor a la pitjor.
 
     Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
@@ -246,7 +257,8 @@ def configurations(smoke, plan, columns, seeds, best, dataset):
     del mateix tipus, o les `best` millors si `kept` és `"BEST"`, si totes les seeds en
     tenen; els números de lloc, `placeholder`, marcats, si cap seed no en té; i una sola
     sense números per a una família que no es cerca, `kept` zero. `columns` són les de
-    la matriu sobre la qual es cerca, que la cerca compara amb les seves, `best` el
+    la matriu sobre la qual es cerca i `searcher` el `search.py` de la cerca, que es
+    comparen amb els seus, `best` el
     `BEST` de la comanda, i `dataset` l'empremta del dataset d'ara. Refusa una cerca que
     només té algunes seeds: la dispersió barrejaria seeds cercades i sense cercar, i res
     no ho diria.
@@ -255,7 +267,10 @@ def configurations(smoke, plan, columns, seeds, best, dataset):
         return {seed: [{"rank": 0}] for seed in seeds}
     kept = best if plan["kept"] == "BEST" else plan["kept"]
     family = plan["searched_as"]
-    found = {seed: searched(smoke, family, seed, columns, dataset) for seed in seeds}
+    found = {
+        seed: searched(smoke, family, seed, columns, searcher, dataset)
+        for seed in seeds
+    }
     missing = [seed for seed, record in found.items() if record is None]
     if len(missing) == len(seeds):
         return {

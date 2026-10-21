@@ -6,8 +6,8 @@ graella és la del codi de dos dels seus autors per a un altre problema, amb Lig
 
 from epf.contract.metrics import mae
 from epf.contract.split import validation_parts
-from epf.models.lightgbm.hyperparameters import MOST_TREES
-from epf.models.lightgbm.train import fit_rows, predict_rows
+from epf.models.lightgbm.hyperparameters import MOST_TREES, NAME
+from epf.models.lightgbm.train import FAMILIES, fit_rows, predict_rows
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # La matriu de la cerca, la per hora, com la de la passada.
@@ -22,6 +22,11 @@ GRID = {
     "learning_rate": (0.001, 0.05, 0.01, 0.1),
     "min_child_samples": (50, 100, 500),
 }
+
+# Com es cerca, que el study desa i compara amb el d'ara: la graella, i els números que
+# cap trial no cerca, els que la passada desa al seu registre.
+SPACE = GRID
+FIXED = FAMILIES[NAME]["fixed"]
 
 
 def drawn(family, optuna_trial):

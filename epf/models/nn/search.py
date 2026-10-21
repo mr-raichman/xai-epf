@@ -1,6 +1,6 @@
 """La cerca de les xarxes, sobre l'espai del codi de Marcjasz et al. (2023)."""
 
-from epf.models.nn import network
+from epf.models.nn import hyperparameters, network
 from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
 from epf.models.nn.dnn.train import POINT, POINT_FAMILY
 
@@ -19,6 +19,18 @@ ACTIVATIONS = ("sigmoid", "relu", "elu", "tanh", "softplus")
 DROPOUT = (0.0, 1.0)
 L1 = (1e-5, 10.0)
 LEARNING_RATE = (1e-5, 0.1)
+
+# Com es cerca, que el study desa i compara amb el d'ara: l'espai, i els números que cap
+# trial no cerca, els que la passada desa al seu registre.
+FIXED = hyperparameters.FIXED
+SPACE = {
+    "layers": LAYERS,
+    "neurons": NEURONS,
+    "activations": ACTIVATIONS,
+    "dropout": DROPOUT,
+    "l1": L1,
+    "learning_rate": LEARNING_RATE,
+}
 
 
 def penalty(optuna_trial, name):

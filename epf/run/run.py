@@ -113,15 +113,17 @@ def main(arguments):
         if families.recorded(where / family) is not None:
             continue
         plan = trainers[family].FAMILIES[family]
-        columns = None
-        # La cerca es compara amb les columnes de la matriu del seu `search.py`.
+        columns = searcher = None
+        # La cerca es compara amb el seu `search.py` i les columnes de la seva matriu.
         if plan["kept"]:
-            X, _ = getattr(matrices, search.searcher(plan["searched_as"]).MATRIX)
+            searcher = search.searcher(plan["searched_as"])
+            X, _ = getattr(matrices, searcher.MATRIX)
             columns = X.columns
         plans[family] = configurations(
             arguments.smoke,
             plan,
             columns,
+            searcher,
             values["SEEDS"],
             values["BEST"],
             fingerprints["dataset"],
