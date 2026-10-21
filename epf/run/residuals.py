@@ -9,7 +9,6 @@ import pandas as pd
 from scipy import stats
 
 from epf.contract import figure
-from epf.contract.figure import plt
 from epf.models.naive.train import FAMILIES as COPIES
 from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
 from epf.run import families
@@ -24,8 +23,8 @@ WHITE_NOISE_Z = 1.96
 
 # Columnes de la figura, una família per panell, i l'alçada de cada panell entre la seva
 # amplada.
-PANELS_PER_ROW = 3
-PANEL_ASPECT = 3 / 4
+RESIDUALS_PER_ROW = 3
+RESIDUALS_ASPECT = 3 / 4
 
 # El test de cada família, un per fila, al costat de la figura.
 RESIDUALS = "residuals.csv"
@@ -96,13 +95,8 @@ def report(where, described, colours):
     ]
     if not fitted:
         return
-    rows = -(-len(fitted) // PANELS_PER_ROW)
-    panels, axes = plt.subplots(
-        rows,
-        PANELS_PER_ROW,
-        figsize=figure.size(rows * figure.WIDTH / PANELS_PER_ROW * PANEL_ASPECT),
-        squeeze=False,
-        sharey=True,
+    panels, axes = figure.panel_grid(
+        len(fitted), RESIDUALS_PER_ROW, RESIDUALS_ASPECT, sharey=True
     )
     tests = []
     for axis, family in zip(axes.flat, fitted, strict=False):
@@ -133,8 +127,6 @@ def report(where, described, colours):
         axis.set_title(f"{figure.FAMILY_LABELS[family]}\n{figure.p_value(value)}")
     for axis in axes[:, 0]:
         axis.set_ylabel("autocorrelació")
-    for axis in axes.flat[len(fitted) :]:
-        axis.set_visible(False)
     figure.save(panels, where, "residuals")
     pd.DataFrame(tests).to_csv(
         where / RESIDUALS, index=False, lineterminator="\n", encoding="utf-8"

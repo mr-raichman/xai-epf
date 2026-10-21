@@ -311,6 +311,25 @@ def point_style(count, coloured=False):
     }
 
 
+def panel_grid(count, per_row, aspect, **options):
+    """Torna una figura de `count` panells, `per_row` per fila, i la seva graella.
+
+    L'alçada de cada panell és `aspect` vegades la seva amplada, i els de la graella que
+    passen de `count` s'amaguen. `options` va a `plt.subplots`, com `sharey`.
+    """
+    rows = math.ceil(count / per_row)
+    drawing, axes = plt.subplots(
+        rows,
+        per_row,
+        figsize=size(rows * WIDTH / per_row * aspect),
+        squeeze=False,
+        **options,
+    )
+    for axis in axes.flat[count:]:
+        axis.set_visible(False)
+    return drawing, axes
+
+
 def save(drawing, folder, name):
     """Desa una figura a `folder/<name>.svg` i la tanca.
 
@@ -582,16 +601,8 @@ def dependence(folder, models, present, colour):
     """
     explained = list(outputs(models[0]))
     units = dict(zip(explained, models[0]["units"], strict=True))
-    rows = math.ceil(len(present) / DEPENDENCE_PER_ROW)
     for output in explained:
-        panels, axes = plt.subplots(
-            rows,
-            DEPENDENCE_PER_ROW,
-            figsize=size(rows * WIDTH / DEPENDENCE_PER_ROW * DEPENDENCE_ASPECT),
-            squeeze=False,
-        )
-        for axis in axes.flat[len(present) :]:
-            axis.set_visible(False)
+        panels, axes = panel_grid(len(present), DEPENDENCE_PER_ROW, DEPENDENCE_ASPECT)
         for axis, name in zip(axes.flat, present, strict=False):
             slopes = []
             for count, model in enumerate(models):

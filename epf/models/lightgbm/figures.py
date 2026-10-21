@@ -4,15 +4,14 @@ import numpy as np
 
 from epf.contract import figure
 from epf.contract.explanation import PRICE_UNITS
-from epf.contract.figure import plt
 
 # Socis de cada sèrie a les interaccions, els que més hi interactuen: la regla que fa de
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
 # Panells de les interaccions per fila, i l'alçada de cada un entre la seva amplada.
-PANELS_PER_ROW = 2
-PANEL_ASPECT = 3 / 4
+INTERACTIONS_PER_ROW = 2
+INTERACTIONS_ASPECT = 3 / 4
 
 
 def _interactions(folder, model, present, colour):
@@ -27,17 +26,10 @@ def _interactions(folder, model, present, colour):
     rows = model["interaction_rows"]
     inputs, interactions = model["inputs"][rows], model["interactions"]
     values = model["values"][rows]
-    count = 2 + PARTNERS
-    lines = -(-count // PANELS_PER_ROW)
     for name in present:
-        panels, axes = plt.subplots(
-            lines,
-            PANELS_PER_ROW,
-            figsize=figure.size(lines * figure.WIDTH / PANELS_PER_ROW * PANEL_ASPECT),
-            squeeze=False,
+        panels, axes = figure.panel_grid(
+            2 + PARTNERS, INTERACTIONS_PER_ROW, INTERACTIONS_ASPECT
         )
-        for axis in axes.flat[count:]:
-            axis.set_visible(False)
         (j,) = figure.members(model, name)
         x = inputs[:, j] / figure.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
