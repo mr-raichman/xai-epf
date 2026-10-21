@@ -4,11 +4,14 @@ import pandas as pd
 import pytest
 
 from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
-from epf.models.nn import search
+from epf.contract.split import split
+from epf.models.nn import network, search
+from epf.models.nn.ddnn import train as ddnn
 from epf.models.nn.ddnn.attribution import attribute_rows
 from epf.models.nn.ddnn.distributions import JOHNSON_SU, NORMAL
+from epf.models.nn.dnn import train as dnn
 from epf.models.nn.network import build, fit_rows, parameters, parameters_rows
-from epf.parameters import HOUR_COLUMNS
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, HOUR_COLUMNS
 
 # Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn de
 # com d'ajustada estigui.
@@ -57,6 +60,7 @@ def test_each_parameters_base_and_contributions_add_up_to_it(distribution):
         (X[:120], y[:120]),
         (X[120:], y[120:]),
         tuned(distribution),
+        0,
         batch=16,
         epochs=5,
         patience=2,
@@ -115,3 +119,29 @@ def test_the_point_networks_space_asks_for_no_output_penalty():
     # Una L1 a la sortida faria fallar `FixedTrial`, que no en té el paràmetre.
     tuned = search.drawn("dnn", optuna.trial.FixedTrial(FIXED))
     assert tuned["parameter_l1"] == [0.0]
+
+
+def test_a_trial_and_the_run_hand_each_networks_fit_the_same_seed(monkeypatch):
+    """Amb una altra seed, la passada no ajustaria el que la cerca va puntuar."""
+
+    class Stopped(Exception):
+        """L'ajust fals s'atura aquí, un cop desada la seed."""
+
+    seen = []
+
+    def recorded(distribution, train, validate, tuned, seed, **keywords):
+        seen.append(seed)
+        raise Stopped
+
+    monkeypatch.setattr(network, "fit_rows", recorded)
+    X, y = rows(10)
+    parts = split(3, DEVELOPMENT, BLACKOUT_WEEK)
+    numbers = tuned(JOHNSON_SU)
+    for fit in (
+        lambda: search.trial("ddnn_jsu", numbers, (X, y), (X, y), 3),
+        lambda: ddnn._fitted(JOHNSON_SU, X, y, parts, parts.test, 3, numbers),
+        lambda: dnn._fitted(X, y, parts, 3, tuned(dnn.POINT)),
+    ):
+        with pytest.raises(Stopped):
+            fit()
+    assert seen == [3, 3, 3]

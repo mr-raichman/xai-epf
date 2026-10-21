@@ -26,7 +26,7 @@ FAMILIES = {
 }
 
 
-def _fitted(distribution, X, y, parts, explained, numbers):
+def _fitted(distribution, X, y, parts, explained, seed, numbers):
     """Ajusta la xarxa d'una configuració i n'explica les files explicades.
 
     Explica cada paràmetre contra els dies d'entrenament, i puntua la distribució de les
@@ -40,6 +40,7 @@ def _fitted(distribution, X, y, parts, explained, numbers):
         (X[training], y[training]),
         (X[validation], y[validation]),
         numbers,
+        seed,
     )
     explanation = attribution.attribute_rows(
         distribution, fitted, X[shown], background=X[training]
@@ -110,7 +111,7 @@ def train(family, folder, configurations, explained_days):
             if path.exists():
                 continue
             fitted = _fitted(
-                distribution, X, y, parts, explained, configuration["numbers"]
+                distribution, X, y, parts, explained, seed, configuration["numbers"]
             )
             check(fitted, rank)
             scores = scored(fitted.predicted, fitted.actual) | fitted.scores

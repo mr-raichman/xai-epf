@@ -1,8 +1,10 @@
 import datetime
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from epf import parameters
 from epf.contract.split import _deal, split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, SEEDS, SHARES
 
@@ -75,6 +77,15 @@ def test_the_same_seed_gives_the_same_split_and_another_seed_another():
     )
     assert all(a.equals(b) for a, b in zip(first, again, strict=True))
     assert not first.test.equals(other.test)
+
+
+def test_a_seeds_deal_changes_with_PROJECT_SEED(monkeypatch):
+    """La partició es barrejava amb la seed sola, igual amb qualsevol `PROJECT_SEED`."""
+    first, again = (_deal(0, DEVELOPMENT, BLACKOUT_WEEK, SHARES)[1] for _ in range(2))
+    monkeypatch.setattr(parameters, "PROJECT_SEED", 1)
+    _, other = _deal(0, DEVELOPMENT, BLACKOUT_WEEK, SHARES)
+    assert all(np.array_equal(a, b) for a, b in zip(first, again, strict=True))
+    assert not np.array_equal(first[0], other[0])
 
 
 def test_a_period_of_broken_weeks_is_refused():

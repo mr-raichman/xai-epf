@@ -25,8 +25,8 @@ from epf.parameters import (
     BLACKOUT_WEEK,
     DEVELOPMENT,
     INTERACTION_ROWS,
-    PROJECT_SEED,
     THREADS,
+    seeded,
 )
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
@@ -45,11 +45,11 @@ FAMILIES = {
 }
 
 
-def lightgbm(point, trees, project_seed=PROJECT_SEED):
+def lightgbm(point, trees, seed):
     """Torna un regressor de LightGBM sense ajustar d'un punt de la graella, `point`.
 
-    Fa `trees` arbres com a molt, i `project_seed` fixa quines files pren cada arbre
-    quan el punt en pren menys de totes.
+    Fa `trees` arbres com a molt. La seed de l'ajust de la partició `seed` fixa quines
+    files pren cada arbre quan el punt en pren menys de totes.
     """
     return LGBMRegressor(
         n_estimators=trees,
@@ -60,7 +60,7 @@ def lightgbm(point, trees, project_seed=PROJECT_SEED):
         subsample_freq=SUBSAMPLE_FREQ,
         min_child_samples=point["min_child_samples"],
         min_child_weight=MIN_CHILD_WEIGHT,
-        random_state=project_seed,
+        random_state=seeded("fit", seed),
         n_jobs=THREADS,
         verbose=-1,
         # Sense totes dues, dos ajustos de la mateixa finestra no donen els mateixos
@@ -71,17 +71,18 @@ def lightgbm(point, trees, project_seed=PROJECT_SEED):
     )
 
 
-def fit_rows(X, y, point, trees, validation=(), patience=PATIENCE):
+def fit_rows(X, y, point, trees, seed, validation=(), patience=PATIENCE):
     """Ajusta i torna un model d'un punt de la graella amb les files donades.
 
-    Sense `validation` fa `trees` arbres, ni un més ni un menys. Amb `validation`,
+    `seed` és la de la partició, d'on surt la de l'ajust. Sense `validation` fa
+    `trees` arbres, ni un més ni un menys. Amb `validation`,
     parelles `(X, y)`, `trees` és el sostre, i l'early stopping atura l'entrenament quan
     qualsevol d'elles porta `patience` arbres sense millorar, i el model es queda amb el
     millor arbre d'aquella: amb quatre parelles és l'early stopping de Trebbien et al.
     (2023), que parteix la validació en quatre. Cada crida fa un regressor nou, de
     manera que cap ajust no hereta res de l'anterior.
     """
-    model = lightgbm(point, trees)
+    model = lightgbm(point, trees, seed)
     if not validation:
         return model.fit(X, y)
     parts, targets = zip(*validation, strict=True)
@@ -112,7 +113,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
     weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
     validation = [(X[part], y[part]) for part in (X.index.isin(days) for days in weeks)]
     model = fit_rows(
-        X[training], y[training], numbers, MOST_TREES, validation=validation
+        X[training], y[training], numbers, MOST_TREES, seed, validation=validation
     )
     values, base = attribution.attribute_rows(model, X[shown])
     # La base més les contribucions torna la predicció.
@@ -129,7 +130,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
     if best:
         count = int(shown.sum())
         sample = np.sort(
-            np.random.default_rng(seed).choice(
+            np.random.default_rng(seeded("interactions", seed)).choice(
                 count, min(INTERACTION_ROWS, count), replace=False
             )
         )

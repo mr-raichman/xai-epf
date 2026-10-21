@@ -40,11 +40,15 @@ FAMILIES = {
 }
 
 
-def _fitted(X, y, parts, numbers):
+def _fitted(X, y, parts, seed, numbers):
     """Ajusta la xarxa d'una configuració i en prediu les setmanes de prova."""
     training, validation, test = (X.index.isin(days) for days in parts)
     fitted = network.fit_rows(
-        POINT, (X[training], y[training]), (X[validation], y[validation]), numbers
+        POINT,
+        (X[training], y[training]),
+        (X[validation], y[validation]),
+        numbers,
+        seed,
     )
     return Fitted(
         network.predict_rows(POINT, fitted, X[test]).ravel(),
@@ -69,7 +73,7 @@ def train(family, folder, configurations, explained_days):
             path = folder / paths.SEED.format(seed=seed, rank=rank)
             if path.exists():
                 continue
-            fitted = _fitted(X, y, parts, configuration["numbers"])
+            fitted = _fitted(X, y, parts, seed, configuration["numbers"])
             scores = scored(fitted.predicted, fitted.actual)
             save_model(path, parts, None, fitted, scores, rank)
             done.append([seed, rank])

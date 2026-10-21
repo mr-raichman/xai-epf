@@ -62,6 +62,7 @@ def trial(family, drawn, train, validate, seed):
         y,
         drawn,
         MOST_TREES,
+        seed,
         validation=[(X_validate[part], y_validate[part]) for part in parts],
     )
     return drawn, mae(predict_rows(model, X_validate), y_validate)

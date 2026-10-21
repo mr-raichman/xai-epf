@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from epf import Refusal
-from epf.parameters import DAYS_PER_WEEK, GAP, SHARES
+from epf.parameters import DAYS_PER_WEEK, GAP, SHARES, seeded
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
 Split = collections.namedtuple("Split", "training validation test")
@@ -47,7 +47,7 @@ def _deal(seed, period, deleted, shares):
             f"les setmanes del període"
         )
     kept = np.delete(np.arange(weeks), first // DAYS_PER_WEEK)
-    order = np.random.default_rng(seed).permutation(kept)
+    order = np.random.default_rng(seeded("split", seed)).permutation(kept)
     _, validation_share, test_share = shares
     validation = VALIDATION_PARTS * round(
         len(kept) * validation_share / 100 / VALIDATION_PARTS

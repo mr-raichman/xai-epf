@@ -103,7 +103,7 @@ def trial(family, drawn, train, validate, seed):
     dins, com la que puntua el codi de l'article. Torna els números i la puntuació.
     """
     X_validate, y_validate = validate
-    fitted = network.fit_rows(_output(family), train, validate, drawn)
+    fitted = network.fit_rows(_output(family), train, validate, drawn, seed)
     return drawn, float(
         fitted.evaluate(
             network.inputs(X_validate).to_numpy(),
