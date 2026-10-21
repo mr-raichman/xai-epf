@@ -18,15 +18,10 @@ from epf.contract.explanation import check, group
 from epf.contract.metrics import scored
 from epf.contract.record import save_model
 from epf.contract.split import split
-from epf.models.lightgbm.hyperparameters import NAME
+from epf.models.lightgbm.hyperparameters import DATE, DAY_COUNTER, NAME
 from epf.models.lightgbm.train import FAMILIES as TREE
 from epf.models.lightgbm.train import fitted
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-
-# La columna del comptador, els dies des del primer del període, i el seu grup a la
-# importància per grups, que no és cap sèrie ni el calendari.
-DAY_COUNTER = "day_counter"
-DATE = "date"
 
 # La família, com la planifica una passada: els números de l'arbre, i la millor
 # configuració de cada seed de la cerca de l'arbre.

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from epf.contract.record import fitted_files
-from epf.models.lightgbm.date_probe import DAY_COUNTER
+from epf.models.lightgbm.hyperparameters import DAY_COUNTER
 from epf.models.lightgbm.hyperparameters import NAME as TREE
 from epf.run import families
 
