@@ -46,6 +46,6 @@ def draw(name, frame):
 
     title, unit = LABELS[name], figure.GROUP_UNITS[name]
     axis.set_title(f"{title}, de {frame.index[0].year} a {frame.index[-1].year}")
-    axis.set_ylabel(unit)
+    axis.set_ylabel(figure.unit_label("valor horari", unit))
     axis.set_xlim(instants[0], instants[-1])
     figure.save(panels, paths.DATA_FIGURES / name, name)

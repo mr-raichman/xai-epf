@@ -10,6 +10,7 @@ import numpy as np
 
 from epf import Refusal, paths
 from epf.contract import figure
+from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
 from epf.run import families, residuals, tables
 
@@ -27,7 +28,7 @@ def _performance(where, described, colours):
     positions = np.arange(len(shown))[::-1]
     for axis, metric, label in (
         (axes[0], "r2", "R² a les setmanes de prova"),
-        (axes[1], "mae", "MAE a les setmanes de prova, EUR/MWh"),
+        (axes[1], "mae", figure.unit_label("MAE a les setmanes de prova", PRICE_UNITS)),
     ):
         for position, family in zip(positions, shown, strict=True):
             for best, marker, opacity in (

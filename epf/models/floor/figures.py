@@ -3,6 +3,7 @@
 import numpy as np
 
 from epf.contract import figure
+from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
 
 # L'alçada de la figura, en mm, i les caselles de la densitat a cada eix.
@@ -35,8 +36,8 @@ def draw(folder, models, colour):
             np.polyval(model["coefficients"], span * figure.PER_GW),
             color=colour,
         )
-    axis.set_xlabel("càrrega residual prevista, GW")
-    axis.set_ylabel("preu, EUR/MWh")
+    axis.set_xlabel(figure.unit_label("càrrega residual prevista", "GW"))
+    axis.set_ylabel(figure.unit_label("preu", PRICE_UNITS))
     axis.set_title(
         "El sòl de l'ordre de mèrit\nles files d'entrenament de la primera seed i el "
         f"cúbic de cada una, seeds: {len(models)}"

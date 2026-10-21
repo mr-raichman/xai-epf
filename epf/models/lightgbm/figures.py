@@ -3,6 +3,7 @@
 import numpy as np
 
 from epf.contract import figure
+from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
 
 # Socis de cada sèrie a les interaccions, els que més hi interactuen: la regla que fa de
@@ -66,8 +67,11 @@ def _interactions(folder, model, present, colour):
                     panels, image, axis, figure.unit_label("valor del soci", unit)
                 )
             axis.set_title(title)
-            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
-        panels.supylabel("contribució, EUR/MWh", fontsize=figure.AXIS_TITLE_SIZE)
+            axis.set_xlabel(figure.unit_label(figure.GROUP_LABELS[name], "GW"))
+        panels.supylabel(
+            figure.unit_label("contribució", PRICE_UNITS),
+            fontsize=figure.AXIS_TEXT_SIZE,
+        )
         figure.save(panels, folder, f"interactions_{name}")
 
 

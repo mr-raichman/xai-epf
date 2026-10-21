@@ -17,18 +17,13 @@ from epf.parameters import HOUR_COLUMNS
 # el té triat.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap, to_rgba  # noqa: E402
+from matplotlib.colors import to_rgba  # noqa: E402
 from matplotlib.ticker import ScalarFormatter  # noqa: E402
 
 
 def rgb(red, green, blue):
     """Torna el color dels tres canals, de 0 a 255, en els de 0 a 1 de matplotlib."""
     return (red / 255, green / 255, blue / 255)
-
-
-def rgba(red, green, blue, alpha):
-    """Torna el color dels tres canals, de 0 a 255, amb l'opacitat, de 0 a 1."""
-    return (*rgb(red, green, blue), alpha)
 
 
 # La lletra de tot el text de les figures, la de la memòria, i la que la substitueix on
@@ -42,21 +37,9 @@ FALLBACK_FONT = "Liberation Serif"
 CAPTION_SIZE = 12
 PANEL_HEADING_SIZE = CAPTION_SIZE - 1
 AXIS_TEXT_SIZE = CAPTION_SIZE - 2
-AXIS_TITLE_SIZE = AXIS_TEXT_SIZE
-TICK_LABEL_SIZE = AXIS_TEXT_SIZE
-LEGEND_SIZE = AXIS_TEXT_SIZE
-COLORBAR_TITLE_SIZE = AXIS_TEXT_SIZE
-COLORBAR_TICK_SIZE = AXIS_TEXT_SIZE
-ANNOTATION_SIZE = AXIS_TEXT_SIZE
-PANEL_LETTER_SIZE = PANEL_HEADING_SIZE
-
-PANEL_LETTER_WEIGHT = "bold"
 
 # `PANEL_HEADING_PLACE`, "left", "center" o "right".
 PANEL_HEADING_PLACE = "center"
-
-# On va la lletra d'un panell, en punts des del seu cantó de dalt a l'esquerra.
-PANEL_LETTER_OFFSET = (-8, 4)
 
 # L'amplada de tota figura, la de la caixa de text de la memòria, i l'espai al voltant
 # de cada panell, en mm.
@@ -89,23 +72,6 @@ OTHER_COLOUR = rgb(163, 86, 130)
 # L'escala dels valors continus, pel seu nom a matplotlib.
 SCALE = "viridis"
 
-# L'escala dels valors amb signe, el zero al mig, de blau a vermell, interpolada entre
-# aquests colors.
-DIVERGING_SCALE = LinearSegmentedColormap.from_list(
-    "diverging",
-    (
-        rgb(33, 102, 172),
-        rgb(67, 147, 195),
-        rgb(146, 197, 222),
-        rgb(209, 229, 240),
-        rgb(247, 247, 247),
-        rgb(253, 219, 199),
-        rgb(244, 165, 130),
-        rgb(214, 96, 77),
-        rgb(178, 24, 43),
-    ),
-)
-
 # Gruixos i llargades en punts, i opacitats de 0 a 1, que substitueixen la d'un color
 # rgba. Una línia de referència és la que no és cap dada, com un ajust, un zero o un
 # tall entre períodes.
@@ -116,9 +82,6 @@ REFERENCE_STYLE = "--"
 MARKER_SIZE = 2
 POINT_OPACITY = 0.5
 BAND_OPACITY = 0.2
-
-# La línia, del color del fons, entre dues barres d'un histograma, que es toquen.
-HISTOGRAM_EDGE_WIDTH = 0.3
 
 # L'amplada d'una barra, en fracció del lloc que té.
 BAR_WIDTH = 0.7
@@ -179,14 +142,14 @@ STYLE = {
     "axes.labelcolor": TEXT_COLOUR,
     "xtick.color": TEXT_COLOUR,
     "ytick.color": TEXT_COLOUR,
-    "axes.labelsize": AXIS_TITLE_SIZE,
+    "axes.labelsize": AXIS_TEXT_SIZE,
     "axes.titlesize": PANEL_HEADING_SIZE,
     "axes.titlelocation": PANEL_HEADING_PLACE,
     "figure.titlesize": PANEL_HEADING_SIZE,
-    "xtick.labelsize": TICK_LABEL_SIZE,
-    "ytick.labelsize": TICK_LABEL_SIZE,
-    "legend.fontsize": LEGEND_SIZE,
-    "legend.title_fontsize": LEGEND_SIZE,
+    "xtick.labelsize": AXIS_TEXT_SIZE,
+    "ytick.labelsize": AXIS_TEXT_SIZE,
+    "legend.fontsize": AXIS_TEXT_SIZE,
+    "legend.title_fontsize": AXIS_TEXT_SIZE,
     "legend.frameon": LEGEND_FRAME,
     "figure.facecolor": BACKGROUND,
     "axes.facecolor": BACKGROUND,
@@ -311,8 +274,8 @@ def localise(drawing):
 def colorbar(drawing, image, axes, label):
     """Afegeix la barra de colors d'una imatge al costat dels eixos `axes`."""
     bar = drawing.colorbar(image, ax=axes, aspect=COLORBAR_ASPECT)
-    bar.set_label(label, fontsize=COLORBAR_TITLE_SIZE)
-    bar.ax.tick_params(labelsize=COLORBAR_TICK_SIZE)
+    bar.set_label(label, fontsize=AXIS_TEXT_SIZE)
+    bar.ax.tick_params(labelsize=AXIS_TEXT_SIZE)
     bar.outline.set_linewidth(FRAME_WIDTH)
     bar.outline.set_edgecolor(FRAME_COLOUR)
 
@@ -358,15 +321,16 @@ def save(drawing, folder, name):
     plt.close(drawing)
 
 
-# Com es diu cada grup de columnes a les figures.
+# Com es diu cada grup de columnes a les figures, en l'ordre en què les sèries es
+# mostren a tot arreu.
 GROUP_LABELS = {
     "price": "preu del dia abans",
     "demand_fcst": "demanda prevista",
-    "wind_fcst": "eòlica prevista",
     "solar_fcst": "fotovoltaica prevista",
+    "wind_fcst": "eòlica prevista",
     "nuclear_sched": "nuclear programada",
-    "coal_gas_sched": "carbó i gas programats",
     "hydro_sched": "hidràulica programada",
+    "coal_gas_sched": "carbó i gas programats",
     "calendar": "calendari",
     "date": "comptador de dies",
 }
@@ -428,9 +392,12 @@ OUTPUT_LABELS = {
     "tail_weight": "pes de la cua",
 }
 
-# Les sèries que tenen panells de dependència: totes les de l'information set menys el
-# preu, les previsions com a Trebbien et al. (2023) i el programa igual.
-DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
+# Les sèries que tenen panells de dependència, en el seu ordre: totes les de
+# l'information set menys el preu, les previsions com a Trebbien et al. (2023) i el
+# programa igual.
+DEPENDENCE = tuple(
+    name for name in GROUP_LABELS if name in INFORMATION and name != PRICE
+)
 
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
 SHOWN = 20
@@ -438,16 +405,18 @@ SHOWN = 20
 # MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
 
-# Panells per fila de la importància i de la dependència, i l'alçada de cada panell de
-# dependència entre la seva amplada.
-IMPORTANCE_PER_ROW = 2
+# L'alçada de cada panell de la importància, un per fila amb els noms de les columnes
+# drets a sota, en mm.
+IMPORTANCE_HEIGHT = 70
+
+# Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.
 DEPENDENCE_PER_ROW = 2
 DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
 def unit_label(label, unit):
-    """Torna el títol d'un eix amb la unitat, `preu, EUR/MWh`, o sol si no en té."""
-    return label if unit == UNITLESS else f"{label}, {unit}"
+    """Torna el títol d'un eix amb la unitat, `preu (EUR/MWh)`, o sol si no en té."""
+    return label if unit == UNITLESS else f"{label} ({unit})"
 
 
 def p_value(value):
@@ -520,57 +489,54 @@ def importances(values, groups):
 def importance(folder, models, colour):
     """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
-    De les columnes, les `SHOWN` que més pesen. La mitjana, en barres de `colour`, el
-    color de la família, i cada model ajustat, en un punt. Un model ajustat sense cap
-    contribució en una sortida, que no depèn de les entrades, no hi entra, i el títol
-    diu llavors quants models hi entren de quants.
+    Un panell per sortida, una fila cada un. De les columnes, les `SHOWN` que més pesen,
+    de la que més a l'esquerra; dels grups, tots en el seu ordre. La mitjana, en barres
+    de `colour`, el color de la família, i cada model ajustat, en un punt. Un model
+    ajustat sense cap contribució en una sortida, que no depèn de les entrades, no hi
+    entra, i el títol diu llavors quants models hi entren de quants.
     """
     explained = list(outputs(models[0]))
     groups = models[0]["groups"]
     columns = models[0]["columns"]
-    across = min(IMPORTANCE_PER_ROW, len(explained))
-    rows = math.ceil(len(explained) / across)
     for kind in ("columns", "groups"):
-        count = min(SHOWN, len(columns)) if kind == "columns" else len(set(groups))
         panels, axes = plt.subplots(
-            rows, across, figsize=size(rows * rows_height(count)), squeeze=False
+            len(explained), 1, figsize=size(len(explained) * IMPORTANCE_HEIGHT)
         )
-        for axis in axes.flat[len(explained) :]:
-            axis.set_visible(False)
-        for axis, output in zip(axes.flat, explained, strict=False):
+        for axis, output in zip(np.atleast_1d(axes), explained, strict=True):
             # La seva part seria zero entre zero.
             kept = [model for model in models if np.any(outputs(model)[output])]
-            axis.set_title(
-                f"{OUTPUT_LABELS[output]}, models: {len(kept)} de {len(models)}"
-                if len(kept) < len(models)
-                else OUTPUT_LABELS[output]
-            )
+            # Una família d'una sola sortida no en dona el nom, que no hi afegiria res.
+            title = OUTPUT_LABELS[output] if len(explained) > 1 else ""
+            if len(kept) < len(models):
+                counted = f"models: {len(kept)} de {len(models)}"
+                title = f"{title}, {counted}" if title else counted
+            axis.set_title(title)
             if not kept:
                 continue
             found = [importances(outputs(model)[output], groups) for model in kept]
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
-                order = np.argsort(table.mean(axis=0))[-SHOWN:]
+                order = np.argsort(-table.mean(axis=0), kind="stable")[:SHOWN]
                 names = [column_label(columns[j], groups[j]) for j in order]
             else:
-                labels = list(found[0][1])
+                labels = [name for name in GROUP_LABELS if name in found[0][1]]
                 table = np.array(
                     [[by_group[name] for name in labels] for _, by_group in found]
                 )
                 order = np.arange(len(labels))
                 names = [GROUP_LABELS[name] for name in labels]
             positions = np.arange(len(order))
-            axis.barh(
-                positions, table[:, order].mean(axis=0), color=colour, height=BAR_WIDTH
+            axis.bar(
+                positions, table[:, order].mean(axis=0), color=colour, width=BAR_WIDTH
             )
             for row in table[:, order]:
-                axis.plot(row, positions, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
-            axis.set_yticks(positions, names)
-        panels.supxlabel(
+                axis.plot(positions, row, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
+            axis.set_xticks(positions, names, rotation=90)
+        panels.supylabel(
             "importància, la més gran de cada model a 1"
             if kind == "columns"
             else "part de la importància",
-            fontsize=AXIS_TITLE_SIZE,
+            fontsize=AXIS_TEXT_SIZE,
         )
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
@@ -642,13 +608,13 @@ def dependence(folder, models, present, colour):
                     axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
                     span = np.array([x.min(), x.max()]) / PER_GW
                     axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
-            axis.set_xlabel(f"{GROUP_LABELS[name]}, GW")
+            axis.set_xlabel(unit_label(GROUP_LABELS[name], "GW"))
             first_slope = catalan(f"{slopes[0]:.2g}")
             mean = catalan(f"{np.mean(slopes):.2g}")
             spread = catalan(f"{np.std(slopes):.2g}")
             axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
         panels.supylabel(
-            unit_label(OUTPUT_LABELS[output], units[output]), fontsize=AXIS_TITLE_SIZE
+            unit_label(OUTPUT_LABELS[output], units[output]), fontsize=AXIS_TEXT_SIZE
         )
         name = "dependence" if len(explained) == 1 else f"dependence_{output}"
         save(panels, folder, name)

@@ -201,5 +201,8 @@ def draw(name, title, frame, by_hours, by_days):
         f"{title}\ndistància de cada valor horari als seus veïns, de "
         f"{frame.index[0].year} a {frame.index[-1].year}"
     )
-    panels.supylabel("distància a la mediana, en MAD", fontsize=figure.AXIS_TITLE_SIZE)
+    panels.supylabel(
+        figure.unit_label("distància a la mediana", "MAD"),
+        fontsize=figure.AXIS_TEXT_SIZE,
+    )
     figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")
