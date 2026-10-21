@@ -52,6 +52,9 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(matrix, "series", lambda: None)
     monkeypatch.setattr(matrix, "matrices", lambda series: built)
     monkeypatch.setattr(matrix, "write", lambda found, folder: None)
+    monkeypatch.setattr(
+        matrix, "refuse_missing_days", lambda found, period, deleted: None
+    )
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
     monkeypatch.setattr(
         search, "searcher", lambda family: types.SimpleNamespace(MATRIX="daily")

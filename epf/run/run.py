@@ -100,6 +100,7 @@ def main(arguments):
     values = parameters.chosen(arguments.smoke)
     chosen = families.named(arguments.family, TRAINERS)
     matrices = matrix.matrices(matrix.series())
+    matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)
     # La partició i les parts de validació, només per refusar-les abans d'escriure res.
     split(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)

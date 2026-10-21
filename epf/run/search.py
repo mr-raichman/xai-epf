@@ -70,6 +70,7 @@ def main(arguments):
     # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     matrices = matrix.matrices(matrix.series())
+    matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)
     # La partició i les parts de validació, només per refusar-les abans de cercar res.
     split(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
     validation_parts(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)

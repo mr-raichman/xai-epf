@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import paths
+from epf import Refusal, paths
 from epf.contract import matrix
 from epf.contract.matrix import (
     DAY,
@@ -15,6 +15,7 @@ from epf.contract.matrix import (
     build,
     matrices,
     per_hour,
+    refuse_missing_days,
 )
 from epf.dataset import build as dataset
 from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
@@ -207,3 +208,17 @@ def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
         assert np.array_equal(
             stored[target].to_numpy(), np.asarray(y).reshape(len(X), -1)
         )
+
+
+def test_a_period_day_the_matrices_lost_is_refused_unless_it_is_the_deleted_week():
+    # Una sèrie en blanc abans del seu primer dia, com la del gas de vapor abans que
+    # s'hi comptessin zeros, treia de les matrius els dies d'abans sense dir-ho.
+    period = (datetime.date(2020, 1, 2), datetime.date(2020, 1, 30))
+    deleted = (datetime.date(2020, 1, 10), datetime.date(2020, 1, 16))
+    inside = matrices(every_series([d for d in range(30) if d != 12]))
+    refuse_missing_days(inside, period, deleted)
+    outside = matrices(every_series([d for d in range(30) if d != 20]))
+    with pytest.raises(
+        Refusal, match="no tenen 2 dies del període, el primer 2020-01-21"
+    ):
+        refuse_missing_days(outside, period, deleted)

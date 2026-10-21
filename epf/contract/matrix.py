@@ -181,6 +181,26 @@ def matrices(series):
     return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
 
 
+def refuse_missing_days(found, period, deleted):
+    """Refusa unes matrius, `found`, a les quals falta algun dia del període.
+
+    `build` en treu sense dir-ho cada dia amb alguna entrada absent, com en trauria els
+    d'abans del primer dia d'una sèrie que comencés tard; la setmana suprimida,
+    `deleted`, no hi compta, perquè no és de cap part.
+    """
+    days = pd.date_range(*period, freq="D")
+    wanted = days[(days < pd.Timestamp(deleted[0])) | (days > pd.Timestamp(deleted[1]))]
+    missing = wanted.difference(found.daily[0].index)
+    if len(missing):
+        first = f"{missing[0]:%Y-%m-%d}"
+        raise Refusal(
+            f"les matrius no tenen 1 dia del període, el {first}"
+            if len(missing) == 1
+            else f"les matrius no tenen {len(missing)} dies del període, el primer "
+            f"{first}"
+        )
+
+
 def write(found, folder):
     """Desa a `folder` les dues matrius, `found`, amb el preu que se'n prediu.
 
