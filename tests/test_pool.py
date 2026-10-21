@@ -107,3 +107,26 @@ def test_the_tasks_are_read_only_as_a_worker_frees(tmp_path):
         on_return=lambda label, result: seen.append(len(read)),
     )
     assert seen[0] == 2 and read == [0, 1, 2, 3]
+
+
+def test_a_none_task_waits_for_a_return_and_then_every_free_worker_is_fed(tmp_path):
+    """Llegint-ne una per tasca tornada, els processos lliures quedarien aturats."""
+    read, returned = [], set()
+
+    def tasks():
+        read.append("a")
+        yield ("a", 0, 0), int, ("1",)
+        while "a" not in returned:
+            yield None
+        for unit in ("b", "c"):
+            read.append(unit)
+            yield (unit, 0, 0), int, ("1",)
+
+    seen = {}
+
+    def on_return(label, result):
+        returned.add(label[0])
+        seen[label[0]] = len(read)
+
+    pool.done(tasks(), 2, 1, tmp_path / "workers.log", Shown(), on_return=on_return)
+    assert seen == {"a": 1, "b": 3, "c": 3}
