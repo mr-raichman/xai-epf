@@ -1,4 +1,8 @@
-"""La comanda `epf run`, la passada del protocol de Trebbien et al. (2023)."""
+"""La comanda `epf run`, la passada del protocol de Trebbien et al. (2023).
+
+Cerca i ajusta amb un sol pool: una seed d'una família s'ajusta tan bon punt la seva
+cerca té tots els trials, mentre les altres seeds encara es cerquen.
+"""
 
 import datetime
 import importlib
@@ -78,24 +82,50 @@ def _train(module, family, folder, seed, configuration, explained_days):
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
     Crida el `train` del mòdul del model, `module`, amb un pla d'aquesta seed i aquesta
-    configuració soles. Torna què ha desat i quants segons ha trigat.
+    configuració soles. Torna quants segons ha trigat.
     """
     started = time.time()
-    described = importlib.import_module(module).train(
+    importlib.import_module(module).train(
         family, folder, {seed: [configuration]}, explained_days
     )
-    return {"described": described, "seconds": time.time() - started}
+    return time.time() - started
+
+
+def _ordered(by_seed):
+    """Torna un diccionari de seeds, escrites com a text, en ordre de seed."""
+    return dict(sorted(by_seed.items(), key=lambda item: int(item[0])))
+
+
+def _planned(folder, seed, configurations):
+    """Desa al registre d'una família el pla d'una seed, que ja no canvia."""
+    path = folder / paths.SEED_RECORD
+    found = json.loads(path.read_text(encoding="utf-8"))
+    found["configurations"][str(seed)] = configurations
+    found["configurations"] = _ordered(found["configurations"])
+    record.write_record(path, found)
+
+
+def _timed(folder, seed, rank, seconds):
+    """Desa al registre d'una família els segons d'un ajust, al costat dels altres."""
+    path = folder / paths.SEED_RECORD
+    found = json.loads(path.read_text(encoding="utf-8"))
+    ranks = found["seconds"].setdefault(str(seed), {})
+    ranks[str(rank)] = round(seconds, 1)
+    found["seconds"][str(seed)] = _ordered(ranks)
+    found["seconds"] = _ordered(found["seconds"])
+    record.write_record(path, found)
 
 
 def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
-    Continua l'última del seu tipus si no és acabada. Les famílies triades que encara no
-    hi tenen pla en reben un, que queda al seu registre i ja no canvia: les millors
-    configuracions de la cerca de cada seed o, sense cerca, uns números que no s'han
-    cercat. Ajusta cada configuració que encara no té el seu fitxer, unes quantes
-    alhora, i dibuixa les figures si cap seed no ha fallat. Refusa abans d'escriure res
-    el que no pot fer, i acaba amb un refús si alguna seed ha fallat.
+    Continua l'última del seu tipus si no és acabada. Cerca el que falta i, amb els
+    mateixos processos, ajusta cada configuració planificada que encara no té el seu
+    fitxer. Una seed d'una família que no es cerca rep el pla de seguida, i una d'una
+    que es cerca, les millors configuracions de la seva cerca quan la té acabada; el
+    pla queda al registre de la família i ja no canvia. Dibuixa les figures si cap seed
+    no ha fallat. Refusa abans d'escriure la passada el que no pot fer, i acaba amb un
+    refús si alguna seed ha fallat.
     """
     values = parameters.chosen(arguments.smoke)
     chosen = families.named(arguments.family, TRAINERS)
@@ -107,110 +137,169 @@ def main(arguments):
     fingerprints = record.fingerprints()
     where = _where(arguments.smoke, fingerprints)
     continued = where.exists()
-    trainers = {family: importlib.import_module(TRAINERS[family]) for family in chosen}
-    plans = {}
-    for family in chosen:
-        if families.recorded(where / family) is not None:
-            continue
-        plan = trainers[family].FAMILIES[family]
-        columns = searcher = None
-        # La cerca es compara amb el seu `search.py` i les columnes de la seva matriu.
-        if plan["kept"]:
-            searcher = search.searcher(plan["searched_as"])
-            X, _ = getattr(matrices, searcher.MATRIX)
-            columns = X.columns
-        plans[family] = configurations(
-            arguments.smoke,
-            plan,
-            columns,
-            searcher,
-            values["SEEDS"],
-            values["BEST"],
-            fingerprints["dataset"],
+    plans = {
+        family: importlib.import_module(TRAINERS[family]).FAMILIES[family]
+        for family in chosen
+    }
+    # Les configuracions que una família guarda de cada seed.
+    kept = {
+        family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
+        for family, plan in plans.items()
+    }
+    # La cerca que llegeix cada família que guarda alguna configuració, en l'ordre de
+    # les cerques: la sonda de datació fa cercar l'arbre.
+    searched = [
+        name
+        for name in search.SEARCHERS
+        if any(
+            kept[family] and plans[family]["searched_as"] == name for family in chosen
         )
+    ]
+    searching = search.Search(
+        arguments.smoke,
+        searched,
+        values["SEEDS"],
+        values["TRIALS"],
+        matrices,
+        fingerprints,
+    )
     where.mkdir(parents=True, exist_ok=True)
     matrix.write(matrices, where)
     # Els trials són els de la cerca, que porta cada configuració, i el calendari no
     # canvia mai.
     left_out = {"TRIALS", "DAYS_PER_WEEK", "HOURS_PER_DAY", "HOUR_COLUMNS"}
     written = {name: value for name, value in values.items() if name not in left_out}
-    for family, planned in plans.items():
-        record.write_record(
-            where / family / paths.SEED_RECORD,
-            {
-                "family": family,
-                "smoke": arguments.smoke,
-                **fingerprints,
-                "seeds": values["SEEDS"],
-                "explained_days": values["EXPLAINED_DAYS"],
-                "fixed": trainers[family].FAMILIES[family]["fixed"],
-                "configurations": planned,
-                "described_now": None,
-                "seconds": {},
-                "parameters": written,
-            },
-        )
-    # Cada ajust, el primer també, llegeix el pla del registre.
+    for family in chosen:
+        if families.recorded(where / family) is None:
+            record.write_record(
+                where / family / paths.SEED_RECORD,
+                {
+                    "family": family,
+                    "smoke": arguments.smoke,
+                    **fingerprints,
+                    "seeds": values["SEEDS"],
+                    "explained_days": values["EXPLAINED_DAYS"],
+                    "fixed": plans[family]["fixed"],
+                    "configurations": {},
+                    "seconds": {},
+                    "parameters": written,
+                },
+            )
+
+    def planned(family, seed):
+        """Fa, desa i torna el pla d'una seed d'una família, o `None` si encara no pot.
+
+        No pot mentre la cerca de la seed que la família llegeix no és acabada.
+        """
+        made = None
+        if kept[family]:
+            made = searching.found(plans[family]["searched_as"], seed)
+            if made is None:
+                return None
+        configured = configurations(made, kept[family])
+        _planned(where / family, seed, configured)
+        return configured
+
+    for family in chosen:
+        recorded = families.recorded(where / family)
+        for seed in values["SEEDS"]:
+            if seed not in recorded:
+                planned(family, seed)
     recorded = {family: families.recorded(where / family) for family in chosen}
     missing = {family: families.missing(where / family) for family in chosen}
+
+    def units(family, seed):
+        """Torna les unitats de cada tipus d'una seed d'una família, i les que ja té."""
+        found = {}
+        if family in searched:
+            found["trial"] = searching.counts(family, seed)
+        if family in chosen:
+            configured = recorded[family].get(seed)
+            if configured is None:
+                # Abans del pla, les que en guardarà.
+                found["fit"] = (min(kept[family], values["TRIALS"]), 0)
+            else:
+                absent = missing[family].get(seed, [])
+                found["fit"] = (len(configured), len(configured) - len(absent))
+        return found
+
     block = progress.Block(
         f"Passada {where.name}{', continuada' if continued else ''}",
-        "fit",
         {
-            family: {
-                seed: (len(planned), len(planned) - len(missing[family].get(seed, [])))
-                for seed, planned in recorded[family].items()
-            }
-            for family in chosen
+            family: {seed: units(family, seed) for seed in values["SEEDS"]}
+            for family in families.EVERY
+            if family in chosen or family in searched
         },
     )
-    # Un generador: el pool en llegeix una tasca quan un procés queda lliure, i ja no
-    # llegeix les d'una seed que ha fallat.
-    tasks = (
-        (
-            (family, seed, one["rank"]),
-            _train,
-            (
-                TRAINERS[family],
-                family,
-                where / family,
-                seed,
-                one,
-                values["EXPLAINED_DAYS"],
-            ),
-        )
+    # Cada ajust planificat que encara no té el seu fitxer, en l'ordre de les famílies,
+    # de les seeds i dels llocs; la d'una seed acabada de cercar s'hi afegeix al final.
+    queue = [
+        (family, seed, configuration)
         for family in chosen
-        for seed, ones in missing[family].items()
-        for one in ones
-        if not block.stopped(family, seed)
+        for seed, absent in missing[family].items()
+        for configuration in absent
+    ]
+
+    def tasks():
+        # Un generador: el pool en llegeix tasques quan té processos lliures. Primer els
+        # ajustos, després els trials, i `None` mentre els trials que falten esperen
+        # els que encara no han tornat.
+        while True:
+            while queue and block.stopped(*queue[0][:2]):
+                queue.pop(0)
+            if queue:
+                family, seed, configuration = queue.pop(0)
+                yield (
+                    (family, seed, "fit", configuration["rank"]),
+                    _train,
+                    (
+                        TRAINERS[family],
+                        family,
+                        where / family,
+                        seed,
+                        configuration,
+                        values["EXPLAINED_DAYS"],
+                    ),
+                )
+                continue
+            task = searching.next(block.stopped)
+            if task is None and not searching.in_flight():
+                return
+            yield task
+
+    def returned(label, result):
+        family, seed, kind, rank = label
+        if kind == "fit":
+            _timed(where / family, seed, rank, result)
+            return
+        if searching.returned(label, result) is None:
+            return
+        # La cerca de la seed és acabada: cada família triada que la llegeix en rep el
+        # pla, si encara no el té, i els seus ajustos es fan abans que cap trial.
+        for other in chosen:
+            if (
+                kept[other]
+                and plans[other]["searched_as"] == family
+                and seed not in families.recorded(where / other)
+            ):
+                configured = planned(other, seed)
+                block.plan(other, seed, len(configured))
+                queue.extend((other, seed, one) for one in configured)
+
+    def failed(label):
+        if label[2] == "trial":
+            searching.failed(label)
+
+    pool.done(
+        tasks(),
+        values["WORKERS"],
+        values["THREADS"],
+        where / paths.WORKERS_LOG,
+        block,
+        returned,
+        failed,
     )
-    results = pool.done(
-        tasks, values["WORKERS"], values["THREADS"], where / paths.WORKERS_LOG, block
-    )
-    for family in chosen:
-        found = sorted(
-            (label, one) for label, one in results.items() if label[0] == family
-        )
-        if not found:
-            continue
-        path = where / family / paths.SEED_RECORD
-        recorded = json.loads(path.read_text(encoding="utf-8"))
-        # Els segons de cada ajust, per seed i configuració, al costat dels que una
-        # passada continuada ja hi tenia.
-        seconds = recorded["seconds"]
-        for (_, seed, rank), one in found:
-            seconds.setdefault(str(seed), {})[str(rank)] = round(one["seconds"], 1)
-        record.write_record(
-            path,
-            recorded
-            | {
-                "described_now": [
-                    pair for _, one in found for pair in one["described"]
-                ],
-                "seconds": seconds,
-            },
-        )
     if block.failed:
-        counted = progress.counted(block.failed, chosen)
+        counted = progress.counted(block.failed, families.EVERY)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}")
     figures.draw(where)

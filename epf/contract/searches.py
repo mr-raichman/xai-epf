@@ -6,10 +6,9 @@ un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu regist
 desa tots, del millor al pitjor, en la forma en què els pren l'ajust, sobre quines
 files es van fer, les columnes de la matriu, la partició i els seus dies, amb quina
 `PROJECT_SEED`, i sobre quin espai i amb quins números fixos. Una cerca continua sobre
-un altre codi o
-unes altres biblioteques, i cada trial en desa les empremtes, però no sobre un altre
-dataset, unes altres files, un altre espai o uns altres números fixos, ni amb una altra
-`PROJECT_SEED`; i una passada no llegeix un registre fet així.
+un altre codi o unes altres biblioteques, i cada trial en desa les empremtes, però no
+sobre un altre dataset, unes altres files, un altre espai o uns altres números fixos,
+ni amb una altra `PROJECT_SEED`.
 """
 
 import hashlib
@@ -239,79 +238,22 @@ def save(found, smoke):
     )
 
 
-def searched(smoke, family, seed, columns, searcher, dataset):
-    """Torna el registre de la cerca d'una família en una seed, o `None` si no en té.
+def configurations(found, kept):
+    """Torna les configuracions que s'ajusten a una seed, de la millor a la pitjor.
 
-    Refusa un registre fet sobre unes altres columnes, `columns`, una altra partició o
-    uns altres dies, sobre un altre espai o amb uns altres números fixos que els de
-    `searcher`, el `search.py` d'ara, amb una altra `PROJECT_SEED` o amb algun trial
-    d'un altre dataset que el d'ara, `dataset`: els seus números s'haurien triat d'una
-    altra manera, i res no ho diria.
+    Cada una porta el seu lloc a la cerca. Són les `kept` millors del registre de la
+    cerca de la seed, `found`, o, amb `kept` zero, una sola sense números, la d'una
+    família que no es cerca.
     """
-    path = folder(smoke, family) / RECORD.format(seed=seed)
-    if not path.exists():
-        return None
-    found = json.loads(path.read_text(encoding="utf-8"))
-    why = _different(found, made_on(columns, seed), searcher)
-    if not why and {one["dataset"] for one in found["ranked"]} - {dataset}:
-        why = "amb un altre dataset"
-    if why:
-        study = path.with_name(STUDY.format(seed=seed))
-        raise Refusal(
-            f"la cerca de {family} seed {seed} es va fer {why}; "
-            f"esborrar {paths.relative(path)} i {paths.relative(study)}, cercar amb "
-            f'"uv run epf search"'
-        )
-    return found
-
-
-def configurations(smoke, plan, columns, searcher, seeds, best, dataset):
-    """Torna les configuracions que s'ajusten a cada seed, de la millor a la pitjor.
-
-    Cada una porta el seu lloc a la cerca. `plan` és l'entrada de la família a
-    `FAMILIES` del seu model: les `kept` millors de la cerca de la família `searched_as`
-    del mateix tipus, o les `best` millors si `kept` és `"BEST"`, si totes les seeds en
-    tenen; els números de lloc, `placeholder`, marcats, si cap seed no en té; i una sola
-    sense números per a una família que no es cerca, `kept` zero. `columns` són les de
-    la matriu sobre la qual es cerca i `searcher` el `search.py` de la cerca, que es
-    comparen amb els seus, `best` el
-    `BEST` de la comanda, i `dataset` l'empremta del dataset d'ara. Refusa una cerca que
-    només té algunes seeds: la dispersió barrejaria seeds cercades i sense cercar, i res
-    no ho diria.
-    """
-    if not plan["kept"]:
-        return {seed: [{"rank": 0}] for seed in seeds}
-    kept = best if plan["kept"] == "BEST" else plan["kept"]
-    family = plan["searched_as"]
-    found = {
-        seed: searched(smoke, family, seed, columns, searcher, dataset)
-        for seed in seeds
-    }
-    missing = [seed for seed, record in found.items() if record is None]
-    if len(missing) == len(seeds):
-        return {
-            seed: [{"rank": 0, "numbers": plan["placeholder"], "unsearched": True}]
-            for seed in seeds
+    if not kept:
+        return [{"rank": 0}]
+    return [
+        {
+            "rank": rank,
+            "numbers": one["numbers"],
+            "score": one["score"],
+            "trial": one["trial"],
+            "trials": found["trials"],
         }
-    if missing:
-        asked = (
-            f"la seed {missing[0]}"
-            if len(missing) == 1
-            else f"les seeds {', '.join(map(str, missing))}"
-        )
-        raise Refusal(
-            f'la cerca de {family} no té {asked}; acabar amb "uv run epf search"'
-        )
-    return {
-        seed: [
-            {
-                "rank": rank,
-                "numbers": one["numbers"],
-                "score": one["score"],
-                "trial": one["trial"],
-                "trials": record["trials"],
-            }
-            for rank, one in enumerate(record["ranked"][:kept])
-        ]
-        for seed, record in found.items()
-    }
+        for rank, one in enumerate(found["ranked"][:kept])
+    ]

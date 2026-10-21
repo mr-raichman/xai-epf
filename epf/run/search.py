@@ -1,17 +1,15 @@
-"""La comanda `epf search`, la cerca de Trebbien et al. (2023)."""
+"""La cerca de Trebbien et al. (2023), dins d'una passada."""
 
 import importlib
 
 import optuna
 
-from epf import Refusal, parameters, paths
-from epf.contract import matrix, record, searches
-from epf.contract.split import split, validation_parts
+from epf.contract import matrix, searches
+from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-from epf.run import families, pool, progress
 
 # Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
-# model, que s'importa quan la família es cerca o es planifica.
+# model, que s'importa quan la família es cerca.
 SEARCHERS = {
     "ddnn_jsu": "epf.models.nn.search",
     "ddnn_normal": "epf.models.nn.search",
@@ -38,112 +36,108 @@ def _trial(family, seed, drawn):
     )
 
 
-def main(arguments):
-    """Fa una cerca, la comanda `epf search`.
+class Search:
+    """La cerca d'una passada: el study de cada família que es cerca, a cada seed.
 
-    Fa els trials que falten a cada família triada a cada seed, o a les de `--seed`,
-    uns quants alhora, i desa el registre de cada seed que els té tots. Refusa abans de
-    cercar res el que no pot fer, i acaba amb un refús si alguna seed ha fallat.
+    Porta els trials demanats que encara no han tornat i el registre de cada seed que ja
+    té tots els seus trials.
     """
-    values = parameters.chosen(arguments.smoke)
-    seeds = values["SEEDS"]
-    chosen = families.named(arguments.family, SEARCHERS)
-    if not chosen:
-        named = ", ".join(f'"{name}"' for name in arguments.family)
-        raise Refusal(
-            f"no es pot fer una cerca de {named}; les famílies que es cerquen: "
-            f"{', '.join(SEARCHERS)}"
+
+    def __init__(self, smoke, searched, seeds, trials, matrices, fingerprints):
+        """Obre el study de cada família de `searched` a cada seed de `seeds`.
+
+        `trials` són els trials de cada seed, i `matrices` i `fingerprints` les matrius
+        i les empremtes de la passada. Refusa un study fet d'una altra manera abans de
+        desar cap registre, i desa el de cada seed que ja té tots els seus trials.
+        """
+        # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        self.smoke, self.trials, self.fingerprints = smoke, trials, fingerprints
+        self.studies = {}
+        for family in searched:
+            module = searcher(family)
+            X, _ = getattr(matrices, module.MATRIX)
+            folder = searches.folder(smoke, family)
+            folder.mkdir(parents=True, exist_ok=True)
+            for seed in seeds:
+                self.studies[family, seed] = searches.opened(
+                    folder / searches.STUDY.format(seed=seed),
+                    family,
+                    module,
+                    seed,
+                    X.columns,
+                    fingerprints["dataset"],
+                )
+        # Els trials que té cada seed, i el trial demanat per cada tasca que encara no
+        # ha tornat.
+        self.done = {
+            key: len(searches.completed(study)) for key, study in self.studies.items()
+        }
+        self.pending = {}
+        self.records = {}
+        for family, seed in self.studies:
+            if self.done[family, seed] >= trials:
+                self._saved(family, seed)
+
+    def next(self, stopped):
+        """Torna la tasca del trial següent, o `None` si no en queda cap per demanar.
+
+        Les famílies van en l'ordre de `searched` i, dins de cada una, les seeds. Salta
+        les seeds que `stopped(família, seed)` diu fallades i les que ja tenen demanats
+        tots els seus trials.
+        """
+        for (family, seed), study in self.studies.items():
+            asked = self.done[family, seed] + sum(
+                label[:2] == (family, seed) for label in self.pending
+            )
+            if stopped(family, seed) or asked >= self.trials:
+                continue
+            optuna_trial, drawn = searches.asked(study, searcher(family), family)
+            label = (family, seed, "trial", optuna_trial.number)
+            self.pending[label] = optuna_trial
+            return label, _trial, (family, seed, drawn)
+        return None
+
+    def in_flight(self):
+        """Diu si algun trial demanat encara no ha tornat."""
+        return bool(self.pending)
+
+    def returned(self, label, result):
+        """Desa al seu study el que torna un trial, els números i la puntuació.
+
+        `result` és el que torna. Torna el registre de la seed si amb aquest trial ja
+        els té tots, i si no, `None`.
+        """
+        family, seed, _, _ = label
+        numbers, score = result
+        searches.told(
+            self.studies[family, seed],
+            self.pending.pop(label),
+            numbers,
+            score,
+            self.fingerprints,
         )
-    if arguments.seed:
-        outside = sorted(set(arguments.seed) - set(seeds))
-        if outside:
-            kind = "un assaig" if arguments.smoke else "una mesura"
-            asked = (
-                f"la seed {outside[0]}"
-                if len(outside) == 1
-                else f"les seeds {', '.join(map(str, outside))}"
-            )
-            raise Refusal(
-                f"{kind} no té {asked}; les que té: {', '.join(map(str, seeds))}"
-            )
-        seeds = [seed for seed in seeds if seed in arguments.seed]
-    # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    matrices = matrix.matrices(matrix.series())
-    matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)
-    # La partició i les parts de validació, només per refusar-les abans de cercar res.
-    split(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
-    validation_parts(seeds[0], DEVELOPMENT, BLACKOUT_WEEK)
-    fingerprints = record.fingerprints()
-    trials = values["TRIALS"]
-    studies = {}
-    for family in chosen:
-        module = searcher(family)
-        X, _ = getattr(matrices, module.MATRIX)
-        folder = searches.folder(arguments.smoke, family)
-        folder.mkdir(parents=True, exist_ok=True)
-        for seed in seeds:
-            studies[family, seed] = searches.opened(
-                folder / searches.STUDY.format(seed=seed),
-                family,
-                module,
-                seed,
-                X.columns,
-                fingerprints["dataset"],
-            )
-    done = {
-        key: min(len(searches.completed(study)), trials)
-        for key, study in studies.items()
-    }
-    # Una seed que ja els té tots, com quan la cerca s'atura entre el seu últim trial i
-    # el seu registre.
-    for (family, seed), study in studies.items():
-        if done[family, seed] == trials:
-            searches.save(
-                searches.record(study, family, seed, arguments.smoke), arguments.smoke
-            )
-    block = progress.Block(
-        "Cerca d'assaig" if arguments.smoke else "Cerca",
-        "trial",
-        {
-            family: {seed: (trials, done[family, seed]) for seed in seeds}
-            for family in chosen
-        },
-    )
-    # El trial que el pare ha demanat per cada tasca que encara no ha tornat.
-    pending = {}
+        self.done[family, seed] += 1
+        if self.done[family, seed] == self.trials:
+            return self._saved(family, seed)
+        return None
 
-    def tasks():
-        # Un generador: el pool en llegeix una tasca quan un procés queda lliure, i el
-        # trial es demana llavors; una llista els demanaria tots d'entrada.
-        for (family, seed), study in studies.items():
-            for _ in range(trials - done[family, seed]):
-                if block.stopped(family, seed):
-                    break
-                optuna_trial, drawn = searches.asked(study, searcher(family), family)
-                label = (family, seed, optuna_trial.number)
-                pending[label] = optuna_trial
-                yield label, _trial, (family, seed, drawn)
+    def failed(self, label):
+        """Dona per fallat al seu study un trial que no ha tornat cap resultat."""
+        family, seed, _, _ = label
+        searches.abandoned(self.studies[family, seed], self.pending.pop(label))
 
-    def returned(label, found):
-        family, seed, _ = label
-        study = studies[family, seed]
-        numbers, score = found
-        searches.told(study, pending.pop(label), numbers, score, fingerprints)
-        if len(searches.completed(study)) == trials:
-            searches.save(
-                searches.record(study, family, seed, arguments.smoke), arguments.smoke
-            )
+    def found(self, family, seed):
+        """Torna el registre d'una seed que ja té tots els seus trials, o `None`."""
+        return self.records.get((family, seed))
 
-    def failed(label):
-        family, seed, _ = label
-        searches.abandoned(studies[family, seed], pending.pop(label))
+    def counts(self, family, seed):
+        """Torna els trials d'una seed i els que ja té, `(trials, fets)`."""
+        return self.trials, min(self.done[family, seed], self.trials)
 
-    prefix = paths.SMOKE_PREFIX if arguments.smoke else ""
-    log = paths.SEARCHES / f"{prefix}{paths.WORKERS_LOG}"
-    pool.done(
-        tasks(), values["WORKERS"], values["THREADS"], log, block, returned, failed
-    )
-    if block.failed:
-        counted = progress.counted(block.failed, chosen)
-        raise Refusal(f"la cerca no és acabada: {counted}")
+    def _saved(self, family, seed):
+        """Desa el registre d'una seed que ja té tots els seus trials, i el torna."""
+        found = searches.record(self.studies[family, seed], family, seed, self.smoke)
+        searches.save(found, self.smoke)
+        self.records[family, seed] = found
+        return found

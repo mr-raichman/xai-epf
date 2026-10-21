@@ -81,7 +81,7 @@ INTERACTION_ROWS = 1000
 
 ### Processos ###
 
-# Quants processos fan alhora els ajustos d'una cerca o d'una passada.
+# Quants processos fan alhora els trials i els ajustos d'una passada.
 WORKERS = 4
 
 # Els fils de cada procés, sempre els mateixos: amb uns altres un ajust dona uns altres
@@ -138,8 +138,8 @@ def chosen(smoke):
     }
     if not smoke:
         return found
-    # Els que les comandes llegeixen del que torna aquesta funció, a `run/run.py` i
-    # `run/search.py`; la resta s'importen on es fan servir.
+    # Els que `run/run.py` llegeix del que torna aquesta funció; la resta s'importen on
+    # es fan servir.
     read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS", "WORKERS", "THREADS")
     unread = [name for name in globals()[smoke] if name not in read]
     if unread:

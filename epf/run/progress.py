@@ -1,4 +1,4 @@
-"""El bloc que mostra una cerca o una passada mentre es fa."""
+"""El bloc que mostra una passada mentre es fa."""
 
 import os
 import sys
@@ -15,6 +15,10 @@ MORE = "..."
 # Cada procés que fa una unitat d'una família, a la seva línia.
 WORKER = "·"
 
+# Les unitats d'una seed, en l'ordre de les seves columnes: els trials de la seva cerca
+# i els seus ajustos.
+KINDS = ("trial", "fit")
+
 
 def _cut(line, columns):
     """Torna la primera fila de `line` tallada a `columns` columnes.
@@ -28,6 +32,16 @@ def _cut(line, columns):
     if len(first) <= room and not newline:
         return first
     return first[: max(room - len(MORE), 0)] + MORE
+
+
+def _word(word, total):
+    """Torna `word` en singular per a una sola unitat, i en plural per a la resta."""
+    return word if total == 1 else f"{word}s"
+
+
+def _tally(done, total, word, digits=0):
+    """Torna `3/10 seeds`, amb les xifres de cada nombre a `digits`."""
+    return f"{done:>{digits}}/{total:<{digits}} {_word(word, total)}"
 
 
 def counted(failed, order):
@@ -44,23 +58,28 @@ def counted(failed, order):
 
 
 class Block:
-    """El bloc d'una comanda, que escriu a stderr.
+    """El bloc d'una passada, que escriu a stderr.
 
-    `title` va a la primera línia, i `unit` és el que compta dins de cada seed, `trial`
-    o `fit`. `planned` són les seeds de cada família, cada una amb les unitats que
-    planifica i les que ja tenia acabades, una parella `(unitats, acabades)`. `failed`
+    `title` va a la primera línia. `planned` són les seeds de cada família, cada una amb
+    una parella `(unitats, acabades)` per tipus de `KINDS`, sense el que la família no
+    fa: els trials d'una família que es cerca, els ajustos d'una que s'ajusta. `failed`
     són les seeds fallades, `(família, seed)`, en l'ordre en què han fallat.
     """
 
-    def __init__(self, title, unit, planned):
+    def __init__(self, title, planned):
         self.title = title
-        self.unit = unit
         self.units = {
-            family: {seed: units for seed, (units, _) in seeds.items()}
+            family: {
+                seed: {kind: units for kind, (units, _) in kinds.items()}
+                for seed, kinds in seeds.items()
+            }
             for family, seeds in planned.items()
         }
         self.done = {
-            family: {seed: done for seed, (_, done) in seeds.items()}
+            family: {
+                seed: {kind: done for kind, (_, done) in kinds.items()}
+                for seed, kinds in seeds.items()
+            }
             for family, seeds in planned.items()
         }
         self.working = dict.fromkeys(planned, 0)
@@ -80,17 +99,24 @@ class Block:
         if self.live:
             self._draw()
 
-    def advance(self, family, seed):
+    def advance(self, family, seed, kind):
         """Compta una unitat acabada d'una seed, i la seed quan és la seva última.
 
-        Fora d'un terminal, només es veu la seed acabada.
+        `kind` és el tipus de la unitat, de `KINDS`. Fora d'un terminal, només es veu la
+        seed acabada.
         """
         self.working[family] -= 1
-        self.done[family][seed] += 1
+        self.done[family][seed][kind] += 1
         if self.live:
             self._draw()
-        elif self.done[family][seed] == self.units[family][seed]:
+        elif kind == self._last(family, seed) and self._finished(family, seed):
             self._write(f"{family}: {self._count(family)}\n")
+
+    def plan(self, family, seed, units):
+        """Posa els ajustos d'una seed quan se'n fa el pla, `units`."""
+        self.units[family][seed]["fit"] = units
+        if self.live:
+            self._draw()
 
     def fail(self, family, seed, message):
         """Compta una unitat fallada i, la primera vegada, la seed i el seu missatge.
@@ -98,6 +124,10 @@ class Block:
         Les unitats de la seed que ja es feien poden fallar també.
         """
         self.working[family] -= 1
+        self.stop(family, seed, message)
+
+    def stop(self, family, seed, message):
+        """Compta una seed fallada, la primera vegada, amb el seu missatge."""
         if not self.stopped(family, seed):
             self.failed.append((family, seed))
             line = f"error: {family} seed {seed} ha fallat: {message}"
@@ -121,36 +151,62 @@ class Block:
         if self.live:
             self._draw(whole=True)
 
-    def _count(self, family, widths=(0, 0, 0)):
-        """Torna `3/10 seeds    27/100 trials` d'una família.
+    def _last(self, family, seed):
+        """Torna el tipus de la unitat amb què acaba una seed.
 
-        `widths` són les amplades que alineen les famílies: la d'un total de seeds, la
-        de la paraula `seeds` i la d'un total d'unitats.
+        Són els ajustos, i els trials d'una família que es cerca només per a una altra.
         """
-        planned, done = self.units[family], self.done[family]
-        seeds = len(planned)
-        done_seeds = sum(done[seed] >= units for seed, units in planned.items())
-        units, done_units = sum(planned.values()), sum(done.values())
-        seed_word = "seed" if seeds == 1 else "seeds"
-        unit_word = self.unit if units == 1 else f"{self.unit}s"
-        seed_width, word_width, unit_width = widths
-        seed_count = f"{done_seeds:>{seed_width}}/{seeds:<{seed_width}}"
-        unit_count = f"{done_units:>{unit_width}}/{units:<{unit_width}}"
-        return f"{seed_count} {seed_word:<{word_width}}    {unit_count} {unit_word}"
+        return "fit" if "fit" in self.units[family][seed] else "trial"
+
+    def _finished(self, family, seed):
+        last = self._last(family, seed)
+        return self.done[family][seed][last] >= self.units[family][seed][last]
+
+    def _columns(self, family):
+        """Torna el recompte de les seeds d'una família i el de cada tipus de `KINDS`.
+
+        Cada un és `(acabades, total, paraula)`, i el d'un tipus que la família no fa,
+        `None`.
+        """
+        seeds = self.units[family]
+        found = [
+            (sum(self._finished(family, seed) for seed in seeds), len(seeds), "seed")
+        ]
+        for kind in KINDS:
+            if any(kind in units for units in seeds.values()):
+                done = sum(self.done[family][seed][kind] for seed in seeds)
+                total = sum(units[kind] for units in seeds.values())
+                found.append((done, total, kind))
+            else:
+                found.append(None)
+        return found
+
+    def _count(self, family):
+        """Torna `3/10 seeds    212/500 trials    3/10 fits` d'una família."""
+        return "    ".join(
+            _tally(*column) for column in self._columns(family) if column
+        )
 
     def _lines(self):
         width = max(len(family) for family in self.units)
-        seeds = [len(units) for units in self.units.values()]
-        widths = (
-            max(len(str(count)) for count in seeds),
-            max(len("seed" if count == 1 else "seeds") for count in seeds),
-            max(len(str(sum(units.values()))) for units in self.units.values()),
-        )
-        counts = {
-            family: f"{family:<{width}}  {self._count(family, widths)}"
-            for family in self.units
-        }
-        # `fit` i `fits` no fan la mateixa amplada.
+        columns = {family: self._columns(family) for family in self.units}
+        # Cada columna que alguna família té, amb les xifres del seu total més llarg i
+        # les lletres de la seva paraula més llarga, que l'alineen.
+        shown = []
+        for number in range(1 + len(KINDS)):
+            present = [found[number] for found in columns.values() if found[number]]
+            if present:
+                digits = max(len(str(total)) for _, total, _ in present)
+                letters = max(len(_word(word, total)) for _, total, word in present)
+                shown.append((number, digits, letters))
+        counts = {}
+        for family, found in columns.items():
+            parts = []
+            for number, digits, letters in shown:
+                text = _tally(*found[number], digits) if found[number] else ""
+                parts.append(f"{text:<{2 * digits + 2 + letters}}")
+            counts[family] = f"{family:<{width}}  {'    '.join(parts)}".rstrip()
+        # Les línies no fan la mateixa amplada.
         longest = max(len(count) for count in counts.values())
         lines = [self.title, ""]
         for family, line in counts.items():

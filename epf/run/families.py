@@ -74,8 +74,13 @@ def missing(folder):
 
 
 def complete(folder):
-    """Diu si una família té pla i tots els fitxers que el pla diu."""
-    return recorded(folder) is not None and not missing(folder)
+    """Diu si una família té pla per a cada seed i tots els fitxers que el pla diu."""
+    path = folder / paths.SEED_RECORD
+    if not path.exists():
+        return False
+    found = json.loads(path.read_text(encoding="utf-8"))
+    planned = {int(seed) for seed in found["configurations"]}
+    return planned >= set(found["seeds"]) and not missing(folder)
 
 
 def finished(where):

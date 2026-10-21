@@ -37,8 +37,8 @@ SEED = "seed_{seed}_{rank}.npz"
 SEED_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
 
-# El fitxer on cada procés d'una passada o d'una cerca escriu la seva sortida, i on van
-# les traces de les seves fallades.
+# El fitxer on cada procés d'una passada escriu la seva sortida, i on van les traces de
+# les seves fallades.
 WORKERS_LOG = "workers.log"
 
 # Una passada es diu pel dia local en què va començar i pel seu número de dues xifres

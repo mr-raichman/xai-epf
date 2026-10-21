@@ -14,8 +14,6 @@ from epf.contract.searches import (
     folder,
     opened,
     record,
-    save,
-    searched,
     told,
     tried,
 )
@@ -97,15 +95,12 @@ def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
     assert len(values) == 6 and len(set(values)) == 6
 
 
-def _saved(tmp_path, monkeypatch, X, y):
-    """Fa una cerca de dos trials de `fake` a la seed 0, i la desa a l'assaig.
-
-    Torna el seu registre.
-    """
+def _studied(tmp_path, monkeypatch, X, y):
+    """Torna el study d'una cerca de dos trials de `fake` a la seed 0, a l'assaig."""
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
     where = folder(True, "fake")
     where.mkdir(parents=True)
-    study = _study(
+    return _study(
         where / "seed_0.db",
         _searcher({"value": (3, 1, 2)}, []),
         X,
@@ -114,124 +109,36 @@ def _saved(tmp_path, monkeypatch, X, y):
         0,
         2,
     )
-    found = record(study, "fake", 0, True)
-    save(found, True)
-    return found
 
 
-def test_a_saved_search_is_read_for_its_own_family_and_seed_alone(
-    tmp_path, monkeypatch
-):
-    """Llegit per una altra seed, un registre donaria números que no són seus."""
+def _continued(searcher, columns, dataset=FINGERPRINTS["dataset"]):
+    """Torna a obrir el study de `fake` a la seed 0 amb el que es cerca ara."""
+    return opened(
+        folder(True, "fake") / "seed_0.db", "fake", searcher, 0, columns, dataset
+    )
+
+
+def test_a_search_made_on_other_columns_is_not_continued(tmp_path, monkeypatch):
     X, y = _table()
-    found = _saved(tmp_path, monkeypatch, X, y)
-    assert (
-        searched(
-            True,
-            "fake",
-            0,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-        == found
-    )
-    assert [one["score"] for one in found["ranked"]] == sorted(
-        one["score"] for one in found["ranked"]
-    )
-    assert (
-        searched(
-            True,
-            "fake",
-            1,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-        is None
-    )
-    assert (
-        searched(
-            True,
-            "other",
-            0,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-        is None
-    )
-    assert (
-        searched(
-            False,
-            "fake",
-            0,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-        is None
-    )
+    _studied(tmp_path, monkeypatch, X, y)
+    with pytest.raises(ValueError, match="sobre altres files"):
+        _continued(_searcher({"value": (3, 1, 2)}, []), X.assign(z=0.0).columns)
 
 
-def test_a_search_made_on_other_columns_is_neither_read_nor_continued(
+def test_a_search_made_with_another_PROJECT_SEED_is_not_continued(
     tmp_path, monkeypatch
 ):
     X, y = _table()
-    _saved(tmp_path, monkeypatch, X, y)
-    other = X.assign(z=0.0)
-    with pytest.raises(ValueError):
-        searched(
-            True,
-            "fake",
-            0,
-            other.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-    with pytest.raises(ValueError):
-        opened(
-            folder(True, "fake") / "seed_0.db",
-            "fake",
-            _searcher({"value": (3, 1, 2)}, []),
-            0,
-            other.columns,
-            FINGERPRINTS["dataset"],
-        )
-
-
-def test_a_search_made_with_another_PROJECT_SEED_is_neither_read_nor_continued(
-    tmp_path, monkeypatch
-):
-    X, y = _table()
-    _saved(tmp_path, monkeypatch, X, y)
+    _studied(tmp_path, monkeypatch, X, y)
     monkeypatch.setattr("epf.contract.searches.PROJECT_SEED", 1)
-    with pytest.raises(ValueError):
-        searched(
-            True,
-            "fake",
-            0,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-    with pytest.raises(ValueError):
-        opened(
-            folder(True, "fake") / "seed_0.db",
-            "fake",
-            _searcher({"value": (3, 1, 2)}, []),
-            0,
-            X.columns,
-            FINGERPRINTS["dataset"],
-        )
+    with pytest.raises(ValueError, match="amb una altra PROJECT_SEED"):
+        _continued(_searcher({"value": (3, 1, 2)}, []), X.columns)
 
 
-def test_a_search_made_on_another_deal_is_neither_read_nor_continued(
-    tmp_path, monkeypatch
-):
+def test_a_search_made_on_another_deal_is_not_continued(tmp_path, monkeypatch):
     """Les setmanes d'una seed canvien amb una altra derivació o una altra NumPy."""
     X, y = _table()
-    _saved(tmp_path, monkeypatch, X, y)
+    _studied(tmp_path, monkeypatch, X, y)
     real = split_module.seeded
     # Una altra partició de la mateixa seed, i la mateixa `PROJECT_SEED`.
     monkeypatch.setattr(
@@ -240,195 +147,53 @@ def test_a_search_made_on_another_deal_is_neither_read_nor_continued(
         lambda label, *parts: real(label, *parts, *([1] if label == "split" else [])),
     )
     with pytest.raises(ValueError, match="sobre altres files"):
-        searched(
-            True,
-            "fake",
-            0,
-            X.columns,
-            _searcher({"value": (3, 1, 2)}, []),
-            FINGERPRINTS["dataset"],
-        )
-    with pytest.raises(ValueError, match="sobre altres files"):
-        opened(
-            folder(True, "fake") / "seed_0.db",
-            "fake",
-            _searcher({"value": (3, 1, 2)}, []),
-            0,
-            X.columns,
-            FINGERPRINTS["dataset"],
-        )
+        _continued(_searcher({"value": (3, 1, 2)}, []), X.columns)
 
 
-def test_a_search_made_on_another_dataset_is_neither_read_nor_continued(
-    tmp_path, monkeypatch
-):
+def test_a_search_made_on_another_dataset_is_not_continued(tmp_path, monkeypatch):
     """Uns trials puntuats sobre unes altres dades es compararien amb els d'ara."""
     X, y = _table()
-    _saved(tmp_path, monkeypatch, X, y)
+    _studied(tmp_path, monkeypatch, X, y)
     with pytest.raises(ValueError, match="amb un altre dataset"):
-        searched(
-            True, "fake", 0, X.columns, _searcher({"value": (3, 1, 2)}, []), "un altre"
-        )
-    with pytest.raises(ValueError, match="amb un altre dataset"):
-        opened(
-            folder(True, "fake") / "seed_0.db",
-            "fake",
-            _searcher({"value": (3, 1, 2)}, []),
-            0,
-            X.columns,
-            "un altre",
-        )
+        _continued(_searcher({"value": (3, 1, 2)}, []), X.columns, "un altre")
 
 
-def test_a_search_made_on_another_space_or_fixed_numbers_is_neither_read_nor_continued(
+def test_a_search_made_on_another_space_or_fixed_numbers_is_not_continued(
     tmp_path, monkeypatch
 ):
     """Uns trials d'un altre espai o d'altres números no es comparen amb els d'ara."""
     X, y = _table()
-    _saved(tmp_path, monkeypatch, X, y)
+    _studied(tmp_path, monkeypatch, X, y)
+    searcher = vars(_searcher({"value": (3, 1, 2)}, []))
     for change, why in (
         ({"SPACE": {"value": (3, 1, 2, 4)}}, "sobre un altre espai"),
         ({"FIXED": {"patience": 2}}, "amb uns altres números fixos"),
     ):
-        changed = types.SimpleNamespace(
-            **vars(_searcher({"value": (3, 1, 2)}, [])) | change
-        )
         with pytest.raises(ValueError, match=why):
-            searched(True, "fake", 0, X.columns, changed, FINGERPRINTS["dataset"])
-        with pytest.raises(ValueError, match=why):
-            opened(
-                folder(True, "fake") / "seed_0.db",
-                "fake",
-                changed,
-                0,
-                X.columns,
-                FINGERPRINTS["dataset"],
-            )
+            _continued(types.SimpleNamespace(**searcher | change), X.columns)
 
 
-# Una família que es cerca i se n'ajusten les tres millors configuracions de cada seed.
-FAKE = {"fixed": {}, "placeholder": {"value": 0}, "kept": 3, "searched_as": "fake"}
-
-
-def _searched(tmp_path, monkeypatch, seeds):
-    """Fa una cerca de quatre trials de `fake` a cada seed de `seeds`, a l'assaig.
-
-    Torna les columnes sobre les quals es van fer.
-    """
-    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(
+    tmp_path,
+):
+    """La sonda de datació en guarda la millor: amb més, no seria la sonda que diu."""
     X, y = _table()
-    where = folder(True, "fake")
-    where.mkdir(parents=True)
-    for seed in seeds:
-        study = _study(
-            where / f"seed_{seed}.db",
-            _searcher({"value": (4, 1, 3, 2)}, []),
-            X,
-            y,
-            split(seed, PERIOD, DELETED),
-            seed,
-            4,
-        )
-        save(record(study, "fake", seed, True), True)
-    return X.columns
-
-
-def test_with_no_seed_searched_each_seed_fits_the_placeholders_marked(
-    tmp_path, monkeypatch
-):
-    columns = _searched(tmp_path, monkeypatch, [])
-    found = configurations(
-        True,
-        FAKE,
-        columns,
+    study = _study(
+        tmp_path / "seed_0.db",
         _searcher({"value": (4, 1, 3, 2)}, []),
-        (0, 1),
-        10,
-        FINGERPRINTS["dataset"],
+        X,
+        y,
+        split(0, PERIOD, DELETED),
+        0,
+        4,
     )
-    assert found == {
-        seed: [{"rank": 0, "numbers": {"value": 0}, "unsearched": True}]
-        for seed in (0, 1)
-    }
+    found = record(study, "fake", 0, True)
+    best = configurations(found, 2)
+    assert [one["rank"] for one in best] == [0, 1]
+    assert [one["numbers"]["value"] for one in best] == [1, 2]
+    assert all(one["trials"] == 4 for one in best)
+    assert [one["numbers"]["value"] for one in configurations(found, 1)] == [1]
 
 
-def test_with_every_seed_searched_each_fits_its_best_and_the_date_probe_the_first(
-    tmp_path, monkeypatch
-):
-    columns = _searched(tmp_path, monkeypatch, (0, 1))
-    found = configurations(
-        True,
-        FAKE,
-        columns,
-        _searcher({"value": (4, 1, 3, 2)}, []),
-        (0, 1),
-        10,
-        FINGERPRINTS["dataset"],
-    )
-    for seed in (0, 1):
-        assert [one["rank"] for one in found[seed]] == [0, 1, 2]
-        assert [one["numbers"]["value"] for one in found[seed]] == [1, 2, 3]
-        assert all(one["trials"] == 4 for one in found[seed])
-    # La sonda de datació en guarda una, la millor, de la cerca d'una altra família: amb
-    # més, no seria la sonda que diu.
-    probe = {"fixed": {}, "placeholder": None, "kept": 1, "searched_as": "fake"}
-    alone = configurations(
-        True,
-        probe,
-        columns,
-        _searcher({"value": (4, 1, 3, 2)}, []),
-        (0, 1),
-        10,
-        FINGERPRINTS["dataset"],
-    )
-    assert {
-        seed: [one["numbers"]["value"] for one in ones] for seed, ones in alone.items()
-    } == {0: [1], 1: [1]}
-
-
-def test_the_tree_keeps_the_commands_BEST(tmp_path, monkeypatch):
-    """Un assaig amb `BEST` a 1 ajustava les deu millors, el `BEST` de la mesura."""
-    columns = _searched(tmp_path, monkeypatch, (0, 1))
-    found = configurations(
-        True,
-        FAKE | {"kept": "BEST"},
-        columns,
-        _searcher({"value": (4, 1, 3, 2)}, []),
-        (0, 1),
-        2,
-        FINGERPRINTS["dataset"],
-    )
-    assert {
-        seed: [one["numbers"]["value"] for one in ones] for seed, ones in found.items()
-    } == {0: [1, 2], 1: [1, 2]}
-
-
-def test_a_search_of_some_seeds_only_is_refused(tmp_path, monkeypatch):
-    columns = _searched(tmp_path, monkeypatch, (0,))
-    with pytest.raises(ValueError):
-        configurations(
-            True,
-            FAKE,
-            columns,
-            _searcher({"value": (4, 1, 3, 2)}, []),
-            (0, 1),
-            10,
-            FINGERPRINTS["dataset"],
-        )
-
-
-def test_a_family_never_searched_fits_once_with_no_numbers(tmp_path, monkeypatch):
-    columns = _searched(tmp_path, monkeypatch, (0,))
-    never = FAKE | {"placeholder": None, "kept": 0}
-    assert configurations(
-        True,
-        never,
-        columns,
-        _searcher({"value": (4, 1, 3, 2)}, []),
-        (0, 1),
-        10,
-        FINGERPRINTS["dataset"],
-    ) == {
-        0: [{"rank": 0}],
-        1: [{"rank": 0}],
-    }
+def test_a_family_never_searched_fits_once_with_no_numbers():
+    assert configurations(None, 0) == [{"rank": 0}]

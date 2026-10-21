@@ -1,4 +1,4 @@
-"""Els processos que fan les tasques d'una cerca o d'una passada, uns quants alhora.
+"""Els processos que fan les tasques d'una passada, uns quants alhora.
 
 Només el pare escriu al terminal, on el bloc no es podria tornar a escriure si hi
 caigués una línia d'un procés.
@@ -96,8 +96,9 @@ def _fed(pool, running, tasks, workers, block):
 def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
     """Fa les tasques en `workers` processos de `threads` fils cada un.
 
-    Cada tasca és `((família, seed, unitat), funció, arguments)`, i la funció ha de
-    viure en un mòdul, perquè un procés nou la importa pel seu nom. De `tasks` se'n
+    Cada tasca és `((família, seed, tipus, número), funció, arguments)`: el tipus,
+    `trial` o `fit`, i el número del trial o el lloc de la configuració. La funció ha
+    de viure en un mòdul, perquè un procés nou la importa pel seu nom. De `tasks` se'n
     llegeixen fins que n'hi ha `workers` en marxa, al començament i cada vegada que en
     torna una, i mai no n'hi ha més alhora. Una tasca `None` vol dir que encara no n'hi
     ha cap a punt, i se'n torna a llegir quan en torna una altra; si no n'hi ha cap en
@@ -130,7 +131,7 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
                 )
                 for future in ready:
                     label = running.pop(future)
-                    family, seed, unit = label
+                    family, seed, kind, number = label
                     trace = None
                     try:
                         results[label] = future.result()
@@ -146,14 +147,14 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
                     else:
                         if on_return is not None:
                             on_return(label, results[label])
-                        block.advance(family, seed)
+                        block.advance(family, seed, kind)
                         _fed(pool, running, tasks, workers, block)
                         continue
                     # Un refús, pel seu missatge, que el bloc talla a l'amplada del
                     # terminal; qualsevol altra fallada, pel seu traceback.
                     with open(log, "a", encoding="utf-8") as handle:
                         handle.write(
-                            f"{family} seed {seed} {block.unit} {unit} ha fallat:"
+                            f"{family} seed {seed} {kind} {number} ha fallat:"
                             + (f" {message}\n" if trace is None else f"\n{trace}")
                         )
                     if on_failure is not None:

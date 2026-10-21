@@ -22,7 +22,7 @@ Command = collections.namedtuple("Command", "module function help arguments")
 
 # Les subcomandes que fa `epf start`, en ordre, i els segons entre l'una i l'altra, un
 # marge arbitrari.
-SEQUENCE = ("download", "dataset", "search", "run")
+SEQUENCE = ("download", "dataset", "run")
 PAUSE = 5
 
 # La variable d'entorn que nomena un programa, amb els seus arguments, que `epf start`
@@ -66,20 +66,6 @@ def run_arguments(parser):
     return parser
 
 
-def search_arguments(parser):
-    """Declara a `parser` els arguments d'una cerca, i el torna."""
-    run_arguments(parser)
-    parser.add_argument(
-        "--seed",
-        type=int,
-        nargs="+",
-        action="extend",
-        metavar="N",
-        help="només aquestes seeds",
-    )
-    return parser
-
-
 def figures_arguments(parser):
     """Declara a `parser` els arguments de `epf figures`, i el torna."""
     # Una sola opció d'assaig, i no una per variant: les passades d'assaig de totes les
@@ -113,18 +99,11 @@ COMMANDS = {
         "d'outliers",
         None,
     ),
-    "search": Command(
-        "epf.run.search",
-        "main",
-        "cerca els hiperparàmetres de cada família amb la cerca a l'atzar de "
-        "Trebbien et al. (2023)",
-        search_arguments,
-    ),
     "run": Command(
         "epf.run.run",
         "main",
-        "entrena els models i descriu el preu amb el protocol de Trebbien et al. "
-        "(2023)",
+        "cerca els hiperparàmetres, entrena els models i descriu el preu amb el "
+        "protocol de Trebbien et al. (2023)",
         run_arguments,
     ),
     "figures": Command(
