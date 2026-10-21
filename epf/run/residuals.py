@@ -18,8 +18,10 @@ from epf.run import families
 # Athanasopoulos (2021) per a una sèrie estacional.
 LAGS = 2 * DAYS_PER_WEEK
 
-# Columnes de la figura, una família per quadre.
+# Columnes de la figura, una família per quadre, i l'alçada de cada quadre entre la seva
+# amplada.
 PANELS_PER_ROW = 4
+PANEL_ASPECT = 3 / 4
 
 # El test de cada família, un per fila, al costat de la figura.
 RESIDUALS = "residuals.csv"
@@ -76,11 +78,11 @@ def ljung_box(series, lags=LAGS):
     return statistic, stats.chi2.sf(statistic, lags), correlations
 
 
-def report(where, described):
+def report(where, described, colours):
     """Dibuixa el correlograma de cada família ajustada i en desa el test.
 
-    El test va a `residuals.csv`, i el correlograma marca la distància de la partició i
-    la setmana.
+    El test va a `residuals.csv`, i el correlograma, del color de cada família de
+    `colours`, marca la distància de la partició i la setmana.
     """
     fitted = [
         family
@@ -93,8 +95,7 @@ def report(where, described):
     panels, axes = plt.subplots(
         rows,
         PANELS_PER_ROW,
-        figsize=(4 * PANELS_PER_ROW, 3 * rows),
-        facecolor=figure.SURFACE,
+        figsize=figure.size(rows * figure.WIDTH / PANELS_PER_ROW * PANEL_ASPECT),
         squeeze=False,
     )
     tests = []
@@ -105,12 +106,17 @@ def report(where, described):
         tests.append(
             {"family": family, "lags": LAGS, "q": statistic, "p": value, "days": days}
         )
-        axis.bar(np.arange(1, LAGS + 1), correlations, color=figure.SERIES, width=0.6)
+        axis.bar(
+            np.arange(1, LAGS + 1),
+            correlations,
+            color=colours[family],
+            width=figure.BAR_WIDTH,
+        )
         for lag in (GAP, DAYS_PER_WEEK):
-            axis.axvline(lag, color=figure.MUTED_INK, linestyle="--", linewidth=0.8)
-        axis.axhline(0, color=figure.INK, linewidth=0.6)
-        axis.set_xlabel("retard, dies", color=figure.MUTED_INK)
-        figure.style(axis, f"{family}, p {value:.2g}")
+            axis.axvline(lag, **figure.REFERENCE_LINE)
+        axis.axhline(0, **figure.REFERENCE_LINE)
+        axis.set_xlabel("retard, dies")
+        axis.set_title(f"{family}, p {figure.catalan(f'{value:.2g}')}")
     for axis in axes.flat[len(fitted) :]:
         axis.set_visible(False)
     figure.save(panels, where, "residuals")

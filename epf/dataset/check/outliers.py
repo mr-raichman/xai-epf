@@ -10,7 +10,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from epf import paths
 from epf.contract import figure
-from epf.contract.figure import GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.contract.figure import plt
 from epf.parameters import HOURS_PER_DAY
 
 # Veïns d'un valor, a cada costat: les hores adjacents de la sèrie cronològica, i la
@@ -25,8 +25,12 @@ HIGHEST = 100
 # 10 i les més altes arriben als milers.
 LINEAR_UP_TO = 1
 
-# Vermell de les puntuacions marcades.
-HIGHLIGHT_COLOUR = "#e34948"
+# Vermell, i el doble de grans que les altres, les puntuacions marcades.
+HIGHLIGHT_COLOUR = figure.rgb(227, 73, 72)
+HIGHLIGHT_SIZE = 2 * figure.MARKER_SIZE
+
+# L'alçada de la figura, en mm.
+HEIGHT = 91
 
 
 def window_median_mad(values, half_width):
@@ -127,49 +131,42 @@ def report(name, frame):
 
 
 def _style(axis, title, ylabel):
-    """Dona a uns eixos l'aspecte de la figura."""
-    axis.set_facecolor(SURFACE)
-    axis.set_title(title, color=INK, loc="left")
-    axis.set_ylabel(ylabel, color=MUTED_INK)
+    """Dona a uns eixos el títol, el de l'eix vertical i la seva escala."""
+    axis.set_title(title)
+    axis.set_ylabel(ylabel)
     axis.set_yscale("symlog", linthresh=LINEAR_UP_TO)
-    axis.grid(axis="y", color=GRID, linewidth=0.5)
-    axis.tick_params(colors=MUTED_INK)
-    for side in ("top", "right"):
-        axis.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        axis.spines[side].set_color(GRID)
 
 
 def draw(name, frame, by_hours, by_days):
-    """Dibuixa les puntuacions d'outliers d'una sèrie a `outliers_<sèrie>.png`.
+    """Dibuixa les puntuacions d'outliers d'una sèrie a `outliers_<sèrie>.svg`.
 
     A la carpeta de la sèrie: les de les hores adjacents, `by_hours`, un dia per línia,
     i les de la mateixa hora dels dies del voltant, `by_days`, en el temps, amb les
     `HIGHEST` més altes de cada neighbourhood en vermell.
     """
-    panels, (top, bottom) = plt.subplots(2, 1, figsize=(20, 12), facecolor=SURFACE)
+    panels, (top, bottom) = plt.subplots(2, 1, figsize=figure.size(HEIGHT))
 
     hours = np.arange(HOURS_PER_DAY)
     top.add_collection(
         LineCollection(
             [np.column_stack([hours, day]) for day in by_hours],
-            colors=SERIES,
-            linewidths=0.3,
-            alpha=0.3,
+            colors=figure.OTHER_COLOUR,
+            alpha=figure.POINT_OPACITY,
+            rasterized=by_hours.size > figure.DENSE_POINTS,
         )
     )
     top_marks = highest(by_hours)
     top.scatter(
         top_marks % HOURS_PER_DAY,
         by_hours.ravel()[top_marks],
-        s=12,
+        s=HIGHLIGHT_SIZE**2,
         color=HIGHLIGHT_COLOUR,
         zorder=3,
     )
     top.set_xlim(0, HOURS_PER_DAY - 1)
     top.set_ylim(0, np.nanmax(by_hours) * 1.5)
     top.set_xticks(hours)
-    top.set_xlabel("hora del dia", color=MUTED_INK)
+    top.set_xlabel("hora del dia")
     _style(
         top,
         f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
@@ -180,12 +177,19 @@ def draw(name, frame, by_hours, by_days):
     instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
         np.tile(hours, len(frame)), unit="h"
     )
-    bottom.scatter(instants, by_days.ravel(), s=1, color=SERIES, linewidths=0)
+    bottom.scatter(
+        instants,
+        by_days.ravel(),
+        s=figure.MARKER_SIZE**2,
+        color=figure.OTHER_COLOUR,
+        linewidths=0,
+        rasterized=by_days.size > figure.DENSE_POINTS,
+    )
     bottom_marks = highest(by_days)
     bottom.scatter(
         instants[bottom_marks],
         by_days.ravel()[bottom_marks],
-        s=12,
+        s=HIGHLIGHT_SIZE**2,
         color=HIGHLIGHT_COLOUR,
         zorder=3,
     )
@@ -200,9 +204,6 @@ def draw(name, frame, by_hours, by_days):
 
     panels.suptitle(
         f"Distància de cada valor horari de {name} als seus veïns, "
-        f"{frame.index[0].year} a {frame.index[-1].year}",
-        color=INK,
-        x=0.01,
-        ha="left",
+        f"{frame.index[0].year} a {frame.index[-1].year}"
     )
     figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")

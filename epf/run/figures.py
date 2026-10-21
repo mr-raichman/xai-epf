@@ -27,26 +27,27 @@ FIGURES = {
     "naive_previous_day": None,
 }
 
+# L'alçada de la figura de rendiment, en mm.
+PERFORMANCE_HEIGHT = 70
 
-def _performance(where, described):
+
+def _performance(where, described, colours):
     """Dibuixa l'R² i el MAE de cada família a les setmanes de prova.
 
-    La millor configuració de cada seed amb una marca, i les altres amb una de petita i
-    grisa al darrere. Només les famílies explicades tenen color; els bancs de
-    comparació, que no desen cap contribució, van en gris.
+    La millor configuració de cada seed amb una marca del color de la família, i les
+    altres amb una de petita i transparent al darrere.
     """
     shown = [family for family in families.EVERY if family in described]
-    explained = [family for family in shown if "values" in described[family][0].files]
-    colour = {name: hue for hue, name in figure.colours(explained)}
-    panels, axes = plt.subplots(
-        1, 2, figsize=(max(8, 1.1 * len(shown)), 5), facecolor=figure.SURFACE
-    )
+    panels, axes = plt.subplots(1, 2, figsize=figure.size(PERFORMANCE_HEIGHT))
     for axis, metric, label in (
         (axes[0], "r2", "R²"),
         (axes[1], "mae", "MAE, EUR/MWh"),
     ):
         for position, family in enumerate(shown):
-            for best, size in ((False, 2), (True, 4)):
+            for best, marker, opacity in (
+                (False, figure.MARKER_SIZE / 2, figure.POINT_OPACITY),
+                (True, figure.MARKER_SIZE, 1),
+            ):
                 found = [
                     float(model[metric])
                     for model in described[family]
@@ -56,19 +57,19 @@ def _performance(where, described):
                     [position] * len(found),
                     found,
                     "o",
-                    markersize=size,
-                    color=colour.get(family, figure.MUTED_INK)
-                    if best
-                    else figure.MUTED_INK,
+                    markersize=marker,
+                    color=colours[family],
+                    alpha=opacity,
                 )
-        axis.set_xticks(range(len(shown)), shown, fontsize=6, rotation=90)
-        axis.set_ylabel(label, color=figure.MUTED_INK)
-        figure.style(axis, f"{label} a les setmanes de prova, la millor de cada seed")
+        axis.set_xticks(range(len(shown)), shown, rotation=90)
+        axis.set_ylabel(label)
+        axis.set_title(f"{label} a les setmanes de prova, la millor de cada seed")
     figure.save(panels, where, "performance")
 
 
 def draw(where):
     """Dibuixa totes les figures d'una passada, `where`, del que hi ha desat."""
+    colours = figure.family_colours(families.MODELS)
     described = {}
     folders = [path for path in where.iterdir() if path.is_dir()]
     # En l'ordre de les famílies.
@@ -78,10 +79,12 @@ def draw(where):
             continue
         described[folder.name] = models
         if FIGURES[folder.name] is not None:
-            importlib.import_module(FIGURES[folder.name]).draw(folder, models)
+            importlib.import_module(FIGURES[folder.name]).draw(
+                folder, models, colours[folder.name]
+            )
     if described:
-        _performance(where, described)
-        residuals.report(where, described)
+        _performance(where, described, colours)
+        residuals.report(where, described, colours)
         tables.scores(where)
         tables.date_probe(where)
 

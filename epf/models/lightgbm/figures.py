@@ -9,23 +9,26 @@ from epf.contract.figure import plt
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
+# L'alçada de cada tauler de les interaccions entre la seva amplada.
+PANEL_ASPECT = 3.5 / 4
 
-def _interactions(folder, model, present):
+
+def _interactions(folder, model, present, colour):
     """Dibuixa les interaccions de cada sèrie al millor model ajustat, `model`.
 
-    És el de la primera seed. Per sèrie de `present`, la dependència sencera, l'efecte
-    sense interaccions i la interacció amb els `PARTNERS` socis més forts, amb el color
-    del valor de cada soci.
+    És el de la primera seed. Per sèrie de `present`, la dependència sencera i l'efecte
+    sense interaccions, de `colour`, el color de la família, i la interacció amb els
+    `PARTNERS` socis més forts, amb el color del valor de cada soci a l'escala contínua.
     """
     columns = list(model["columns"])
     rows = model["interaction_rows"]
     inputs, interactions = model["inputs"][rows], model["interactions"]
     values = model["values"][rows]
+    across = 2 + PARTNERS
     panels, axes = plt.subplots(
         len(present),
-        2 + PARTNERS,
-        figsize=(4 * (2 + PARTNERS), 3.5 * len(present)),
-        facecolor=figure.SURFACE,
+        across,
+        figsize=figure.size(len(present) * figure.WIDTH / across * PANEL_ASPECT),
         squeeze=False,
     )
     for row, name in zip(axes, present, strict=True):
@@ -42,25 +45,41 @@ def _interactions(folder, model, present):
             (2 * interactions[:, j, k], inputs[:, k], f"amb {columns[k]}")
             for k in partners
         ]
-        for axis, (y, colour, title) in zip(row, panels_of_row, strict=True):
-            if colour is None:
-                axis.plot(x, y, ".", color=figure.SERIES, markersize=2, alpha=0.5)
+        dense = x.size > figure.DENSE_POINTS
+        for axis, (y, partner, title) in zip(row, panels_of_row, strict=True):
+            if partner is None:
+                axis.plot(
+                    x,
+                    y,
+                    ".",
+                    color=colour,
+                    alpha=figure.POINT_OPACITY,
+                    rasterized=dense,
+                )
             else:
-                image = axis.scatter(x, y, c=colour, cmap=figure.MAGNITUDE, s=3)
+                image = axis.scatter(
+                    x,
+                    y,
+                    c=partner,
+                    s=figure.MARKER_SIZE**2,
+                    linewidths=0,
+                    rasterized=dense,
+                )
                 figure.colorbar(panels, image, axis, "valor del soci")
-            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW", color=figure.MUTED_INK)
-            figure.style(axis, title)
+            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
+            axis.set_title(title)
     figure.save(panels, folder, "interactions")
 
 
-def draw(folder, models):
+def draw(folder, models, colour):
     """Dibuixa les figures d'una família a `folder`, dels seus models ajustats.
 
-    La importància, la dependència i, si el fitxer en porta, les interaccions.
+    La importància, la dependència i, si el fitxer en porta, les interaccions, de
+    `colour`, el color de la família.
     """
-    figure.importance(folder, models)
+    figure.importance(folder, models, colour)
     present = figure.present(models[0])
     if present:
-        figure.dependence(folder, models, present)
+        figure.dependence(folder, models, present, colour)
         if "interactions" in models[0].files:
-            _interactions(folder, models[0], present)
+            _interactions(folder, models[0], present, colour)

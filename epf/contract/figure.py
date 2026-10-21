@@ -3,6 +3,8 @@
 Les dels models explicats es dibuixen dels models ajustats que la passada va desar.
 """
 
+import math
+
 import matplotlib
 import numpy as np
 
@@ -14,64 +16,294 @@ from epf.contract.record import fitted_files
 # el té triat.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap, to_rgba  # noqa: E402
+from matplotlib.ticker import ScalarFormatter  # noqa: E402
 
-# Tinta del text, tinta apagada de les etiquetes, línies de reixa i fons.
-INK = "#0b0b0b"
-MUTED_INK = "#898781"
-GRID = "#e1e0d9"
-SURFACE = "#fcfcfb"
 
-# El blau de la sèrie principal, que també encapçala la seqüència de línies.
-SERIES = "#2a78d6"
+def rgb(red, green, blue):
+    """Torna el color dels tres canals, de 0 a 255, en els de 0 a 1 de matplotlib."""
+    return (red / 255, green / 255, blue / 255)
 
+
+def rgba(red, green, blue, alpha):
+    """Torna el color dels tres canals, de 0 a 255, amb l'opacitat, de 0 a 1."""
+    return (*rgb(red, green, blue), alpha)
+
+
+# La lletra de tot el text de les figures, la de la memòria.
+FONT = "Times New Roman"
+
+# Mides del text, en punts.
+AXIS_TITLE_SIZE = 7
+TICK_LABEL_SIZE = 6
+PANEL_HEADING_SIZE = 7
+PANEL_LETTER_SIZE = 10
+LEGEND_SIZE = 5
+COLORBAR_TITLE_SIZE = 7
+COLORBAR_TICK_SIZE = 5
+ANNOTATION_SIZE = 5
+
+PANEL_LETTER_WEIGHT = "bold"
+
+# `PANEL_HEADING_PLACE`, "left", "center" o "right".
+PANEL_HEADING_PLACE = "center"
+
+# On va la lletra d'un panell, en punts des del seu cantó de dalt a l'esquerra.
+PANEL_LETTER_OFFSET = (-8, 4)
+
+# L'amplada de tota figura, la de la caixa de text de la memòria, i l'espai al voltant
+# de cada panell, en mm.
+WIDTH = 152
+PANEL_GAP = 1
+MM_PER_INCH = 25.4
+
+# La resolució, en punts per polzada, de tot el que es desa com a imatge: un mapa, una
+# barra de colors o una capa de més de `DENSE_POINTS` punts.
 DPI = 300
 
-# Escala seqüencial d'un sol to.
-MAGNITUDE = LinearSegmentedColormap.from_list(
-    "magnitude", [SURFACE, "#c3d9f2", "#6fa4e0", "#2a78d6", "#143f73"]
+TEXT_COLOUR = rgb(0, 0, 0)
+BACKGROUND = rgb(255, 255, 255)
+
+# El color de cada model. Les seves famílies en prenen tons, en l'ordre en què el model
+# les fa, cada una `SHADE` més a prop del blanc que l'anterior.
+MODEL_COLOURS = {
+    "ddnn": rgb(106, 66, 140),
+    "dnn": rgb(12, 115, 208),
+    "lightgbm": rgb(171, 97, 37),
+    "elastic_net": rgb(66, 131, 95),
+    "floor": rgb(60, 60, 60),
+    "naive": rgb(91, 91, 91),
+}
+SHADE = 0.32
+
+# El color de tot el que no és d'una família, com les sèries del dataset.
+OTHER_COLOUR = rgb(163, 86, 130)
+
+# L'escala dels valors continus, pel seu nom a matplotlib.
+SCALE = "viridis"
+
+# L'escala dels valors amb signe, el zero al mig, de blau a vermell, interpolada entre
+# aquests colors.
+DIVERGING_SCALE = LinearSegmentedColormap.from_list(
+    "diverging",
+    (
+        rgb(33, 102, 172),
+        rgb(67, 147, 195),
+        rgb(146, 197, 222),
+        rgb(209, 229, 240),
+        rgb(247, 247, 247),
+        rgb(253, 219, 199),
+        rgb(244, 165, 130),
+        rgb(214, 96, 77),
+        rgb(178, 24, 43),
+    ),
 )
 
-# Seqüència de colors de línia, encapçalada pel blau de la sèrie.
-LINES = (SERIES, "#d6622a", "#2ba86a", "#9b4fd6", "#c0392b", "#117a8b", "#b5338f")
+# Gruixos i llargades en punts, i opacitats de 0 a 1, que substitueixen la d'un color
+# rgba. Una línia de referència és la que no és cap dada, com un ajust, un zero o un
+# tall entre períodes.
+LINE_WIDTH = 0.75
+REFERENCE_WIDTH = 0.5
+REFERENCE_COLOUR = rgb(0, 0, 0)
+REFERENCE_STYLE = "--"
+MARKER_SIZE = 2
+POINT_OPACITY = 0.5
+BAND_OPACITY = 0.2
+
+# La línia, del color del fons, entre dues barres d'un histograma, que es toquen.
+HISTOGRAM_EDGE_WIDTH = 0.3
+
+# L'amplada d'una barra, en fracció del lloc que té.
+BAR_WIDTH = 0.7
+
+# `GRID_AXIS`, "x", "y" o "both".
+GRID_SHOWN = True
+GRID_AXIS = "both"
+GRID_COLOUR = rgb(221, 221, 221)
+GRID_WIDTH = 0.3
+GRID_STYLE = "-"
+
+# Els costats del marc que es dibuixen.
+FRAME_SIDES = ("left", "bottom")
+FRAME_COLOUR = rgb(0, 0, 0)
+FRAME_WIDTH = 0.5
+
+# `TICK_DIRECTION`, "out", "in" o "inout".
+TICK_LENGTH = 2
+TICK_WIDTH = 0.5
+TICK_DIRECTION = "out"
+
+LEGEND_FRAME = False
+
+# La llargada de la barra de colors entre el seu gruix.
+COLORBAR_ASPECT = 30
+
+# Les capes de més punts que aquests es desen com a imatge, a `DPI`: com a vector, el
+# SVG en guardaria un objecte per punt.
+DENSE_POINTS = 5000
+
+# `SVG_TEXT`, "path", el text com a traços, o "none", com a text, que el PDF deixa
+# seleccionar i cercar.
+SVG_TEXT = "none"
+
+# Els separadors de les xifres, els de la memòria.
+DECIMAL_SEPARATOR = ","
+THOUSANDS_SEPARATOR = "."
+
+# El que matplotlib pren per defecte, fet de les variables de dalt: qui importa aquest
+# mòdul ja el té.
+STYLE = {
+    "font.family": FONT,
+    "text.color": TEXT_COLOUR,
+    "axes.labelcolor": TEXT_COLOUR,
+    "xtick.color": TEXT_COLOUR,
+    "ytick.color": TEXT_COLOUR,
+    "axes.labelsize": AXIS_TITLE_SIZE,
+    "axes.titlesize": PANEL_HEADING_SIZE,
+    "axes.titlelocation": PANEL_HEADING_PLACE,
+    "figure.titlesize": PANEL_HEADING_SIZE,
+    "xtick.labelsize": TICK_LABEL_SIZE,
+    "ytick.labelsize": TICK_LABEL_SIZE,
+    "legend.fontsize": LEGEND_SIZE,
+    "legend.title_fontsize": LEGEND_SIZE,
+    "legend.frameon": LEGEND_FRAME,
+    "figure.facecolor": BACKGROUND,
+    "axes.facecolor": BACKGROUND,
+    "savefig.facecolor": BACKGROUND,
+    "savefig.dpi": DPI,
+    "svg.fonttype": SVG_TEXT,
+    # Les fórmules, com R² o σ, en la lletra del text.
+    "mathtext.fontset": "custom",
+    "mathtext.rm": FONT,
+    "mathtext.it": f"{FONT}:italic",
+    "mathtext.bf": f"{FONT}:bold",
+    "mathtext.fallback": "stix",
+    # Cada xifra sencera, sense un desplaçament comú a l'extrem de l'eix.
+    "axes.formatter.useoffset": False,
+    "image.cmap": SCALE,
+    "lines.linewidth": LINE_WIDTH,
+    "lines.markersize": MARKER_SIZE,
+    "axes.grid": GRID_SHOWN,
+    "axes.grid.axis": GRID_AXIS,
+    "axes.axisbelow": True,
+    "grid.color": GRID_COLOUR,
+    "grid.linewidth": GRID_WIDTH,
+    "grid.linestyle": GRID_STYLE,
+    "axes.edgecolor": FRAME_COLOUR,
+    "axes.linewidth": FRAME_WIDTH,
+    **{
+        f"axes.spines.{side}": side in FRAME_SIDES
+        for side in ("left", "right", "top", "bottom")
+    },
+    "xtick.major.size": TICK_LENGTH,
+    "ytick.major.size": TICK_LENGTH,
+    "xtick.major.width": TICK_WIDTH,
+    "ytick.major.width": TICK_WIDTH,
+    "xtick.direction": TICK_DIRECTION,
+    "ytick.direction": TICK_DIRECTION,
+    # Els panells alineats entre ells, cosa que `tight_layout` no fa amb una barra de
+    # colors.
+    "figure.constrained_layout.use": True,
+    "figure.constrained_layout.h_pad": PANEL_GAP / MM_PER_INCH,
+    "figure.constrained_layout.w_pad": PANEL_GAP / MM_PER_INCH,
+}
+plt.rcParams.update(STYLE)
+
+# Com es dibuixa una línia de referència.
+REFERENCE_LINE = {
+    "color": REFERENCE_COLOUR,
+    "linewidth": REFERENCE_WIDTH,
+    "linestyle": REFERENCE_STYLE,
+}
 
 
-def colours(names):
-    """Torna un color per nom, en l'ordre dels noms.
+def size(height):
+    """Torna en polzades la mida d'una figura de `WIDTH` mm i `height` mm d'alt."""
+    return (WIDTH / MM_PER_INCH, height / MM_PER_INCH)
 
-    Falla si n'hi ha més que colors: `zip(LINES, ...)` els deixaria fora sense dir-ho, i
-    repetir-ne un faria dues línies que la llegenda no distingeix.
+
+def shade(model, number):
+    """Torna el color de la família `number` d'un model, comptant des de zero.
+
+    La primera pren el color del model, i cada una de les següents és `SHADE` més a prop
+    del blanc que l'anterior, amb la mateixa opacitat.
     """
-    names = list(names)
-    if len(names) > len(LINES):
-        raise ValueError(
-            f"{len(names)} sèries i només {len(LINES)} colors de línia: "
-            f"{', '.join(map(str, names))}"
-        )
-    return list(zip(LINES, names, strict=False))
+    *channels, alpha = to_rgba(MODEL_COLOURS[model])
+    lighter = 1 - (1 - np.array(channels)) * (1 - SHADE) ** number
+    return (*lighter, alpha)
 
 
-def style(axis, title=None):
-    """Dona a uns eixos el títol, les marques i el marc de tot el projecte."""
-    if title:
-        axis.set_title(title, color=INK, loc="left", fontsize=10)
-    axis.tick_params(colors=MUTED_INK, length=0)
-    for side in axis.spines.values():
-        side.set_color(GRID)
+def family_colours(models):
+    """Torna el color de cada família, pel seu nom.
+
+    `models` dona les famílies de cada model, en ordre. Un model sense color, que només
+    n'agrupa d'altres, no hi entra.
+    """
+    return {
+        family: shade(model, number)
+        for model, families in models.items()
+        if model in MODEL_COLOURS
+        for number, family in enumerate(families)
+    }
 
 
-def colorbar(figure, image, axis, label):
-    bar = figure.colorbar(image, ax=axis, fraction=0.046, pad=0.02)
-    bar.set_label(label, color=MUTED_INK)
-    bar.ax.tick_params(colors=MUTED_INK, length=0)
-    bar.outline.set_color(GRID)
+def catalan(text):
+    """Torna un nombre escrit amb punt decimal amb els separadors de la memòria.
+
+    Agrupa les xifres enteres de tres en tres i escriu el signe menys, el de les xifres
+    dels eixos, també en la mantissa i l'exponent d'un nombre en notació científica.
+    Torna igual el que no és un nombre.
+    """
+    mantissa, marker, exponent = text.partition("e")
+    if marker and exponent.lstrip("+-").isdigit():
+        return catalan(mantissa) + marker + catalan(exponent)
+    negative = text[:1] in ("-", "\N{MINUS SIGN}")
+    whole, point, decimals = text[negative:].partition(".")
+    if not whole.isdigit() or (point and not decimals.isdigit()):
+        return text
+    groups = [whole[max(0, end - 3) : end] for end in range(len(whole), 0, -3)]
+    return (
+        ("\N{MINUS SIGN}" if negative else "")
+        + THOUSANDS_SEPARATOR.join(reversed(groups))
+        + (DECIMAL_SEPARATOR + decimals if point else "")
+    )
 
 
-def save(figure, folder, name):
-    """Desa una figura a `folder/<name>.png` i la tanca."""
-    figure.tight_layout()
-    figure.savefig(folder / f"{name}.png", dpi=DPI)
-    plt.close(figure)
+class Numbers(ScalarFormatter):
+    """Les xifres d'un eix, amb els separadors de la memòria."""
+
+    def __call__(self, value, position=None):
+        return catalan(super().__call__(value, position))
+
+
+def localise(drawing):
+    """Posa els separadors de la memòria a les xifres de tots els eixos d'una figura.
+
+    Només als eixos de nombres: un de dates o d'etiquetes ja té el seu format.
+    """
+    for axes in drawing.axes:
+        for axis in (axes.xaxis, axes.yaxis):
+            if type(axis.get_major_formatter()) is ScalarFormatter:
+                axis.set_major_formatter(Numbers())
+
+
+def colorbar(drawing, image, axes, label):
+    """Afegeix la barra de colors d'una imatge al costat dels eixos `axes`."""
+    bar = drawing.colorbar(image, ax=axes, aspect=COLORBAR_ASPECT)
+    bar.set_label(label, fontsize=COLORBAR_TITLE_SIZE)
+    bar.ax.tick_params(labelsize=COLORBAR_TICK_SIZE)
+    bar.outline.set_linewidth(FRAME_WIDTH)
+    bar.outline.set_edgecolor(FRAME_COLOUR)
+
+
+def save(drawing, folder, name):
+    """Desa una figura a `folder/<name>.svg` i la tanca.
+
+    Abans hi posa els separadors de la memòria a les xifres dels eixos.
+    """
+    localise(drawing)
+    drawing.savefig(folder / f"{name}.svg")
+    plt.close(drawing)
 
 
 # Com es diu cada grup de columnes a les figures.
@@ -106,6 +338,13 @@ SHOWN = 20
 
 # MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
+
+# Taulers per fila de la importància i de la dependència, i l'alçada de cada un entre la
+# seva amplada.
+IMPORTANCE_PER_ROW = 2
+IMPORTANCE_ASPECT = 6 / 5
+DEPENDENCE_PER_ROW = 4
+DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
 def saved(folder):
@@ -150,25 +389,29 @@ def importances(values, groups):
     )
 
 
-def importance(folder, models):
+def importance(folder, models, colour):
     """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
-    De les columnes, les `SHOWN` que més pesen. Un model ajustat sense cap contribució
-    en una sortida, que no depèn de les entrades, no hi entra, i el títol diu quants
-    models hi entren de quants.
+    De les columnes, les `SHOWN` que més pesen. La mitjana, en barres de `colour`, el
+    color de la família, i cada model ajustat, en un punt. Un model ajustat sense cap
+    contribució en una sortida, que no depèn de les entrades, no hi entra, i el títol
+    diu quants models hi entren de quants.
     """
     explained = list(outputs(models[0]))
     groups = models[0]["groups"]
     columns = models[0]["columns"]
+    across = min(IMPORTANCE_PER_ROW, len(explained))
+    rows = math.ceil(len(explained) / across)
     for kind in ("columns", "groups"):
         panels, axes = plt.subplots(
-            1,
-            len(explained),
-            figsize=(5 * len(explained), 6),
-            facecolor=SURFACE,
+            rows,
+            across,
+            figsize=size(rows * WIDTH / across * IMPORTANCE_ASPECT),
             squeeze=False,
         )
-        for axis, output in zip(axes[0], explained, strict=True):
+        for axis in axes.flat[len(explained) :]:
+            axis.set_visible(False)
+        for axis, output in zip(axes.flat, explained, strict=False):
             # La seva part seria zero entre zero.
             kept = [model for model in models if np.any(outputs(model)[output])]
             counted = (
@@ -176,9 +419,8 @@ def importance(folder, models):
                 if len(kept) < len(models)
                 else len(kept)
             )
-            title = f"{OUTPUT_LABELS[output]}, models: {counted}"
+            axis.set_title(f"{OUTPUT_LABELS[output]}, models: {counted}")
             if not kept:
-                style(axis, title)
                 continue
             found = [importances(outputs(model)[output], groups) for model in kept]
             if kind == "columns":
@@ -193,17 +435,17 @@ def importance(folder, models):
                 order = np.arange(len(labels))
                 names = [GROUP_LABELS[name] for name in labels]
             positions = np.arange(len(order))
-            axis.barh(positions, table[:, order].mean(axis=0), color=SERIES, height=0.6)
+            axis.barh(
+                positions, table[:, order].mean(axis=0), color=colour, height=BAR_WIDTH
+            )
             for row in table[:, order]:
-                axis.plot(row, positions, "o", color=INK, markersize=2)
-            axis.set_yticks(positions, names, fontsize=7)
+                axis.plot(row, positions, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
+            axis.set_yticks(positions, names)
             axis.set_xlabel(
                 "importància, la de la columna més important a 1"
                 if kind == "columns"
-                else "part de la importància",
-                color=MUTED_INK,
+                else "part de la importància"
             )
-            style(axis, title)
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
@@ -242,40 +484,57 @@ def pairs(model, values, name):
     return x.ravel(), y.ravel()
 
 
-def dependence(folder, models, present):
+def dependence(folder, models, present, colour):
     """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
 
-    Els punts i la recta ajustada són del millor model ajustat de la primera seed, i el
-    títol en dona el pendent i després la mitjana i la dispersió dels pendents de tots,
-    que són el que llegeixen Trebbien et al. (2023).
+    Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
+    model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
+    i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
+    (2023). Cada sèrie té un tauler per sortida explicada, i una fila en porta tantes
+    sèries com hi caben en `DEPENDENCE_PER_ROW` taulers, repartides igual entre les
+    files.
     """
     explained = list(outputs(models[0]))
     units = dict(zip(explained, models[0]["units"], strict=True))
+    rows = math.ceil(len(present) * len(explained) / DEPENDENCE_PER_ROW)
+    per_row = math.ceil(len(present) / rows)
+    rows = math.ceil(len(present) / per_row)
+    across = per_row * len(explained)
     panels, axes = plt.subplots(
-        len(present),
-        len(explained),
-        figsize=(4.5 * len(explained), 3.5 * len(present)),
-        facecolor=SURFACE,
+        rows,
+        across,
+        figsize=size(rows * WIDTH / across * DEPENDENCE_ASPECT),
         squeeze=False,
     )
-    for row, name in zip(axes, present, strict=True):
+    for axis in axes.flat[len(present) * len(explained) :]:
+        axis.set_visible(False)
+    for number, name in enumerate(present):
+        first = number % per_row * len(explained)
+        row = axes[number // per_row, first : first + len(explained)]
         for axis, output in zip(row, explained, strict=True):
             slopes = []
-            for number, model in enumerate(models):
+            for count, model in enumerate(models):
                 x, y = pairs(model, outputs(model)[output], name)
                 slope, intercept = np.polyfit(x / PER_GW, y, 1)
                 slopes.append(slope)
-                if number == 0:
-                    axis.plot(x / PER_GW, y, ".", color=SERIES, markersize=1, alpha=0.3)
+                if count == 0:
+                    axis.plot(
+                        x / PER_GW,
+                        y,
+                        ".",
+                        color=colour,
+                        alpha=POINT_OPACITY,
+                        rasterized=x.size > DENSE_POINTS,
+                    )
                     span = np.array([x.min(), x.max()]) / PER_GW
-                    axis.plot(span, slope * span + intercept, color=INK, linewidth=1)
-            axis.set_xlabel(f"{GROUP_LABELS[name]}, GW", color=MUTED_INK)
-            axis.set_ylabel(
-                f"{OUTPUT_LABELS[output]}, {units[output]}", color=MUTED_INK
-            )
-            style(
-                axis,
-                f"pendent {slopes[0]:.3g} {units[output]} per GW\nla mitjana dels "
-                f"{len(slopes)} models, {np.mean(slopes):.3g} (±{np.std(slopes):.2g})",
+                    axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
+            axis.set_xlabel(f"{GROUP_LABELS[name]}, GW")
+            axis.set_ylabel(f"{OUTPUT_LABELS[output]}, {units[output]}")
+            first_slope = catalan(f"{slopes[0]:.3g}")
+            mean = catalan(f"{np.mean(slopes):.3g}")
+            spread = catalan(f"{np.std(slopes):.2g}")
+            axis.set_title(
+                f"pendent {first_slope} {units[output]} per GW\nla mitjana dels "
+                f"{len(slopes)} models, {mean} (±{spread})"
             )
     save(panels, folder, "dependence")

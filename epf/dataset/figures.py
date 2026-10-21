@@ -5,8 +5,11 @@ import pandas as pd
 
 from epf import paths
 from epf.contract import figure
-from epf.contract.figure import GRID, INK, MUTED_INK, SERIES, SURFACE, plt
+from epf.contract.figure import plt
 from epf.parameters import HOURS_PER_DAY
+
+# L'alçada de la figura, en mm.
+HEIGHT = 46
 
 # El títol i la unitat de la figura de cada sèrie.
 LABELS = {
@@ -26,29 +29,18 @@ LABELS = {
 def draw(name, frame):
     """Dibuixa cada valor horari d'una sèrie, `frame` en dies per hores.
 
-    La figura va a la carpeta de la sèrie, `<sèrie>.png`, i una hora absent, com les de
+    La figura va a la carpeta de la sèrie, `<sèrie>.svg`, i una hora absent, com les de
     l'apagada, hi talla la línia en lloc d'unir-ne les veïnes.
     """
     instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
         np.tile(np.arange(HOURS_PER_DAY), len(frame)), unit="h"
     )
 
-    panels, axis = plt.subplots(figsize=(20, 6), facecolor=SURFACE)
-    axis.set_facecolor(SURFACE)
-    axis.plot(instants, frame.to_numpy().ravel(), color=SERIES, linewidth=0.3)
+    panels, axis = plt.subplots(figsize=figure.size(HEIGHT))
+    axis.plot(instants, frame.to_numpy().ravel(), color=figure.OTHER_COLOUR)
 
     title, unit = LABELS[name]
-    axis.set_title(
-        f"{title}, {frame.index[0].year} a {frame.index[-1].year}",
-        color=INK,
-        loc="left",
-    )
-    axis.set_ylabel(unit, color=MUTED_INK)
+    axis.set_title(f"{title}, {frame.index[0].year} a {frame.index[-1].year}")
+    axis.set_ylabel(unit)
     axis.set_xlim(instants[0], instants[-1])
-    axis.grid(axis="y", color=GRID, linewidth=0.5)
-    axis.tick_params(colors=MUTED_INK)
-    for side in ("top", "right"):
-        axis.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        axis.spines[side].set_color(GRID)
     figure.save(panels, paths.DATA_FIGURES / name, name)
