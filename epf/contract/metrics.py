@@ -113,7 +113,7 @@ def scored(predicted, actual):
     spread = actual - np.mean(actual)
     return {
         "r2": float(1 - np.sum(error**2) / np.sum(spread**2)),
-        "mae": float(np.mean(np.abs(error))),
+        "mae": mae(predicted, actual),
     }
 
 

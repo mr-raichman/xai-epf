@@ -11,6 +11,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from epf import paths
 from epf.contract import figure
 from epf.contract.figure import plt
+from epf.contract.matrix import HOUR
 from epf.parameters import HOURS_PER_DAY
 
 # Veïns d'un valor, a cada costat: les hores adjacents de la sèrie cronològica, i la
@@ -79,9 +80,9 @@ def report(name, frame):
 
     De cada neighbourhood, les hores adjacents de la sèrie cronològica, `hours`, i la
     mateixa hora dels dies del voltant, `days`, desa les `HIGHEST` puntuacions més altes
-    a `outliers_<sèrie>.csv`, a la carpeta de la sèrie, cada una amb el valor i la
-    mediana i la MAD de la seva finestra. Torna totes les puntuacions de cada
-    neighbourhood, en dies per hores, per dibuixar-les.
+    a `outliers_<sèrie>.csv`, a la carpeta de la sèrie, que ja hi ha de ser, cada una
+    amb el valor i la mediana i la MAD de la seva finestra. Torna totes les puntuacions
+    de cada neighbourhood, en dies per hores, per dibuixar-les.
     """
     values = frame.to_numpy().ravel()
     by_hours = hampel_score(values, HOUR_HALF_WIDTH).reshape(frame.shape)
@@ -124,10 +125,8 @@ def report(name, frame):
                 }
             )
         )
-    folder = paths.DATA_FIGURES / name
-    folder.mkdir(parents=True, exist_ok=True)
     pd.concat(rows).to_csv(
-        folder / f"{OUTLIERS.format(series=name)}.csv",
+        paths.DATA_FIGURES / name / f"{OUTLIERS.format(series=name)}.csv",
         index=False,
         lineterminator="\n",
         encoding="utf-8",
@@ -170,7 +169,7 @@ def draw(name, title, frame, by_hours, by_days):
     top.set_xlim(0, HOURS_PER_DAY - 1)
     top.set_ylim(0, np.nanmax(by_hours) * AXIS_TOP)
     top.set_xticks(hours)
-    top.set_xlabel("hora del dia")
+    top.set_xlabel(figure.CALENDAR_LABELS[HOUR])
     _style(
         top,
         f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
