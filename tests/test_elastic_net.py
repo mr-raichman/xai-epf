@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import ElasticNetCV
 
+from epf import Refusal
 from epf.contract.matrix import HOUR, PRICE, matrices
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
@@ -166,7 +167,7 @@ def test_a_window_without_spread_fails_loudly():
 
 def test_a_column_without_mad_is_refused_unless_the_caller_declares_the_fallback():
     values = np.column_stack([np.arange(10.0), EVENING_SOLAR])
-    with pytest.raises(ValueError):
+    with pytest.raises(Refusal):
         Scaler(values, ["a", "b"])
     scaler = Scaler(values, ["a", "b"], std_where_flat=True)
     assert scaler.scale[1] == np.std(EVENING_SOLAR)
@@ -175,5 +176,5 @@ def test_a_column_without_mad_is_refused_unless_the_caller_declares_the_fallback
 
 def test_the_fallback_still_refuses_a_column_that_never_moves():
     flat = np.column_stack([np.arange(10.0), np.zeros(10)])
-    with pytest.raises(ValueError, match="1 columna no té dispersió .*, b$"):
+    with pytest.raises(Refusal, match="1 columna no té dispersió .*, b$"):
         Scaler(flat, ["a", "b"], std_where_flat=True)

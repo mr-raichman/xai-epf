@@ -3,6 +3,7 @@ import optuna
 import pandas as pd
 import pytest
 
+from epf import Refusal
 from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.contract.split import split
 from epf.models.nn import network, search
@@ -72,14 +73,15 @@ def test_each_parameters_base_and_contributions_add_up_to_it(distribution):
     assert np.allclose(rebuilt, direct, atol=1e-3)
 
 
-def test_a_parameter_l1_for_another_distribution_is_refused():
+def test_a_parameter_l1_for_another_distribution_fails():
     """La pèrdua llegiria menys sortides de les que la xarxa treu, sense fallar.
 
     Amb quatre caps i una pèrdua de dos paràmetres, en llegiria dos, i la xarxa
     n'aprendria quatre.
     """
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as raised:
         build(NORMAL, 6, tuned(JOHNSON_SU))
+    assert not isinstance(raised.value, Refusal)
 
 
 def test_the_tail_weight_never_drops_below_one():

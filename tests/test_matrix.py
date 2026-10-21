@@ -91,8 +91,9 @@ def test_the_day_of_week_is_seven_indicators_on_the_delivery_day():
 
 def test_wrong_columns_fail_loudly():
     price = frame_of(range(10)).rename(columns={"h00": "hora0"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as raised:
         build({PRICE: price}, PRICE_ONLY)
+    assert not isinstance(raised.value, Refusal)
 
 
 def test_the_per_hour_row_carries_its_day_and_its_own_hour():
@@ -176,14 +177,14 @@ def test_the_dataset_reads_back_exactly_what_was_written(downloaded):
 def test_a_dataset_whose_downloaded_files_changed_is_refused(downloaded):
     matrix.series()
     downloaded.write_text('{"indicator": {"values": [{}]}}')
-    with pytest.raises(ValueError, match="desfasat"):
+    with pytest.raises(Refusal, match="desfasat"):
         matrix.series()
 
 
 def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
     with paths.DATASET.open("a", encoding="utf-8") as handle:
         handle.write("\n")
-    with pytest.raises(ValueError, match="ha canviat des que es va fer"):
+    with pytest.raises(Refusal, match="ha canviat des que es va fer"):
         matrix.series()
 
 

@@ -45,8 +45,9 @@ def test_an_hour_that_never_misses_gets_a_value_and_not_a_nan():
 def test_a_score_refuses_a_prediction_that_is_not_a_number_and_fails_a_missing_price():
     with pytest.raises(Refusal, match="la predicció té 2 valors no finits"):
         scored([1.0, np.nan, np.inf], [1.0, 2.0, 3.0])
-    with pytest.raises(ValueError, match="el preu real té 1 valor absent"):
+    with pytest.raises(ValueError, match="el preu real té 1 valor absent") as raised:
         scored([1.0, 2.0, 3.0], [1.0, np.nan, 3.0])
+    assert not isinstance(raised.value, Refusal)
 
 
 def test_a_price_exactly_on_its_bound_counts_inside_whatever_the_rounding():

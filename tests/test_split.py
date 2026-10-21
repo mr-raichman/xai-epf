@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import parameters
+from epf import parameters, Refusal
 from epf.contract.split import _deal, split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, SEEDS, SHARES
 
@@ -90,7 +90,7 @@ def test_a_seeds_deal_changes_with_PROJECT_SEED(monkeypatch):
 
 def test_a_period_of_broken_weeks_is_refused():
     # Les setmanes de calendari deixarien una primera de sis dies i una última d'un.
-    with pytest.raises(ValueError, match="setmanes senceres"):
+    with pytest.raises(Refusal, match="setmanes senceres"):
         split(0, (datetime.date(2019, 1, 1), datetime.date(2024, 9, 29)), BLACKOUT_WEEK)
 
 

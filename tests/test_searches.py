@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import paths
+from epf import paths, Refusal
 from epf.contract import split as split_module
 from epf.contract.searches import (
     asked,
@@ -122,7 +122,7 @@ def _continued(searcher, columns, dataset=FINGERPRINTS["dataset"]):
 def test_a_search_made_on_other_columns_is_not_continued(tmp_path, monkeypatch):
     X, y = _table()
     _studied(tmp_path, monkeypatch, X, y)
-    with pytest.raises(ValueError, match="sobre altres files"):
+    with pytest.raises(Refusal, match="sobre altres files"):
         _continued(_searcher({"value": (3, 1, 2)}, []), X.assign(z=0.0).columns)
 
 
@@ -132,7 +132,7 @@ def test_a_search_made_with_another_PROJECT_SEED_is_not_continued(
     X, y = _table()
     _studied(tmp_path, monkeypatch, X, y)
     monkeypatch.setattr("epf.contract.searches.PROJECT_SEED", 1)
-    with pytest.raises(ValueError, match="amb una altra PROJECT_SEED"):
+    with pytest.raises(Refusal, match="amb una altra PROJECT_SEED"):
         _continued(_searcher({"value": (3, 1, 2)}, []), X.columns)
 
 
@@ -147,7 +147,7 @@ def test_a_search_made_on_another_deal_is_not_continued(tmp_path, monkeypatch):
         "seeded",
         lambda label, *parts: real(label, *parts, *([1] if label == "split" else [])),
     )
-    with pytest.raises(ValueError, match="sobre altres files"):
+    with pytest.raises(Refusal, match="sobre altres files"):
         _continued(_searcher({"value": (3, 1, 2)}, []), X.columns)
 
 
@@ -155,7 +155,7 @@ def test_a_search_made_on_another_dataset_is_not_continued(tmp_path, monkeypatch
     """Uns trials puntuats sobre unes altres dades es compararien amb els d'ara."""
     X, y = _table()
     _studied(tmp_path, monkeypatch, X, y)
-    with pytest.raises(ValueError, match="amb un altre dataset"):
+    with pytest.raises(Refusal, match="amb un altre dataset"):
         _continued(_searcher({"value": (3, 1, 2)}, []), X.columns, "un altre")
 
 
@@ -170,7 +170,7 @@ def test_a_search_made_on_another_space_or_fixed_numbers_is_not_continued(
         ({"SPACE": {"value": (3, 1, 2, 4)}}, "sobre un altre espai"),
         ({"FIXED": {"patience": 2}}, "amb uns altres números fixos"),
     ):
-        with pytest.raises(ValueError, match=why):
+        with pytest.raises(Refusal, match=why):
             _continued(types.SimpleNamespace(**searcher | change), X.columns)
 
 
@@ -187,7 +187,7 @@ def test_a_trial_without_a_finite_score_diverges_and_keeps_its_dataset(tmp_path,
     optuna_trial, drawn = asked(study, searcher, "fake")
     assert told(study, optuna_trial, {"value": drawn}, score, FINGERPRINTS)
     assert [one.state.name for one in study.trials] == ["FAIL"]
-    with pytest.raises(ValueError, match="amb un altre dataset"):
+    with pytest.raises(Refusal, match="amb un altre dataset"):
         opened(store, "fake", searcher, 0, X.columns, "un altre")
 
 

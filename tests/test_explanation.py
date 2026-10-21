@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from epf import Refusal
 from epf.contract.explanation import TOLERANCE
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import Split
@@ -56,7 +57,7 @@ def test_a_file_that_does_not_add_up_is_refused_and_takes_no_name(tmp_path):
     """Un fitxer que no sumés el que explica faria figures d'una altra explicació."""
     # Les prediccions desades en un altre ordre, com les deixaria un fitxer mal escrit.
     values = np.random.default_rng(0).normal(0, 10, (2 * HOURS_PER_DAY, 20))
-    with pytest.raises(ValueError):
+    with pytest.raises(Refusal):
         _saved(
             tmp_path,
             {"values": values, "base": 50.0},
@@ -71,7 +72,7 @@ def test_a_file_holding_a_nan_is_refused(tmp_path):
     values = np.random.default_rng(0).normal(0, 10, (2 * HOURS_PER_DAY, 20))
     predicted = _tree(values)
     values[0, 0] = np.nan
-    with pytest.raises(ValueError):
+    with pytest.raises(Refusal):
         _saved(
             tmp_path,
             {"values": values, "base": 50.0},
@@ -80,11 +81,11 @@ def test_a_file_holding_a_nan_is_refused(tmp_path):
         )
 
 
-def test_explained_days_other_than_the_first_test_days_are_refused(tmp_path):
+def test_explained_days_other_than_the_first_test_days_fail(tmp_path):
     # Amb uns altres dies explicats, la lectura compararia les sumes amb les prediccions
     # d'uns altres dies, i aquí, on totes valen igual, no se n'adonaria.
     values = np.zeros((2 * HOURS_PER_DAY, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as raised:
         _saved(
             tmp_path,
             {"values": values, "base": 50.0},
@@ -92,6 +93,7 @@ def test_explained_days_other_than_the_first_test_days_are_refused(tmp_path):
             lambda found: tree.sums(found, with_interactions=False),
             TEST_DAYS[1:],
         )
+    assert not isinstance(raised.value, Refusal)
 
 
 def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):

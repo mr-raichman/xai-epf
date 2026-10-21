@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 import pytest
 
+from epf import Refusal
 from epf.dataset.esios import (
     MARKET_TIMEZONE,
     hourly,
@@ -108,7 +109,7 @@ def test_spring_inserts_the_missing_hour():
 
 
 def test_a_value_off_the_hour_is_refused_rather_than_dropped():
-    with pytest.raises(ValueError, match="fora de l'hora"):
+    with pytest.raises(Refusal, match="fora de l'hora"):
         hourly(QUARTERS)
 
 
@@ -116,7 +117,7 @@ def test_two_values_at_one_instant_are_refused_rather_than_summed():
     repeated = NUCLEAR + [
         {"datetime": "2024-03-09T01:00:00.000+01:00", "value": 1063.9}
     ]
-    with pytest.raises(ValueError, match="més d'un valor"):
+    with pytest.raises(Refusal, match="més d'un valor"):
         hourly(repeated)
 
 
@@ -175,5 +176,6 @@ def test_the_repair_only_moves_the_third_hour():
 
 
 def test_an_unknown_length_fails_loudly():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as raised:
         repair_dst([0.0] * 20)
+    assert not isinstance(raised.value, Refusal)

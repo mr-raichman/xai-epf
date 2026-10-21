@@ -47,7 +47,7 @@ def test_a_forecast_served_for_another_geography_too_is_refused():
         {"datetime": "2024-03-05T00:00:00.000+01:00", "value": value, "geo_name": name}
         for value, name in ((25000.0, "Península"), (5000.0, "Portugal"))
     ]
-    with pytest.raises(ValueError, match="geografies"):
+    with pytest.raises(Refusal, match="geografies"):
         esios.admissible(values, build.INDICATORS["demand_fcst"])
 
 

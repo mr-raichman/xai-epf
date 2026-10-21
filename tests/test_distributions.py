@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
+from epf import Refusal
 from epf.contract.metrics import PERCENTILES, crps
 from epf.models.nn.ddnn.distributions import JOHNSON_SU, NORMAL
 from epf.models.nn.network import parameters
@@ -134,5 +135,5 @@ def test_a_non_finite_quantile_is_refused_rather_than_averaged_away():
     actual = frame_of(60.0)
     quantiles = NORMAL.quantiles(normal_parameters(60.0, 5.0), PERCENTILES)
     quantiles[3, 2, 10] = np.inf
-    with pytest.raises(ValueError, match="no finits"):
+    with pytest.raises(Refusal, match="no finits"):
         crps(actual, quantiles)
