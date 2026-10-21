@@ -1,29 +1,11 @@
-import datetime
-
 import numpy as np
 import pandas as pd
 import pytest
 from scipy import stats
 
 from epf import Refusal
-from epf.contract.metrics import SIGNIFICANCE, fail_on_missing, kupiec, scored
+from epf.contract.metrics import SIGNIFICANCE, kupiec, scored
 from epf.parameters import HOUR_COLUMNS
-
-
-def frame_of(days, start=datetime.date(2024, 1, 1), offset=0.0):
-    """Torna uns preus sintètics on cada valor és dia * 100 + hora + `offset`."""
-    index = pd.DatetimeIndex(
-        [start + datetime.timedelta(days=d) for d in range(days)], name="day"
-    )
-    rows = [[d * 100 + hour + offset for hour in range(24)] for d in range(days)]
-    return pd.DataFrame(rows, index=index, columns=HOUR_COLUMNS)
-
-
-def test_a_missing_value_fails_naming_where_it_is():
-    holed = frame_of(30, offset=3.0)
-    holed.iloc[4, 0] = np.nan
-    with pytest.raises(ValueError, match="1 valor absent, a .* 00:00"):
-        fail_on_missing(holed, "el preu real")
 
 
 def _hits_per_hour(inside, days):

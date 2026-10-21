@@ -26,24 +26,21 @@ SIGNIFICANCE = 0.05
 ON_BOUND = 1e-4
 
 
-def fail_on_missing(frame, what):
-    """Falla si `frame` té cap valor absent, i diu on és el primer.
+def _fail_on_absent(actual):
+    """Falla si el preu real té cap valor absent, i diu quants.
 
     Un NaN faria tornar NaN la mesura sencera, o la faria saltar l'hora i informar-la
-    com si fos neta, segons com es mitjanés. `what` és el nom de la matriu al missatge.
+    com si fos neta, segons com es mitjanés.
     """
-    missing = frame.isna()
-    if not missing.to_numpy().any():
-        return
-    flat = missing.stack()
-    row, column = next(iter(flat[flat].index))
-    count = int(missing.to_numpy().sum())
-    moment = f"{row:%Y-%m-%d} {int(column[1:]):02d}:00"
-    raise ValueError(
-        f"{what} té 1 valor absent, a {moment}"
-        if count == 1
-        else f"{what} té {count} valors absents, el primer a {moment}"
-    )
+    absent = int(np.isnan(np.asarray(actual)).sum())
+    # Només un error del codi hi arriba, i n'hi ha prou amb el recompte: el dataset no
+    # té cap preu absent dins del seu tram, i `matrix.series` retalla cada sèrie al seu.
+    if absent:
+        raise ValueError(
+            "el preu real té 1 valor absent"
+            if absent == 1
+            else f"el preu real té {absent} valors absents"
+        )
 
 
 def _checked(actual, quantiles):
@@ -51,7 +48,7 @@ def _checked(actual, quantiles):
 
     Falla amb un preu absent, i refusa uns quantils que no són finits.
     """
-    fail_on_missing(actual, "el preu real")
+    _fail_on_absent(actual)
     if not np.isfinite(quantiles).all():
         raise Refusal("els quantils predits tenen valors no finits")
     return actual.to_numpy()[:, :, None]
@@ -104,15 +101,7 @@ def scored(predicted, actual):
     sol NaN tornaria NaN totes dues puntuacions sense dir-ho.
     """
     predicted, actual = np.asarray(predicted), np.asarray(actual)
-    absent = int(np.isnan(actual).sum())
-    # Només un error del codi hi arriba, i n'hi ha prou amb el recompte: el dataset no
-    # té cap preu absent dins del seu tram, i `matrix.series` retalla cada sèrie al seu.
-    if absent:
-        raise ValueError(
-            "el preu real té 1 valor absent"
-            if absent == 1
-            else f"el preu real té {absent} valors absents"
-        )
+    _fail_on_absent(actual)
     wrong = int((~np.isfinite(predicted)).sum())
     if wrong:
         raise Refusal(
