@@ -86,7 +86,6 @@ def draw(where):
         _performance(where, described, colours)
         residuals.report(where, described, colours)
         tables.scores(where)
-        tables.date_probe(where)
 
 
 def main(arguments):
