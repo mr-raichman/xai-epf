@@ -65,3 +65,17 @@ def test_a_score_refuses_a_prediction_that_is_not_a_number_and_fails_a_missing_p
         scored([1.0, np.nan, np.inf], [1.0, 2.0, 3.0])
     with pytest.raises(ValueError, match="el preu real té 1 valor absent"):
         scored([1.0, 2.0, 3.0], [1.0, np.nan, 3.0])
+
+
+def test_a_price_exactly_on_its_bound_counts_inside_whatever_the_rounding():
+    # El dia similar del 2022-12-25 a les 23:00: la còpia, 89.00, més l'error del 5% de
+    # l'hora, el del 2024-09-14, 80.98 - 123.86, fa l'extrem de 46.12, el preu mateix, i
+    # la suma en coma flotant en queda a 46.120000000000005; amb l'error desat en
+    # float32, a 46.11999893.
+    error = 80.98 - 123.86
+    price = pd.DataFrame({HOUR_COLUMNS[0]: [46.12] * 10})
+    inside = np.tile([[[40.0, 50.0]]], (10, 1, 1))
+    for lower in (89.0 + error, 89.0 + float(np.float32(error))):
+        tied = inside.copy()
+        tied[0, 0, 0] = lower
+        assert kupiec(price, tied, 0.9) == pytest.approx(kupiec(price, inside, 0.9))

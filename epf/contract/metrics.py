@@ -18,6 +18,13 @@ INTERVALS = {50: (0.25, 0.75), 90: (0.05, 0.95)}
 # Nivell de significació del test de Kupiec, el de Marcjasz et al. (2023).
 SIGNIFICANCE = 0.05
 
+# Distància a un extrem, en EUR/MWh, dins de la qual un preu hi és a sobre, perquè
+# l'interval tancat de Nowotarski i Weron (2018) ho sigui també en coma flotant. Els
+# preus són múltiples de 0.00125, i els extrems del dia similar, fets de preus, també:
+# dos valors diferents se separen almenys 0.00125, i l'arrodoniment, també el d'un error
+# desat en `float32`, en mou menys de 4e-5.
+ON_BOUND = 1e-4
+
 
 def refuse_missing(frame, what):
     """Falla si `frame` té cap valor absent, i diu on és el primer.
@@ -66,12 +73,12 @@ def kupiec(actual, bounds, coverage):
     """Torna el valor p del test de cobertura incondicional de Kupiec (1995), per hora.
 
     `bounds` són els extrems de l'interval, `(dies, hores, 2)`, i `coverage` la seva
-    cobertura nominal. Un preu dins l'interval, extrems inclosos, n'és un encert, i el
-    test és la raó de versemblances de Nowotarski i Weron (2018), una khi quadrat d'un
-    grau.
+    cobertura nominal. Un preu dins l'interval, extrems inclosos, n'és un encert, un a
+    `ON_BOUND` d'un extrem també, i el test és la raó de versemblances de Nowotarski i
+    Weron (2018), una khi quadrat d'un grau.
     """
     price = _checked(actual, bounds)[..., 0]
-    hits = (bounds[..., 0] <= price) & (price <= bounds[..., 1])
+    hits = (bounds[..., 0] - ON_BOUND <= price) & (price <= bounds[..., 1] + ON_BOUND)
     inside = hits.sum(axis=0)
     outside = len(hits) - inside
     observed = inside / len(hits)
