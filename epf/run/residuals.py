@@ -97,6 +97,7 @@ def report(where, described, colours):
         PANELS_PER_ROW,
         figsize=figure.size(rows * figure.WIDTH / PANELS_PER_ROW * PANEL_ASPECT),
         squeeze=False,
+        sharey=True,
     )
     tests = []
     for axis, family in zip(axes.flat, fitted, strict=False):
@@ -116,7 +117,9 @@ def report(where, described, colours):
             axis.axvline(lag, **figure.REFERENCE_LINE)
         axis.axhline(0, **figure.REFERENCE_LINE)
         axis.set_xlabel("retard, dies")
-        axis.set_title(f"{family}, p {figure.catalan(f'{value:.2g}')}")
+        axis.set_title(f"{figure.FAMILY_LABELS[family]}, {figure.p_value(value)}")
+    for axis in axes[:, 0]:
+        axis.set_ylabel("autocorrelació")
     for axis in axes.flat[len(fitted) :]:
         axis.set_visible(False)
     figure.save(panels, where, "residuals")

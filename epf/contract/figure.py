@@ -8,6 +8,7 @@ import math
 import matplotlib
 import numpy as np
 
+from epf.contract.explanation import UNITLESS
 from epf.contract.matrix import INFORMATION, PRICE
 from epf.contract.record import fitted_files
 from epf.parameters import HOUR_COLUMNS
@@ -119,6 +120,11 @@ HISTOGRAM_EDGE_WIDTH = 0.3
 # L'amplada d'una barra, en fracció del lloc que té.
 BAR_WIDTH = 0.7
 
+# Un panell d'una fila per cosa, una barra o els punts d'una família, creix amb les
+# seves files: el lloc de cada una, i el del títol, l'eix i les seves xifres, en mm.
+ROW_PITCH = 3.5
+ROW_PANEL_FRAME = 16
+
 # `GRID_AXIS`, "x", "y" o "both".
 GRID_SHOWN = True
 GRID_AXIS = "both"
@@ -141,9 +147,18 @@ LEGEND_FRAME = False
 # La llargada de la barra de colors entre el seu gruix.
 COLORBAR_ASPECT = 30
 
-# Les capes de més punts que aquests es desen com a imatge, a `DPI`: com a vector, el
-# SVG en guardaria un objecte per punt.
+# Les capes de més punts que aquests, denses, es desen com a imatge, a `DPI`: com a
+# vector, el SVG en guardaria un objecte per punt.
 DENSE_POINTS = 5000
+
+# Una capa densa, com milers de dies superposats o les desenes de milers d'hores d'una
+# sèrie, va més prima i, si les seves línies o els seus punts se superposen, més
+# transparent: amb el gruix i la mida de sempre es tapen, i en surt una taca en lloc
+# d'on se n'amunteguen més.
+DENSE_LINE_WIDTH = 0.2
+DENSE_MARKER_SIZE = 0.6
+DENSE_LINE_OPACITY = 0.15
+DENSE_POINT_OPACITY = 0.3
 
 # `SVG_TEXT`, "path", el text com a traços, o "none", com a text, que el PDF deixa
 # seleccionar i cercar.
@@ -299,6 +314,36 @@ def colorbar(drawing, image, axes, label):
     bar.outline.set_edgecolor(FRAME_COLOUR)
 
 
+def line_style(count, overlapping):
+    """Torna com es dibuixa una capa de línies de `count` punts en total.
+
+    El gruix i si es desa com a imatge, per a `plot` o una col·lecció de línies, i
+    l'opacitat si les seves línies se superposen, `overlapping`.
+    """
+    dense = count > DENSE_POINTS
+    found = {
+        "linewidth": DENSE_LINE_WIDTH if dense else LINE_WIDTH,
+        "rasterized": dense,
+    }
+    if overlapping:
+        found["alpha"] = DENSE_LINE_OPACITY if dense else POINT_OPACITY
+    return found
+
+
+def point_style(count):
+    """Torna com es dibuixa una capa de `count` punts, per a `scatter`.
+
+    La mida, l'opacitat, cap vora, i si es desa com a imatge.
+    """
+    dense = count > DENSE_POINTS
+    return {
+        "s": (DENSE_MARKER_SIZE if dense else MARKER_SIZE) ** 2,
+        "alpha": DENSE_POINT_OPACITY if dense else POINT_OPACITY,
+        "linewidths": 0,
+        "rasterized": dense,
+    }
+
+
 def save(drawing, folder, name):
     """Desa una figura a `folder/<name>.svg` i la tanca.
 
@@ -322,6 +367,40 @@ GROUP_LABELS = {
     "date": "comptador de dies",
 }
 
+# Com es diu cada columna del calendari a les figures; el dia 0 de la setmana és el
+# dilluns.
+WEEKDAYS = (
+    "dilluns",
+    "dimarts",
+    "dimecres",
+    "dijous",
+    "divendres",
+    "dissabte",
+    "diumenge",
+)
+CALENDAR_LABELS = {
+    "hour": "hora del dia",
+    "day_of_week": "dia de la setmana",
+    **{f"day_of_week_{number}": day for number, day in enumerate(WEEKDAYS)},
+}
+
+# El valor p més petit que una figura escriu; un de menor s'hi escriu `p < 0,001`.
+SMALLEST_P = 0.001
+
+# Com es diu cada família a les figures.
+FAMILY_LABELS = {
+    "ddnn_jsu": "DDNN Johnson SU",
+    "ddnn_normal": "DDNN normal",
+    "dnn": "xarxa de punt",
+    "elastic_net": "elastic net",
+    "lightgbm": "arbre",
+    "date_probe": "sonda de datació",
+    "floor": "sòl",
+    "naive_similar_day": "dia similar",
+    "naive_previous_week": "setmana anterior",
+    "naive_previous_day": "dia anterior",
+}
+
 # Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de les
 # famílies que n'expliquen un de sol.
 OUTPUT_LABELS = {
@@ -342,12 +421,41 @@ SHOWN = 20
 # MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
 
-# Panells per fila de la importància i de la dependència, i l'alçada de cada un entre la
-# seva amplada.
+# Panells per fila de la importància i de la dependència, i l'alçada de cada panell de
+# dependència entre la seva amplada.
 IMPORTANCE_PER_ROW = 2
-IMPORTANCE_ASPECT = 6 / 5
 DEPENDENCE_PER_ROW = 4
 DEPENDENCE_ASPECT = 3.5 / 4.5
+
+
+def unit_label(label, unit):
+    """Torna el títol d'un eix amb la unitat, `preu, EUR/MWh`, o sol si no en té."""
+    return label if unit == UNITLESS else f"{label}, {unit}"
+
+
+def p_value(value):
+    """Torna `p = 0,03`, o `p < 0,001` per sota de `SMALLEST_P`."""
+    if value < SMALLEST_P:
+        return f"p < {catalan(str(SMALLEST_P))}"
+    return f"p = {catalan(f'{value:.2g}')}"
+
+
+def column_label(column, group):
+    """Torna com es diu una columna a les figures, del seu grup, `group`, i l'hora.
+
+    `price_lag1_h23`, del grup `price`, és `preu del dia abans, 23 h`.
+    """
+    if column in CALENDAR_LABELS:
+        return CALENDAR_LABELS[column]
+    hour = column.rsplit("_", 1)[-1]
+    if hour in HOUR_COLUMNS:
+        return f"{GROUP_LABELS[group]}, {int(hour[1:])} h"
+    return GROUP_LABELS[group]
+
+
+def rows_height(count):
+    """Torna en mm l'alçada d'un panell de `count` files."""
+    return count * ROW_PITCH + ROW_PANEL_FRAME
 
 
 def saved(folder):
@@ -406,11 +514,9 @@ def importance(folder, models, colour):
     across = min(IMPORTANCE_PER_ROW, len(explained))
     rows = math.ceil(len(explained) / across)
     for kind in ("columns", "groups"):
+        count = min(SHOWN, len(columns)) if kind == "columns" else len(set(groups))
         panels, axes = plt.subplots(
-            rows,
-            across,
-            figsize=size(rows * WIDTH / across * IMPORTANCE_ASPECT),
-            squeeze=False,
+            rows, across, figsize=size(rows * rows_height(count)), squeeze=False
         )
         for axis in axes.flat[len(explained) :]:
             axis.set_visible(False)
@@ -429,7 +535,7 @@ def importance(folder, models, colour):
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
                 order = np.argsort(table.mean(axis=0))[-SHOWN:]
-                names = columns[order]
+                names = [column_label(columns[j], groups[j]) for j in order]
             else:
                 labels = list(found[0][1])
                 table = np.array(
@@ -445,7 +551,7 @@ def importance(folder, models, colour):
                 axis.plot(row, positions, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
             axis.set_yticks(positions, names)
             axis.set_xlabel(
-                "importància, la de la columna més important de cada model a 1"
+                "importància, la més gran de cada model a 1"
                 if kind == "columns"
                 else "part de la importància"
             )
@@ -521,23 +627,13 @@ def dependence(folder, models, present, colour):
                 slope, intercept = np.polyfit(x / PER_GW, y, 1)
                 slopes.append(slope)
                 if count == 0:
-                    axis.plot(
-                        x / PER_GW,
-                        y,
-                        ".",
-                        color=colour,
-                        alpha=POINT_OPACITY,
-                        rasterized=x.size > DENSE_POINTS,
-                    )
+                    axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
                     span = np.array([x.min(), x.max()]) / PER_GW
                     axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
             axis.set_xlabel(f"{GROUP_LABELS[name]}, GW")
-            axis.set_ylabel(f"{OUTPUT_LABELS[output]}, {units[output]}")
-            first_slope = catalan(f"{slopes[0]:.3g}")
-            mean = catalan(f"{np.mean(slopes):.3g}")
+            axis.set_ylabel(unit_label(OUTPUT_LABELS[output], units[output]))
+            first_slope = catalan(f"{slopes[0]:.2g}")
+            mean = catalan(f"{np.mean(slopes):.2g}")
             spread = catalan(f"{np.std(slopes):.2g}")
-            axis.set_title(
-                f"pendent {first_slope} {units[output]} per GW\nla mitjana dels "
-                f"{len(slopes)} models, {mean} (±{spread})"
-            )
+            axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
     save(panels, folder, "dependence")

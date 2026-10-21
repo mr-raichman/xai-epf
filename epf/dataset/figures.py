@@ -37,10 +37,16 @@ def draw(name, frame):
     )
 
     panels, axis = plt.subplots(figsize=figure.size(HEIGHT))
-    axis.plot(instants, frame.to_numpy().ravel(), color=figure.OTHER_COLOUR)
+    values = frame.to_numpy().ravel()
+    axis.plot(
+        instants,
+        values,
+        color=figure.OTHER_COLOUR,
+        **figure.line_style(values.size, overlapping=False),
+    )
 
     title, unit = LABELS[name]
-    axis.set_title(f"{title}, {frame.index[0].year} a {frame.index[-1].year}")
+    axis.set_title(f"{title}, de {frame.index[0].year} a {frame.index[-1].year}")
     axis.set_ylabel(unit)
     axis.set_xlim(instants[0], instants[-1])
     figure.save(panels, paths.DATA_FIGURES / name, name)

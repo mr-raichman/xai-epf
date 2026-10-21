@@ -6,28 +6,30 @@ Es dibuixen del que la passada va desar, sense tornar a ajustar res.
 import importlib
 import sys
 
+import numpy as np
+
 from epf import Refusal, paths
 from epf.contract import figure
 from epf.contract.figure import plt
 from epf.run import families, residuals, tables
 
-# L'alçada de la figura de rendiment, en mm.
-PERFORMANCE_HEIGHT = 70
-
 
 def _performance(where, described, colours):
-    """Dibuixa l'R² i el MAE de cada família a les setmanes de prova.
+    """Dibuixa l'R² i el MAE de cada família a les setmanes de prova, una per fila.
 
     La millor configuració de cada seed amb una marca del color de la família, i les
-    altres amb una de petita i transparent al darrere.
+    altres amb una de petita i transparent al darrere. La primera família, a dalt.
     """
     shown = [family for family in families.EVERY if family in described]
-    panels, axes = plt.subplots(1, 2, figsize=figure.size(PERFORMANCE_HEIGHT))
+    panels, axes = plt.subplots(
+        1, 2, figsize=figure.size(figure.rows_height(len(shown))), sharey=True
+    )
+    positions = np.arange(len(shown))[::-1]
     for axis, metric, label in (
-        (axes[0], "r2", "R²"),
-        (axes[1], "mae", "MAE, EUR/MWh"),
+        (axes[0], "r2", "R² a les setmanes de prova"),
+        (axes[1], "mae", "MAE a les setmanes de prova, EUR/MWh"),
     ):
-        for position, family in enumerate(shown):
+        for position, family in zip(positions, shown, strict=True):
             for best, marker, opacity in (
                 (False, figure.MARKER_SIZE / 2, figure.POINT_OPACITY),
                 (True, figure.MARKER_SIZE, 1),
@@ -38,16 +40,15 @@ def _performance(where, described, colours):
                     if (int(model["rank"]) == 0) == best
                 ]
                 axis.plot(
-                    [position] * len(found),
                     found,
+                    [position] * len(found),
                     "o",
                     markersize=marker,
                     color=colours[family],
                     alpha=opacity,
                 )
-        axis.set_xticks(range(len(shown)), shown, rotation=90)
-        axis.set_ylabel(label)
-        axis.set_title(f"{label} a les setmanes de prova, la millor de cada seed")
+        axis.set_xlabel(label)
+    axes[0].set_yticks(positions, [figure.FAMILY_LABELS[family] for family in shown])
     figure.save(panels, where, "performance")
 
 

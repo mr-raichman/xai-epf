@@ -25,9 +25,9 @@ HIGHEST = 100
 # 10 i les més altes arriben als milers.
 LINEAR_UP_TO = 1
 
-# Vermell, i el doble de grans que les altres, les puntuacions marcades.
+# Vermell, i de la mida d'un punt d'una capa que no és densa, les puntuacions marcades.
 HIGHLIGHT_COLOUR = figure.rgb(227, 73, 72)
-HIGHLIGHT_SIZE = 2 * figure.MARKER_SIZE
+HIGHLIGHT_SIZE = figure.MARKER_SIZE
 
 # L'alçada de la figura, en mm.
 HEIGHT = 91
@@ -137,12 +137,13 @@ def _style(axis, title, ylabel):
     axis.set_yscale("symlog", linthresh=LINEAR_UP_TO)
 
 
-def draw(name, frame, by_hours, by_days):
+def draw(name, title, frame, by_hours, by_days):
     """Dibuixa les puntuacions d'outliers d'una sèrie a `outliers_<sèrie>.svg`.
 
-    A la carpeta de la sèrie: les de les hores adjacents, `by_hours`, un dia per línia,
-    i les de la mateixa hora dels dies del voltant, `by_days`, en el temps, amb les
-    `HIGHEST` més altes de cada neighbourhood en vermell.
+    `title` és el nom de la sèrie a les figures. A la carpeta de la sèrie: les de les
+    hores adjacents, `by_hours`, un dia per línia, i les de la mateixa hora dels dies
+    del voltant, `by_days`, en el temps, amb les `HIGHEST` més altes de cada
+    neighbourhood en vermell.
     """
     panels, (top, bottom) = plt.subplots(2, 1, figsize=figure.size(HEIGHT))
 
@@ -151,8 +152,7 @@ def draw(name, frame, by_hours, by_days):
         LineCollection(
             [np.column_stack([hours, day]) for day in by_hours],
             colors=figure.OTHER_COLOUR,
-            alpha=figure.POINT_OPACITY,
-            rasterized=by_hours.size > figure.DENSE_POINTS,
+            **figure.line_style(by_hours.size, overlapping=True),
         )
     )
     top_marks = highest(by_hours)
@@ -180,10 +180,8 @@ def draw(name, frame, by_hours, by_days):
     bottom.scatter(
         instants,
         by_days.ravel(),
-        s=figure.MARKER_SIZE**2,
         color=figure.OTHER_COLOUR,
-        linewidths=0,
-        rasterized=by_days.size > figure.DENSE_POINTS,
+        **figure.point_style(by_days.size),
     )
     bottom_marks = highest(by_days)
     bottom.scatter(
@@ -203,7 +201,7 @@ def draw(name, frame, by_hours, by_days):
     )
 
     panels.suptitle(
-        f"Distància de cada valor horari de {name} als seus veïns, "
+        f"{title}: distància de cada valor horari als seus veïns, de "
         f"{frame.index[0].year} a {frame.index[-1].year}"
     )
     figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")

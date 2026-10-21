@@ -42,32 +42,21 @@ def _interactions(folder, model, present, colour):
             (interactions[:, j, j], None, "sense interaccions"),
         ]
         panels_of_row += [
-            (2 * interactions[:, j, k], inputs[:, k], f"amb {columns[k]}")
+            (
+                2 * interactions[:, j, k],
+                inputs[:, k],
+                f"amb {figure.column_label(columns[k], model['groups'][k])}",
+            )
             for k in partners
         ]
-        dense = x.size > figure.DENSE_POINTS
         for axis, (y, partner, title) in zip(row, panels_of_row, strict=True):
             if partner is None:
-                axis.plot(
-                    x,
-                    y,
-                    ".",
-                    color=colour,
-                    alpha=figure.POINT_OPACITY,
-                    rasterized=dense,
-                )
+                axis.scatter(x, y, color=colour, **figure.point_style(x.size))
             else:
-                image = axis.scatter(
-                    x,
-                    y,
-                    c=partner,
-                    s=figure.MARKER_SIZE**2,
-                    linewidths=0,
-                    rasterized=dense,
-                )
+                image = axis.scatter(x, y, c=partner, **figure.point_style(x.size))
                 figure.colorbar(panels, image, axis, "valor del soci")
-            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
             axis.set_title(title)
+        row[0].set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
     figure.save(panels, folder, "interactions")
 
 
