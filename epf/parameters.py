@@ -5,6 +5,8 @@ tots al registre de cada família.
 """
 
 import datetime
+import hashlib
+import json
 
 from epf import Refusal
 
@@ -56,7 +58,7 @@ SCHEDULE_LAG = 1
 
 ### Ajust i cerca ###
 
-# Seed de tota família que en faci servir.
+# La seed d'on surt cada tria a l'atzar del projecte, per `seeded`.
 PROJECT_SEED = 0
 
 # Trials de la cerca de cada família a cada seed, i quants dels millors se n'expliquen:
@@ -96,6 +98,21 @@ THREADS = 4
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
 SMOKE_1 = {"SEEDS": tuple(range(2)), "TRIALS": 1, "BEST": 1}
 SMOKE_2 = {"SEEDS": tuple(range(2)), "TRIALS": 10}
+
+
+def seeded(label, *parts):
+    """Torna la seed d'una tria a l'atzar, feta de `PROJECT_SEED`, `label` i `parts`.
+
+    `label` diu què es tria, i `parts` són els seus números, com la seed de la
+    partició. Dues llistes diferents donen seeds independents, i la mateixa llista la
+    mateixa seed a cada procés, com no faria el `hash` d'un text. Llegeix
+    `PROJECT_SEED` en cridar-la. La seed és de 32 bits, els que admet
+    `numpy.random.seed`.
+    """
+    # La SHA-256 de la llista sencera, i no `SeedSequence`, que omple amb zeros una
+    # llista de menys de quatre paraules: `[a, b, c]` i `[a, b, c, 0]` en donarien una.
+    text = json.dumps([PROJECT_SEED, label, *parts])
+    return int.from_bytes(hashlib.sha256(text.encode()).digest()[:4], "big")
 
 
 def variants():

@@ -14,12 +14,11 @@ dataset, unes altres files, un altre espai o uns altres números fixos, ni amb u
 import json
 import os
 
-import numpy as np
 import optuna
 
 from epf import Refusal, paths
 from epf.contract.record import plain, write_record
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES, seeded
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
@@ -68,17 +67,6 @@ def _different(made, now, searcher):
     return None
 
 
-def _seed(*parts):
-    """Torna una seed d'Optuna feta de la del projecte i de `parts`, enters o textos.
-
-    No canvia d'un procés a un altre, com faria el `hash` d'un text.
-    """
-    entropy = [PROJECT_SEED]
-    for part in parts:
-        entropy += list(part.encode()) if isinstance(part, str) else [part]
-    return int(np.random.SeedSequence(entropy).generate_state(1)[0])
-
-
 def _sampler(searcher, family, seed, study):
     """Torna el sampler d'un study: la graella del cercador, `GRID`, o l'espai.
 
@@ -92,9 +80,11 @@ def _sampler(searcher, family, seed, study):
     if searcher.GRID is not None:
         return _Grid(
             {name: list(values) for name, values in searcher.GRID.items()},
-            seed=_seed(family, seed),
+            seed=seeded("sampler", family, seed),
         )
-    return optuna.samplers.RandomSampler(seed=_seed(family, seed, len(study.trials)))
+    return optuna.samplers.RandomSampler(
+        seed=seeded("sampler", family, seed, len(study.trials))
+    )
 
 
 class _Grid(optuna.samplers.GridSampler):
