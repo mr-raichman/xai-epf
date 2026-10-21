@@ -9,7 +9,7 @@ def test_a_group_sums_its_columns_before_the_absolute_value():
     # Dues columnes del mateix grup que s'anul·len: per columna pesen, com a grup no.
     values = np.array([[1.0, -1.0, 2.0], [1.0, -1.0, -2.0]])
     by_column, by_group = importances(values, np.array(["a", "a", "b"]))
-    assert np.allclose(by_column, [0.5, 0.5, 1.0])
+    assert np.allclose(by_column, [0.25, 0.25, 0.5])
     assert by_group == {"a": 0.0, "b": 1.0}
 
 

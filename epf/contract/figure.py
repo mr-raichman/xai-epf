@@ -468,20 +468,19 @@ def outputs(model):
 
 
 def importances(values, groups):
-    """Torna la importància de cada columna i la de cada grup.
+    """Torna la importància de cada columna i la de cada grup, la seva part del total.
 
-    És la mitjana del valor absolut de les contribucions. La de les columnes, entre la
-    de la més important, com la normalitzen Trebbien et al. (2023); la d'un grup suma
-    les contribucions de les seves columnes abans de prendre-la, com Pesenti i
-    O'Sullivan (2025), i és la seva part del total, com la donen Pesenti i O'Sullivan
-    (2026).
+    És la mitjana del valor absolut de les contribucions, en part del total com la
+    donen Pesenti i O'Sullivan (2026), de manera que la d'una columna i la d'un grup es
+    llegeixen igual. La d'un grup suma les contribucions de les seves columnes abans de
+    prendre-la, com Pesenti i O'Sullivan (2025).
     """
     by_column = np.abs(values).mean(axis=0)
     names = list(dict.fromkeys(groups))
     by_group = np.array(
         [np.abs(values[:, groups == name].sum(axis=1)).mean() for name in names]
     )
-    return by_column / by_column.max(), dict(
+    return by_column / by_column.sum(), dict(
         zip(names, by_group / by_group.sum(), strict=True)
     )
 
@@ -532,12 +531,7 @@ def importance(folder, models, colour):
             for row in table[:, order]:
                 axis.plot(positions, row, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
             axis.set_xticks(positions, names, rotation=90)
-        panels.supylabel(
-            "importància, la més gran de cada model a 1"
-            if kind == "columns"
-            else "part de la importància",
-            fontsize=AXIS_TEXT_SIZE,
-        )
+        panels.supylabel("part de la importància", fontsize=AXIS_TEXT_SIZE)
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
