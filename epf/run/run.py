@@ -300,6 +300,14 @@ class Run:
         if label[2] == "trial":
             self.searching.failed(label)
 
+    def undone(self):
+        """Torna les famílies triades que no són completes, en ordre."""
+        return [
+            family
+            for family in self.chosen
+            if not families.complete(self.where / family)
+        ]
+
 
 def main(arguments):
     """Fa una passada, la comanda `epf run`.
@@ -310,7 +318,8 @@ def main(arguments):
     que es cerca, les millors configuracions de la seva cerca quan la té acabada; el
     pla queda al registre de la família i ja no canvia. Dibuixa les figures si cap seed
     no ha fallat. Refusa abans d'escriure la passada el que no pot fer, i acaba amb un
-    refús si alguna seed ha fallat.
+    refús si alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a
+    alguna família li falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke)
     chosen = families.named(arguments.family)
@@ -334,4 +343,16 @@ def main(arguments):
     if run.block.failed:
         counted = progress.counted(run.block.failed, families.EVERY)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}")
+    undone = run.undone()
+    if undone:
+        # Sense cap seed fallada, només un error del codi hi deixa res per fer, i en
+        # mostra el traceback.
+        raise RuntimeError(
+            f"la passada {where.name} no és acabada i cap seed no ha fallat: "
+            + (
+                f"1 família no és completa, {undone[0]}"
+                if len(undone) == 1
+                else f"{len(undone)} famílies no són completes, la primera {undone[0]}"
+            )
+        )
     figures.draw(where)

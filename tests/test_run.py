@@ -382,3 +382,19 @@ def test_each_fits_seconds_are_kept_as_soon_as_it_returns(fake):
         "0": ["0", "1"],
         "1": ["0", "1"],
     }
+
+
+def test_a_family_reading_a_search_none_makes_ends_in_an_error(fake, monkeypatch):
+    """Sense pla ni cap seed fallada, la passada en dibuixava les figures i acabava."""
+    drawn = []
+    monkeypatch.setattr(figures, "draw", drawn.append)
+    fake.module.FAMILIES["second"]["searched_as"] = "absent"
+    with pytest.raises(RuntimeError, match="1 família no és completa, second$"):
+        fake.main()
+    assert not drawn
+
+
+def test_a_fit_that_saves_no_file_is_not_taken_for_done(fake, monkeypatch):
+    monkeypatch.setattr(fake.module, "train", lambda *arguments: None)
+    with pytest.raises(RuntimeError, match="3 famílies no són completes, la primera"):
+        fake.main()
