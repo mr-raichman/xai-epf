@@ -7,8 +7,8 @@ import numpy as np
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.explanation import PRICE_UNITS, TOLERANCE, UNITLESS, check, group
-from epf.contract.metrics import scored, scored_distribution
+from epf.contract.explanation import PRICE_UNITS, TOLERANCE, UNITLESS, group
+from epf.contract.metrics import scored_distribution
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.nn import network
@@ -88,27 +88,17 @@ def _fitted(distribution, X, y, parts, explained, seed, numbers):
     )
 
 
-def train(family, folder, configurations, explained_days):
-    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+def train(family, folder, seed, configuration, explained_days):
+    """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `configurations` és el pla de la família per seed, i `explained_days` els dies de
-    prova que s'expliquen de cada seed, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
     X, y = matrix.matrices(matrix.series()).daily
-    distribution = DISTRIBUTIONS[family]
-    for seed, planned in configurations.items():
-        parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
-        explained = (
-            parts.test if explained_days is None else parts.test[:explained_days]
-        )
-        for configuration in planned:
-            rank = configuration["rank"]
-            path = folder / paths.SEED.format(seed=seed, rank=rank)
-            if path.exists():
-                continue
-            fitted = _fitted(
-                distribution, X, y, parts, explained, seed, configuration["numbers"]
-            )
-            check(fitted, rank)
-            scores = scored(fitted.predicted, fitted.actual) | fitted.scores
-            save_model(path, parts, explained, fitted, scores, rank)
+    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    explained = parts.test if explained_days is None else parts.test[:explained_days]
+    rank = configuration["rank"]
+    fitted = _fitted(
+        DISTRIBUTIONS[family], X, y, parts, explained, seed, configuration["numbers"]
+    )
+    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    save_model(path, parts, explained, fitted, rank)

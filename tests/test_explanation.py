@@ -20,8 +20,10 @@ def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED):
     """Desa un model ajustat amb `arrays` i `predicted`, i en torna el camí."""
     none = TEST_DAYS[:0]
     path = tmp_path / "seed_0_0.npz"
-    fitted = Fitted(predicted, predicted, arrays, 0.0, TOLERANCE, stored=stored)
-    save_model(path, Split(none, none, TEST_DAYS), explained, fitted, {}, 0)
+    # Un preu real que varia, perquè l'R² en surti.
+    actual = np.arange(len(predicted), dtype=float)
+    fitted = Fitted(predicted, actual, arrays, 0.0, TOLERANCE, stored=stored)
+    save_model(path, Split(none, none, TEST_DAYS), explained, fitted, 0)
     return path
 
 

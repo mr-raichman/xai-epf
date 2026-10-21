@@ -7,10 +7,8 @@ from epf.contract import matrix
 from epf.contract.explanation import (
     TRANSFORMED_TOLERANCE,
     TRANSFORMED_UNITS,
-    check,
     group,
 )
-from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.elastic_net import attribution, regression
@@ -63,24 +61,15 @@ def _fitted(X, y, parts, explained, numbers):
     )
 
 
-def train(family, folder, configurations, explained_days):
-    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+def train(family, folder, seed, configuration, explained_days):
+    """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `configurations` és el pla de la família per seed, i `explained_days` els dies de
-    prova que s'expliquen de cada seed, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
     X, y = matrix.matrices(matrix.series()).hourly
-    for seed, planned in configurations.items():
-        parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
-        explained = (
-            parts.test if explained_days is None else parts.test[:explained_days]
-        )
-        for configuration in planned:
-            rank = configuration["rank"]
-            path = folder / paths.SEED.format(seed=seed, rank=rank)
-            if path.exists():
-                continue
-            fitted = _fitted(X, y, parts, explained, configuration["numbers"])
-            check(fitted, rank)
-            scores = scored(fitted.predicted, fitted.actual)
-            save_model(path, parts, explained, fitted, scores, rank)
+    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    explained = parts.test if explained_days is None else parts.test[:explained_days]
+    rank = configuration["rank"]
+    fitted = _fitted(X, y, parts, explained, configuration["numbers"])
+    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    save_model(path, parts, explained, fitted, rank)

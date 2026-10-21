@@ -8,8 +8,7 @@ from lightgbm import LGBMRegressor, early_stopping
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.explanation import PRICE_UNITS, TOLERANCE, check, group
-from epf.contract.metrics import scored
+from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split, validation_parts
 from epf.models.lightgbm import attribution
@@ -144,34 +143,25 @@ def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
     )
 
 
-def train(family, folder, configurations, explained_days):
-    """Ajusta, comprova, puntua i desa cada configuració del pla que encara no hi és.
+def train(family, folder, seed, configuration, explained_days):
+    """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `configurations` és el pla de la família per seed, i `explained_days` els dies de
-    prova que s'expliquen de cada seed, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
     X, y = matrix.matrices(matrix.series()).hourly
     groups = np.array([group(column) for column in X.columns])
-    for seed, planned in configurations.items():
-        parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
-        explained = (
-            parts.test if explained_days is None else parts.test[:explained_days]
-        )
-        for configuration in planned:
-            rank = configuration["rank"]
-            path = folder / paths.SEED.format(seed=seed, rank=rank)
-            if path.exists():
-                continue
-            found = fitted(
-                X,
-                y,
-                groups,
-                parts,
-                explained,
-                seed,
-                configuration["numbers"],
-                with_interactions=rank == 0,
-            )
-            check(found, rank)
-            scores = scored(found.predicted, found.actual)
-            save_model(path, parts, explained, found, scores, rank)
+    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    explained = parts.test if explained_days is None else parts.test[:explained_days]
+    rank = configuration["rank"]
+    found = fitted(
+        X,
+        y,
+        groups,
+        parts,
+        explained,
+        seed,
+        configuration["numbers"],
+        with_interactions=rank == 0,
+    )
+    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    save_model(path, parts, explained, found, rank)

@@ -8,7 +8,8 @@ import json
 import numpy as np
 
 from epf import Refusal, paths
-from epf.contract.explanation import read_back
+from epf.contract.explanation import check, read_back
+from epf.contract.metrics import scored
 
 # El que surt d'ajustar una família en una seed i una configuració: la predicció i el
 # preu de les files de prova en el mateix ordre, el que es desa de l'explicació, el
@@ -100,15 +101,20 @@ def fitted_files(folder):
     return dict(sorted(found.items()))
 
 
-def save_model(path, parts, explained, fitted, scores, rank):
-    """Desa un model ajustat, `fitted`, amb la seva partició i les seves puntuacions.
+def save_model(path, parts, explained, fitted, rank):
+    """Comprova, puntua i desa un model ajustat, `fitted`, amb la seva partició.
 
     Un fitxer amb nom és sempre un model ajustat sencer i, d'una família explicada, un
-    que torna el que explica: les sumes de l'explicació es tornen a fer sobre el que
-    s'ha escrit, i un que no les passa es refusa. `explained` són els dies explicats, i
-    `None` en una família que no explica res, que no en desa cap. Les taules de més
-    d'una dimensió es desen en `float32`. `rank` és el lloc de la configuració.
+    que torna el que explica: l'explicació ha de tornar la predicció abans d'escriure'l,
+    i les sumes es tornen a fer sobre el que s'ha escrit; un que no ho fa es refusa.
+    `explained` són els dies explicats, i `None` en una família que no explica res, que
+    no en desa cap ni es comprova. Les puntuacions són l'R² i el MAE, amb les de la
+    distribució que porti `fitted`. Les taules de més d'una dimensió es desen en
+    `float32`. `rank` és el lloc de la configuració.
     """
+    if explained is not None:
+        check(fitted, rank)
+    scores = scored(fitted.predicted, fitted.actual) | (fitted.scores or {})
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
     if explained is not None:
         arrays["days_explained"] = _days(explained)

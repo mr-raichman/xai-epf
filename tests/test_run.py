@@ -47,8 +47,7 @@ def fake(tmp_path, monkeypatch):
         if (family, seed, kind) in state.failing:
             raise state.failing[family, seed, kind]("interrompuda")
 
-    def train(family, folder, configurations, explained_days):
-        ((seed, (configuration,)),) = configurations.items()
+    def train(family, folder, seed, configuration, explained_days):
         state.calls.append(("fit", family, seed, configuration.get("numbers")))
         raised(family, seed, "fit")
         (folder / paths.SEED.format(seed=seed, rank=configuration["rank"])).touch()

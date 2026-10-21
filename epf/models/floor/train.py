@@ -7,7 +7,6 @@ import numpy as np
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
@@ -46,20 +45,14 @@ def _fitted(X, y, parts):
     )
 
 
-def train(family, folder, configurations, explained_days):
-    """Ajusta, puntua i desa cada configuració del pla que encara no hi és.
+def train(family, folder, seed, configuration, explained_days):
+    """Ajusta, puntua i desa una configuració del pla d'una seed.
 
-    `configurations` és el pla de la família per seed, i `explained_days` no hi fa res,
-    perquè la família no explica res.
+    `explained_days` no hi fa res, perquè la família no explica res.
     """
     X, y = matrix.matrices(matrix.series()).hourly
-    for seed, planned in configurations.items():
-        parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
-        for configuration in planned:
-            rank = configuration["rank"]
-            path = folder / paths.SEED.format(seed=seed, rank=rank)
-            if path.exists():
-                continue
-            fitted = _fitted(X, y, parts)
-            scores = scored(fitted.predicted, fitted.actual)
-            save_model(path, parts, None, fitted, scores, rank)
+    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    rank = configuration["rank"]
+    fitted = _fitted(X, y, parts)
+    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    save_model(path, parts, None, fitted, rank)
