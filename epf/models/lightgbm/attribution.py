@@ -25,11 +25,11 @@ def interaction_rows(model, X):
     return shap.TreeExplainer(model).shap_interaction_values(X)
 
 
-def sums(found, best):
+def sums(found, with_interactions):
     """Torna les sumes de l'arbre que es tornen a fer sobre el seu fitxer, `found`.
 
-    La base més les contribucions de cada fila contra la seva predicció i, a la millor
-    configuració, `best`, cada fila d'interaccions contra la contribució de la seva
+    La base més les contribucions de cada fila contra la seva predicció i, amb
+    `with_interactions`, cada fila d'interaccions contra la contribució de la seva
     columna.
     """
     found_sums = [
@@ -38,7 +38,7 @@ def sums(found, best):
             found["predicted"][explained_rows(found, HOURS_PER_DAY)],
         )
     ]
-    if best:
+    if with_interactions:
         found_sums.append(
             (
                 *summed(0.0, found["interactions"], 2),

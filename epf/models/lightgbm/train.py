@@ -95,13 +95,13 @@ def predict_rows(model, X):
     return model.predict(X)
 
 
-def fitted(X, y, groups, parts, explained, seed, numbers, best):
+def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
     L'early stopping l'atura quan qualsevol de les quatre parts de la validació deixa de
-    millorar. A la millor configuració de la seed, `best`, explica també les
-    interaccions d'una mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el
-    grup de cada columna de `X`, i `numbers` el punt de la configuració.
+    millorar. Amb `with_interactions`, explica també les interaccions d'una mostra de
+    `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna de `X`, i
+    `numbers` el punt de la configuració.
     """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)
@@ -123,7 +123,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
         "base": base,
         "trees": model.best_iteration_,
     }
-    if best:
+    if with_interactions:
         count = int(shown.sum())
         sample = np.sort(
             np.random.default_rng(seeded("interactions", seed)).choice(
@@ -140,7 +140,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, best):
         arrays,
         gap,
         TOLERANCE,
-        stored=lambda found: attribution.sums(found, best),
+        stored=lambda found: attribution.sums(found, with_interactions),
     )
 
 
@@ -170,7 +170,7 @@ def train(family, folder, configurations, explained_days):
                 explained,
                 seed,
                 configuration["numbers"],
-                best=rank == 0,
+                with_interactions=rank == 0,
             )
             check(found, rank)
             scores = scored(found.predicted, found.actual)

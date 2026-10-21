@@ -45,7 +45,7 @@ def test_a_file_off_only_by_float32_rounding_takes_its_name(tmp_path):
         tmp_path,
         {"values": values, "base": 50.0},
         _tree(values),
-        lambda found: tree.sums(found, best=False),
+        lambda found: tree.sums(found, with_interactions=False),
     )
     assert path.exists()
 
@@ -59,7 +59,7 @@ def test_a_file_that_does_not_add_up_is_refused_and_takes_no_name(tmp_path):
             tmp_path,
             {"values": values, "base": 50.0},
             _tree(values)[::-1],
-            lambda found: tree.sums(found, best=False),
+            lambda found: tree.sums(found, with_interactions=False),
         )
     assert not (tmp_path / "seed_0_0.npz").exists()
 
@@ -74,7 +74,7 @@ def test_a_file_holding_a_nan_is_refused(tmp_path):
             tmp_path,
             {"values": values, "base": 50.0},
             predicted,
-            lambda found: tree.sums(found, best=False),
+            lambda found: tree.sums(found, with_interactions=False),
         )
 
 
@@ -87,7 +87,7 @@ def test_explained_days_other_than_the_first_test_days_are_refused(tmp_path):
             tmp_path,
             {"values": values, "base": 50.0},
             np.full(3 * HOURS_PER_DAY, 50.0),
-            lambda found: tree.sums(found, best=False),
+            lambda found: tree.sums(found, with_interactions=False),
             TEST_DAYS[1:],
         )
 
@@ -109,7 +109,7 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
             "interactions": interactions,
         },
         _tree(values),
-        lambda found: tree.sums(found, best=True),
+        lambda found: tree.sums(found, with_interactions=True),
     ).exists()
     # La xarxa distribucional: contribucions per fila, columna, hora i paràmetre, i els
     # paràmetres de tots els dies de prova.
