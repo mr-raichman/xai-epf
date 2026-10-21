@@ -1,6 +1,9 @@
+import json
+
 import pandas as pd
 import pytest
 
+from epf import Refusal
 from epf.dataset import build, esios
 from epf.parameters import HOUR_COLUMNS
 
@@ -46,3 +49,32 @@ def test_a_forecast_served_for_another_geography_too_is_refused():
     ]
     with pytest.raises(ValueError, match="geografies"):
         esios.admissible(values, build.INDICATORS["demand_fcst"])
+
+
+def test_an_indicator_with_no_value_is_refused_by_name(tmp_path, monkeypatch):
+    """Sense cap valor, un indicador ancorat no rebia els zeros de l'àncora."""
+    monkeypatch.setattr(
+        build,
+        "INDICATORS",
+        {
+            "anchor": esios.Indicator(12, "sum", "Península", True, None, ()),
+            "anchored": esios.Indicator(4, "sum", "Península", True, "anchor", ()),
+        },
+    )
+    held = {
+        "anchor": [
+            {
+                "datetime": "2024-03-05T00:00:00.000+01:00",
+                "value": 1.0,
+                "geo_name": "Península",
+            }
+        ],
+        "anchored": [],
+    }
+    for name, values in held.items():
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "2024.json").write_text(
+            json.dumps({"indicator": {"values": values}}), encoding="utf-8"
+        )
+    with pytest.raises(Refusal, match="^l'indicador anchored no té cap valor$"):
+        build.indicators(tmp_path)

@@ -125,7 +125,8 @@ def indicators(directory):
 
     Torna també els fitxers llegits. Una àncora ha de precedir a `INDICATORS` els
     indicadors que hi estan ancorats. Un indicador que el lector refusa es refusa amb el
-    seu nom.
+    seu nom, i també un sense cap valor de la seva geografia als anys llegits, sense
+    interpretar per què.
     """
     anchors = {indicator.anchor for indicator in INDICATORS.values()} - {None}
     published, frames, read = {}, {}, []
@@ -133,9 +134,16 @@ def indicators(directory):
         found = esios.files(directory / name, SPAN)
         try:
             values = esios.admissible(esios.values(found), indicator)
-            if name in anchors:
-                published[name] = esios.published_instants(values)
-            anchor = published[indicator.anchor] if indicator.anchor else None
+        except Refusal as refusal:
+            raise Refusal(f"l'indicador {name} té {refusal}") from None
+        # Sense cap valor, un indicador ancorat no tindria els zeros de l'àncora, i un
+        # que no ho és faria fallar `series`.
+        if not values:
+            raise Refusal(f"l'indicador {name} no té cap valor")
+        if name in anchors:
+            published[name] = esios.published_instants(values)
+        anchor = published[indicator.anchor] if indicator.anchor else None
+        try:
             frames[name] = esios.hourly(values, anchor)
         except Refusal as refusal:
             raise Refusal(f"l'indicador {name} té {refusal}") from None
