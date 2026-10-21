@@ -8,9 +8,10 @@ from epf import paths
 REFERENCES = paths.ROOT / "references.bib"
 
 # Una cita per autor i any: el primer cognom, els altres darrere de comes i d'una «i», o
-# «et al.», i l'any entre parèntesis o, dins d'un parèntesi, darrere d'una coma.
-# Qualsevol altra forma no es veu.
-SURNAME = r"[A-ZÀ-Ý][a-zà-ÿ]+"
+# «et al.», i l'any entre parèntesis o, dins d'un parèntesi, darrere d'una coma. Un
+# cognom pot dur un apòstrof darrere la inicial, O'Sullivan, que sense es llegia com un
+# altre cognom. Qualsevol altra forma no es veu.
+SURNAME = r"[A-ZÀ-Ý](?:'[A-ZÀ-Ý])?[a-zà-ÿ]+"
 AUTHORS = rf"({SURNAME})(?:, {SURNAME})*(?: i {SURNAME})?(?: et al\.)?"
 CITATIONS = (
     re.compile(rf"\b{AUTHORS} \((\d{{4}}[a-z]?)\)"),

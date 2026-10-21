@@ -3,15 +3,15 @@ import warnings
 import numpy as np
 
 from epf.contract import figure
-from epf.contract.figure import outputs, pairs, shares
+from epf.contract.figure import importances, outputs, pairs
 from epf.parameters import HOUR_COLUMNS
 
 
 def test_a_group_sums_its_columns_before_the_absolute_value():
     # Dues columnes del mateix grup que s'anul·len: per columna pesen, com a grup no.
     values = np.array([[1.0, -1.0, 2.0], [1.0, -1.0, -2.0]])
-    by_column, by_group = shares(values, np.array(["a", "a", "b"]))
-    assert np.allclose(by_column, [0.25, 0.25, 0.5])
+    by_column, by_group = importances(values, np.array(["a", "a", "b"]))
+    assert np.allclose(by_column, [0.5, 0.5, 1.0])
     assert by_group == {"a": 0.0, "b": 1.0}
 
 

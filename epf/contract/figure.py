@@ -131,18 +131,21 @@ def outputs(model):
     }
 
 
-def shares(values, groups):
-    """Torna la importància de cada columna i grup, la de Trebbien et al. (2023).
+def importances(values, groups):
+    """Torna la importància de cada columna i la de cada grup.
 
-    És la mitjana del valor absolut, normalitzada a u, i la d'un grup suma les
-    contribucions de les seves columnes abans de prendre'l.
+    És la mitjana del valor absolut de les contribucions. La de les columnes, entre la
+    de la més important, com la normalitzen Trebbien et al. (2023); la d'un grup suma
+    les contribucions de les seves columnes abans de prendre-la, com Pesenti i
+    O'Sullivan (2025), i és la seva part del total, com la donen Pesenti i O'Sullivan
+    (2026).
     """
     by_column = np.abs(values).mean(axis=0)
     names = list(dict.fromkeys(groups))
     by_group = np.array(
         [np.abs(values[:, groups == name].sum(axis=1)).mean() for name in names]
     )
-    return by_column / by_column.sum(), dict(
+    return by_column / by_column.max(), dict(
         zip(names, by_group / by_group.sum(), strict=True)
     )
 
@@ -177,7 +180,7 @@ def importance(folder, models):
             if not kept:
                 style(axis, title)
                 continue
-            found = [shares(outputs(model)[output], groups) for model in kept]
+            found = [importances(outputs(model)[output], groups) for model in kept]
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
                 order = np.argsort(table.mean(axis=0))[-SHOWN:]
@@ -194,7 +197,12 @@ def importance(folder, models):
             for row in table[:, order]:
                 axis.plot(row, positions, "o", color=INK, markersize=2)
             axis.set_yticks(positions, names, fontsize=7)
-            axis.set_xlabel("part de la importància", color=MUTED_INK)
+            axis.set_xlabel(
+                "importància, la de la columna més important a 1"
+                if kind == "columns"
+                else "part de la importància",
+                color=MUTED_INK,
+            )
             style(axis, title)
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
