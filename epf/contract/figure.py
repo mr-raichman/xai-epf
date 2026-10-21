@@ -245,8 +245,9 @@ def pairs(model, values, name):
 def dependence(folder, models, present):
     """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
 
-    Al millor model ajustat de la primera seed, amb la recta ajustada, i el pendent de
-    tots, que és el que llegeixen Trebbien et al. (2023).
+    Els punts i la recta ajustada són del millor model ajustat de la primera seed, i el
+    títol en dona el pendent i després la mitjana i la dispersió dels pendents de tots,
+    que són el que llegeixen Trebbien et al. (2023).
     """
     explained = list(outputs(models[0]))
     units = dict(zip(explained, models[0]["units"], strict=True))
@@ -274,7 +275,7 @@ def dependence(folder, models, present):
             )
             style(
                 axis,
-                f"pendent {np.mean(slopes):.3g} (±{np.std(slopes):.2g}), "
-                f"{units[output]} per GW",
+                f"pendent {slopes[0]:.3g} {units[output]} per GW\nla mitjana dels "
+                f"{len(slopes)} models, {np.mean(slopes):.3g} (±{np.std(slopes):.2g})",
             )
     save(panels, folder, "dependence")
