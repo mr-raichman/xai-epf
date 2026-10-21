@@ -9,8 +9,8 @@ import matplotlib
 import numpy as np
 
 from epf.contract.matrix import INFORMATION, PRICE
-from epf.parameters import HOUR_COLUMNS
 from epf.contract.record import fitted_files
+from epf.parameters import HOUR_COLUMNS
 
 # El motor sense finestra, triat abans d'importar `pyplot`: qui importa aquest mòdul ja
 # el té triat.

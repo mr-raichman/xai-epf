@@ -3,12 +3,12 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import ElasticNetCV
 
-from epf.parameters import HOUR_COLUMNS
 from epf.contract.matrix import HOUR, PRICE, matrices
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler
 from epf.models.elastic_net.search import penalties
+from epf.parameters import HOUR_COLUMNS
 
 PENALTY, MIXING = 0.01, 0.5
 

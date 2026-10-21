@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from epf import paths
-from epf.contract.split import split
 from epf.contract.searches import (
     asked,
     completed,
@@ -19,6 +18,7 @@ from epf.contract.searches import (
     told,
     tried,
 )
+from epf.contract.split import split
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))

@@ -121,8 +121,8 @@ def chosen(smoke):
     }
     if not smoke:
         return found
-    # Els que les comandes llegeixen del que torna aquesta funció; la resta s'importen
-    # on es fan servir.
+    # Els que les comandes llegeixen del que torna aquesta funció, a `run/run.py` i
+    # `run/search.py`; la resta s'importen on es fan servir.
     read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS", "WORKERS", "THREADS")
     unread = [name for name in globals()[smoke] if name not in read]
     if unread:
