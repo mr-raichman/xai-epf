@@ -66,12 +66,14 @@ def _where(smoke, fingerprints):
 def _train(module, family, folder, seed, configuration, explained_days):
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
-    Crida el `train` del mòdul del model, `module`. Torna quants segons ha trigat.
+    Crida el `train` del mòdul del model, `module`. Torna quants segons ha trigat, sense
+    importar-lo.
     """
+    train = importlib.import_module(module).train
+    # Un procés l'importa a la seva primera tasca del model, i només en un assaig això
+    # passa sovint en un ajust.
     started = time.time()
-    importlib.import_module(module).train(
-        family, folder, seed, configuration, explained_days
-    )
+    train(family, folder, seed, configuration, explained_days)
     return time.time() - started
 
 
