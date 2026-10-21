@@ -102,6 +102,205 @@ def _timed(folder, seed, rank, seconds):
     record.write_record(path, found)
 
 
+class Run:
+    """Una passada: els plans de les famílies triades, la seva cerca i la cua d'ajustos.
+
+    Dona al pool els ajustos planificats abans que cap trial, i el pla d'una seed d'una
+    família que es cerca quan la seva cerca té tots els trials.
+    """
+
+    def __init__(self, where, smoke, values, chosen, fingerprints, matrices):
+        """Obre la cerca, escriu la passada a `where` i fa cada pla que ja pot.
+
+        `smoke` és la variant d'assaig, `values` els valors de `parameters.chosen`,
+        `chosen` les famílies triades, i `fingerprints` i `matrices` les de la passada.
+        La cerca refusa abans que s'escrigui res de la passada. Escriu el registre de
+        cada família que encara no en té, i el bloc es mostra des d'aquí.
+        """
+        self.where, self.values, self.chosen = where, values, chosen
+        continued = where.exists()
+        self.plans = {}
+        for family in chosen:
+            module = importlib.import_module(families.MODULES[family]["train"])
+            self.plans[family] = module.FAMILIES[family]
+        # Les configuracions que una família guarda de cada seed.
+        self.kept = {
+            family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
+            for family, plan in self.plans.items()
+        }
+        # La cerca que llegeix cada família que guarda alguna configuració, en l'ordre
+        # de les cerques: la sonda de datació fa cercar l'arbre.
+        self.searched = [
+            name
+            for name in families.EVERY
+            if families.MODULES[name]["search"]
+            and any(
+                self.kept[family] and self.plans[family]["searched_as"] == name
+                for family in chosen
+            )
+        ]
+        self.searching = search.Search(
+            smoke,
+            self.searched,
+            values["SEEDS"],
+            values["TRIALS"],
+            matrices,
+            fingerprints,
+            where / paths.WORKERS_LOG,
+        )
+        where.mkdir(parents=True, exist_ok=True)
+        matrix.write(matrices, where)
+        # Els trials són els de la cerca, que porta cada configuració, i el calendari no
+        # canvia mai.
+        left_out = {"TRIALS", "DAYS_PER_WEEK", "HOURS_PER_DAY", "HOUR_COLUMNS"}
+        written = {
+            name: value for name, value in values.items() if name not in left_out
+        }
+        for family in chosen:
+            if families.recorded(where / family) is None:
+                record.write_record(
+                    where / family / paths.SEED_RECORD,
+                    {
+                        "family": family,
+                        "smoke": smoke,
+                        **fingerprints,
+                        "seeds": values["SEEDS"],
+                        "explained_days": values["EXPLAINED_DAYS"],
+                        "fixed": self.plans[family]["fixed"],
+                        "configurations": {},
+                        "seconds": {},
+                        "parameters": written,
+                    },
+                )
+        for family in chosen:
+            recorded = families.recorded(where / family)
+            for seed in values["SEEDS"]:
+                if seed not in recorded:
+                    self.planned(family, seed)
+        recorded = {family: families.recorded(where / family) for family in chosen}
+        missing = {family: families.missing(where / family) for family in chosen}
+        self.block = progress.Block(
+            f"Passada {where.name}{', continuada' if continued else ''}",
+            {
+                family: {
+                    seed: self._units(family, seed, recorded, missing)
+                    for seed in values["SEEDS"]
+                }
+                for family in families.EVERY
+                if family in chosen or family in self.searched
+            },
+        )
+        for name in self.searched:
+            for seed in values["SEEDS"]:
+                why = self.searching.unscored(name, seed)
+                if why is not None:
+                    self.block.stop(name, seed, why)
+        # Cada ajust planificat que encara no té el seu fitxer, en l'ordre de les
+        # famílies, de les seeds i dels llocs; la d'una seed acabada de cercar s'hi
+        # afegeix al final.
+        self.queue = [
+            (family, seed, configuration)
+            for family in chosen
+            for seed, absent in missing[family].items()
+            for configuration in absent
+        ]
+
+    def planned(self, family, seed):
+        """Fa, desa i torna el pla d'una seed d'una família, o `None` si no pot.
+
+        No pot mentre la cerca de la seed que la família llegeix no és acabada, ni si en
+        acabar no té cap trial que puntuï.
+        """
+        made = None
+        if self.kept[family]:
+            made = self.searching.found(self.plans[family]["searched_as"], seed)
+            if made is None or not made["ranked"]:
+                return None
+        configured = configurations(made, self.kept[family])
+        _planned(self.where / family, seed, configured)
+        return configured
+
+    def _units(self, family, seed, recorded, missing):
+        """Torna les unitats de cada tipus d'una seed d'una família, i les que ja té.
+
+        `recorded` i `missing` són el pla de cada família i els seus ajustos que encara
+        no tenen el seu fitxer.
+        """
+        found = {}
+        if family in self.searched:
+            found["trial"] = self.searching.counts(family, seed)
+        if family in self.chosen:
+            configured = recorded[family].get(seed)
+            if configured is None:
+                # Abans del pla, les que en guardarà com a molt.
+                found["fit"] = (min(self.kept[family], self.values["TRIALS"]), 0)
+            else:
+                absent = missing[family].get(seed, [])
+                found["fit"] = (len(configured), len(configured) - len(absent))
+        return found
+
+    def tasks(self):
+        """Dona les tasques de la passada, un generador que el pool llegeix.
+
+        Primer els ajustos, després els trials, i `None` mentre els trials que falten
+        esperen els que encara no han tornat.
+        """
+        while True:
+            while self.queue and self.block.stopped(*self.queue[0][:2]):
+                self.queue.pop(0)
+            if self.queue:
+                family, seed, configuration = self.queue.pop(0)
+                yield (
+                    (family, seed, "fit", configuration["rank"]),
+                    _train,
+                    (
+                        families.MODULES[family]["train"],
+                        family,
+                        self.where / family,
+                        seed,
+                        configuration,
+                        self.values["EXPLAINED_DAYS"],
+                    ),
+                )
+                continue
+            task = self.searching.next(self.block.stopped)
+            if task is None and not self.searching.in_flight():
+                return
+            yield task
+
+    def returned(self, label, result):
+        """Desa el que torna una tasca: d'un ajust, els segons; d'un trial, el resultat.
+
+        Quan amb el trial la cerca de la seed ja és acabada, planifica cada família
+        triada que la llegeix, i en posa els ajustos a la cua.
+        """
+        family, seed, kind, rank = label
+        if kind == "fit":
+            _timed(self.where / family, seed, rank, result)
+            return
+        if self.searching.returned(label, result) is None:
+            return
+        why = self.searching.unscored(family, seed)
+        if why is not None:
+            self.block.stop(family, seed, why)
+            return
+        # Els ajustos de la seed es fan abans que cap trial.
+        for other in self.chosen:
+            if (
+                self.kept[other]
+                and self.plans[other]["searched_as"] == family
+                and seed not in families.recorded(self.where / other)
+            ):
+                configured = self.planned(other, seed)
+                self.block.plan(other, seed, len(configured))
+                self.queue.extend((other, seed, one) for one in configured)
+
+    def failed(self, label):
+        """Dona per fallat a la cerca un trial que no ha tornat cap resultat."""
+        if label[2] == "trial":
+            self.searching.failed(label)
+
+
 def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
@@ -122,182 +321,17 @@ def main(arguments):
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     fingerprints = record.fingerprints()
     where = _where(arguments.smoke, fingerprints)
-    continued = where.exists()
-    plans = {}
-    for family in chosen:
-        module = importlib.import_module(families.MODULES[family]["train"])
-        plans[family] = module.FAMILIES[family]
-    # Les configuracions que una família guarda de cada seed.
-    kept = {
-        family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
-        for family, plan in plans.items()
-    }
-    # La cerca que llegeix cada família que guarda alguna configuració, en l'ordre de
-    # les cerques: la sonda de datació fa cercar l'arbre.
-    searched = [
-        name
-        for name in families.EVERY
-        if families.MODULES[name]["search"]
-        and any(
-            kept[family] and plans[family]["searched_as"] == name for family in chosen
-        )
-    ]
-    searching = search.Search(
-        arguments.smoke,
-        searched,
-        values["SEEDS"],
-        values["TRIALS"],
-        matrices,
-        fingerprints,
-        where / paths.WORKERS_LOG,
-    )
-    where.mkdir(parents=True, exist_ok=True)
-    matrix.write(matrices, where)
-    # Els trials són els de la cerca, que porta cada configuració, i el calendari no
-    # canvia mai.
-    left_out = {"TRIALS", "DAYS_PER_WEEK", "HOURS_PER_DAY", "HOUR_COLUMNS"}
-    written = {name: value for name, value in values.items() if name not in left_out}
-    for family in chosen:
-        if families.recorded(where / family) is None:
-            record.write_record(
-                where / family / paths.SEED_RECORD,
-                {
-                    "family": family,
-                    "smoke": arguments.smoke,
-                    **fingerprints,
-                    "seeds": values["SEEDS"],
-                    "explained_days": values["EXPLAINED_DAYS"],
-                    "fixed": plans[family]["fixed"],
-                    "configurations": {},
-                    "seconds": {},
-                    "parameters": written,
-                },
-            )
-
-    def planned(family, seed):
-        """Fa, desa i torna el pla d'una seed d'una família, o `None` si no pot.
-
-        No pot mentre la cerca de la seed que la família llegeix no és acabada, ni si en
-        acabar no té cap trial que puntuï.
-        """
-        made = None
-        if kept[family]:
-            made = searching.found(plans[family]["searched_as"], seed)
-            if made is None or not made["ranked"]:
-                return None
-        configured = configurations(made, kept[family])
-        _planned(where / family, seed, configured)
-        return configured
-
-    for family in chosen:
-        recorded = families.recorded(where / family)
-        for seed in values["SEEDS"]:
-            if seed not in recorded:
-                planned(family, seed)
-    recorded = {family: families.recorded(where / family) for family in chosen}
-    missing = {family: families.missing(where / family) for family in chosen}
-
-    def units(family, seed):
-        """Torna les unitats de cada tipus d'una seed d'una família, i les que ja té."""
-        found = {}
-        if family in searched:
-            found["trial"] = searching.counts(family, seed)
-        if family in chosen:
-            configured = recorded[family].get(seed)
-            if configured is None:
-                # Abans del pla, les que en guardarà com a molt.
-                found["fit"] = (min(kept[family], values["TRIALS"]), 0)
-            else:
-                absent = missing[family].get(seed, [])
-                found["fit"] = (len(configured), len(configured) - len(absent))
-        return found
-
-    block = progress.Block(
-        f"Passada {where.name}{', continuada' if continued else ''}",
-        {
-            family: {seed: units(family, seed) for seed in values["SEEDS"]}
-            for family in families.EVERY
-            if family in chosen or family in searched
-        },
-    )
-    for name in searched:
-        for seed in values["SEEDS"]:
-            why = searching.unscored(name, seed)
-            if why is not None:
-                block.stop(name, seed, why)
-    # Cada ajust planificat que encara no té el seu fitxer, en l'ordre de les famílies,
-    # de les seeds i dels llocs; la d'una seed acabada de cercar s'hi afegeix al final.
-    queue = [
-        (family, seed, configuration)
-        for family in chosen
-        for seed, absent in missing[family].items()
-        for configuration in absent
-    ]
-
-    def tasks():
-        # Un generador: el pool en llegeix tasques quan té processos lliures. Primer els
-        # ajustos, després els trials, i `None` mentre els trials que falten esperen
-        # els que encara no han tornat.
-        while True:
-            while queue and block.stopped(*queue[0][:2]):
-                queue.pop(0)
-            if queue:
-                family, seed, configuration = queue.pop(0)
-                yield (
-                    (family, seed, "fit", configuration["rank"]),
-                    _train,
-                    (
-                        families.MODULES[family]["train"],
-                        family,
-                        where / family,
-                        seed,
-                        configuration,
-                        values["EXPLAINED_DAYS"],
-                    ),
-                )
-                continue
-            task = searching.next(block.stopped)
-            if task is None and not searching.in_flight():
-                return
-            yield task
-
-    def returned(label, result):
-        family, seed, kind, rank = label
-        if kind == "fit":
-            _timed(where / family, seed, rank, result)
-            return
-        if searching.returned(label, result) is None:
-            return
-        why = searching.unscored(family, seed)
-        if why is not None:
-            block.stop(family, seed, why)
-            return
-        # La cerca de la seed és acabada: cada família triada que la llegeix en rep el
-        # pla, si encara no el té, i els seus ajustos es fan abans que cap trial.
-        for other in chosen:
-            if (
-                kept[other]
-                and plans[other]["searched_as"] == family
-                and seed not in families.recorded(where / other)
-            ):
-                configured = planned(other, seed)
-                block.plan(other, seed, len(configured))
-                queue.extend((other, seed, one) for one in configured)
-
-    def failed(label):
-        if label[2] == "trial":
-            searching.failed(label)
-
+    run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
-        tasks(),
+        run.tasks(),
         WORKERS,
         THREADS,
         where / paths.WORKERS_LOG,
-        block,
-        returned,
-        failed,
+        run.block,
+        run.returned,
+        run.failed,
     )
-    if block.failed:
-        counted = progress.counted(block.failed, families.EVERY)
+    if run.block.failed:
+        counted = progress.counted(run.block.failed, families.EVERY)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}")
     figures.draw(where)
