@@ -4,12 +4,14 @@ Diu si l'error de prova de cada família ajustada està correlacionat d'un dia a
 el test que Bergmeir, Hyndman i Koo (2018) fan a la validació creuada.
 """
 
+import json
+
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+from epf import paths
 from epf.contract import figure
-from epf.models.naive.train import FAMILIES as COPIES
 from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
 from epf.run import families
 
@@ -82,24 +84,27 @@ def ljung_box(series, lags=LAGS):
 
 
 def report(where, described, colours):
-    """Dibuixa el correlograma de cada família ajustada i en desa el test.
+    """Dibuixa el correlograma i desa el test de cada família que comprova els residus.
 
-    El test va a `residuals.csv`, i el correlograma, del color de cada família de
-    `colours`, marca la distància de la partició i la setmana, i on cauria el 95 % de
+    Les famílies són les de `described` el registre de les quals ho diu, a la passada
+    `where`. El test va a `residuals.csv`, i el correlograma, del color de cada família
+    de `colours`, marca la distància de la partició i la setmana, i on cauria el 95 % de
     les autocorrelacions si l'error fos soroll blanc.
     """
-    fitted = [
-        family
-        for family in families.EVERY
-        if family in described and family not in COPIES
-    ]
-    if not fitted:
+    checked = []
+    for family in families.EVERY:
+        if family not in described:
+            continue
+        record = where / family / paths.FAMILY_RECORD
+        if json.loads(record.read_text(encoding="utf-8"))["residuals_checked"]:
+            checked.append(family)
+    if not checked:
         return
     panels, axes = figure.panel_grid(
-        len(fitted), RESIDUALS_PER_ROW, RESIDUALS_ASPECT, sharey=True
+        len(checked), RESIDUALS_PER_ROW, RESIDUALS_ASPECT, sharey=True
     )
     tests = []
-    for axis, family in zip(axes.flat, fitted, strict=False):
+    for axis, family in zip(axes.flat, checked, strict=False):
         series = daily_errors(described[family])
         statistic, value, correlations = ljung_box(series)
         days = int((~np.isnan(series)).sum())

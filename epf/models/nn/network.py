@@ -10,13 +10,9 @@ import keras
 import numpy as np
 from keras import ops
 
-from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
+from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS
 from epf.models.nn.hyperparameters import BATCH, EPOCHS, PATIENCE
 from epf.parameters import HOUR_COLUMNS, HOURS_PER_DAY, seeded
-
-# El dia de la setmana del dia que es prediu, de dilluns 0 a diumenge 6, en una sola
-# columna com al codi de l'article, que per error hi posa una funció del número de fila.
-DAY = "day_of_week"
 
 # La sortida d'una xarxa, una distribució o els 24 preus de la de punt. `names` són els
 # seus paràmetres, en l'ordre en què surten de la xarxa; `loss`, la pèrdua que
@@ -45,9 +41,14 @@ def parameters(distribution, raw):
 
 
 def inputs(X):
-    """Torna les entrades de la xarxa, `X` amb `DAY` en lloc de les set dummies."""
+    """Torna les entrades de la xarxa, `X` amb `DAY_OF_WEEK` per les set dummies."""
     found = X.drop(columns=DAY_OF_WEEK_COLUMNS).astype(float)
-    found.insert(0, DAY, X[DAY_OF_WEEK_COLUMNS].to_numpy().argmax(axis=1).astype(float))
+    # El dia de la setmana del dia que es prediu, de dilluns 0 a diumenge 6, en una sola
+    # columna com al codi de l'article, que per error hi posa una funció del número de
+    # fila.
+    found.insert(
+        0, DAY_OF_WEEK, X[DAY_OF_WEEK_COLUMNS].to_numpy().argmax(axis=1).astype(float)
+    )
     return found
 
 

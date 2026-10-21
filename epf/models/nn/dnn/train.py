@@ -29,7 +29,9 @@ NAME = "dnn"
 
 # La família, com la planifica una passada: el batch, les èpoques i la paciència, que no
 # es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
-FAMILIES = {NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME}}
+FAMILIES = {
+    NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME, "residuals_checked": True}
+}
 
 
 def _fitted(X, y, parts, seed, numbers):

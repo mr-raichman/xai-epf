@@ -20,7 +20,8 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 # Cada família, com la planifica una passada: el batch, les èpoques i la paciència, que
 # no es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
 FAMILIES = {
-    name: {"fixed": FIXED, "kept": 1, "searched_as": name} for name in DISTRIBUTIONS
+    name: {"fixed": FIXED, "kept": 1, "searched_as": name, "residuals_checked": True}
+    for name in DISTRIBUTIONS
 }
 
 

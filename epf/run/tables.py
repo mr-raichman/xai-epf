@@ -3,11 +3,14 @@
 Es fa dels fitxers que la passada va desar, i va al costat de les figures.
 """
 
+import json
+
 import numpy as np
 import pandas as pd
 
+from epf import paths
+from epf.contract.figure import importances
 from epf.contract.record import fitted_files
-from epf.models.lightgbm.hyperparameters import DAY_COUNTER
 from epf.run import families
 
 # Les puntuacions que porta un model ajustat, les de la distribució només a les famílies
@@ -15,29 +18,31 @@ from epf.run import families
 SCORE_NAMES = ("r2", "mae", "crps", "kupiec_50", "kupiec_90")
 SCORES = "scores.csv"
 
-# La família de la sonda de datació.
-PROBE = "date_probe"
-
 
 def scores(where):
     """Escriu a `scores.csv` les puntuacions de cada model ajustat d'una passada.
 
     Una fila per família, seed i configuració, en l'ordre de les famílies, i buida la
-    puntuació que una família no té. La sonda de datació hi porta també la seva lectura,
-    `counter_share`: la part del comptador de dies en la mitjana del valor absolut de
-    les contribucions.
+    puntuació que una família no té. La família el registre de la qual diu una columna
+    de comptador de dies, la sonda de datació, hi porta també la seva lectura,
+    `counter_share`: la part del comptador en la importància de les columnes.
     """
     rows = []
     for family in families.EVERY:
-        for (seed, rank), path in fitted_files(where / family).items():
+        files = fitted_files(where / family)
+        if not files:
+            continue
+        record = where / family / paths.FAMILY_RECORD
+        counter = json.loads(record.read_text(encoding="utf-8")).get("counter")
+        for (seed, rank), path in files.items():
             with np.load(path) as found:
                 row = {"family": family, "seed": seed, "rank": rank} | {
                     name: found[name].item() for name in SCORE_NAMES if name in found
                 }
-                if family == PROBE:
-                    weight = np.abs(found["values"].astype(np.float64)).mean(axis=0)
-                    counter = list(found["columns"]).index(DAY_COUNTER)
-                    row["counter_share"] = weight[counter] / weight.sum()
+                if counter is not None:
+                    by_column, _ = importances(found["values"], found["groups"])
+                    column = list(found["columns"]).index(counter)
+                    row["counter_share"] = by_column[column]
             rows.append(row)
     frame = pd.DataFrame(
         rows, columns=["family", "seed", "rank", *SCORE_NAMES, "counter_share"]

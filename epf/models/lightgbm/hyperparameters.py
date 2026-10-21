@@ -3,10 +3,8 @@
 # Nom del model i de la seva família.
 NAME = "lightgbm"
 
-# La columna del comptador de la sonda de datació, els dies des del primer del període,
-# i el seu grup a la importància per grups, que no és cap sèrie ni el calendari.
+# La columna del comptador de la sonda de datació, els dies des del primer del període.
 DAY_COUNTER = "day_counter"
-DATE = "date"
 
 # Arbres com a molt d'un ajust amb early stopping, i rondes sense millorar abans
 # d'aturar-lo: els del codi de Kruse et al. (2022), que la graella de la cerca

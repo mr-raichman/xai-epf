@@ -17,6 +17,11 @@ PRICE_UNITS = "EUR/MWh"
 TRANSFORMED_UNITS = "espai transformat"
 UNITLESS = "sense unitats"
 
+# Els grups d'una columna que no surt de cap sèrie: el calendari, i el comptador de dies
+# de la sonda de datació.
+CALENDAR = "calendar"
+DATE = "date"
+
 # Marge de la comprovació d'additivitat, en EUR/MWh: molt per sota de qualsevol
 # diferència que vulgui dir res en un preu.
 TOLERANCE = 1e-3
@@ -39,7 +44,7 @@ def group(column):
     for name in INFORMATION:
         if column == name or column.startswith(f"{name}_"):
             return name
-    return "calendar"
+    return CALENDAR
 
 
 def check(fitted, rank):

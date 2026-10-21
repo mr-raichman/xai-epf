@@ -13,6 +13,11 @@ def _saved(where, family, seed, rank, **arrays):
     np.savez(folder / paths.MODEL.format(seed=seed, rank=rank), **arrays)
 
 
+def _recorded(where, family, **fields):
+    """Desa a la passada `where` el registre d'una família, que només porta `fields`."""
+    paths.write_record(where / family / paths.FAMILY_RECORD, fields)
+
+
 def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_path):
     # En un altre ordre que el de la taula.
     _saved(tmp_path, TREE, 1, 0, r2=0.75, mae=9.0)
@@ -30,11 +35,20 @@ def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_pat
         kupiec_90=20,
     )
     # Mitjanes del valor absolut 1, 2 i 2: la part del comptador és 2 de 5.
-    columns = np.array(["price_lag1_h00", DAY_COUNTER, "hour"])
-    values = np.array([[1.0, -2.0, 3.0], [-1.0, 2.0, -1.0]])
     _saved(
-        tmp_path, tables.PROBE, 0, 0, columns=columns, values=values, r2=0.5, mae=7.0
+        tmp_path,
+        "date_probe",
+        0,
+        0,
+        columns=np.array(["price_lag1_h00", DAY_COUNTER, "hour"]),
+        groups=np.array(["price", "date", "calendar"]),
+        values=np.array([[1.0, -2.0, 3.0], [-1.0, 2.0, -1.0]]),
+        r2=0.5,
+        mae=7.0,
     )
+    for family in (TREE, "ddnn_jsu"):
+        _recorded(tmp_path, family, residuals_checked=True)
+    _recorded(tmp_path, "date_probe", residuals_checked=True, counter=DAY_COUNTER)
     tables.scores(tmp_path)
     assert (tmp_path / tables.SCORES).read_text(encoding="utf-8").splitlines() == [
         "family,seed,rank,r2,mae,crps,kupiec_50,kupiec_90,counter_share",

@@ -14,11 +14,11 @@ import pandas as pd
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.explanation import group
+from epf.contract.explanation import DATE, group
 from epf.contract.record import save_model
 from epf.contract.split import split
 from epf.models.lightgbm import hyperparameters
-from epf.models.lightgbm.hyperparameters import DATE, DAY_COUNTER
+from epf.models.lightgbm.hyperparameters import DAY_COUNTER
 from epf.models.lightgbm.train import FAMILIES as TREE
 from epf.models.lightgbm.train import fitted
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
@@ -27,9 +27,10 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 NAME = "date_probe"
 
 # La família, com la planifica una passada: els números de l'arbre, i la millor
-# configuració de cada seed de la cerca de l'arbre.
+# configuració de cada seed de la cerca de l'arbre; i la columna del seu comptador.
 FAMILIES = {
-    NAME: TREE[hyperparameters.NAME] | {"kept": 1, "searched_as": hyperparameters.NAME}
+    NAME: TREE[hyperparameters.NAME]
+    | {"kept": 1, "searched_as": hyperparameters.NAME, "counter": DAY_COUNTER}
 }
 
 

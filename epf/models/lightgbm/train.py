@@ -42,6 +42,7 @@ FAMILIES = {
         },
         "kept": "BEST",
         "searched_as": NAME,
+        "residuals_checked": True,
     }
 }
 

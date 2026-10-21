@@ -20,6 +20,11 @@ from epf.run import families, figures, pool, progress, search
 # d'assaig pot canviar; la resta s'importen on es fan servir.
 READ = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
 
+# El que les taules i les figures de la passada llegeixen d'una família, que el seu
+# registre copia de `FAMILIES`: si se'n comproven els residus i, de la que en té, la
+# columna del comptador de dies.
+COPIED = ("residuals_checked", "counter")
+
 
 def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
@@ -164,6 +169,11 @@ class Run:
                         "smoke": smoke,
                         **fingerprints,
                         "fixed": self.plans[family]["fixed"],
+                        **{
+                            name: self.plans[family][name]
+                            for name in COPIED
+                            if name in self.plans[family]
+                        },
                         "configurations": {},
                         "seconds": {},
                         "settings": written,

@@ -62,9 +62,25 @@ def fake(tmp_path, monkeypatch):
 
     trainer = types.ModuleType("fake_trainer")
     trainer.FAMILIES = {
-        "first": {"fixed": {}, "kept": "BEST", "searched_as": "first"},
-        "second": {"fixed": {}, "kept": 1, "searched_as": "first"},
-        "third": {"fixed": {}, "kept": 0, "searched_as": "third"},
+        "first": {
+            "fixed": {},
+            "kept": "BEST",
+            "searched_as": "first",
+            "residuals_checked": True,
+        },
+        "second": {
+            "fixed": {},
+            "kept": 1,
+            "searched_as": "first",
+            "residuals_checked": True,
+            "counter": "x",
+        },
+        "third": {
+            "fixed": {},
+            "kept": 0,
+            "searched_as": "third",
+            "residuals_checked": False,
+        },
     }
     trainer.train = train
     searcher = types.ModuleType("fake_searcher")

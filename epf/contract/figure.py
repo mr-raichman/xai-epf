@@ -8,8 +8,14 @@ import math
 import matplotlib
 import numpy as np
 
-from epf.contract.explanation import UNITLESS
-from epf.contract.matrix import INFORMATION, PRICE
+from epf.contract.explanation import CALENDAR, DATE, UNITLESS
+from epf.contract.matrix import (
+    DAY_OF_WEEK,
+    DAY_OF_WEEK_COLUMNS,
+    HOUR,
+    INFORMATION,
+    PRICE,
+)
 from epf.contract.record import fitted_files
 from epf.parameters import HOUR_COLUMNS
 
@@ -361,8 +367,8 @@ GROUP_LABELS = {
     "nuclear_sched": "nuclear programada",
     "hydro_sched": "hidràulica programada",
     "coal_gas_sched": "carbó i gas programats",
-    "calendar": "calendari",
-    "date": "comptador de dies",
+    CALENDAR: "calendari",
+    DATE: "comptador de dies",
 }
 
 # La unitat de cada grup de columnes, la de la seva sèrie al dataset.
@@ -374,8 +380,8 @@ GROUP_UNITS = {
     "nuclear_sched": "MWh",
     "hydro_sched": "MWh",
     "coal_gas_sched": "MWh",
-    "calendar": UNITLESS,
-    "date": "dies",
+    CALENDAR: UNITLESS,
+    DATE: "dies",
 }
 
 # Com es diu cada columna del calendari a les figures; el dia 0 de la setmana és el
@@ -390,9 +396,9 @@ WEEKDAYS = (
     "diumenge",
 )
 CALENDAR_LABELS = {
-    "hour": "hora del dia",
-    "day_of_week": "dia de la setmana",
-    **{f"day_of_week_{number}": day for number, day in enumerate(WEEKDAYS)},
+    HOUR: "hora del dia",
+    DAY_OF_WEEK: "dia de la setmana",
+    **dict(zip(DAY_OF_WEEK_COLUMNS, WEEKDAYS, strict=True)),
 }
 
 # Com es diu cada família a les figures.
@@ -494,8 +500,9 @@ def importances(values, groups):
     És la mitjana del valor absolut de les contribucions, en part del total com la
     donen Pesenti i O'Sullivan (2026), de manera que la d'una columna i la d'un grup es
     llegeixen igual. La d'un grup suma les contribucions de les seves columnes abans de
-    prendre-la, com Pesenti i O'Sullivan (2025).
+    prendre-la, com Pesenti i O'Sullivan (2025). Es calcula en `float64`.
     """
+    values = np.asarray(values, dtype=np.float64)
     by_column = np.abs(values).mean(axis=0)
     names = list(dict.fromkeys(groups))
     by_group = np.array(

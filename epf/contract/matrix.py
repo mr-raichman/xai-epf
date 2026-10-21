@@ -39,8 +39,9 @@ INFORMATION = {
 }
 
 # El dia de la setmana, en set dummies, com les llegeixen l'arbre i l'elastic net; les
-# xarxes en fan un sol enter, a `models/nn/network.py`.
-DAY_OF_WEEK_COLUMNS = [f"day_of_week_{number}" for number in range(DAYS_PER_WEEK)]
+# xarxes en fan una sola columna, `DAY_OF_WEEK`, a `models/nn/network.py`.
+DAY_OF_WEEK = "day_of_week"
+DAY_OF_WEEK_COLUMNS = [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)]
 
 # Les dues matrius d'un information set i el preu real amb què es comparen. `daily` i
 # `hourly` són les parelles `(X, y)` que una família pren; `actual` és el `y` de la
