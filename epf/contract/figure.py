@@ -30,8 +30,11 @@ def rgba(red, green, blue, alpha):
     return (*rgb(red, green, blue), alpha)
 
 
-# La lletra de tot el text de les figures, la de la memòria.
+# La lletra de tot el text de les figures, la de la memòria, i la que la substitueix on
+# no hi és, que en vol tenir les mides: el text mesurat amb ella hi cap igual quan la
+# memòria el posa en la primera.
 FONT = "Times New Roman"
+FALLBACK_FONT = "Liberation Serif"
 
 # Mides del text, en punts.
 AXIS_TITLE_SIZE = 7
@@ -153,7 +156,7 @@ THOUSANDS_SEPARATOR = "."
 # El que matplotlib pren per defecte, fet de les variables de dalt: qui importa aquest
 # mòdul ja el té.
 STYLE = {
-    "font.family": FONT,
+    "font.family": [FONT, FALLBACK_FONT],
     "text.color": TEXT_COLOUR,
     "axes.labelcolor": TEXT_COLOUR,
     "xtick.color": TEXT_COLOUR,
