@@ -55,3 +55,17 @@ select = ["E4", "E7", "E9", "E501", "F"]
 # Només les proves de tests/.
 testpaths = ["tests"]
 addopts = "-q"
+# Tot avís és un error, llevat dels coneguts de les biblioteques.
+filterwarnings = [
+    "error",
+    # Com a error, AutoGraph l'atrapa i deixa sense convertir el gradient de
+    # DeepExplainer, sense que cap prova falli.
+    "ignore:.*got an unexpected keyword argument '___pyct_anno':DeprecationWarning",
+    # Només amb les dades petites de les proves.
+    "ignore::sklearn.exceptions.ConvergenceWarning",
+    "ignore:The structure of `inputs` doesn't match the expected structure:UserWarning",
+    "ignore:Your TensorFlow version is newer than 2.4.0:UserWarning",
+    "ignore:The set_(bad|over|under) function will be deprecated:PendingDeprecationWarning",
+    # Les connexions d'SQLite dels studies d'Optuna, que tanca el recol·lector.
+    "ignore:unclosed database:ResourceWarning",
+]

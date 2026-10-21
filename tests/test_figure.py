@@ -1,5 +1,3 @@
-import warnings
-
 import numpy as np
 
 from epf.contract import figure
@@ -49,10 +47,8 @@ def test_a_model_with_no_contribution_is_left_out_of_the_importance(tmp_path):
         "columns": np.array(["x", "y", "z"]),
     }
     constant = model | {"values": np.zeros((1, 3))}
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        figure.importance(tmp_path, [model, constant], figure.OTHER_COLOUR)
-        figure.importance(tmp_path, [constant], figure.OTHER_COLOUR)
+    figure.importance(tmp_path, [model, constant], figure.OTHER_COLOUR)
+    figure.importance(tmp_path, [constant], figure.OTHER_COLOUR)
     assert {path.stem for path in tmp_path.iterdir()} >= {"importance", "groups"}
 
 
