@@ -442,7 +442,7 @@ def importance(folder, models, colour):
                 axis.plot(row, positions, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
             axis.set_yticks(positions, names)
             axis.set_xlabel(
-                "importància, la de la columna més important a 1"
+                "importància, la de la columna més important de cada model a 1"
                 if kind == "columns"
                 else "part de la importància"
             )
