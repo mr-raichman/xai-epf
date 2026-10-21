@@ -118,7 +118,7 @@ def fitted_files(folder):
     """
     found = {
         tuple(int(part) for part in path.stem.split("_")[1:]): path
-        for path in folder.glob(paths.SEED.format(seed="*", rank="*"))
+        for path in folder.glob(paths.MODEL.format(seed="*", rank="*"))
     }
     return dict(sorted(found.items()))
 

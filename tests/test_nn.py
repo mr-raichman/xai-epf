@@ -92,7 +92,7 @@ def test_the_tail_weight_never_drops_below_one():
 
 
 # Una xarxa de l'espai, sense cap L1 als pesos ni a les sortides de les capes amagades.
-FIXED = {
+PARAMS = {
     "neurons_1": 32,
     "neurons_2": 16,
     "activation_1": "relu",
@@ -109,15 +109,15 @@ FIXED = {
 def test_each_parameters_l1_is_the_one_named_after_it():
     """Per posició, les L1 de l'asimetria i del pes de la cua s'intercanviarien."""
     rates = {"location": 1e-4, "scale": 1e-3, "skewness": 1e-2, "tail_weight": 1e-1}
-    fixed = FIXED | {f"regularize_{name}": True for name in rates}
-    fixed |= {f"{name}_l1": rate for name, rate in rates.items()}
-    tuned = search.drawn("ddnn_jsu", optuna.trial.FixedTrial(fixed))
+    params = PARAMS | {f"regularize_{name}": True for name in rates}
+    params |= {f"{name}_l1": rate for name, rate in rates.items()}
+    tuned = search.drawn("ddnn_jsu", optuna.trial.FixedTrial(params))
     assert tuned["parameter_l1"] == [rates[name] for name in JOHNSON_SU.names]
 
 
 def test_the_point_networks_space_asks_for_no_output_penalty():
     # Una L1 a la sortida faria fallar `FixedTrial`, que no en té el paràmetre.
-    tuned = search.drawn("dnn", optuna.trial.FixedTrial(FIXED))
+    tuned = search.drawn("dnn", optuna.trial.FixedTrial(PARAMS))
     assert tuned["parameter_l1"] == [0.0]
 
 

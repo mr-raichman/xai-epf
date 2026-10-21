@@ -50,7 +50,7 @@ def fake(tmp_path, monkeypatch):
     def train(family, folder, seed, configuration, explained_days):
         state.calls.append(("fit", family, seed, configuration.get("numbers")))
         raised(family, seed, "fit")
-        (folder / paths.SEED.format(seed=seed, rank=configuration["rank"])).touch()
+        (folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])).touch()
 
     def trial(family, drawn, train, validate, seed):
         order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
@@ -163,7 +163,7 @@ def _name(number):
 
 def _recorded(family, number=1):
     """Torna el registre d'una família a la passada d'assaig d'avui `number`."""
-    path = paths.RUNS / _name(number) / family / paths.SEED_RECORD
+    path = paths.RUNS / _name(number) / family / paths.FAMILY_RECORD
     return json.loads(path.read_text(encoding="utf-8"))
 
 

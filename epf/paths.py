@@ -33,8 +33,8 @@ SEARCHES = OUTPUT / "searches"
 # de la configuració a la cerca de la seed, 0 la millor; el registre de la família, al
 # costat; i cada matriu que hi van llegir els models, la diària i la per hora, a dalt de
 # la passada.
-SEED = "seed_{seed}_{rank}.npz"
-SEED_RECORD = "record.json"
+MODEL = "seed_{seed}_{rank}.npz"
+FAMILY_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
 
 # El fitxer on cada procés d'una passada escriu la seva sortida, i on van les traces de

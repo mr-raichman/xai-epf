@@ -24,11 +24,12 @@ POINT = network.Distribution(
     quantiles=None,
 )
 
-POINT_FAMILY = "dnn"
+# Nom del model i de la seva família.
+NAME = "dnn"
 
 # La família, com la planifica una passada: el batch, les èpoques i la paciència, que no
 # es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
-FAMILIES = {POINT_FAMILY: {"fixed": FIXED, "kept": 1, "searched_as": POINT_FAMILY}}
+FAMILIES = {NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME}}
 
 
 def _fitted(X, y, parts, seed, numbers):
@@ -57,5 +58,5 @@ def train(family, folder, seed, configuration, explained_days):
     parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts, seed, configuration["numbers"])
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, None, fitted, rank)

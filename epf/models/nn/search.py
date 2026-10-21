@@ -2,7 +2,7 @@
 
 from epf.models.nn import hyperparameters, network
 from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
-from epf.models.nn.dnn.train import POINT, POINT_FAMILY
+from epf.models.nn.dnn import train as dnn
 
 # La matriu de la cerca, la diària, com la de la passada.
 MATRIX = "daily"
@@ -46,7 +46,7 @@ def penalty(optuna_trial, name):
 
 def _output(family):
     """Torna la sortida d'una família, la seva distribució o els preus de la de punt."""
-    return POINT if family == POINT_FAMILY else DISTRIBUTIONS[family]
+    return dnn.POINT if family == dnn.NAME else DISTRIBUTIONS[family]
 
 
 def drawn(family, optuna_trial):
@@ -79,7 +79,7 @@ def drawn(family, optuna_trial):
         ],
         "parameter_l1": (
             [0.0] * len(names)
-            if family == POINT_FAMILY
+            if family == dnn.NAME
             else [penalty(optuna_trial, name) for name in names]
         ),
         "learning_rate": optuna_trial.suggest_float(

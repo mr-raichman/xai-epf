@@ -171,5 +171,5 @@ def train(family, folder, seed, configuration, explained_days):
         configuration["numbers"],
         with_interactions=rank == 0,
     )
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, found, rank)

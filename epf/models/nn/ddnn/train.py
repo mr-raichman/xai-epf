@@ -100,5 +100,5 @@ def train(family, folder, seed, configuration, explained_days):
     fitted = _fitted(
         DISTRIBUTIONS[family], X, y, parts, explained, seed, configuration["numbers"]
     )
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)

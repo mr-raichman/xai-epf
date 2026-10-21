@@ -10,7 +10,7 @@ def _saved(where, family, seed, rank, **arrays):
     """Desa a la passada `where` un model ajustat que només porta `arrays`."""
     folder = where / family
     folder.mkdir(exist_ok=True)
-    np.savez(folder / paths.SEED.format(seed=seed, rank=rank), **arrays)
+    np.savez(folder / paths.MODEL.format(seed=seed, rank=rank), **arrays)
 
 
 def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_path):

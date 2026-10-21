@@ -109,7 +109,7 @@ def recorded(folder):
 
     El pla són les configuracions de cada seed.
     """
-    path = folder / paths.SEED_RECORD
+    path = folder / paths.FAMILY_RECORD
     if not path.exists():
         return None
     found = json.loads(path.read_text(encoding="utf-8"))["configurations"]
@@ -127,7 +127,7 @@ def missing(folder):
         absent = [
             one
             for one in planned
-            if not (folder / paths.SEED.format(seed=seed, rank=one["rank"])).exists()
+            if not (folder / paths.MODEL.format(seed=seed, rank=one["rank"])).exists()
         ]
         if absent:
             found[seed] = absent
@@ -139,7 +139,7 @@ def complete(folder):
 
     Un registre sense `settings` és d'un altre codi, i no ho diu.
     """
-    path = folder / paths.SEED_RECORD
+    path = folder / paths.FAMILY_RECORD
     if not path.exists():
         return False
     found = json.loads(path.read_text(encoding="utf-8"))

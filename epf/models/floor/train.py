@@ -11,17 +11,18 @@ from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-FLOOR = "floor"
+# Nom del model i de la seva família.
+NAME = "floor"
 
 # Grau del polinomi, el cúbic de Trebbien et al. (2023).
 FLOOR_DEGREE = 3
 
 # La família, com la planifica una passada: el grau, i cap cerca.
 FAMILIES = {
-    FLOOR: {
+    NAME: {
         "fixed": {"degree": FLOOR_DEGREE},
         "kept": 0,
-        "searched_as": FLOOR,
+        "searched_as": NAME,
     }
 }
 
@@ -54,5 +55,5 @@ def train(family, folder, seed, configuration, explained_days):
     parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts)
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, None, fitted, rank)

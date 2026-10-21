@@ -34,7 +34,7 @@ def _where(smoke, fingerprints):
         return paths.next_run(smoke, datetime.date.today())
     latest = found[-1]
     differ, begun = set(), set()
-    for path in sorted(latest.glob(f"*/{paths.SEED_RECORD}")):
+    for path in sorted(latest.glob(f"*/{paths.FAMILY_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
         differ |= {
             name for name, value in fingerprints.items() if made.get(name) != value
@@ -82,7 +82,7 @@ def _ordered(by_seed):
 
 def _planned(folder, seed, configurations):
     """Desa al registre d'una família el pla d'una seed, que ja no canvia."""
-    path = folder / paths.SEED_RECORD
+    path = folder / paths.FAMILY_RECORD
     found = json.loads(path.read_text(encoding="utf-8"))
     found["configurations"][str(seed)] = configurations
     found["configurations"] = _ordered(found["configurations"])
@@ -91,7 +91,7 @@ def _planned(folder, seed, configurations):
 
 def _timed(folder, seed, rank, seconds):
     """Desa al registre d'una família els segons d'un ajust, al costat dels altres."""
-    path = folder / paths.SEED_RECORD
+    path = folder / paths.FAMILY_RECORD
     found = json.loads(path.read_text(encoding="utf-8"))
     ranks = found["seconds"].setdefault(str(seed), {})
     ranks[str(rank)] = round(seconds, 1)
@@ -158,7 +158,7 @@ class Run:
         for family in chosen:
             if families.recorded(where / family) is None:
                 record.write_record(
-                    where / family / paths.SEED_RECORD,
+                    where / family / paths.FAMILY_RECORD,
                     {
                         "family": family,
                         "smoke": smoke,

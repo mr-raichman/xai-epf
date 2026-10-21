@@ -16,8 +16,8 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 # anterior. Dilluns és 0.
 WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
 
-PREVIOUS_WEEK = 7
-PREVIOUS_DAY = 1
+WEEK_LAG = 7
+DAY_LAG = 1
 
 # Les parts de la seed d'on la predicció ingènua pren els errors per fer-se
 # probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
@@ -39,12 +39,12 @@ def similar_day(price, days):
 
 def previous_week(price, days):
     """Torna el preu de la mateixa hora de fa una setmana, `(dies, hores)`."""
-    return _copied(price, days, PREVIOUS_WEEK)
+    return _copied(price, days, WEEK_LAG)
 
 
 def previous_day(price, days):
     """Torna el preu de la mateixa hora del dia anterior, `(dies, hores)`."""
-    return _copied(price, days, PREVIOUS_DAY)
+    return _copied(price, days, DAY_LAG)
 
 
 def bootstrapped(copied, errors, probabilities):
@@ -66,13 +66,13 @@ FORECASTS = {
     "naive_similar_day": (
         similar_day,
         {
-            "lag": PREVIOUS_DAY,
+            "lag": DAY_LAG,
             "weekdays_from_yesterday": WEEKDAYS_FROM_YESTERDAY,
-            "lag_otherwise": PREVIOUS_WEEK,
+            "lag_otherwise": WEEK_LAG,
         },
     ),
-    "naive_previous_week": (previous_week, {"lag": PREVIOUS_WEEK}),
-    "naive_previous_day": (previous_day, {"lag": PREVIOUS_DAY}),
+    "naive_previous_week": (previous_week, {"lag": WEEK_LAG}),
+    "naive_previous_day": (previous_day, {"lag": DAY_LAG}),
 }
 
 # La que Marcjasz et al. (2023) fan probabilística, amb els errors de la mostra.
@@ -127,5 +127,5 @@ def train(family, folder, seed, configuration, explained_days):
     parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
     rank = configuration["rank"]
     fitted = _fitted(family, price, y, parts)
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, None, fitted, rank)

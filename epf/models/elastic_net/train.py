@@ -77,5 +77,5 @@ def train(family, folder, seed, configuration, explained_days):
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts, explained, configuration["numbers"])
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)

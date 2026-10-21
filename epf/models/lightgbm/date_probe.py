@@ -17,14 +17,20 @@ from epf.contract import matrix
 from epf.contract.explanation import group
 from epf.contract.record import save_model
 from epf.contract.split import split
-from epf.models.lightgbm.hyperparameters import DATE, DAY_COUNTER, NAME
+from epf.models.lightgbm import hyperparameters
+from epf.models.lightgbm.hyperparameters import DATE, DAY_COUNTER
 from epf.models.lightgbm.train import FAMILIES as TREE
 from epf.models.lightgbm.train import fitted
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
+# Nom de la família.
+NAME = "date_probe"
+
 # La família, com la planifica una passada: els números de l'arbre, i la millor
 # configuració de cada seed de la cerca de l'arbre.
-FAMILIES = {"date_probe": TREE[NAME] | {"kept": 1, "searched_as": NAME}}
+FAMILIES = {
+    NAME: TREE[hyperparameters.NAME] | {"kept": 1, "searched_as": hyperparameters.NAME}
+}
 
 
 def train(family, folder, seed, configuration, explained_days):
@@ -51,5 +57,5 @@ def train(family, folder, seed, configuration, explained_days):
         configuration["numbers"],
         with_interactions=False,
     )
-    path = folder / paths.SEED.format(seed=seed, rank=rank)
+    path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, found, rank)
