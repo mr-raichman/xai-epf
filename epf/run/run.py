@@ -24,21 +24,6 @@ DIFFERENT = {
     "environment": ("unes altres biblioteques", "aquelles biblioteques"),
 }
 
-# Cada família, en l'ordre en què una passada les ajusta, amb el mòdul del seu model que
-# l'ajusta, que s'importa quan es tria la família.
-TRAINERS = {
-    "ddnn_jsu": "epf.models.nn.ddnn.train",
-    "ddnn_normal": "epf.models.nn.ddnn.train",
-    "dnn": "epf.models.nn.dnn.train",
-    "elastic_net": "epf.models.elastic_net.train",
-    "lightgbm": "epf.models.lightgbm.train",
-    "date_probe": "epf.models.lightgbm.date_probe",
-    "floor": "epf.models.floor.train",
-    "naive_similar_day": "epf.models.naive.train",
-    "naive_previous_week": "epf.models.naive.train",
-    "naive_previous_day": "epf.models.naive.train",
-}
-
 
 def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
@@ -127,7 +112,7 @@ def main(arguments):
     refús si alguna seed ha fallat.
     """
     values = parameters.chosen(arguments.smoke)
-    chosen = families.named(arguments.family, TRAINERS)
+    chosen = families.named(arguments.family)
     matrices = matrix.matrices(matrix.series())
     matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)
     # La partició i les parts de validació, només per refusar-les abans d'escriure res.
@@ -136,10 +121,10 @@ def main(arguments):
     fingerprints = record.fingerprints()
     where = _where(arguments.smoke, fingerprints)
     continued = where.exists()
-    plans = {
-        family: importlib.import_module(TRAINERS[family]).FAMILIES[family]
-        for family in chosen
-    }
+    plans = {}
+    for family in chosen:
+        module = importlib.import_module(families.MODULES[family]["train"])
+        plans[family] = module.FAMILIES[family]
     # Les configuracions que una família guarda de cada seed.
     kept = {
         family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
@@ -149,8 +134,9 @@ def main(arguments):
     # les cerques: la sonda de datació fa cercar l'arbre.
     searched = [
         name
-        for name in search.SEARCHERS
-        if any(
+        for name in families.EVERY
+        if families.MODULES[name]["search"]
+        and any(
             kept[family] and plans[family]["searched_as"] == name for family in chosen
         )
     ]
@@ -259,7 +245,7 @@ def main(arguments):
                     (family, seed, "fit", configuration["rank"]),
                     _train,
                     (
-                        TRAINERS[family],
+                        families.MODULES[family]["train"],
                         family,
                         where / family,
                         seed,

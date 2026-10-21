@@ -4,25 +4,86 @@ import json
 
 from epf import Refusal, paths
 
-# Cada model amb les seves famílies, en l'ordre en què es fan, es mostren i s'escriuen a
-# tot arreu. Les xarxes són un model, `nn`, i cada una de les seves dues carpetes,
-# `ddnn` i `dnn`, també.
-MODELS = {
-    "ddnn": ("ddnn_jsu", "ddnn_normal"),
-    "dnn": ("dnn",),
-    "nn": ("ddnn_jsu", "ddnn_normal", "dnn"),
-    "elastic_net": ("elastic_net",),
-    "lightgbm": ("lightgbm", "date_probe"),
-    "floor": ("floor",),
-    "naive": ("naive_similar_day", "naive_previous_week", "naive_previous_day"),
+# Cada família, en l'ordre en què es fan, es mostren i s'escriuen a tot arreu, amb els
+# models que la tenen i els mòduls del seu model que l'ajusten, la cerquen i la
+# dibuixen, o `None` si no en té cap, que s'importen quan es fan servir. Les xarxes són
+# un model, `nn`, i cada una de les seves dues carpetes, `ddnn` i `dnn`, també.
+MODULES = {
+    "ddnn_jsu": {
+        "models": ("nn", "ddnn"),
+        "train": "epf.models.nn.ddnn.train",
+        "search": "epf.models.nn.search",
+        "figures": "epf.models.nn.ddnn.figures",
+    },
+    "ddnn_normal": {
+        "models": ("nn", "ddnn"),
+        "train": "epf.models.nn.ddnn.train",
+        "search": "epf.models.nn.search",
+        "figures": "epf.models.nn.ddnn.figures",
+    },
+    "dnn": {
+        "models": ("nn", "dnn"),
+        "train": "epf.models.nn.dnn.train",
+        "search": "epf.models.nn.search",
+        "figures": None,
+    },
+    "elastic_net": {
+        "models": ("elastic_net",),
+        "train": "epf.models.elastic_net.train",
+        "search": "epf.models.elastic_net.search",
+        "figures": "epf.models.elastic_net.figures",
+    },
+    "lightgbm": {
+        "models": ("lightgbm",),
+        "train": "epf.models.lightgbm.train",
+        "search": "epf.models.lightgbm.search",
+        "figures": "epf.models.lightgbm.figures",
+    },
+    "date_probe": {
+        "models": ("lightgbm",),
+        "train": "epf.models.lightgbm.date_probe",
+        "search": None,
+        "figures": "epf.models.lightgbm.figures",
+    },
+    "floor": {
+        "models": ("floor",),
+        "train": "epf.models.floor.train",
+        "search": None,
+        "figures": "epf.models.floor.figures",
+    },
+    "naive_similar_day": {
+        "models": ("naive",),
+        "train": "epf.models.naive.train",
+        "search": None,
+        "figures": None,
+    },
+    "naive_previous_week": {
+        "models": ("naive",),
+        "train": "epf.models.naive.train",
+        "search": None,
+        "figures": None,
+    },
+    "naive_previous_day": {
+        "models": ("naive",),
+        "train": "epf.models.naive.train",
+        "search": None,
+        "figures": None,
+    },
 }
 
-# Totes les famílies, de tots els models, en l'ordre de `MODELS`.
-EVERY = tuple(dict.fromkeys(family for model in MODELS.values() for family in model))
+EVERY = tuple(MODULES)
+
+# Les famílies de cada model, en ordre.
+MODELS = {
+    model: tuple(family for family in EVERY if model in MODULES[family]["models"])
+    for model in dict.fromkeys(
+        model for found in MODULES.values() for model in found["models"]
+    )
+}
 
 
-def named(names, among):
-    """Torna les famílies d'`among` que diu `names`, en l'ordre d'`among`.
+def named(names):
+    """Torna les famílies que diu `names`, en ordre.
 
     Totes si `names` és `None`, i cap si cap no hi és. Un model diu totes les seves
     famílies, i on un model i una família es diuen igual, el nom és el del model:
@@ -30,7 +91,7 @@ def named(names, among):
     família ni cap model.
     """
     if names is None:
-        return list(among)
+        return list(EVERY)
     unknown = [name for name in names if name not in MODELS and name not in EVERY]
     if unknown:
         quoted = ", ".join(f'"{name}"' for name in unknown)
@@ -40,7 +101,7 @@ def named(names, among):
             f"{', '.join(EVERY)}; els models: {', '.join(MODELS)}"
         )
     wanted = {family for name in names for family in MODELS.get(name, (name,))}
-    return [family for family in among if family in wanted]
+    return [family for family in EVERY if family in wanted]
 
 
 def recorded(folder):

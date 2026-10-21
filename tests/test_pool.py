@@ -55,7 +55,7 @@ def test_a_failing_task_is_reported_and_the_others_still_return(tmp_path):
 
 def test_a_refusal_in_a_task_is_its_message_alone(tmp_path):
     block, log = Shown(), tmp_path / "workers.log"
-    pool.done([(("a", 0, "fit", 2), families.named, (["cap"], {}))], 1, 1, log, block)
+    pool.done([(("a", 0, "fit", 2), families.named, (["cap"],))], 1, 1, log, block)
     assert block.failed[0][2].startswith('"cap" no és cap família')
     written = log.read_text(encoding="utf-8")
     assert 'a seed 0 fit 2 ha fallat: "cap" no és cap família' in written

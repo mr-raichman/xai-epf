@@ -13,7 +13,7 @@ import pytest
 from epf import Refusal, parameters, paths
 from epf.contract import matrix, record, searches
 from epf.parameters import DEVELOPMENT
-from epf.run import families, figures, pool, run, search
+from epf.run import families, figures, pool, run
 
 # La graella de la cerca falsa, amb més punts que trials: cap trial continuat no en
 # torna a fer cap.
@@ -77,9 +77,18 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "fake_trainer", trainer)
     monkeypatch.setitem(sys.modules, "fake_searcher", searcher)
     monkeypatch.setattr(
-        run, "TRAINERS", dict.fromkeys(trainer.FAMILIES, "fake_trainer")
+        families,
+        "MODULES",
+        {
+            family: {
+                "models": (family,),
+                "train": "fake_trainer",
+                "search": "fake_searcher" if family == "first" else None,
+                "figures": None,
+            }
+            for family in trainer.FAMILIES
+        },
     )
-    monkeypatch.setattr(search, "SEARCHERS", {"first": "fake_searcher"})
     monkeypatch.setattr(families, "EVERY", tuple(trainer.FAMILIES))
     monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
     monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")

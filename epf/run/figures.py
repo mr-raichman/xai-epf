@@ -11,22 +11,6 @@ from epf.contract import figure
 from epf.contract.figure import plt
 from epf.run import families, residuals, tables
 
-# Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són
-# totes: una carpeta d'una família que no hi és fa fallar el dibuix, en lloc de
-# quedar-se sense figures sense dir-ho.
-FIGURES = {
-    "ddnn_jsu": "epf.models.nn.ddnn.figures",
-    "ddnn_normal": "epf.models.nn.ddnn.figures",
-    "dnn": None,
-    "elastic_net": "epf.models.elastic_net.figures",
-    "lightgbm": "epf.models.lightgbm.figures",
-    "date_probe": "epf.models.lightgbm.figures",
-    "floor": "epf.models.floor.figures",
-    "naive_similar_day": None,
-    "naive_previous_week": None,
-    "naive_previous_day": None,
-}
-
 # L'alçada de la figura de rendiment, en mm.
 PERFORMANCE_HEIGHT = 70
 
@@ -72,16 +56,16 @@ def draw(where):
     colours = figure.family_colours(families.MODELS)
     described = {}
     folders = [path for path in where.iterdir() if path.is_dir()]
-    # En l'ordre de les famílies.
-    for folder in sorted(folders, key=lambda path: list(FIGURES).index(path.name)):
+    # En l'ordre de les famílies; una carpeta d'una família que no hi és fa fallar el
+    # dibuix, en lloc de quedar-se sense figures sense dir-ho.
+    for folder in sorted(folders, key=lambda path: families.EVERY.index(path.name)):
         models = figure.saved(folder)
         if not models:
             continue
         described[folder.name] = models
-        if FIGURES[folder.name] is not None:
-            importlib.import_module(FIGURES[folder.name]).draw(
-                folder, models, colours[folder.name]
-            )
+        module = families.MODULES[folder.name]["figures"]
+        if module is not None:
+            importlib.import_module(module).draw(folder, models, colours[folder.name])
     if described:
         _performance(where, described, colours)
         residuals.report(where, described, colours)

@@ -7,21 +7,12 @@ import optuna
 from epf.contract import matrix, searches
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-
-# Cada família que es cerca, en l'ordre en què es cerquen, amb el `search.py` del seu
-# model, que s'importa quan la família es cerca.
-SEARCHERS = {
-    "ddnn_jsu": "epf.models.nn.search",
-    "ddnn_normal": "epf.models.nn.search",
-    "dnn": "epf.models.nn.search",
-    "elastic_net": "epf.models.elastic_net.search",
-    "lightgbm": "epf.models.lightgbm.search",
-}
+from epf.run import families
 
 
 def searcher(family):
     """Torna el `search.py` del model d'una família que es cerca."""
-    return importlib.import_module(SEARCHERS[family])
+    return importlib.import_module(families.MODULES[family]["search"])
 
 
 def _trial(family, seed, drawn):
