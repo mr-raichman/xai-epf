@@ -146,7 +146,7 @@ def main(arguments):
                 "fixed": trainers[family].FAMILIES[family]["fixed"],
                 "configurations": planned,
                 "described_now": None,
-                "seconds_now": None,
+                "seconds": {},
                 "parameters": written,
             },
         )
@@ -193,20 +193,21 @@ def main(arguments):
         )
         if not found:
             continue
-        seconds = {}
-        for (_, seed, _), one in found:
-            seconds[seed] = seconds.get(seed, 0) + one["seconds"]
         path = where / family / paths.SEED_RECORD
+        recorded = json.loads(path.read_text(encoding="utf-8"))
+        # Els segons de cada ajust, per seed i configuració, al costat dels que una
+        # passada continuada ja hi tenia.
+        seconds = recorded["seconds"]
+        for (_, seed, rank), one in found:
+            seconds.setdefault(str(seed), {})[str(rank)] = round(one["seconds"], 1)
         record.write_record(
             path,
-            json.loads(path.read_text(encoding="utf-8"))
+            recorded
             | {
                 "described_now": [
                     pair for _, one in found for pair in one["described"]
                 ],
-                "seconds_now": {
-                    seed: round(total, 1) for seed, total in seconds.items()
-                },
+                "seconds": seconds,
             },
         )
     if block.failed:

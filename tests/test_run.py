@@ -1,4 +1,5 @@
 import datetime
+import json
 import sys
 import types
 
@@ -15,8 +16,9 @@ def fake(tmp_path, monkeypatch):
     """Prepara passades d'assaig de dues famílies d'un model que no ajusta res.
 
     Cada família desa un fitxer buit per configuració del pla que rep, i falla si és a
-    `failing`. Les tasques es fan aquí mateix i no en processos nous, que no veurien res
-    del que es canvia aquí. Torna l'estat, amb `main`, que en fa una.
+    `failing`, ella o, `(família, seed)`, una de les seves seeds. Les tasques es fan
+    aquí mateix i no en processos nous, que no veurien res del que es canvia aquí. Torna
+    l'estat, amb `main`, que en fa una.
     """
     state = types.SimpleNamespace(
         calls=[], failing=set(), fingerprints={"code": "codi", "dataset": "conjunt"}
@@ -24,7 +26,9 @@ def fake(tmp_path, monkeypatch):
 
     def train(family, folder, configurations, explained_days):
         state.calls.append((family, configurations))
-        if family in state.failing:
+        if family in state.failing or {(family, seed) for seed in configurations} & set(
+            state.failing
+        ):
             raise RuntimeError("interrompuda")
         for seed, planned in configurations.items():
             for one in planned:
@@ -138,3 +142,25 @@ def test_a_smoke_run_is_never_continued_under_another_variant(fake):
     with pytest.raises(Refusal, match='començar amb "--smoke"; continuar amb "uv run'):
         run.main(types.SimpleNamespace(smoke="SMOKE_1", family=None))
     assert len(fake.calls) == calls
+
+
+def test_a_continued_run_keeps_the_seconds_of_the_fits_it_made_before(
+    fake, monkeypatch
+):
+    """`seconds_now`, que una passada continuada sobreescrivia, perdia els d'abans."""
+    monkeypatch.setattr(
+        parameters,
+        "chosen",
+        lambda smoke, one=parameters.chosen: one(smoke) | {"SEEDS": (0, 1)},
+    )
+    fake.failing = {("second", 1)}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = set()
+    fake.main()
+    path = paths.RUNS / _name(1) / "second" / paths.SEED_RECORD
+    seconds = json.loads(path.read_text(encoding="utf-8"))["seconds"]
+    assert {seed: sorted(ranks) for seed, ranks in seconds.items()} == {
+        "0": ["0"],
+        "1": ["0"],
+    }
