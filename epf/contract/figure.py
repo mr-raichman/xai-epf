@@ -21,6 +21,9 @@ from matplotlib.colors import to_rgba  # noqa: E402
 from matplotlib.ticker import ScalarFormatter  # noqa: E402
 
 
+### Aspecte ###
+
+
 def rgb(red, green, blue):
     """Torna el color dels tres canals, de 0 a 255, en els de 0 a 1 de matplotlib."""
     return (red / 255, green / 255, blue / 255)
@@ -311,6 +314,11 @@ def point_style(count, coloured=False):
     }
 
 
+def rows_height(count):
+    """Torna en mm l'alçada d'un panell de `count` files."""
+    return count * ROW_PITCH + ROW_PANEL_FRAME
+
+
 def panel_grid(count, per_row, aspect, **options):
     """Torna una figura de `count` panells, `per_row` per fila, i la seva graella.
 
@@ -340,6 +348,9 @@ def save(drawing, folder, name):
     plt.close(drawing)
 
 
+### Noms i unitats ###
+
+
 # Com es diu cada grup de columnes a les figures, en l'ordre en què les sèries es
 # mostren a tot arreu.
 GROUP_LABELS = {
@@ -358,11 +369,11 @@ GROUP_LABELS = {
 GROUP_UNITS = {
     "price": "EUR/MWh",
     "demand_fcst": "MW",
-    "wind_fcst": "MW",
     "solar_fcst": "MW",
+    "wind_fcst": "MW",
     "nuclear_sched": "MWh",
-    "coal_gas_sched": "MWh",
     "hydro_sched": "MWh",
+    "coal_gas_sched": "MWh",
     "calendar": UNITLESS,
     "date": "dies",
 }
@@ -383,9 +394,6 @@ CALENDAR_LABELS = {
     "day_of_week": "dia de la setmana",
     **{f"day_of_week_{number}": day for number, day in enumerate(WEEKDAYS)},
 }
-
-# El valor p més petit que una figura escriu; un de menor s'hi escriu `p < 0,001`.
-SMALLEST_P = 0.001
 
 # Com es diu cada família a les figures.
 FAMILY_LABELS = {
@@ -411,26 +419,11 @@ OUTPUT_LABELS = {
     "tail_weight": "pes de la cua",
 }
 
-# Les sèries que tenen panells de dependència, en el seu ordre: totes les de
-# l'information set menys el preu, les previsions com a Trebbien et al. (2023) i el
-# programa igual.
-DEPENDENCE = tuple(
-    name for name in GROUP_LABELS if name in INFORMATION and name != PRICE
-)
-
-# Columnes que mostra la importància per columna; la resta compten al seu grup.
-SHOWN = 20
+# El valor p més petit que una figura escriu; un de menor s'hi escriu `p < 0,001`.
+SMALLEST_P = 0.001
 
 # MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
-
-# L'alçada de cada panell de la importància, un per fila amb els noms de les columnes
-# drets a sota, en mm.
-IMPORTANCE_HEIGHT = 70
-
-# Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.
-DEPENDENCE_PER_ROW = 2
-DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
 def unit_label(label, unit):
@@ -458,9 +451,7 @@ def column_label(column, group):
     return GROUP_LABELS[group]
 
 
-def rows_height(count):
-    """Torna en mm l'alçada d'un panell de `count` files."""
-    return count * ROW_PITCH + ROW_PANEL_FRAME
+### Models ajustats ###
 
 
 def saved(folder):
@@ -484,6 +475,17 @@ def outputs(model):
         str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
         for number, name in enumerate(model["names"])
     }
+
+
+### Importància ###
+
+
+# Columnes que mostra la importància per columna; la resta compten al seu grup.
+SHOWN = 20
+
+# L'alçada de cada panell de la importància, un per fila amb els noms de les columnes
+# drets a sota, en mm.
+IMPORTANCE_HEIGHT = 70
 
 
 def importances(values, groups):
@@ -526,7 +528,7 @@ def importance(folder, models, colour):
             # Una família d'una sola sortida no en dona el nom, que no hi afegiria res.
             title = OUTPUT_LABELS[output] if len(explained) > 1 else ""
             if len(kept) < len(models):
-                counted = f"models: {len(kept)} de {len(models)}"
+                counted = f"models ajustats: {len(kept)} de {len(models)}"
                 title = f"{title}, {counted}" if title else counted
             axis.set_title(title)
             if not kept:
@@ -537,7 +539,10 @@ def importance(folder, models, colour):
                 order = np.argsort(-table.mean(axis=0), kind="stable")[:SHOWN]
                 names = [column_label(columns[j], groups[j]) for j in order]
             else:
-                labels = [name for name in GROUP_LABELS if name in found[0][1]]
+                # Un grup sense nom hi falla, com a `column_label`, i no en queda fora
+                # amb la seva part al total.
+                place = {name: number for number, name in enumerate(GROUP_LABELS)}
+                labels = sorted(found[0][1], key=lambda name: place[name])
                 table = np.array(
                     [[by_group[name] for name in labels] for _, by_group in found]
                 )
@@ -552,6 +557,21 @@ def importance(folder, models, colour):
             axis.set_xticks(positions, names, rotation=90)
         panels.supylabel("part de la importància", fontsize=AXIS_TEXT_SIZE)
         save(panels, folder, "importance" if kind == "columns" else "groups")
+
+
+### Dependència ###
+
+
+# Les sèries que tenen panells de dependència, en el seu ordre: totes les de
+# l'information set menys el preu, les previsions com a Trebbien et al. (2023) i el
+# programa igual.
+DEPENDENCE = tuple(
+    name for name in GROUP_LABELS if name in INFORMATION and name != PRICE
+)
+
+# Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.
+DEPENDENCE_PER_ROW = 2
+DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
 def present(model):
