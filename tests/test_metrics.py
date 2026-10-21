@@ -6,7 +6,7 @@ import pytest
 from scipy import stats
 
 from epf import Refusal
-from epf.contract.metrics import SIGNIFICANCE, kupiec, refuse_missing, scored
+from epf.contract.metrics import SIGNIFICANCE, fail_on_missing, kupiec, scored
 from epf.parameters import HOUR_COLUMNS
 
 
@@ -23,7 +23,7 @@ def test_a_missing_value_fails_naming_where_it_is():
     holed = frame_of(30, offset=3.0)
     holed.iloc[4, 0] = np.nan
     with pytest.raises(ValueError, match="1 valor absent, a .* 00:00"):
-        refuse_missing(holed, "el preu real")
+        fail_on_missing(holed, "el preu real")
 
 
 def _hits_per_hour(inside, days):

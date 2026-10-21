@@ -26,7 +26,7 @@ SIGNIFICANCE = 0.05
 ON_BOUND = 1e-4
 
 
-def refuse_missing(frame, what):
+def fail_on_missing(frame, what):
     """Falla si `frame` té cap valor absent, i diu on és el primer.
 
     Un NaN faria tornar NaN la mesura sencera, o la faria saltar l'hora i informar-la
@@ -51,7 +51,7 @@ def _checked(actual, quantiles):
 
     Falla amb un preu absent, i refusa uns quantils que no són finits.
     """
-    refuse_missing(actual, "el preu real")
+    fail_on_missing(actual, "el preu real")
     if not np.isfinite(quantiles).all():
         raise Refusal("els quantils predits tenen valors no finits")
     return actual.to_numpy()[:, :, None]
