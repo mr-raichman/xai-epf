@@ -1,7 +1,6 @@
 """Els registres de les cerques i de les passades, i el fitxer de cada model ajustat."""
 
 import collections
-import datetime
 import hashlib
 import json
 
@@ -83,27 +82,6 @@ def refuse_changed(started):
     ]
     if then:
         raise Refusal(f"la passada es va començar amb {' i '.join(then)}")
-
-
-def plain(value):
-    """Torna un valor tal com es pot escriure a JSON, sense perdre què era.
-
-    Converteix les dates, les tuples i les claus, i deixa que qualsevol altra cosa faci
-    fallar l'escriptura, en lloc d'escriure-la com a text sense dir-ho.
-    """
-    if isinstance(value, dict):
-        return {str(key): plain(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [plain(item) for item in value]
-    if isinstance(value, datetime.date):
-        return str(value)
-    return value
-
-
-def write_record(path, content):
-    """Escriu el registre `content` a JSON, sencer o gens."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    paths.write_whole(path, json.dumps(plain(content), indent=2) + "\n")
 
 
 def _days(index):

@@ -32,6 +32,9 @@ HIGHLIGHT_SIZE = figure.MARKER_SIZE
 # L'alçada de la figura, en mm.
 HEIGHT = 91
 
+# El nom de la taula i de la figura de l'estudi d'una sèrie, sense l'extensió.
+OUTLIERS = "outliers_{series}"
+
 
 def window_median_mad(values, half_width):
     """Torna la mediana i la MAD de la finestra centrada en cada valor.
@@ -122,7 +125,7 @@ def report(name, frame):
     folder = paths.DATA_FIGURES / name
     folder.mkdir(parents=True, exist_ok=True)
     pd.concat(rows).to_csv(
-        folder / f"outliers_{name}.csv",
+        folder / f"{OUTLIERS.format(series=name)}.csv",
         index=False,
         lineterminator="\n",
         encoding="utf-8",
@@ -205,4 +208,4 @@ def draw(name, title, frame, by_hours, by_days):
         figure.unit_label("distància a la mediana", "MAD"),
         fontsize=figure.AXIS_TEXT_SIZE,
     )
-    figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")
+    figure.save(panels, paths.DATA_FIGURES / name, OUTLIERS.format(series=name))

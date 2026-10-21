@@ -1,4 +1,7 @@
 import datetime
+import json
+
+import pytest
 
 from epf import paths
 
@@ -23,3 +26,8 @@ def test_the_next_run_counts_on_from_the_days_highest_and_smoke_apart(
         "2026-10-14_03",
         "2026-10-15_02",
     ]
+
+
+def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
+    with pytest.raises(TypeError):
+        json.dumps(paths.plain({"bad": object()}))

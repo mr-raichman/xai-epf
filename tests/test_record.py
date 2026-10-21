@@ -1,13 +1,4 @@
-import json
-
-import pytest
-
 from epf.contract import record
-
-
-def test_a_value_json_cannot_write_is_refused_and_not_silently_dropped():
-    with pytest.raises(TypeError):
-        json.dumps(record.plain({"bad": object()}))
 
 
 def test_the_code_fingerprint_ignores_line_endings_and_sees_any_other_edit(tmp_path):

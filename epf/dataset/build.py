@@ -1,7 +1,6 @@
 """El dataset, `output/data/dataset.csv`, fet dels fitxers d'ESIOS baixats."""
 
 import datetime
-import json
 import sys
 
 import numpy as np
@@ -217,7 +216,7 @@ def write(rows, read):
         },
         "dataset": paths.digest(paths.DATASET),
     }
-    paths.write_whole(paths.DATASET_RECORD, json.dumps(record, indent=2))
+    paths.write_record(paths.DATASET_RECORD, record)
 
 
 def main():

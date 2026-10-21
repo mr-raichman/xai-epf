@@ -36,7 +36,7 @@ def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_pat
         tmp_path, tables.PROBE, 0, 0, columns=columns, values=values, r2=0.5, mae=7.0
     )
     tables.scores(tmp_path)
-    assert (tmp_path / tables.SCORES_FILE).read_text(encoding="utf-8").splitlines() == [
+    assert (tmp_path / tables.SCORES).read_text(encoding="utf-8").splitlines() == [
         "family,seed,rank,r2,mae,crps,kupiec_50,kupiec_90,counter_share",
         "ddnn_jsu,0,0,0.5,10.0,4.0,23,20,",
         "lightgbm,0,0,0.25,12.0,,,,",

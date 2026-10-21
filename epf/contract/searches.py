@@ -19,7 +19,7 @@ import os
 import optuna
 
 from epf import Refusal, paths
-from epf.contract.record import plain, write_record
+from epf.paths import plain, write_record
 from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES, seeded
 

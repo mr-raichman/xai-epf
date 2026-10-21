@@ -86,7 +86,7 @@ def _planned(folder, seed, configurations):
     found = json.loads(path.read_text(encoding="utf-8"))
     found["configurations"][str(seed)] = configurations
     found["configurations"] = _ordered(found["configurations"])
-    record.write_record(path, found)
+    paths.write_record(path, found)
 
 
 def _timed(folder, seed, rank, seconds):
@@ -97,7 +97,7 @@ def _timed(folder, seed, rank, seconds):
     ranks[str(rank)] = round(seconds, 1)
     found["seconds"][str(seed)] = _ordered(ranks)
     found["seconds"] = _ordered(found["seconds"])
-    record.write_record(path, found)
+    paths.write_record(path, found)
 
 
 class Run:
@@ -157,7 +157,7 @@ class Run:
         }
         for family in chosen:
             if families.recorded(where / family) is None:
-                record.write_record(
+                paths.write_record(
                     where / family / paths.FAMILY_RECORD,
                     {
                         "family": family,
