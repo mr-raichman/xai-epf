@@ -23,6 +23,9 @@ DST_HOUR = 2
 URL = "https://api.esios.ree.es/indicators/"
 ACCEPT = "application/json; application/vnd.esios-api-v1+json"
 
+# Segons que una petició espera la resposta d'ESIOS.
+TIMEOUT = 600
+
 # Temps després de l'últim dia que es llegeix d'un any a partir del qual el seu fitxer
 # es dona per complet.
 PUBLICATION_MARGIN = datetime.timedelta(days=2)
@@ -132,7 +135,7 @@ def download(indicator, folder, span, session=None):
         # ESIOS interpreta les dates en hora local.
         response = session.get(
             URL + str(indicator.id),
-            timeout=600,
+            timeout=TIMEOUT,
             params={
                 "start_date": f"{first}T00:00",
                 "end_date": f"{last}T23:59",

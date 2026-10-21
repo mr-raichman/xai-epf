@@ -29,8 +29,10 @@ LINEAR_UP_TO = 1
 HIGHLIGHT_COLOUR = figure.rgb(227, 73, 72)
 HIGHLIGHT_SIZE = figure.MARKER_SIZE
 
-# L'alçada de la figura, en mm.
+# L'alçada de la figura, en mm, i fins on arriba l'eix de les puntuacions de cada
+# panell, en vegades la seva puntuació més alta.
 HEIGHT = 91
+AXIS_TOP = 1.5
 
 # El nom de la taula i de la figura de l'estudi d'una sèrie, sense l'extensió.
 OUTLIERS = "outliers_{series}"
@@ -166,7 +168,7 @@ def draw(name, title, frame, by_hours, by_days):
         zorder=3,
     )
     top.set_xlim(0, HOURS_PER_DAY - 1)
-    top.set_ylim(0, np.nanmax(by_hours) * 1.5)
+    top.set_ylim(0, np.nanmax(by_hours) * AXIS_TOP)
     top.set_xticks(hours)
     top.set_xlabel("hora del dia")
     _style(
@@ -193,7 +195,7 @@ def draw(name, title, frame, by_hours, by_days):
         zorder=3,
     )
     bottom.set_xlim(instants[0], instants[-1])
-    bottom.set_ylim(0, np.nanmax(by_days) * 1.5)
+    bottom.set_ylim(0, np.nanmax(by_days) * AXIS_TOP)
     _style(
         bottom,
         f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} "

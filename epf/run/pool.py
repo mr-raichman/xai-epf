@@ -15,6 +15,11 @@ from concurrent.futures.process import BrokenProcessPool
 
 from epf import Refusal
 
+# Segons que el pare espera que torni alguna tasca abans de tornar-ho a mirar. On una
+# espera no es pot interrompre, com l'adquisició d'un lock fora de POSIX segons la
+# documentació de `threading`, és el que pot trigar un Ctrl+C a arribar-li.
+WAIT = 1
+
 
 class Failure(Exception):
     """La fallada d'una tasca que no és un refús, amb el traceback del seu procés.
@@ -157,7 +162,9 @@ def done(tasks, workers, threads, log, block, on_return=None, on_failure=None):
             broken = _fed(pool, running, tasks, workers, block, log, on_failure)
             while running:
                 ready, _ = concurrent.futures.wait(
-                    running, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED
+                    running,
+                    timeout=WAIT,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
                 )
                 for future in ready:
                     label = running.pop(future)

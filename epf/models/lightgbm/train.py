@@ -75,13 +75,13 @@ def lightgbm(point, trees, seed):
     )
 
 
-def fit_rows(X, y, point, trees, seed, validation=(), patience=PATIENCE):
+def fit_rows(X, y, point, trees, seed, validation=()):
     """Ajusta i torna un model d'un punt de la graella amb les files donades.
 
     `seed` és la de la partició, d'on surt la de l'ajust. Sense `validation` fa
     `trees` arbres, ni un més ni un menys. Amb `validation`,
     parelles `(X, y)`, `trees` és el sostre, i l'early stopping atura l'entrenament quan
-    qualsevol d'elles porta `patience` arbres sense millorar, i el model es queda amb el
+    qualsevol d'elles porta `PATIENCE` arbres sense millorar, i el model es queda amb el
     millor arbre d'aquella: amb quatre parelles és l'early stopping de Trebbien et al.
     (2023), que parteix la validació en quatre. Cada crida fa un regressor nou, de
     manera que cap ajust no hereta res de l'anterior.
@@ -95,7 +95,7 @@ def fit_rows(X, y, point, trees, seed, validation=(), patience=PATIENCE):
         y,
         eval_X=parts,
         eval_y=targets,
-        callbacks=[early_stopping(patience, verbose=False)],
+        callbacks=[early_stopping(PATIENCE, verbose=False)],
     )
 
 

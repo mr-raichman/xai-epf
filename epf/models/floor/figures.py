@@ -10,6 +10,9 @@ from epf.contract.figure import plt
 HEIGHT = 95
 BINS = 80
 
+# Punts per on passa el cúbic de cada seed.
+CURVE_POINTS = 200
+
 
 def draw(folder, models, colour):
     """Dibuixa la figura del sòl a `folder`, dels seus models ajustats.
@@ -29,7 +32,7 @@ def draw(folder, models, colour):
         rasterized=BINS**2 > figure.DENSE_POINTS,
     )[3]
     figure.colorbar(panels, image, axis, "hores")
-    span = np.linspace(load.min(), load.max(), 200)
+    span = np.linspace(load.min(), load.max(), CURVE_POINTS)
     for model in models:
         axis.plot(
             span,

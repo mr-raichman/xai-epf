@@ -61,10 +61,10 @@ def _prepared(rows, target):
     return fitted, design(rows, fitted), scaled_target
 
 
-def _fit_hour(rows, target, penalty, mixing, max_iter):
+def _fit_hour(rows, target, penalty, mixing):
     """Ajusta el model d'una hora amb les seves files i prou."""
     fitted, matrix, scaled_target = _prepared(rows, target)
-    model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=max_iter)
+    model = ElasticNet(alpha=penalty, l1_ratio=mixing, max_iter=MAX_ITER)
     return fitted._replace(
         model=model.fit(matrix, scaled_target), background=matrix.mean(axis=0)
     )
@@ -76,11 +76,10 @@ def by_hour(X):
     return [np.flatnonzero(hours == hour) for hour in range(HOURS_PER_DAY)]
 
 
-def fit_rows(X, y, penalty, mixing, max_iter=MAX_ITER):
+def fit_rows(X, y, penalty, mixing):
     """Ajusta els 24 models, cada un amb les files de la seva hora i cap més."""
     return tuple(
-        _fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing, max_iter)
-        for rows in by_hour(X)
+        _fit_hour(X.iloc[rows], y.iloc[rows], penalty, mixing) for rows in by_hour(X)
     )
 
 
