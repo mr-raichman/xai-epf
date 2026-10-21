@@ -5,7 +5,7 @@ import pytest
 from epf.contract.split import split
 from epf.models.lightgbm import search, train
 from epf.models.lightgbm.train import fit_rows, predict_rows
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, seeded
 
 # La forma de la finestra on dos ajustos van donar arbres diferents, 1085 dies de 24
 # hores i 98 columnes: una matriu petita no ho destapa mai.
@@ -29,6 +29,22 @@ def test_two_fits_on_the_same_rows_make_the_same_trees():
     y = X[:, :10].sum(axis=1) + rng.normal(scale=5, size=ROWS)
     first, second = (fit_rows(X, y, POINT, TREES, 0) for _ in range(2))
     assert np.array_equal(predict_rows(first, X[:500]), predict_rows(second, X[:500]))
+
+
+def test_a_fit_seed_of_2_31_or_more_reaches_lightgbm_as_itself_less_2_32():
+    """Retallada a 2^31 - 1, la seed de l'ajust seria la mateixa a dues particions."""
+    seed = next(one for one in range(100) if seeded("fit", one) >= 2**31)
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(2000, 5))
+    y = X.sum(axis=1) + rng.normal(size=2000)
+
+    def predicted(shift):
+        model = train.lightgbm(POINT | {"subsample": 0.5}, 20, seed)
+        model.set_params(random_state=model.random_state + shift).fit(X, y)
+        return predict_rows(model, X[:100])
+
+    assert np.array_equal(predicted(0), predicted(-(2**32)))
+    assert not np.array_equal(predicted(0), predicted(1))
 
 
 def test_a_trial_and_the_run_hand_the_fit_the_same_seed(monkeypatch):
