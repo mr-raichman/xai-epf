@@ -43,16 +43,18 @@ class Search:
     té tots els seus trials.
     """
 
-    def __init__(self, smoke, searched, seeds, trials, matrices, fingerprints):
+    def __init__(self, smoke, searched, seeds, trials, matrices, fingerprints, log):
         """Obre el study de cada família de `searched` a cada seed de `seeds`.
 
-        `trials` són els trials de cada seed, i `matrices` i `fingerprints` les matrius
-        i les empremtes de la passada. Refusa un study fet d'una altra manera abans de
-        desar cap registre, i desa el de cada seed que ja té tots els seus trials.
+        `trials` són els trials de cada seed, `matrices` i `fingerprints` les matrius i
+        les empremtes de la passada, i `log`, el fitxer dels seus processos, on va cada
+        trial que divergeix. Refusa un study fet d'una altra manera abans de desar cap
+        registre, i desa el de cada seed que ja té tots els seus trials.
         """
         # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         self.smoke, self.trials, self.fingerprints = smoke, trials, fingerprints
+        self.log = log
         self.studies = {}
         for family in searched:
             module = searcher(family)
@@ -69,9 +71,12 @@ class Search:
                     fingerprints["dataset"],
                 )
         # Els trials que té cada seed, i el trial demanat per cada tasca que encara no
-        # ha tornat.
+        # ha tornat. Un trial que divergeix hi compta, com a la cerca de Marcjasz et al.
+        # (2023), on l'`optimize` d'Optuna el compta entre els seus, i no se'n demana
+        # cap altre en lloc seu.
         self.done = {
-            key: len(searches.completed(study)) for key, study in self.studies.items()
+            key: len(searches.completed(study)) + len(searches.diverged(study))
+            for key, study in self.studies.items()
         }
         self.pending = {}
         self.records = {}
@@ -108,15 +113,19 @@ class Search:
         `result` és el que torna. Torna el registre de la seed si amb aquest trial ja
         els té tots, i si no, `None`.
         """
-        family, seed, _, _ = label
+        family, seed, _, number = label
         numbers, score = result
-        searches.told(
+        if searches.told(
             self.studies[family, seed],
             self.pending.pop(label),
             numbers,
             score,
             self.fingerprints,
-        )
+        ):
+            with open(self.log, "a", encoding="utf-8") as handle:
+                handle.write(
+                    f"{family} seed {seed} trial {number} ha divergit: {score}\n"
+                )
         self.done[family, seed] += 1
         if self.done[family, seed] == self.trials:
             return self._saved(family, seed)
@@ -130,6 +139,19 @@ class Search:
     def found(self, family, seed):
         """Torna el registre d'una seed que ja té tots els seus trials, o `None`."""
         return self.records.get((family, seed))
+
+    def unscored(self, family, seed):
+        """Torna per què una seed amb tots els seus trials no en té cap que puntuï.
+
+        Torna `None` si en té algun, o si encara no els té tots.
+        """
+        found = self.records.get((family, seed))
+        if found is None or found["ranked"]:
+            return None
+        count = len(searches.diverged(self.studies[family, seed]))
+        if count == 1:
+            return "el seu trial ha divergit"
+        return f"els seus {count} trials han divergit"
 
     def counts(self, family, seed):
         """Torna els trials d'una seed i els que ja té, `(trials, fets)`."""

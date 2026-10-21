@@ -162,6 +162,7 @@ def main(arguments):
         values["TRIALS"],
         matrices,
         fingerprints,
+        where / paths.WORKERS_LOG,
     )
     where.mkdir(parents=True, exist_ok=True)
     matrix.write(matrices, where)
@@ -187,14 +188,15 @@ def main(arguments):
             )
 
     def planned(family, seed):
-        """Fa, desa i torna el pla d'una seed d'una família, o `None` si encara no pot.
+        """Fa, desa i torna el pla d'una seed d'una família, o `None` si no pot.
 
-        No pot mentre la cerca de la seed que la família llegeix no és acabada.
+        No pot mentre la cerca de la seed que la família llegeix no és acabada, ni si en
+        acabar no té cap trial que puntuï.
         """
         made = None
         if kept[family]:
             made = searching.found(plans[family]["searched_as"], seed)
-            if made is None:
+            if made is None or not made["ranked"]:
                 return None
         configured = configurations(made, kept[family])
         _planned(where / family, seed, configured)
@@ -231,6 +233,11 @@ def main(arguments):
             if family in chosen or family in searched
         },
     )
+    for name in searched:
+        for seed in values["SEEDS"]:
+            why = searching.unscored(name, seed)
+            if why is not None:
+                block.stop(name, seed, why)
     # Cada ajust planificat que encara no té el seu fitxer, en l'ordre de les famílies,
     # de les seeds i dels llocs; la d'una seed acabada de cercar s'hi afegeix al final.
     queue = [
@@ -273,6 +280,10 @@ def main(arguments):
             _timed(where / family, seed, rank, result)
             return
         if searching.returned(label, result) is None:
+            return
+        why = searching.unscored(family, seed)
+        if why is not None:
+            block.stop(family, seed, why)
             return
         # La cerca de la seed és acabada: cada família triada que la llegeix en rep el
         # pla, si encara no el té, i els seus ajustos es fan abans que cap trial.

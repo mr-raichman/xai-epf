@@ -13,6 +13,7 @@ ni amb una altra `PROJECT_SEED`.
 
 import hashlib
 import json
+import math
 import os
 
 import optuna
@@ -72,6 +73,11 @@ def completed(study):
     return [
         one for one in study.trials if one.state == optuna.trial.TrialState.COMPLETE
     ]
+
+
+def diverged(study):
+    """Torna els trials d'un study que han divergit, sense cap puntuació finita."""
+    return [one for one in study.trials if one.user_attrs.get("diverged")]
 
 
 def _different(made, now, searcher):
@@ -156,7 +162,9 @@ def opened(store, family, searcher, seed, columns, dataset):
         study.set_user_attr("fixed", plain(searcher.FIXED))
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
     why = _different(study.user_attrs, now, searcher)
-    datasets = {one.user_attrs.get("dataset") for one in completed(study)}
+    datasets = {
+        one.user_attrs.get("dataset") for one in completed(study) + diverged(study)
+    }
     if not why and datasets - {dataset}:
         why = "amb un altre dataset"
     if why:
@@ -188,7 +196,8 @@ def told(study, optuna_trial, numbers, score, fingerprints):
     """Desa al study el resultat d'un trial i el dona per acabat.
 
     Hi desa els números, la càrrega de la màquina i les empremtes, `fingerprints`, del
-    codi, del dataset i de les biblioteques que el fan.
+    codi, del dataset i de les biblioteques que el fan. Un trial sense una puntuació
+    finita ha divergit: el dona per fallat, marcat, i diu si ho ha fet.
     """
     optuna_trial.set_user_attr("numbers", plain(numbers))
     # La càrrega quan el trial torna; Windows no la dona, i hi queda buida.
@@ -197,7 +206,14 @@ def told(study, optuna_trial, numbers, score, fingerprints):
     )
     for name, value in fingerprints.items():
         optuna_trial.set_user_attr(name, value)
-    study.tell(optuna_trial, score)
+    if math.isfinite(score):
+        study.tell(optuna_trial, score)
+        return False
+    # Optuna també falla un trial que rep un NaN, però n'avisa a sobre del bloc i el
+    # deixa igual que un d'abandonat.
+    optuna_trial.set_user_attr("diverged", True)
+    study.tell(optuna_trial, state=optuna.trial.TrialState.FAIL)
+    return True
 
 
 def abandoned(study, optuna_trial):

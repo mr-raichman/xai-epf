@@ -1,5 +1,6 @@
 import datetime
 import json
+import math
 import shutil
 import sys
 import types
@@ -26,15 +27,17 @@ def fake(tmp_path, monkeypatch):
     `first` es cerca i guarda les `BEST` millors configuracions de cada seed, `second`
     llegeix la cerca de `first` i en guarda la millor, com la sonda de datació, i
     `third` no es cerca. La cerca falsa proposa a cada trial un punt de `GRID` i el
-    puntua pel seu valor, en studies d'Optuna de debò. Cada ajust desa un fitxer buit,
-    i un trial o un ajust de `failing`, `(família, seed, tipus)`, hi llança la seva
-    excepció. Les tasques es fan aquí mateix, i no en processos nous, que no veurien
-    res del que es canvia aquí: `WORKERS` alhora, la més antiga primer. Torna l'estat,
-    amb `main`, que en fa una.
+    puntua pel seu valor, en studies d'Optuna de debò, o amb un NaN el trial de
+    `diverging`, `(família, seed, ordre)`. Cada ajust desa un fitxer buit, i un trial o
+    un ajust de `failing`, `(família, seed, tipus)`, hi llança la seva excepció. Les
+    tasques es fan aquí mateix, i no en processos nous, que no veurien res del que es
+    canvia aquí: `WORKERS` alhora, la més antiga primer. Torna l'estat, amb `main`, que
+    en fa una.
     """
     state = types.SimpleNamespace(
         calls=[],
         failing={},
+        diverging=set(),
         opened=0,
         fingerprints={"code": "codi", "dataset": "conjunt", "environment": "llibres"},
         values={"SEEDS": (0, 1), "TRIALS": 4, "BEST": 2, "WORKERS": 1},
@@ -51,8 +54,11 @@ def fake(tmp_path, monkeypatch):
         (folder / paths.SEED.format(seed=seed, rank=configuration["rank"])).touch()
 
     def trial(family, drawn, train, validate, seed):
+        order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
         state.calls.append(("trial", family, seed, drawn))
         raised(family, seed, "trial")
+        if (family, seed, order) in state.diverging:
+            return {"value": drawn}, math.nan
         return {"value": drawn}, float(drawn)
 
     trainer = types.ModuleType("fake_trainer")
@@ -216,6 +222,65 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     store = searches.folder("SMOKE", "first") / searches.STUDY.format(seed=1)
     study = optuna.load_study(study_name="first_seed_1", storage=f"sqlite:///{store}")
     assert [one.state.name for one in study.trials] == ["FAIL"] + ["COMPLETE"] * 4
+
+
+def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
+    """Un trial que no puntua compta entre els de la seed, sense cap altre en lloc seu.
+
+    Com a la cerca de Marcjasz et al. (2023).
+    """
+    fake.diverging = {("first", 0, 1)}
+    fake.main()
+    store = searches.folder("SMOKE", "first") / searches.STUDY.format(seed=0)
+    study = optuna.load_study(study_name="first_seed_0", storage=f"sqlite:///{store}")
+    assert [one.state.name for one in study.trials] == [
+        "COMPLETE",
+        "FAIL",
+        "COMPLETE",
+        "COMPLETE",
+    ]
+    assert study.trials[1].user_attrs["diverged"]
+    found = json.loads(store.with_suffix(".json").read_text(encoding="utf-8"))
+    assert found["trials"] == 3 and len(found["ranked"]) == 3
+    assert len(_recorded("first")["configurations"]["0"]) == 2
+    log = paths.RUNS / _name(1) / paths.WORKERS_LOG
+    assert log.read_text(encoding="utf-8") == "first seed 0 trial 1 ha divergit: nan\n"
+
+
+def test_a_continued_run_asks_no_trial_in_place_of_a_diverged_one(fake):
+    """Un trial abandonat es torna a demanar, però un que ha divergit ja compta."""
+    fake.diverging = {("first", 0, 1)}
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = {}
+    fake.calls.clear()
+    fake.main()
+    assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
+        ("fit", "second", 0)
+    ]
+
+
+def test_a_seed_whose_every_trial_diverged_fails_and_the_others_finish(fake, capsys):
+    """Sense cap trial que puntuï, la seed no té res a ajustar, i ho ha de dir."""
+    fake.values["TRIALS"] = 1
+    fake.diverging = {("first", 1, 0)}
+    with pytest.raises(
+        Refusal,
+        match=f"^la passada {_name(1)} no és acabada: 1 seed ha fallat, first seed 1$",
+    ):
+        fake.main()
+    shown = capsys.readouterr().err
+    assert "error: first seed 1 ha fallat: el seu trial ha divergit\n" in shown
+    assert {
+        (family, seed) for kind, family, seed, _ in fake.calls if kind == "fit"
+    } == {
+        ("third", 0),
+        ("third", 1),
+        ("first", 0),
+        ("second", 0),
+    }
+    assert set(_recorded("second")["configurations"]) == {"0"}
 
 
 def test_a_run_after_a_finished_one_asks_no_trial_and_fits_again(fake):

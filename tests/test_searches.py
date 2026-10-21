@@ -1,4 +1,5 @@
 import datetime
+import math
 import types
 
 import numpy as np
@@ -171,6 +172,23 @@ def test_a_search_made_on_another_space_or_fixed_numbers_is_not_continued(
     ):
         with pytest.raises(ValueError, match=why):
             _continued(types.SimpleNamespace(**searcher | change), X.columns)
+
+
+@pytest.mark.parametrize("score", [math.nan, math.inf, -math.inf])
+def test_a_trial_without_a_finite_score_diverges_and_keeps_its_dataset(tmp_path, score):
+    """Optuna acceptava un infinit, i el classificava; i un trial que divergeix compta.
+
+    Comptat, un trial fet sobre unes altres dades no pot continuar el study.
+    """
+    X, y = _table()
+    searcher = _searcher({"value": (3, 1, 2)}, [])
+    store = tmp_path / "seed_0.db"
+    study = opened(store, "fake", searcher, 0, X.columns, FINGERPRINTS["dataset"])
+    optuna_trial, drawn = asked(study, searcher, "fake")
+    assert told(study, optuna_trial, {"value": drawn}, score, FINGERPRINTS)
+    assert [one.state.name for one in study.trials] == ["FAIL"]
+    with pytest.raises(ValueError, match="amb un altre dataset"):
+        opened(store, "fake", searcher, 0, X.columns, "un altre")
 
 
 def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(
