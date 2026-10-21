@@ -36,10 +36,11 @@ def draw(folder, models, colour):
             np.polyval(model["coefficients"], span * figure.PER_GW),
             color=colour,
         )
-    axis.set_xlabel(figure.unit_label("càrrega residual prevista", "GW"))
-    axis.set_ylabel(figure.unit_label("preu", PRICE_UNITS))
+    axis.set_xlabel(figure.unit_label("càrrega residual prevista $L$", "GW"))
+    axis.set_ylabel(figure.unit_label("preu $P$", PRICE_UNITS))
     axis.set_title(
-        "El sòl de l'ordre de mèrit\nles files d'entrenament de la primera seed i el "
-        f"cúbic de cada una, seeds: {len(models)}"
+        "El sòl de l'ordre de mèrit: el cúbic de cada seed\n"
+        r"$\hat{P} = \beta_0 + \beta_1 L + \beta_2 L^2 + \beta_3 L^3$"
+        ", sobre l'entrenament de la primera"
     )
     figure.save(panels, folder, "floor")
