@@ -16,7 +16,7 @@ class Shown:
     """Un bloc que només recorda el que se li diu."""
 
     def __init__(self):
-        self.advanced, self.failed, self.closed = [], [], False
+        self.advanced, self.failed, self.stopped, self.closed = [], [], [], False
 
     def start(self, family):
         pass
@@ -26,6 +26,9 @@ class Shown:
 
     def fail(self, family, seed, message):
         self.failed.append((family, seed, message))
+
+    def stop(self, family, seed, message):
+        self.stopped.append((family, seed, message))
 
     def close(self):
         self.closed = True
@@ -50,6 +53,33 @@ def test_a_failing_task_is_reported_and_the_others_still_return(tmp_path):
     assert "malament seed 1 trial 7 ha fallat:\nTraceback" in log.read_text(
         encoding="utf-8"
     )
+    assert block.closed
+
+
+def test_a_killed_worker_fails_every_task_drawn_and_no_other_is_read(tmp_path):
+    """Un pool trencat feia fallar el `submit` següent, i la passada en un traceback."""
+    order = [
+        (("a", 0, "fit", 0), int, ("1",)),
+        (("b", 1, "fit", 0), os._exit, (1,)),
+        (("c", 2, "trial", 0), int, ("2",)),
+        (("d", 3, "fit", 0), int, ("3",)),
+    ]
+    drawn = []
+
+    def tasks():
+        for task in order:
+            drawn.append(task[0])
+            yield task
+
+    block, failed = Shown(), []
+    results = pool.done(
+        tasks(), 1, 1, tmp_path / "workers.log", block, on_failure=failed.append
+    )
+    assert drawn == [label for label, *_ in order[:3]]
+    assert results == {("a", 0, "fit", 0): 1}
+    assert failed == [("b", 1, "fit", 0), ("c", 2, "trial", 0)]
+    assert [(family, seed) for family, seed, _ in block.failed] == [("b", 1)]
+    assert [(family, seed) for family, seed, _ in block.stopped] == [("c", 2)]
     assert block.closed
 
 
