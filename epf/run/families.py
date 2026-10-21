@@ -135,11 +135,16 @@ def missing(folder):
 
 
 def complete(folder):
-    """Diu si una família té pla per a cada seed i tots els fitxers que el pla diu."""
+    """Diu si una família té pla per a cada seed i tots els fitxers que el pla diu.
+
+    Un registre sense `settings` és d'un altre codi, i no ho diu.
+    """
     path = folder / paths.SEED_RECORD
     if not path.exists():
         return False
     found = json.loads(path.read_text(encoding="utf-8"))
+    if "settings" not in found:
+        return False
     planned = {int(seed) for seed in found["configurations"]}
     return planned >= set(found["settings"]["SEEDS"]) and not missing(folder)
 

@@ -23,3 +23,11 @@ def test_a_family_planned_for_some_seeds_alone_is_not_complete(tmp_path):
         for seed in planned:
             (tmp_path / paths.SEED.format(seed=seed, rank=0)).touch()
         assert families.complete(tmp_path) == (len(planned) == 2)
+
+
+def test_a_record_without_settings_is_not_complete(tmp_path):
+    """Un registre d'abans de `settings` aturava `epf run` amb un `KeyError`."""
+    path = tmp_path / paths.SEED_RECORD
+    record.write_record(path, {"seeds": [0], "configurations": {"0": [{"rank": 0}]}})
+    (tmp_path / paths.SEED.format(seed=0, rank=0)).touch()
+    assert not families.complete(tmp_path)
