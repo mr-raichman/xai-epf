@@ -37,15 +37,18 @@ def rgba(red, green, blue, alpha):
 FONT = "Times New Roman"
 FALLBACK_FONT = "Liberation Serif"
 
-# Mides del text, en punts.
-AXIS_TITLE_SIZE = 7
-TICK_LABEL_SIZE = 6
-PANEL_HEADING_SIZE = 7
-PANEL_LETTER_SIZE = 10
-LEGEND_SIZE = 5
-COLORBAR_TITLE_SIZE = 7
-COLORBAR_TICK_SIZE = 5
-ANNOTATION_SIZE = 5
+# Mides del text, en punts, des de la del peu de figura de la memòria: el títol d'una
+# figura o d'un panell, un punt per sota, i tot el text dels eixos, dos.
+CAPTION_SIZE = 12
+PANEL_HEADING_SIZE = CAPTION_SIZE - 1
+AXIS_TEXT_SIZE = CAPTION_SIZE - 2
+AXIS_TITLE_SIZE = AXIS_TEXT_SIZE
+TICK_LABEL_SIZE = AXIS_TEXT_SIZE
+LEGEND_SIZE = AXIS_TEXT_SIZE
+COLORBAR_TITLE_SIZE = AXIS_TEXT_SIZE
+COLORBAR_TICK_SIZE = AXIS_TEXT_SIZE
+ANNOTATION_SIZE = AXIS_TEXT_SIZE
+PANEL_LETTER_SIZE = PANEL_HEADING_SIZE
 
 PANEL_LETTER_WEIGHT = "bold"
 
@@ -122,7 +125,7 @@ BAR_WIDTH = 0.7
 
 # Un panell d'una fila per cosa, una barra o els punts d'una família, creix amb les
 # seves files: el lloc de cada una, i el del títol, l'eix i les seves xifres, en mm.
-ROW_PITCH = 3.5
+ROW_PITCH = 4.5
 ROW_PANEL_FRAME = 16
 
 # `GRID_AXIS`, "x", "y" o "both".
@@ -330,15 +333,16 @@ def line_style(count, overlapping):
     return found
 
 
-def point_style(count):
+def point_style(count, coloured=False):
     """Torna com es dibuixa una capa de `count` punts, per a `scatter`.
 
-    La mida, l'opacitat, cap vora, i si es desa com a imatge.
+    La mida, l'opacitat, cap vora, i si es desa com a imatge. Uns punts pintats pel seu
+    valor, `coloured`, són opacs: transparents, el seu color ja no diria el valor.
     """
     dense = count > DENSE_POINTS
     return {
         "s": (DENSE_MARKER_SIZE if dense else MARKER_SIZE) ** 2,
-        "alpha": DENSE_POINT_OPACITY if dense else POINT_OPACITY,
+        "alpha": 1 if coloured else DENSE_POINT_OPACITY if dense else POINT_OPACITY,
         "linewidths": 0,
         "rasterized": dense,
     }
@@ -365,6 +369,19 @@ GROUP_LABELS = {
     "hydro_sched": "hidràulica programada",
     "calendar": "calendari",
     "date": "comptador de dies",
+}
+
+# La unitat de cada grup de columnes, la de la seva sèrie al dataset.
+GROUP_UNITS = {
+    "price": "EUR/MWh",
+    "demand_fcst": "MW",
+    "wind_fcst": "MW",
+    "solar_fcst": "MW",
+    "nuclear_sched": "MWh",
+    "coal_gas_sched": "MWh",
+    "hydro_sched": "MWh",
+    "calendar": UNITLESS,
+    "date": "dies",
 }
 
 # Com es diu cada columna del calendari a les figures; el dia 0 de la setmana és el
@@ -424,7 +441,7 @@ PER_GW = 1000
 # Panells per fila de la importància i de la dependència, i l'alçada de cada panell de
 # dependència entre la seva amplada.
 IMPORTANCE_PER_ROW = 2
-DEPENDENCE_PER_ROW = 4
+DEPENDENCE_PER_ROW = 2
 DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
@@ -506,7 +523,7 @@ def importance(folder, models, colour):
     De les columnes, les `SHOWN` que més pesen. La mitjana, en barres de `colour`, el
     color de la família, i cada model ajustat, en un punt. Un model ajustat sense cap
     contribució en una sortida, que no depèn de les entrades, no hi entra, i el títol
-    diu quants models hi entren de quants.
+    diu llavors quants models hi entren de quants.
     """
     explained = list(outputs(models[0]))
     groups = models[0]["groups"]
@@ -523,12 +540,11 @@ def importance(folder, models, colour):
         for axis, output in zip(axes.flat, explained, strict=False):
             # La seva part seria zero entre zero.
             kept = [model for model in models if np.any(outputs(model)[output])]
-            counted = (
-                f"{len(kept)} de {len(models)}"
+            axis.set_title(
+                f"{OUTPUT_LABELS[output]}, models: {len(kept)} de {len(models)}"
                 if len(kept) < len(models)
-                else len(kept)
+                else OUTPUT_LABELS[output]
             )
-            axis.set_title(f"{OUTPUT_LABELS[output]}, models: {counted}")
             if not kept:
                 continue
             found = [importances(outputs(model)[output], groups) for model in kept]
@@ -550,11 +566,12 @@ def importance(folder, models, colour):
             for row in table[:, order]:
                 axis.plot(row, positions, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
             axis.set_yticks(positions, names)
-            axis.set_xlabel(
-                "importància, la més gran de cada model a 1"
-                if kind == "columns"
-                else "part de la importància"
-            )
+        panels.supxlabel(
+            "importància, la més gran de cada model a 1"
+            if kind == "columns"
+            else "part de la importància",
+            fontsize=AXIS_TITLE_SIZE,
+        )
         save(panels, folder, "importance" if kind == "columns" else "groups")
 
 
@@ -599,28 +616,23 @@ def dependence(folder, models, present, colour):
     Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
     model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
     i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
-    (2023). Cada sèrie té un panell per sortida explicada, i una fila en porta tantes
-    sèries com hi caben en `DEPENDENCE_PER_ROW` panells, repartides igual entre les
-    files.
+    (2023). Una figura per sortida explicada, amb un panell per sèrie i
+    `DEPENDENCE_PER_ROW` per fila: `dependence.svg` la d'una família que n'explica una
+    de sola, i `dependence_<sortida>.svg` les de la xarxa distribucional.
     """
     explained = list(outputs(models[0]))
     units = dict(zip(explained, models[0]["units"], strict=True))
-    rows = math.ceil(len(present) * len(explained) / DEPENDENCE_PER_ROW)
-    per_row = math.ceil(len(present) / rows)
-    rows = math.ceil(len(present) / per_row)
-    across = per_row * len(explained)
-    panels, axes = plt.subplots(
-        rows,
-        across,
-        figsize=size(rows * WIDTH / across * DEPENDENCE_ASPECT),
-        squeeze=False,
-    )
-    for axis in axes.flat[len(present) * len(explained) :]:
-        axis.set_visible(False)
-    for number, name in enumerate(present):
-        first = number % per_row * len(explained)
-        row = axes[number // per_row, first : first + len(explained)]
-        for axis, output in zip(row, explained, strict=True):
+    rows = math.ceil(len(present) / DEPENDENCE_PER_ROW)
+    for output in explained:
+        panels, axes = plt.subplots(
+            rows,
+            DEPENDENCE_PER_ROW,
+            figsize=size(rows * WIDTH / DEPENDENCE_PER_ROW * DEPENDENCE_ASPECT),
+            squeeze=False,
+        )
+        for axis in axes.flat[len(present) :]:
+            axis.set_visible(False)
+        for axis, name in zip(axes.flat, present, strict=False):
             slopes = []
             for count, model in enumerate(models):
                 x, y = pairs(model, outputs(model)[output], name)
@@ -631,9 +643,12 @@ def dependence(folder, models, present, colour):
                     span = np.array([x.min(), x.max()]) / PER_GW
                     axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
             axis.set_xlabel(f"{GROUP_LABELS[name]}, GW")
-            axis.set_ylabel(unit_label(OUTPUT_LABELS[output], units[output]))
             first_slope = catalan(f"{slopes[0]:.2g}")
             mean = catalan(f"{np.mean(slopes):.2g}")
             spread = catalan(f"{np.std(slopes):.2g}")
             axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
-    save(panels, folder, "dependence")
+        panels.supylabel(
+            unit_label(OUTPUT_LABELS[output], units[output]), fontsize=AXIS_TITLE_SIZE
+        )
+        name = "dependence" if len(explained) == 1 else f"dependence_{output}"
+        save(panels, folder, name)

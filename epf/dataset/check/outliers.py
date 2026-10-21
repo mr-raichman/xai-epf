@@ -130,10 +130,9 @@ def report(name, frame):
     return by_hours, by_days
 
 
-def _style(axis, title, ylabel):
-    """Dona a uns eixos el títol, el de l'eix vertical i la seva escala."""
+def _style(axis, title):
+    """Dona a uns eixos el títol i l'escala vertical."""
     axis.set_title(title)
-    axis.set_ylabel(ylabel)
     axis.set_yscale("symlog", linthresh=LINEAR_UP_TO)
 
 
@@ -171,7 +170,6 @@ def draw(name, title, frame, by_hours, by_days):
         top,
         f"Respecte de les hores adjacents (±{HOUR_HALF_WIDTH} h), un dia per línia, "
         f"en vermell les {HIGHEST} més altes",
-        "distància a la mediana, en MAD",
     )
 
     instants = frame.index.repeat(HOURS_PER_DAY) + pd.to_timedelta(
@@ -197,11 +195,11 @@ def draw(name, title, frame, by_hours, by_days):
         bottom,
         f"Respecte de la mateixa hora dels dies del voltant (±{DAY_HALF_WIDTH} "
         f"dies), en vermell les {HIGHEST} més altes",
-        "distància a la mediana, en MAD",
     )
 
     panels.suptitle(
-        f"{title}: distància de cada valor horari als seus veïns, de "
+        f"{title}\ndistància de cada valor horari als seus veïns, de "
         f"{frame.index[0].year} a {frame.index[-1].year}"
     )
+    panels.supylabel("distància a la mediana, en MAD", fontsize=figure.AXIS_TITLE_SIZE)
     figure.save(panels, paths.DATA_FIGURES / name, f"outliers_{name}")

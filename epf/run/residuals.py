@@ -18,9 +18,13 @@ from epf.run import families
 # Athanasopoulos (2021) per a una sèrie estacional.
 LAGS = 2 * DAYS_PER_WEEK
 
+# On cauen el 95 % de les autocorrelacions d'un soroll blanc: dins de ±1,96/√T, amb T la
+# llargada de la sèrie, aquí els dies amb error (Hyndman i Athanasopoulos, 2021).
+WHITE_NOISE_Z = 1.96
+
 # Columnes de la figura, una família per panell, i l'alçada de cada panell entre la seva
 # amplada.
-PANELS_PER_ROW = 4
+PANELS_PER_ROW = 3
 PANEL_ASPECT = 3 / 4
 
 # El test de cada família, un per fila, al costat de la figura.
@@ -82,7 +86,8 @@ def report(where, described, colours):
     """Dibuixa el correlograma de cada família ajustada i en desa el test.
 
     El test va a `residuals.csv`, i el correlograma, del color de cada família de
-    `colours`, marca la distància de la partició i la setmana.
+    `colours`, marca la distància de la partició i la setmana, i on cauria el 95 % de
+    les autocorrelacions si l'error fos soroll blanc.
     """
     fitted = [
         family
@@ -113,11 +118,19 @@ def report(where, described, colours):
             color=colours[family],
             width=figure.BAR_WIDTH,
         )
+        bound = WHITE_NOISE_Z / np.sqrt(days)
+        axis.axhspan(
+            -bound,
+            bound,
+            color=figure.REFERENCE_COLOUR,
+            alpha=figure.BAND_OPACITY,
+            linewidth=0,
+        )
         for lag in (GAP, DAYS_PER_WEEK):
             axis.axvline(lag, **figure.REFERENCE_LINE)
         axis.axhline(0, **figure.REFERENCE_LINE)
         axis.set_xlabel("retard, dies")
-        axis.set_title(f"{figure.FAMILY_LABELS[family]}, {figure.p_value(value)}")
+        axis.set_title(f"{figure.FAMILY_LABELS[family]}\n{figure.p_value(value)}")
     for axis in axes[:, 0]:
         axis.set_ylabel("autocorrelació")
     for axis in axes.flat[len(fitted) :]:

@@ -9,55 +9,66 @@ from epf.contract.figure import plt
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
-# L'alçada de cada panell de les interaccions entre la seva amplada.
-PANEL_ASPECT = 3.5 / 4
+# Panells de les interaccions per fila, i l'alçada de cada un entre la seva amplada.
+PANELS_PER_ROW = 2
+PANEL_ASPECT = 3 / 4
 
 
 def _interactions(folder, model, present, colour):
     """Dibuixa les interaccions de cada sèrie al millor model ajustat, `model`.
 
-    És el de la primera seed. Per sèrie de `present`, la dependència sencera i l'efecte
-    sense interaccions, de `colour`, el color de la família, i la interacció amb els
-    `PARTNERS` socis més forts, amb el color del valor de cada soci a l'escala contínua.
+    És el de la primera seed. Per sèrie de `present`, una figura,
+    `interactions_<sèrie>.svg`: la dependència sencera i l'efecte sense interaccions, de
+    `colour`, el color de la família, i la interacció amb els `PARTNERS` socis més
+    forts, amb el color del valor de cada soci a l'escala contínua.
     """
     columns = list(model["columns"])
     rows = model["interaction_rows"]
     inputs, interactions = model["inputs"][rows], model["interactions"]
     values = model["values"][rows]
-    across = 2 + PARTNERS
-    panels, axes = plt.subplots(
-        len(present),
-        across,
-        figsize=figure.size(len(present) * figure.WIDTH / across * PANEL_ASPECT),
-        squeeze=False,
-    )
-    for row, name in zip(axes, present, strict=True):
+    count = 2 + PARTNERS
+    lines = -(-count // PANELS_PER_ROW)
+    for name in present:
+        panels, axes = plt.subplots(
+            lines,
+            PANELS_PER_ROW,
+            figsize=figure.size(lines * figure.WIDTH / PANELS_PER_ROW * PANEL_ASPECT),
+            squeeze=False,
+        )
+        for axis in axes.flat[count:]:
+            axis.set_visible(False)
         (j,) = figure.members(model, name)
         x = inputs[:, j] / figure.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
         strength[j] = -np.inf
         partners = np.argsort(strength)[-PARTNERS:][::-1]
-        panels_of_row = [
+        shown = [
             (values[:, j], None, "sencera"),
             (interactions[:, j, j], None, "sense interaccions"),
         ]
-        panels_of_row += [
+        shown += [
             (
                 2 * interactions[:, j, k],
-                inputs[:, k],
+                k,
                 f"amb {figure.column_label(columns[k], model['groups'][k])}",
             )
             for k in partners
         ]
-        for axis, (y, partner, title) in zip(row, panels_of_row, strict=True):
-            if partner is None:
+        for axis, (y, k, title) in zip(axes.flat, shown, strict=False):
+            if k is None:
                 axis.scatter(x, y, color=colour, **figure.point_style(x.size))
             else:
-                image = axis.scatter(x, y, c=partner, **figure.point_style(x.size))
-                figure.colorbar(panels, image, axis, "valor del soci")
+                image = axis.scatter(
+                    x, y, c=inputs[:, k], **figure.point_style(x.size, coloured=True)
+                )
+                unit = figure.GROUP_UNITS[model["groups"][k]]
+                figure.colorbar(
+                    panels, image, axis, figure.unit_label("valor del soci", unit)
+                )
             axis.set_title(title)
-        row[0].set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
-    figure.save(panels, folder, "interactions")
+            axis.set_xlabel(f"{figure.GROUP_LABELS[name]}, GW")
+        panels.supylabel("contribució, EUR/MWh", fontsize=figure.AXIS_TITLE_SIZE)
+        figure.save(panels, folder, f"interactions_{name}")
 
 
 def draw(folder, models, colour):

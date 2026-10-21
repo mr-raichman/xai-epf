@@ -38,7 +38,7 @@ def draw(folder, models, colour):
     axis.set_xlabel("càrrega residual prevista, GW")
     axis.set_ylabel("preu, EUR/MWh")
     axis.set_title(
-        "El sòl de l'ordre de mèrit: les files d'entrenament de la "
-        f"primera seed i el cúbic de cada una, seeds: {len(models)}"
+        "El sòl de l'ordre de mèrit\nles files d'entrenament de la primera seed i el "
+        f"cúbic de cada una, seeds: {len(models)}"
     )
     figure.save(panels, folder, "floor")
