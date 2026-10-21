@@ -14,16 +14,14 @@ from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.elastic_net import attribution, regression
-from epf.models.elastic_net.hyperparameters import MAX_ITER, MIXING, NAME, PENALTY
+from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
-# La família, com la planifica una passada: el sostre d'iteracions, que no es cerca, el
-# càstig i la barreja de lloc mentre no hi ha cerca, i les `BEST` millors de cada seed
-# de la seva pròpia cerca.
+# La família, com la planifica una passada: el sostre d'iteracions, que no es cerca, i
+# les `BEST` millors de cada seed de la seva pròpia cerca.
 FAMILIES = {
     NAME: {
         "fixed": {"max_iter": MAX_ITER},
-        "placeholder": {"penalty": PENALTY, "mixing": MIXING},
         "kept": "BEST",
         "searched_as": NAME,
     }

@@ -19,7 +19,6 @@ from epf.models.lightgbm.hyperparameters import (
     NAME,
     PATIENCE,
     SUBSAMPLE_FREQ,
-    UNSEARCHED,
 )
 from epf.parameters import (
     BLACKOUT_WEEK,
@@ -30,15 +29,10 @@ from epf.parameters import (
 )
 
 # La família, com la planifica una passada: el sostre d'arbres i la paciència, que no es
-# cerquen, el punt de lloc mentre no hi ha cerca, sense els seus arbres, perquè els
-# arbres els decideix l'early stopping, i les `BEST` millors de cada seed de la seva
-# pròpia cerca.
+# cerquen, i les `BEST` millors de cada seed de la seva pròpia cerca.
 FAMILIES = {
     NAME: {
         "fixed": {"most_trees": MOST_TREES, "patience": PATIENCE},
-        "placeholder": {
-            name: value for name, value in UNSEARCHED.items() if name != "trees"
-        },
         "kept": "BEST",
         "searched_as": NAME,
     }

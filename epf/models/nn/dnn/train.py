@@ -11,7 +11,7 @@ from epf.contract.metrics import scored
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.nn import network
-from epf.models.nn.hyperparameters import FIXED, copied
+from epf.models.nn.hyperparameters import FIXED
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
@@ -28,16 +28,8 @@ POINT = network.Distribution(
 POINT_FAMILY = "dnn"
 
 # La família, com la planifica una passada: el batch, les èpoques i la paciència, que no
-# es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
-# configuració de cada seed de la seva pròpia cerca.
-FAMILIES = {
-    POINT_FAMILY: {
-        "fixed": FIXED,
-        "placeholder": copied(POINT_FAMILY),
-        "kept": 1,
-        "searched_as": POINT_FAMILY,
-    }
-}
+# es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
+FAMILIES = {POINT_FAMILY: {"fixed": FIXED, "kept": 1, "searched_as": POINT_FAMILY}}
 
 
 def _fitted(X, y, parts, seed, numbers):

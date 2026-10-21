@@ -21,7 +21,6 @@ FLOOR_DEGREE = 3
 FAMILIES = {
     FLOOR: {
         "fixed": {"degree": FLOOR_DEGREE},
-        "placeholder": None,
         "kept": 0,
         "searched_as": FLOOR,
     }

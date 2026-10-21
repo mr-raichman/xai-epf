@@ -83,7 +83,6 @@ FAMILIES = {
     name: {
         "fixed": numbers
         | ({"bootstrap_from": IN_SAMPLE} if name == BOOTSTRAPPED else {}),
-        "placeholder": None,
         "kept": 0,
         "searched_as": name,
     }

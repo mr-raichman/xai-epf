@@ -19,14 +19,3 @@ PATIENCE = 20
 # decideix només `min_child_samples`.
 SUBSAMPLE_FREQ = 1
 MIN_CHILD_WEIGHT = 0
-
-# El punt mentre no s'ha cercat: els arbres i la taxa, inventats, i per a la resta els
-# valors per defecte de LightGBM.
-UNSEARCHED = {
-    "learning_rate": 0.05,
-    "num_leaves": 31,
-    "max_depth": -1,
-    "subsample": 1.0,
-    "min_child_samples": 20,
-    "trees": 500,
-}

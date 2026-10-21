@@ -14,15 +14,13 @@ from epf.contract.split import split
 from epf.models.nn import network
 from epf.models.nn.ddnn import attribution
 from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
-from epf.models.nn.hyperparameters import FIXED, copied
+from epf.models.nn.hyperparameters import FIXED
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 
 # Cada família, com la planifica una passada: el batch, les èpoques i la paciència, que
-# no es cerquen, els números copiats de l'article mentre no hi ha cerca, i la millor
-# configuració de cada seed de la seva pròpia cerca.
+# no es cerquen, i la millor configuració de cada seed de la seva pròpia cerca.
 FAMILIES = {
-    name: {"fixed": FIXED, "placeholder": copied(name), "kept": 1, "searched_as": name}
-    for name in DISTRIBUTIONS
+    name: {"fixed": FIXED, "kept": 1, "searched_as": name} for name in DISTRIBUTIONS
 }
 
 
