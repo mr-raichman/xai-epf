@@ -88,6 +88,18 @@ def _days(index):
     return index.to_numpy().astype("datetime64[D]")
 
 
+def fitted_files(folder):
+    """Torna el fitxer de cada model ajustat d'una família, per `(seed, configuració)`.
+
+    En ordre de seed i de configuració, del primer de la primera seed, la seva millor.
+    """
+    found = {
+        tuple(int(part) for part in path.stem.split("_")[1:]): path
+        for path in folder.glob(paths.SEED.format(seed="*", rank="*"))
+    }
+    return dict(sorted(found.items()))
+
+
 def save_model(path, parts, explained, fitted, scores, rank):
     """Desa un model ajustat, `fitted`, amb la seva partició i les seves puntuacions.
 

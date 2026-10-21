@@ -8,7 +8,7 @@ import numpy as np
 
 from epf.contract.matrix import INFORMATION, PRICE
 from epf.parameters import HOUR_COLUMNS
-from epf.paths import SEED
+from epf.contract.record import fitted_files
 
 # El motor sense finestra, triat abans d'importar `pyplot`: qui importa aquest mòdul ja
 # el té triat.
@@ -113,11 +113,7 @@ def saved(folder):
 
     El primer és la millor configuració de la primera seed.
     """
-    paths = sorted(
-        folder.glob(SEED.format(seed="*", rank="*")),
-        key=lambda path: tuple(int(part) for part in path.stem.split("_")[1:]),
-    )
-    return [np.load(path) for path in paths]
+    return [np.load(path) for path in fitted_files(folder).values()]
 
 
 def outputs(model):

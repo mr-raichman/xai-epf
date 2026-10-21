@@ -9,7 +9,7 @@ import sys
 from epf import Refusal, paths
 from epf.contract import figure
 from epf.contract.figure import plt
-from epf.run import families, residuals
+from epf.run import families, residuals, tables
 
 # Cada família amb el `figures.py` del seu model, o `None` si no en té cap. Hi són
 # totes: una carpeta d'una família que no hi és fa fallar el dibuix, en lloc de
@@ -82,6 +82,8 @@ def draw(where):
     if described:
         _performance(where, described)
         residuals.report(where, described)
+        tables.scores(where)
+        tables.date_probe(where)
 
 
 def main(arguments):
