@@ -1,6 +1,6 @@
 """Les figures de les xarxes distribucionals, del que la passada va desar.
 
-Cada figura té un tauler per paràmetre.
+Cada figura té un panell per paràmetre.
 """
 
 from epf.contract import figure

@@ -329,7 +329,7 @@ OUTPUT_LABELS = {
     "tail_weight": "pes de la cua",
 }
 
-# Les sèries que tenen gràfic de dependència: totes les de l'information set menys el
+# Les sèries que tenen panells de dependència: totes les de l'information set menys el
 # preu, les previsions com a Trebbien et al. (2023) i el programa igual.
 DEPENDENCE = tuple(name for name in INFORMATION if name != PRICE)
 
@@ -339,7 +339,7 @@ SHOWN = 20
 # MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
 PER_GW = 1000
 
-# Taulers per fila de la importància i de la dependència, i l'alçada de cada un entre la
+# Panells per fila de la importància i de la dependència, i l'alçada de cada un entre la
 # seva amplada.
 IMPORTANCE_PER_ROW = 2
 IMPORTANCE_ASPECT = 6 / 5
@@ -490,8 +490,8 @@ def dependence(folder, models, present, colour):
     Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
     model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
     i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
-    (2023). Cada sèrie té un tauler per sortida explicada, i una fila en porta tantes
-    sèries com hi caben en `DEPENDENCE_PER_ROW` taulers, repartides igual entre les
+    (2023). Cada sèrie té un panell per sortida explicada, i una fila en porta tantes
+    sèries com hi caben en `DEPENDENCE_PER_ROW` panells, repartides igual entre les
     files.
     """
     explained = list(outputs(models[0]))

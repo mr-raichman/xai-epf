@@ -9,7 +9,7 @@ from epf.contract.figure import plt
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
-# L'alçada de cada tauler de les interaccions entre la seva amplada.
+# L'alçada de cada panell de les interaccions entre la seva amplada.
 PANEL_ASPECT = 3.5 / 4
 
 

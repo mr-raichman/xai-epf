@@ -18,7 +18,7 @@ from epf.run import families
 # Athanasopoulos (2021) per a una sèrie estacional.
 LAGS = 2 * DAYS_PER_WEEK
 
-# Columnes de la figura, una família per quadre, i l'alçada de cada quadre entre la seva
+# Columnes de la figura, una família per panell, i l'alçada de cada panell entre la seva
 # amplada.
 PANELS_PER_ROW = 4
 PANEL_ASPECT = 3 / 4
