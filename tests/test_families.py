@@ -17,7 +17,9 @@ def test_a_family_planned_for_some_seeds_alone_is_not_complete(tmp_path):
     """Planificada seed a seed, una família amb el pla d'una sola es donava per feta."""
     path = tmp_path / paths.SEED_RECORD
     for planned in ({"0": [{"rank": 0}]}, {"0": [{"rank": 0}], "1": [{"rank": 0}]}):
-        record.write_record(path, {"seeds": [0, 1], "configurations": planned})
+        record.write_record(
+            path, {"settings": {"SEEDS": [0, 1]}, "configurations": planned}
+        )
         for seed in planned:
             (tmp_path / paths.SEED.format(seed=seed, rank=0)).touch()
         assert families.complete(tmp_path) == (len(planned) == 2)

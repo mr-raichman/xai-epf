@@ -146,7 +146,9 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(pool, "done", done)
     monkeypatch.setattr(run, "WORKERS", 1)
     real = parameters.chosen
-    monkeypatch.setattr(parameters, "chosen", lambda smoke: real(smoke) | state.values)
+    monkeypatch.setattr(
+        parameters, "chosen", lambda smoke, read: real(smoke, read) | state.values
+    )
     state.module = trainer
     state.main = lambda smoke="SMOKE": run.main(
         types.SimpleNamespace(smoke=smoke, family=None)

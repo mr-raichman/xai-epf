@@ -141,7 +141,7 @@ def complete(folder):
         return False
     found = json.loads(path.read_text(encoding="utf-8"))
     planned = {int(seed) for seed in found["configurations"]}
-    return planned >= set(found["seeds"]) and not missing(folder)
+    return planned >= set(found["settings"]["SEEDS"]) and not missing(folder)
 
 
 def finished(where):

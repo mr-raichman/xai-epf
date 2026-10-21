@@ -16,6 +16,10 @@ from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search
 
+# Els valors que una passada llegeix de `parameters.chosen`, els únics que una variant
+# d'assaig pot canviar; la resta s'importen on es fan servir.
+READ = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
+
 
 def _where(smoke, fingerprints):
     """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
@@ -159,12 +163,10 @@ class Run:
                         "family": family,
                         "smoke": smoke,
                         **fingerprints,
-                        "seeds": values["SEEDS"],
-                        "explained_days": values["EXPLAINED_DAYS"],
                         "fixed": self.plans[family]["fixed"],
                         "configurations": {},
                         "seconds": {},
-                        "parameters": written,
+                        "settings": written,
                     },
                 )
         for family in chosen:
@@ -317,7 +319,7 @@ def main(arguments):
     refús si alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a
     alguna família li falta el pla d'una seed o un fitxer.
     """
-    values = parameters.chosen(arguments.smoke)
+    values = parameters.chosen(arguments.smoke, READ)
     chosen = families.named(arguments.family)
     matrices = matrix.matrices(matrix.series())
     matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)

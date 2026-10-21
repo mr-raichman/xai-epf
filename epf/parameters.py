@@ -130,12 +130,12 @@ def variants():
     }
 
 
-def chosen(smoke):
+def chosen(smoke, read):
     """Torna cada valor d'aquest fitxer pel seu nom, els de la variant d'assaig `smoke`.
 
-    `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura. Refusa una
-    variant que canvia un valor que cap comanda no llegeix d'aquí: no canviaria res, i
-    el registre de la passada el diria canviat.
+    `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura, i `read` els
+    noms que qui la crida llegeix del que torna. Refusa una variant que canvia un altre
+    valor: no canviaria res, i el registre de la passada el diria canviat.
     """
     found = {
         name: value
@@ -144,9 +144,6 @@ def chosen(smoke):
     }
     if not smoke:
         return found
-    # Els que `run/run.py` llegeix del que torna aquesta funció; la resta s'importen on
-    # es fan servir.
-    read = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
     unread = [name for name in globals()[smoke] if name not in read]
     if unread:
         changed = (
