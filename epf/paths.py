@@ -90,6 +90,5 @@ def write_whole(path, text):
     Un procés que s'atura mentre escriu deixa el fitxer com era, i `<nom>.part` al
     costat.
     """
-    unfinished = partial(path)
-    unfinished.write_text(text, encoding="utf-8")
-    unfinished.replace(path)
+    partial(path).write_text(text, encoding="utf-8")
+    partial(path).replace(path)

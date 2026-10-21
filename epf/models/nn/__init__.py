@@ -1,4 +1,4 @@
-"""Les xarxes de Marcjasz et al. (2023), les dues distribucionals i la de punt."""
+"""Les xarxes de Marcjasz et al. (2023)."""
 
 import os
 

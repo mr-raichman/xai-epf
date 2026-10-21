@@ -28,7 +28,9 @@ def attribute_rows(distribution, fitted, X, background):
         fitted.input, keras.layers.Lambda(distribution.flat)(fitted.output)
     )
     # `shap` avisa que retalla el fons a 100 files, però l'avís és de la seva classe
-    # base: DeepExplainer les pren totes.
+    # base: DeepExplainer les pren totes. Avisa també, de qualsevol model, que des de
+    # TensorFlow 2.4.0 alguns grafs estàtics poden no anar bé; la suma de cada
+    # paràmetre, que es comprova, en destaparia un.
     explainer = shap.DeepExplainer(explained, inputs(background).to_numpy())
     shown = inputs(X)
     # Keras avisa que l'estructura de les entrades no és l'esperada perquè DeepExplainer

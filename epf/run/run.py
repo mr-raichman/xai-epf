@@ -218,7 +218,7 @@ def main(arguments):
         if family in chosen:
             configured = recorded[family].get(seed)
             if configured is None:
-                # Abans del pla, les que en guardarà.
+                # Abans del pla, les que en guardarà com a molt.
                 found["fit"] = (min(kept[family], values["TRIALS"]), 0)
             else:
                 absent = missing[family].get(seed, [])
