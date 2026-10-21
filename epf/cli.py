@@ -9,7 +9,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import time
 
 import epf
 from epf import parameters, terminal
@@ -20,10 +19,8 @@ from epf import parameters, terminal
 # un segon llarg, i el pagaria fins i tot `epf --help`.
 Command = collections.namedtuple("Command", "module function help arguments")
 
-# Les subcomandes que fa `epf start`, en ordre, i els segons entre l'una i l'altra, un
-# marge arbitrari.
+# Les subcomandes que fa `epf start`, en ordre.
 SEQUENCE = ("download", "dataset", "run")
-PAUSE = 5
 
 # La variable d'entorn que nomena un programa, amb els seus arguments, que `epf start`
 # executa amb el nom de cada subcomanda que acaba, llevat de l'última, amb la qual acaba
@@ -124,15 +121,13 @@ COMMANDS = {
 def start(arguments):
     """Fa cada subcomanda de `SEQUENCE`, la comanda `epf start`.
 
-    Les fa en ordre, amb `PAUSE` segons entre l'una i l'altra, i s'atura a la primera
-    que es refusa. Cada una rep els seus arguments per defecte, amb l'opció d'assaig
-    donada a `epf start` si ella en pren. Si l'entorn té `NOTIFY`, n'executa el programa
-    en acabar cada una menys l'última, i un programa que no es pot executar es diu.
+    Les fa en ordre i s'atura a la primera que es refusa. Cada una rep els seus
+    arguments per defecte, amb l'opció d'assaig donada a `epf start` si ella en pren. Si
+    l'entorn té `NOTIFY`, n'executa el programa en acabar cada una menys l'última, i un
+    programa que no es pot executar es diu.
     """
     flags = {variant: flag for flag, variant in parameters.variants().items()}
     for position, name in enumerate(SEQUENCE):
-        if position:
-            time.sleep(PAUSE)
         command = COMMANDS[name]
         function = getattr(importlib.import_module(command.module), command.function)
         if command.arguments is None:
