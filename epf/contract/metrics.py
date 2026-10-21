@@ -105,6 +105,8 @@ def scored(predicted, actual):
     """
     predicted, actual = np.asarray(predicted), np.asarray(actual)
     absent = int(np.isnan(actual).sum())
+    # Només un error del codi hi arriba, i n'hi ha prou amb el recompte: el dataset no
+    # té cap preu absent dins del seu tram, i `matrix.series` retalla cada sèrie al seu.
     if absent:
         raise ValueError(
             "el preu real té 1 valor absent"
