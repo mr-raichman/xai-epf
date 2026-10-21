@@ -1,8 +1,9 @@
 """La cerca de les xarxes, sobre l'espai del codi de Marcjasz et al. (2023)."""
 
 from epf.models.nn import hyperparameters, network
-from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
+from epf.models.nn.ddnn.distributions import DISTRIBUTIONS, FLOOR, STRETCH, TAIL_FLOOR
 from epf.models.nn.dnn.train import POINT, POINT_FAMILY
+from epf.parameters import THREADS
 
 # La matriu de la cerca, la diària, com la de la passada.
 MATRIX = "daily"
@@ -20,9 +21,15 @@ DROPOUT = (0.0, 1.0)
 L1 = (1e-5, 10.0)
 LEARNING_RATE = (1e-5, 0.1)
 
-# Com es cerca, que el study desa i compara amb el d'ara: l'espai, i els números que cap
-# trial no cerca, els que la passada desa al seu registre.
-FIXED = hyperparameters.FIXED
+# Com es cerca, que el study desa i compara amb el d'ara: l'espai, i tots els números
+# fixos que llegeixen els trials, uns per a les tres xarxes, de manera que un canvi dels
+# mínims de les distribucions refusa també les cerques de la de punt, que no en té.
+FIXED = hyperparameters.FIXED | {
+    "scale_floor": FLOOR,
+    "stretch": STRETCH,
+    "tail_floor": TAIL_FLOOR,
+    "threads": THREADS,
+}
 SPACE = {
     "layers": LAYERS,
     "neurons": NEURONS,

@@ -5,7 +5,9 @@ import numpy as np
 from epf.contract.metrics import mae
 from epf.models.elastic_net import regression
 from epf.models.elastic_net.hyperparameters import NAME
+from epf.models.elastic_net.scaling import NORMAL_CONSISTENCY
 from epf.models.elastic_net.train import FAMILIES
+from epf.parameters import THREADS
 
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
@@ -20,10 +22,12 @@ RATIO = 1e-4
 GRID = {"mixing": MIXINGS, "step": tuple(range(STEPS))}
 
 # Com es cerca, que el study desa i compara amb el d'ara: les barreges, els passos i la
-# raó dels càstigs, i els números que cap trial no cerca, els que la passada desa al seu
-# registre.
+# raó dels càstigs, i tots els números fixos que llegeixen els trials.
 SPACE = {"mixings": MIXINGS, "steps": STEPS, "ratio": RATIO}
-FIXED = FAMILIES[NAME]["fixed"]
+FIXED = FAMILIES[NAME]["fixed"] | {
+    "normal_consistency": NORMAL_CONSISTENCY,
+    "threads": THREADS,
+}
 
 
 def penalties(X, y):
