@@ -96,7 +96,13 @@ THREADS = 4
 # diccionari que es diu `SMOKE`, o `SMOKE_` i un número, el tria l'opció del seu nom,
 # `--smoke` o `--smoke1`.
 SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
-SMOKE_1 = {"SEEDS": tuple(range(2)), "TRIALS": 1, "BEST": 1}
+# Els menys dies explicats amb què l'arbre encara tria les files de les interaccions.
+SMOKE_1 = {
+    "SEEDS": tuple(range(2)),
+    "TRIALS": 1,
+    "BEST": 1,
+    "EXPLAINED_DAYS": INTERACTION_ROWS // HOURS_PER_DAY + 1,
+}
 SMOKE_2 = {"SEEDS": tuple(range(2)), "TRIALS": 10}
 
 
