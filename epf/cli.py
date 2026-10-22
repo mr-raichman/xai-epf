@@ -118,7 +118,7 @@ COMMANDS = {
     "figures": Command(
         "epf.run.figures",
         "main",
-        "torna a dibuixar les figures de la passada en disc",
+        "torna a dibuixar les figures i les taules de la passada en disc",
         figures_arguments,
     ),
     "start": Command(

@@ -14,7 +14,7 @@ import pytest
 from epf import Declined, Refusal, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.parameters import DEVELOPMENT
-from epf.run import families, figures, pool, run
+from epf.run import families, figures, pool, run, tables
 
 # La graella de la cerca falsa, amb més punts que trials: cap trial continuat no en
 # torna a fer cap.
@@ -54,7 +54,8 @@ def fake(tmp_path, monkeypatch):
     def train(family, folder, seed, configuration, explained_days):
         state.calls.append(("fit", family, seed, configuration.get("numbers")))
         raised(family, seed, "fit")
-        (folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])).touch()
+        path = folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])
+        np.savez(path, r2=np.float64(0.5), mae=np.float64(1.0))
 
     def trial(family, drawn, train, validate, seed):
         order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
@@ -77,7 +78,6 @@ def fake(tmp_path, monkeypatch):
             "kept": 1,
             "searched_as": "first",
             "ljung_box_tested": True,
-            "counter": "x",
         },
         "third": {
             "fixed": {},
@@ -434,6 +434,7 @@ def test_a_family_reading_a_search_none_makes_ends_in_an_error(fake, monkeypatch
     with pytest.raises(RuntimeError, match="1 família no és completa, second$"):
         fake.main()
     assert not drawn
+    assert (paths.next_run(True, MINUTE) / tables.SCORES).exists()
 
 
 def test_a_fit_that_saves_no_file_is_not_taken_for_done(fake, monkeypatch):
@@ -564,3 +565,21 @@ def test_a_run_whose_named_families_are_complete_is_not_offered_to_continue(
         fake.main(family=["third"])
     assert len(fake.calls) == calls
     assert "Continuar la passada" not in capsys.readouterr().err
+
+
+def test_a_run_with_a_failed_seed_leaves_the_others_scores(fake):
+    """Escrita només en dibuixar, una seed fallada deixava la passada sense la taula."""
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    path = paths.next_run(True, MINUTE) / tables.SCORES
+    rows = [row.split(",")[:3] for row in path.read_text(encoding="utf-8").splitlines()]
+    assert rows[1:] == [
+        ["first", "0", "0"],
+        ["first", "0", "1"],
+        ["first", "1", "0"],
+        ["first", "1", "1"],
+        ["second", "1", "0"],
+        ["third", "0", "0"],
+        ["third", "1", "0"],
+    ]

@@ -16,7 +16,7 @@ from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
 from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
-from epf.run import families, figures, pool, progress, search
+from epf.run import families, figures, pool, progress, search, tables
 
 # Els valors que una passada llegeix de `parameters.chosen`, els únics que una variant
 # d'assaig pot canviar; la resta s'importen on es fan servir.
@@ -500,16 +500,17 @@ class Run:
 def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
-    Continua la del seu tipus si no és acabada, i refusa una d'acabada. Cerca el que
-    falta i, amb els mateixos processos, ajusta cada configuració planificada que encara
-    no té el seu fitxer. Una seed d'una família que no es cerca rep el pla de seguida, i
-    una d'una que es cerca, les millors configuracions de la seva cerca quan la té
-    acabada; el pla queda al registre de la família i ja no canvia. Dibuixa les figures
-    si cap seed no ha fallat. Refusa abans d'escriure la passada el que no pot fer; un
-    study refusat deixa a la carpeta de les cerques els que s'han obert abans, nous i
-    sense cap trial, que la passada següent reinicia en obrir-los. Acaba amb un refús si
-    alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a alguna
-    família li falta el pla d'una seed o un fitxer.
+    Abans d'escriure res, pregunta si se substitueix o es continua el que hi ha en disc,
+    com diu `_where`. Cerca el que falta i, amb els mateixos processos, ajusta cada
+    configuració planificada que encara no té el seu fitxer. Una seed d'una família que
+    no es cerca rep el pla de seguida, i una d'una que es cerca, les millors
+    configuracions de la seva cerca quan la té acabada; el pla queda al registre de la
+    família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si no,
+    n'escriu la taula de puntuacions. Refusa abans d'escriure la passada el que no pot
+    fer; un study refusat deixa a la carpeta de les cerques els que s'han obert abans,
+    nous i sense cap trial, que la passada següent reinicia en obrir-los. Acaba amb un
+    refús si alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a
+    alguna família li falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke, READ)
     chosen = families.named(arguments.family)
@@ -540,10 +541,12 @@ def main(arguments):
         run.failed,
     )
     if run.block.failed:
+        tables.scores(where)
         counted = progress.counted(run.block.failed, families.EVERY)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}")
     undone = run.undone()
     if undone:
+        tables.scores(where)
         # Sense cap seed fallada, només un error del codi hi deixa res per fer, i en
         # mostra el traceback.
         raise RuntimeError(
