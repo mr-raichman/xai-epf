@@ -17,13 +17,16 @@ TEST_DAYS = pd.date_range("2019-01-01", periods=3, freq="D")
 EXPLAINED = TEST_DAYS[:2]
 
 
-def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED):
-    """Desa un model ajustat amb `arrays` i `predicted`, i en torna el camí."""
+def _saved(tmp_path, arrays, predicted, stored, explained=EXPLAINED, gap=0.0):
+    """Desa un model ajustat amb `arrays` i `predicted`, i en torna el camí.
+
+    `gap` és el residu de l'explicació que l'ajust diu.
+    """
     none = TEST_DAYS[:0]
     path = tmp_path / "seed_0_0.npz"
     # Un preu real que varia, perquè l'R² en surti.
     actual = np.arange(len(predicted), dtype=float)
-    fitted = Fitted(predicted, actual, arrays, 0.0, TOLERANCE, stored=stored)
+    fitted = Fitted(predicted, actual, arrays, gap, TOLERANCE, stored=stored)
     save_model(path, Split(none, none, TEST_DAYS), explained, fitted, 0)
     return path
 
@@ -51,6 +54,24 @@ def test_a_file_off_only_by_float32_rounding_takes_its_name(tmp_path):
         lambda found: tree.sums(found, with_interactions=False),
     )
     assert path.exists()
+
+
+def test_a_fit_whose_explanation_misses_its_margin_is_refused_before_any_file(
+    tmp_path,
+):
+    """Com l'ajust d'una DDNN normal que se n'allunyava 0.0011, amb marge 0.001."""
+    values = np.zeros((2 * HOURS_PER_DAY, 3))
+    with pytest.raises(
+        Refusal, match="se n'allunya 0.0011, més que el marge de 0.001$"
+    ):
+        _saved(
+            tmp_path,
+            {"values": values, "base": 50.0},
+            _tree(values),
+            lambda found: tree.sums(found, with_interactions=False),
+            gap=0.0011,
+        )
+    assert not list(tmp_path.iterdir())
 
 
 def test_a_file_that_does_not_add_up_is_refused_and_takes_no_name(tmp_path):

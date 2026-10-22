@@ -96,6 +96,16 @@ def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
     assert len(values) == 6 and len(set(values)) == 6
 
 
+def test_a_grid_with_more_trials_than_points_goes_on_and_draws_one_again(tmp_path):
+    """La graella d'Optuna s'atura amb `study.stop`, que fora d'`optimize` falla."""
+    X, y = _table()
+    parts = split(0, PERIOD, DELETED)
+    searcher = _searcher({"value": (3, 1, 2)}, [])
+    study = _study(tmp_path / "study.db", searcher, X, y, parts, 0, 5)
+    values = [one.params["value"] for one in completed(study)]
+    assert len(values) == 5 and set(values) == {1, 2, 3}
+
+
 def _studied(tmp_path, monkeypatch, X, y):
     """Torna el study d'una cerca de dos trials de `fake` a la seed 0, a l'assaig."""
     monkeypatch.setattr(paths, "SEARCHES", tmp_path)
