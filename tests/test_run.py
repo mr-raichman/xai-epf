@@ -238,7 +238,8 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     fake.failing = {("first", 1, "trial"): RuntimeError}
     with pytest.raises(
         Refusal,
-        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1$",
+        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1; "
+        f"llegir .*/{_name()}/workers.log$",
     ):
         fake.main()
     assert [seed for kind, _, seed, _ in fake.calls if kind == "trial"] == [0] * 4 + [1]
@@ -307,7 +308,8 @@ def test_a_seed_whose_every_trial_diverged_fails_and_the_others_finish(fake, cap
     fake.diverging = {("first", 1, 0)}
     with pytest.raises(
         Refusal,
-        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1$",
+        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1; "
+        f"llegir .*/{_name()}/workers.log$",
     ):
         fake.main()
     shown = capsys.readouterr().err

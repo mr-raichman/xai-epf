@@ -543,7 +543,8 @@ def main(arguments):
     if run.block.failed:
         tables.scores(where)
         counted = progress.counted(run.block.failed, families.EVERY)
-        raise Refusal(f"la passada {where.name} no és acabada: {counted}")
+        log = paths.relative(where / paths.WORKERS_LOG)
+        raise Refusal(f"la passada {where.name} no és acabada: {counted}; llegir {log}")
     undone = run.undone()
     if undone:
         tables.scores(where)
