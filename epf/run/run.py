@@ -7,10 +7,12 @@ cerca té tots els trials, mentre les altres seeds encara es cerquen.
 import datetime
 import importlib
 import json
+import shutil
+import sys
 import time
 
-from epf import Refusal, parameters, paths
-from epf.contract import matrix, record
+from epf import Refusal, parameters, paths, terminal
+from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
 from epf.contract.split import split, validation_parts
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
@@ -26,25 +28,46 @@ READ = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
 COPIED = ("ljung_box_tested", "counter")
 
 
-def _where(smoke, fingerprints):
-    """Torna la passada del tipus si no és acabada, o una de nova d'aquest minut.
+def _plans(chosen, values):
+    """Torna com es planifica cada família triada, i les famílies que es cerquen.
 
-    La passada és la més nova de les que porten un nom de la forma del tipus. Refusa una
-    passada acabada; i continuar-ne una que van començar un altre codi, un altre dataset
-    o unes altres biblioteques, perquè les seves famílies no es podrien comparar, i una
-    d'assaig començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria
-    els valors de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
+    De cada família, la seva entrada de `FAMILIES` i quantes configuracions en guarda
+    de cada seed, amb `values`, els valors de `parameters.chosen`. Les que es cerquen
+    són les cerques que llegeix cada família que en guarda alguna, en l'ordre de les
+    cerques: la sonda de datació fa cercar l'arbre.
     """
-    found = paths.named_runs(smoke)
-    if not found:
-        return paths.next_run(smoke, datetime.datetime.now())
-    latest = found[-1]
-    if families.finished(latest):
-        raise Refusal(
-            f"la passada {latest.name} és acabada; esborrar {paths.relative(latest)}/"
+    plans = {
+        family: importlib.import_module(families.MODULES[family]["train"]).FAMILIES[
+            family
+        ]
+        for family in chosen
+    }
+    kept = {
+        family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
+        for family, plan in plans.items()
+    }
+    searched = [
+        name
+        for name in families.EVERY
+        if families.MODULES[name]["search"]
+        and any(
+            kept[family] and plans[family]["searched_as"] == name for family in chosen
         )
+    ]
+    return plans, kept, searched
+
+
+def _otherwise(where, smoke, fingerprints):
+    """Torna com es va començar una passada que no es pot continuar, o `None`.
+
+    Ho torna en dues parts, com es va començar i què faria falta per continuar-la. No
+    es pot continuar si la van començar un altre codi, un altre dataset o unes altres
+    biblioteques, perquè les seves famílies no es podrien comparar, ni una d'assaig
+    començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria els valors
+    de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
+    """
     differ, begun = set(), set()
-    for path in sorted(latest.glob(f"*/{paths.FAMILY_RECORD}")):
+    for path in sorted(where.glob(f"*/{paths.FAMILY_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
         differ |= {
             name for name, value in fingerprints.items() if made.get(name) != value
@@ -52,20 +75,149 @@ def _where(smoke, fingerprints):
         begun.add(made.get("smoke"))
     if differ:
         then = [record.DIFFERENT[name] for name in record.DIFFERENT if name in differ]
-        raise Refusal(
-            f"la passada {latest.name} es va començar amb "
-            f"{' i '.join(other for other, _ in then)}; continuar amb "
-            f"{' i '.join(that for _, that in then)}, o esborrar "
-            f"{paths.relative(latest)}/"
+        return (
+            f"es va començar amb {' i '.join(other for other, _ in then)}",
+            f"continuar amb {' i '.join(that for _, that in then)}",
         )
     variants = sorted(map(str, begun - {smoke}))
     if variants:
         flags = {name: flag for flag, name in parameters.variants().items()}
         flag = flags.get(variants[0], variants[0])
-        raise Refusal(
-            f'la passada {latest.name} es va començar amb "{flag}"; continuar amb '
-            f'"uv run epf run {flag}", o esborrar {paths.relative(latest)}/'
+        return f'es va començar amb "{flag}"', f'continuar amb "uv run epf run {flag}"'
+    return None
+
+
+def _counted(count, one, many):
+    """Torna `1 trial` o `3 trials`, de `one` i `many`, el singular i el plural."""
+    return f"{count} {one if count == 1 else many}"
+
+
+def _on_disk(smoke, searched, seeds, matrices, fingerprints):
+    """Torna el que una passada nova substituiria: de cada cosa, els camins i una línia.
+
+    És tot el que hi ha a la carpeta de les passades del tipus, i cada study que la
+    passada obriria, de les famílies de `searched` a les seeds de `seeds`, que es va fer
+    d'una altra manera, amb el seu registre. Llegeix els studies que hi són i no en crea
+    cap. `matrices` i `fingerprints` són les de la passada.
+    """
+    found = []
+    named = paths.named_runs(smoke)
+    runs = paths.runs(smoke)
+    for path in sorted(runs.iterdir()) if runs.exists() else []:
+        shown = paths.relative(path) + ("/" if path.is_dir() else "")
+        if path not in named:
+            count = ""
+            if path.is_dir():
+                files = sum(one.is_file() for one in path.rglob("*"))
+                count = _counted(files, "fitxer", "fitxers") + ", "
+            found.append(([path], f"{shown}: {count}no és cap passada"))
+            continue
+        recorded = len(list(path.glob(f"*/{paths.FAMILY_RECORD}")))
+        models = len(list(path.glob(f"*/{paths.MODEL.format(seed='*', rank='*')}")))
+        otherwise = _otherwise(path, smoke, fingerprints)
+        if families.finished(path):
+            state = "és acabada"
+        elif otherwise is not None:
+            state = otherwise[0]
+        else:
+            state = "no és acabada"
+        found.append(
+            (
+                [path],
+                f"{shown}: {_counted(recorded, 'família', 'famílies')}, "
+                f"{_counted(models, 'model ajustat', 'models ajustats')}, {state}",
+            )
         )
+    for family in searched:
+        module = search.searcher(family)
+        X, _ = getattr(matrices, module.MATRIX)
+        folder = searches.folder(smoke, family)
+        for seed in seeds:
+            store = folder / searches.STUDY.format(seed=seed)
+            study = searches.stored(store, family, seed)
+            if study is None:
+                continue
+            why = searches.made_otherwise(
+                study, X.columns, seed, module, fingerprints["dataset"]
+            )
+            if why is None:
+                continue
+            kept = folder / searches.RECORD.format(seed=seed)
+            found.append(
+                (
+                    [store] + ([kept] if kept.exists() else []),
+                    f"{paths.relative(store)}: "
+                    f"{_counted(len(study.trials), 'trial', 'trials')}, "
+                    f"es va fer {why}",
+                )
+            )
+    return found
+
+
+def _replaced(found, smoke):
+    """Esborra cada camí de `found`, un cop vist que tots són del tipus `smoke`.
+
+    Abans d'esborrar-ne cap, falla si algun no hi és o no és a la carpeta de les
+    passades o de les cerques del tipus: no esborra mai res de fora.
+    """
+    roots = (paths.runs(smoke), paths.searches(smoke))
+    every = [path for held, _ in found for path in held]
+    for path in every:
+        if not path.exists() or not any(path.is_relative_to(root) for root in roots):
+            raise ValueError(
+                f"{paths.relative(path)} ja no hi és, o no és a la carpeta de les "
+                "passades ni de les cerques del tipus"
+            )
+    for path in every:
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+
+def _where(smoke, searched, seeds, matrices, fingerprints):
+    """Torna on es fa la passada: una de nova d'aquest minut, o la del tipus continuada.
+
+    Sense res a la carpeta de les passades del tipus ni cap study fet d'una altra
+    manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix:
+    `y` ho esborra i en fa una de nova; `n` continua la passada més nova de la forma
+    del tipus si no és acabada i es pot continuar, i si no, refusa. Refusa també sense
+    terminal o sense resposta, i llavors no esborra res.
+    """
+    found = _on_disk(smoke, searched, seeds, matrices, fingerprints)
+    if found:
+        for _, line in found:
+            print(line, file=sys.stderr)
+        if not terminal.interactive():
+            raise Refusal(
+                "sense terminal, no es pot preguntar si se substitueix el que hi ha "
+                "en disc"
+            )
+        answer = terminal.asked("Substituir el que hi ha en disc? [y/n] ")
+        if answer is None:
+            raise Refusal("sense resposta, es conserva el que hi ha en disc")
+        if not answer:
+            return _continued(smoke, fingerprints)
+        _replaced(found, smoke)
+    return paths.next_run(smoke, datetime.datetime.now())
+
+
+def _continued(smoke, fingerprints):
+    """Torna la passada més nova de la forma del tipus, si es pot continuar.
+
+    Refusa que no n'hi hagi cap, que sigui acabada, o que no es pugui continuar.
+    """
+    named = paths.named_runs(smoke)
+    if not named:
+        raise Refusal(
+            "no hi ha cap passada per continuar i es conserva el que hi ha en disc"
+        )
+    latest = named[-1]
+    if families.finished(latest):
+        raise Refusal(f"la passada {latest.name} és acabada i es conserva")
+    otherwise = _otherwise(latest, smoke, fingerprints)
+    if otherwise is not None:
+        raise Refusal(f"la passada {latest.name} {otherwise[0]}; {otherwise[1]}")
     return latest
 
 
@@ -128,26 +280,7 @@ class Run:
         self.where, self.values, self.chosen = where, values, chosen
         self.fingerprints = fingerprints
         continued = where.exists()
-        self.plans = {}
-        for family in chosen:
-            module = importlib.import_module(families.MODULES[family]["train"])
-            self.plans[family] = module.FAMILIES[family]
-        # Les configuracions que una família guarda de cada seed.
-        self.kept = {
-            family: values["BEST"] if plan["kept"] == "BEST" else plan["kept"]
-            for family, plan in self.plans.items()
-        }
-        # La cerca que llegeix cada família que guarda alguna configuració, en l'ordre
-        # de les cerques: la sonda de datació fa cercar l'arbre.
-        self.searched = [
-            name
-            for name in families.EVERY
-            if families.MODULES[name]["search"]
-            and any(
-                self.kept[family] and self.plans[family]["searched_as"] == name
-                for family in chosen
-            )
-        ]
+        self.plans, self.kept, self.searched = _plans(chosen, values)
         self.searching = search.Search(
             smoke,
             self.searched,
@@ -344,7 +477,8 @@ def main(arguments):
     split(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     fingerprints = record.fingerprints()
-    where = _where(arguments.smoke, fingerprints)
+    searched = _plans(chosen, values)[2]
+    where = _where(arguments.smoke, searched, values["SEEDS"], matrices, fingerprints)
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
         run.tasks(),

@@ -80,14 +80,18 @@ def diverged(study):
     return [one for one in study.trials if one.user_attrs.get("diverged")]
 
 
-def _different(made, now, searcher):
-    """Torna en què es va fer diferent una cerca, `made`, o `None` si no ho va fer.
+def made_otherwise(study, columns, seed, searcher, dataset):
+    """Torna en què es va fer diferent el study d'una seed, o `None` si no ho va fer.
 
-    `now` són les files d'ara, i `searcher` el `search.py` d'ara, amb l'espai i els
-    números fixos. Una cerca que no diu la seva `PROJECT_SEED`, el seu espai o els seus
-    números fixos es va fer amb uns altres.
+    `columns` són les columnes de la matriu sobre la qual es cerca, `searcher` el
+    `search.py` d'ara, amb l'espai i els números fixos, i `dataset` l'empremta del
+    dataset d'ara. Diferent vol dir sobre unes altres files, un altre espai o uns altres
+    números fixos, amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset:
+    els seus trials no es podrien comparar amb els d'ara. Un study que no diu la seva
+    `PROJECT_SEED`, el seu espai o els seus números fixos es va fer amb uns altres.
     """
-    if made.get("made_on") != now:
+    made = study.user_attrs
+    if made.get("made_on") != made_on(columns, seed):
         return "sobre altres files"
     if made.get("space") != plain(searcher.SPACE):
         return "sobre un altre espai"
@@ -95,6 +99,11 @@ def _different(made, now, searcher):
         return "amb uns altres números fixos"
     if made.get("PROJECT_SEED") != PROJECT_SEED:
         return "amb una altra PROJECT_SEED"
+    datasets = {
+        one.user_attrs.get("dataset") for one in completed(study) + diverged(study)
+    }
+    if datasets - {dataset}:
+        return "amb un altre dataset"
     return None
 
 
@@ -140,14 +149,22 @@ def _storage(store):
     return f"sqlite:///{store.as_posix()}"
 
 
+def stored(store, family, seed):
+    """Torna el study d'una família en una seed que hi ha a `store`, o `None`.
+
+    No el crea mai: sense el fitxer, torna `None`.
+    """
+    if not store.exists():
+        return None
+    return optuna.load_study(study_name=_name(family, seed), storage=_storage(store))
+
+
 def opened(store, family, searcher, seed, columns, dataset):
     """Torna el study d'una família en una seed, i el crea si encara no hi és.
 
     `searcher` és el `search.py` del model de la família, `columns` les columnes de la
     matriu sobre la qual es cerca, i `dataset` l'empremta del dataset d'ara. Refusa un
-    study fet sobre unes altres files, un altre espai o uns altres números fixos, amb
-    una altra `PROJECT_SEED` o amb algun trial d'un altre dataset: compararia trials
-    que no es poden comparar.
+    study fet d'una altra manera, com diu `made_otherwise`.
     """
     study = optuna.create_study(
         study_name=_name(family, seed),
@@ -155,18 +172,12 @@ def opened(store, family, searcher, seed, columns, dataset):
         storage=_storage(store),
         load_if_exists=True,
     )
-    now = made_on(columns, seed)
     if not study.trials:
-        study.set_user_attr("made_on", now)
+        study.set_user_attr("made_on", made_on(columns, seed))
         study.set_user_attr("space", plain(searcher.SPACE))
         study.set_user_attr("fixed", plain(searcher.FIXED))
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
-    why = _different(study.user_attrs, now, searcher)
-    datasets = {
-        one.user_attrs.get("dataset") for one in completed(study) + diverged(study)
-    }
-    if not why and datasets - {dataset}:
-        why = "amb un altre dataset"
+    why = made_otherwise(study, columns, seed, searcher, dataset)
     if why:
         raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
     study.sampler = _sampler(searcher, family, seed, study)

@@ -1,4 +1,5 @@
 import datetime
+import io
 import json
 import math
 import shutil
@@ -10,7 +11,7 @@ import optuna
 import pandas as pd
 import pytest
 
-from epf import Refusal, parameters, paths
+from epf import Refusal, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.parameters import DEVELOPMENT
 from epf.run import families, figures, pool, run
@@ -34,8 +35,8 @@ def fake(tmp_path, monkeypatch):
     `diverging`, `(família, seed, ordre)`. Cada ajust desa un fitxer buit, i un trial o
     un ajust de `failing`, `(família, seed, tipus)`, hi llança la seva excepció. Les
     tasques es fan aquí mateix, i no en processos nous, que no veurien res del que es
-    canvia aquí: `WORKERS` alhora, la més antiga primer. Torna l'estat, amb `main`, que
-    en fa una.
+    canvia aquí: `WORKERS` alhora, la més antiga primer. La comanda té un terminal, on
+    `typed` escriu les respostes. Torna l'estat, amb `main`, que en fa una.
     """
     state = types.SimpleNamespace(
         calls=[],
@@ -170,7 +171,11 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(
         parameters, "chosen", lambda smoke, read: real(smoke, read) | state.values
     )
+    monkeypatch.setattr(terminal, "interactive", lambda: True)
+    state.typed = lambda text: monkeypatch.setattr(sys, "stdin", io.StringIO(text))
+    state.typed("")
     state.module = trainer
+    state.searcher = searcher
     state.main = lambda smoke="SMOKE": run.main(
         types.SimpleNamespace(smoke=smoke, family=None)
     )
@@ -248,6 +253,7 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     assert "1" not in _recorded("second")["configurations"]
     fake.failing = {}
     fake.calls.clear()
+    fake.typed("n\n")
     fake.main()
     assert [(kind, seed) for kind, _, seed, _ in fake.calls] == [("trial", 1)] * 4 + [
         ("fit", 1)
@@ -288,6 +294,7 @@ def test_a_continued_run_asks_no_trial_in_place_of_a_diverged_one(fake):
         fake.main()
     fake.failing = {}
     fake.calls.clear()
+    fake.typed("n\n")
     fake.main()
     assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
         ("fit", "second", 0)
@@ -317,20 +324,14 @@ def test_a_seed_whose_every_trial_diverged_fails_and_the_others_finish(fake, cap
 
 
 def test_a_run_after_a_finished_one_asks_no_trial_and_fits_again(fake):
-    """Les cerques acabades no es tornen a fer, i la passada nova se'n planifica.
-
-    La primera, desada amb un altre nom, ja no és cap passada que es continuï.
-    """
+    """Les cerques acabades no es tornen a fer, i la passada nova se'n planifica."""
     fake.main()
-    first = paths.next_run(True, MINUTE)
-    kept = first.rename(first.with_name("kept"))
+    planned = _recorded("first")["configurations"]
     fake.calls.clear()
+    fake.typed("y\n")
     fake.main()
     assert [kind for kind, *_ in fake.calls] == ["fit"] * 8
-    assert (
-        _recorded("first")["configurations"]
-        == _recorded("first", kept)["configurations"]
-    )
+    assert _recorded("first")["configurations"] == planned
 
 
 def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, capsys):
@@ -341,6 +342,7 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     planned = _recorded("second")["configurations"]
     fake.failing = {}
     fake.calls.clear()
+    fake.typed("n\n")
     fake.module.FAMILIES["second"]["kept"] = 2
     fake.main()
     assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
@@ -362,6 +364,7 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     }
     shutil.rmtree(paths.searches(True))
     fake.failing = {}
+    fake.typed("n\n")
     fake.module.FAMILIES["first"]["kept"] = 1
     fake.main()
     assert {
@@ -373,7 +376,10 @@ def test_a_finished_run_is_refused_and_never_continued(fake):
     """Una passada acabada que es continués en barrejaria dues."""
     fake.main()
     calls = len(fake.calls)
-    with pytest.raises(Refusal, match=f"^la passada {_name()} és acabada; esborrar "):
+    fake.typed("n\n")
+    with pytest.raises(
+        Refusal, match=f"^la passada {_name()} és acabada i es conserva$"
+    ):
         fake.main()
     assert len(fake.calls) == calls
 
@@ -383,6 +389,7 @@ def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake):
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
     fake.failing = {}
+    fake.typed("n\n")
     fake.fingerprints["code"] = "un altre codi"
     calls, opened = len(fake.calls), fake.opened
     with pytest.raises(Refusal, match=f"la passada {_name()} .* un altre codi;"):
@@ -396,6 +403,7 @@ def test_a_smoke_run_is_never_continued_under_another_variant(fake):
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
     fake.failing = {}
+    fake.typed("n\n")
     calls = len(fake.calls)
     with pytest.raises(Refusal, match='començar amb "--smoke"; continuar amb "uv run'):
         fake.main("SMOKE_1")
@@ -444,3 +452,60 @@ def test_a_task_after_an_edit_fails_its_seed(fake, monkeypatch, capsys):
     shown = capsys.readouterr().err
     assert "ha fallat: la passada es va començar amb un altre codi" in shown
     assert len([call for call in fake.calls if call[0] == "fit"]) == 1
+
+
+def test_the_question_is_asked_again_until_y_or_n_in_either_case(fake, capsys):
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = {}
+    fake.typed("x\nN\n")
+    fake.main()
+    shown = capsys.readouterr().err
+    assert shown.count("Substituir el que hi ha en disc? [y/n] ") == 2
+    assert f"{_name()}/: 3 famílies, 7 models ajustats, no és acabada\n" in shown
+    assert f"Continuant passada {_name()}\n" in shown
+
+
+def test_a_study_made_otherwise_is_listed_and_goes_with_a_y(fake, capsys):
+    fake.main()
+    fake.searcher.FIXED = {"patience": 2}
+    fake.calls.clear()
+    fake.typed("y\n")
+    fake.main()
+    shown = capsys.readouterr().err
+    for seed in (0, 1):
+        assert (
+            f"seed_{seed}.db: 4 trials, es va fer amb uns altres números fixos\n"
+            in shown
+        )
+    assert [kind for kind, *_ in fake.calls].count("trial") == 8
+
+
+@pytest.mark.parametrize(
+    "terminal_, typed, why",
+    [
+        (False, "", "sense terminal, no es pot preguntar"),
+        (True, "", "sense resposta, es conserva el que hi ha en disc"),
+    ],
+    ids=["sense terminal", "sense resposta"],
+)
+def test_without_a_terminal_or_an_answer_nothing_goes(
+    fake, monkeypatch, terminal_, typed, why
+):
+    fake.main()
+    monkeypatch.setattr(terminal, "interactive", lambda: terminal_)
+    fake.typed(typed)
+    with pytest.raises(Refusal, match=f"^{why}"):
+        fake.main()
+    assert paths.named_runs(True) == [paths.next_run(True, MINUTE)]
+
+
+def test_n_with_no_run_to_continue_is_refused_and_keeps_what_is_on_disk(fake):
+    fake.main()
+    first = paths.next_run(True, MINUTE)
+    kept = first.rename(first.with_name("kept"))
+    fake.typed("n\n")
+    with pytest.raises(Refusal, match="^no hi ha cap passada per continuar"):
+        fake.main()
+    assert kept.exists() and not paths.named_runs(True)

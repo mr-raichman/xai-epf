@@ -32,6 +32,31 @@ def live(stream):
     return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
 
 
+def interactive():
+    """Diu si qui fa la comanda pot respondre: si stdin i stderr són un terminal."""
+    return sys.stdin.isatty() and sys.stderr.isatty()
+
+
+def asked(question):
+    """Fa a stderr una pregunta de sí o no, i torna cert per `y` i fals per `n`.
+
+    Llegeix la resposta d'stdin, en majúscula o en minúscula, i torna a fer la pregunta
+    a qualsevol altra. Torna `None` si l'entrada s'acaba sense cap resposta.
+    """
+    while True:
+        print(question, end="", file=sys.stderr, flush=True)
+        line = sys.stdin.readline()
+        if not line:
+            return None
+        # El terminal ja ha escrit la resposta i el salt de línia, i el rellotge, que no
+        # els ha vist, quedaria una fila amunt.
+        if isinstance(sys.stderr, Clock):
+            sys.stderr.echoed(line)
+        answer = line.strip().lower()
+        if answer in ("y", "n"):
+            return answer == "y"
+
+
 def elapsed(seconds):
     """Torna una durada com `h:mm:ss`."""
     hours, rest = divmod(int(seconds), 3600)
@@ -83,6 +108,12 @@ class Clock:
 
     def flush(self):
         self.stream.flush()
+
+    def echoed(self, text):
+        """Compta `text`, que el terminal ja ha escrit, com escrit a la sortida."""
+        with self.lock:
+            self.tail = (self.tail + text)[-2:]
+            self._show()
 
     def __getattr__(self, name):
         # La resta, com `isatty` i `fileno`, és la de la sortida d'errors de debò.
