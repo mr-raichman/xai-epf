@@ -75,8 +75,10 @@ MODEL_COLOURS = {
 }
 SHADE = 0.32
 
-# El color de tot el que no és d'una família, com les sèries del dataset.
+# El color de tot el que no és d'una família, com les sèries del dataset, i el que hi
+# marca uns punts triats, més fosc perquè se'n distingeixin també per la claredat.
 OTHER_COLOUR = rgb(163, 86, 130)
+MARK_COLOUR = rgb(120, 20, 20)
 
 # L'escala dels valors continus, pel seu nom a matplotlib.
 SCALE = "viridis"
