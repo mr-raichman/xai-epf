@@ -194,16 +194,16 @@ def _replaced(found, smoke):
             path.unlink()
 
 
-def _where(smoke, values, searched, matrices, fingerprints, answer):
+def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
     """Torna on es fa la passada: una de nova d'aquest minut, o la del tipus continuada.
 
     Sense res a la carpeta de les passades del tipus ni cap study fet d'una altra
-    manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix:
-    amb `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma
-    del tipus no és acabada i es pot continuar, pregunta si es continua. Qualsevol altre
-    `n` atura la comanda. `answer`, `replace` o `continue`, respon les preguntes sense
-    terminal com les opcions del seu nom, i `None` les fa. Refusa sense terminal o sense
-    resposta, i llavors no esborra res.
+    manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb
+    `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma del
+    tipus es pot continuar i alguna família de `chosen`, les triades, no hi és completa,
+    pregunta si es continua. Qualsevol altre `n` atura la comanda. `answer`, `replace` o
+    `continue`, respon les preguntes sense terminal com les opcions del seu nom, i
+    `None` les fa. Refusa sense terminal o sense resposta, i llavors no esborra res.
     """
     found = _on_disk(smoke, values, searched, matrices, fingerprints)
     if not found:
@@ -220,7 +220,7 @@ def _where(smoke, values, searched, matrices, fingerprints, answer):
     if replaced:
         _replaced(found, smoke)
         return paths.next_run(smoke, datetime.datetime.now())
-    latest = _continuable(smoke, fingerprints)
+    latest = _continuable(smoke, chosen, fingerprints)
     if latest is None or not _answered(
         f"Continuar la passada {latest.name}? [y/n] ", flag, answer == "continue"
     ):
@@ -246,17 +246,19 @@ def _answered(question, flag, given):
     return answer
 
 
-def _continuable(smoke, fingerprints):
+def _continuable(smoke, chosen, fingerprints):
     """Torna la passada més nova de la forma del tipus si es pot continuar, o `None`.
 
-    No es pot continuar si no n'hi ha cap, si és acabada o si es va començar d'una
-    altra manera.
+    No es pot continuar si no n'hi ha cap, si totes les famílies de `chosen`, les
+    triades, hi són completes, o si es va començar d'una altra manera.
     """
     named = paths.named_runs(smoke)
     if not named:
         return None
     latest = named[-1]
-    if families.finished(latest) or _otherwise(latest, smoke, fingerprints):
+    if all(families.complete(latest / family) for family in chosen):
+        return None
+    if _otherwise(latest, smoke, fingerprints):
         return None
     return latest
 
@@ -519,7 +521,13 @@ def main(arguments):
     fingerprints = record.fingerprints()
     searched = _plans(chosen, values)[2]
     where = _where(
-        arguments.smoke, values, searched, matrices, fingerprints, arguments.answer
+        arguments.smoke,
+        values,
+        chosen,
+        searched,
+        matrices,
+        fingerprints,
+        arguments.answer,
     )
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(

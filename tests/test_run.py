@@ -176,8 +176,8 @@ def fake(tmp_path, monkeypatch):
     state.typed("")
     state.module = trainer
     state.searcher = searcher
-    state.main = lambda smoke="SMOKE", answer=None: run.main(
-        types.SimpleNamespace(smoke=smoke, family=None, answer=answer)
+    state.main = lambda smoke="SMOKE", answer=None, family=None: run.main(
+        types.SimpleNamespace(smoke=smoke, family=family, answer=answer)
     )
     return state
 
@@ -549,3 +549,18 @@ def test_the_flags_answer_both_questions_without_a_terminal(fake, monkeypatch, c
     assert "Substituir el que hi ha en disc? [y/n] n (--continue)\n" in shown
     assert f"Continuar la passada {_name()}? [y/n] y (--continue)\n" in shown
     assert "Substituir el que hi ha en disc? [y/n] y (--replace)\n" in shown
+
+
+def test_a_run_whose_named_families_are_complete_is_not_offered_to_continue(
+    fake, capsys
+):
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = {}
+    calls = len(fake.calls)
+    fake.typed("n\n")
+    with pytest.raises(Declined):
+        fake.main(family=["third"])
+    assert len(fake.calls) == calls
+    assert "Continuar la passada" not in capsys.readouterr().err
