@@ -66,20 +66,20 @@ def fake(tmp_path, monkeypatch):
             "fixed": {},
             "kept": "BEST",
             "searched_as": "first",
-            "residuals_checked": True,
+            "ljung_box_tested": True,
         },
         "second": {
             "fixed": {},
             "kept": 1,
             "searched_as": "first",
-            "residuals_checked": True,
+            "ljung_box_tested": True,
             "counter": "x",
         },
         "third": {
             "fixed": {},
             "kept": 0,
             "searched_as": "third",
-            "residuals_checked": False,
+            "ljung_box_tested": False,
         },
     }
     trainer.train = train

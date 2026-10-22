@@ -12,7 +12,7 @@ from epf import Refusal, paths
 from epf.contract import figure
 from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
-from epf.run import families, residuals, tables
+from epf.run import families, ljung_box, tables
 
 
 def _performance(where, described, colours):
@@ -70,7 +70,7 @@ def draw(where):
             importlib.import_module(module).draw(folder, models, colours[folder.name])
     if described:
         _performance(where, described, colours)
-        residuals.report(where, described, colours)
+        ljung_box.report(where, described, colours)
         tables.scores(where)
 
 

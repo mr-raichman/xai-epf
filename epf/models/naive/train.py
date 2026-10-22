@@ -79,14 +79,14 @@ FORECASTS = {
 BOOTSTRAPPED = "naive_similar_day"
 
 # Cada família, com la planifica una passada: els dies que copia, i cap cerca. No se'n
-# comproven els residus, perquè no ajusten res.
+# fa el test de Ljung-Box dels errors, perquè no ajusten res.
 FAMILIES = {
     name: {
         "fixed": numbers
         | ({"bootstrap_from": IN_SAMPLE} if name == BOOTSTRAPPED else {}),
         "kept": 0,
         "searched_as": name,
-        "residuals_checked": False,
+        "ljung_box_tested": False,
     }
     for name, (_, numbers) in FORECASTS.items()
 }

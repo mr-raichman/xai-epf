@@ -21,9 +21,9 @@ from epf.run import families, figures, pool, progress, search
 READ = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
 
 # El que les taules i les figures de la passada llegeixen d'una família, que el seu
-# registre copia de `FAMILIES`: si se'n comproven els residus i, de la que en té, la
-# columna del comptador de dies.
-COPIED = ("residuals_checked", "counter")
+# registre copia de `FAMILIES`: si se'n fa el test de Ljung-Box dels errors i, de la que
+# en té, la columna del comptador de dies.
+COPIED = ("ljung_box_tested", "counter")
 
 
 def _where(smoke, fingerprints):

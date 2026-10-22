@@ -1,4 +1,4 @@
-"""La comprovació dels residus d'una passada, el test de Ljung-Box.
+"""La comprovació dels errors d'una passada, el test de Ljung-Box.
 
 Diu si l'error de prova de cada família ajustada està correlacionat d'un dia a l'altre,
 el test que Bergmeir, Hyndman i Koo (2018) fan a la validació creuada.
@@ -25,11 +25,11 @@ WHITE_NOISE_Z = 1.96
 
 # Columnes de la figura, una família per panell, i l'alçada de cada panell entre la seva
 # amplada.
-RESIDUALS_PER_ROW = 3
-RESIDUALS_ASPECT = 3 / 4
+AUTOCORRELATION_PER_ROW = 3
+AUTOCORRELATION_ASPECT = 3 / 4
 
 # El test de cada família, un per fila, al costat de la figura.
-RESIDUALS = "residuals.csv"
+LJUNG_BOX = "ljung_box.csv"
 
 
 def daily_errors(models):
@@ -63,7 +63,7 @@ def ljung_box(series, lags=LAGS):
 
     Com `Box.test` de R, amb els dies buits passats a `acf`; sense cap dia buit és
     l'estimador de sempre. El valor p és el d'una khi quadrat de `lags` graus, sense
-    restar-ne cap, perquè els residus són de fora de la mostra.
+    restar-ne cap, perquè els errors són de fora de la mostra.
     """
     x = np.asarray(series, dtype=float) - np.nanmean(series)
     present = int((~np.isnan(x)).sum())
@@ -84,24 +84,24 @@ def ljung_box(series, lags=LAGS):
 
 
 def report(where, described, colours):
-    """Dibuixa el correlograma i desa el test de cada família que comprova els residus.
+    """Dibuixa el correlograma i desa el test dels errors de cada família que el fa.
 
     Les famílies són les de `described` el registre de les quals ho diu, a la passada
-    `where`. El test va a `residuals.csv`, i el correlograma, del color de cada família
-    de `colours`, marca la distància de la partició i la setmana, i on cauria el 95 % de
-    les autocorrelacions si l'error fos soroll blanc.
+    `where`. El test va a `ljung_box.csv`, i el correlograma, a `autocorrelation.svg`,
+    del color de cada família de `colours`; marca la distància de la partició i la
+    setmana, i on cauria el 95 % de les autocorrelacions si l'error fos soroll blanc.
     """
     checked = []
     for family in families.EVERY:
         if family not in described:
             continue
         record = where / family / paths.FAMILY_RECORD
-        if json.loads(record.read_text(encoding="utf-8"))["residuals_checked"]:
+        if json.loads(record.read_text(encoding="utf-8"))["ljung_box_tested"]:
             checked.append(family)
     if not checked:
         return
     panels, axes = figure.panel_grid(
-        len(checked), RESIDUALS_PER_ROW, RESIDUALS_ASPECT, sharey=True
+        len(checked), AUTOCORRELATION_PER_ROW, AUTOCORRELATION_ASPECT, sharey=True
     )
     tests = []
     for axis, family in zip(axes.flat, checked, strict=False):
@@ -132,7 +132,7 @@ def report(where, described, colours):
         axis.set_title(f"{figure.FAMILY_LABELS[family]}\n{figure.p_value(value)}")
     for axis in axes[:, 0]:
         axis.set_ylabel("autocorrelació")
-    figure.save(panels, where, "residuals")
+    figure.save(panels, where, "autocorrelation")
     pd.DataFrame(tests).to_csv(
-        where / RESIDUALS, index=False, lineterminator="\n", encoding="utf-8"
+        where / LJUNG_BOX, index=False, lineterminator="\n", encoding="utf-8"
     )

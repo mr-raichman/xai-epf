@@ -21,7 +21,7 @@ from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
 # seus trials i els seus ajustos, i la millor configuració de cada seed de la seva
 # pròpia cerca.
 FAMILIES = {
-    name: {"fixed": FIXED, "kept": 1, "searched_as": name, "residuals_checked": True}
+    name: {"fixed": FIXED, "kept": 1, "searched_as": name, "ljung_box_tested": True}
     for name in DISTRIBUTIONS
 }
 

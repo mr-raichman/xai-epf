@@ -31,7 +31,7 @@ NAME = "dnn"
 # seus trials i els seus ajustos, i la millor configuració de cada seed de la seva
 # pròpia cerca.
 FAMILIES = {
-    NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME, "residuals_checked": True}
+    NAME: {"fixed": FIXED, "kept": 1, "searched_as": NAME, "ljung_box_tested": True}
 }
 
 

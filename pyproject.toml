@@ -33,7 +33,7 @@ epf = "epf.cli:main"
 dev = [
     "pytest>=8.0",
     "ruff==0.16.1",
-    # Només per a una prova: el Ljung-Box dels residus contra una implementació que no és
+    # Només per a una prova: el Ljung-Box dels errors contra una implementació que no és
     # la del projecte.
     "statsmodels==0.15.0",
 ]

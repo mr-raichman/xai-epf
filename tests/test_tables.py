@@ -47,8 +47,8 @@ def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_pat
         mae=7.0,
     )
     for family in (TREE, "ddnn_jsu"):
-        _recorded(tmp_path, family, residuals_checked=True)
-    _recorded(tmp_path, "date_probe", residuals_checked=True, counter=DAY_COUNTER)
+        _recorded(tmp_path, family, ljung_box_tested=True)
+    _recorded(tmp_path, "date_probe", ljung_box_tested=True, counter=DAY_COUNTER)
     tables.scores(tmp_path)
     assert (tmp_path / tables.SCORES).read_text(encoding="utf-8").splitlines() == [
         "family,seed,rank,r2,mae,crps,kupiec_50,kupiec_90,counter_share",

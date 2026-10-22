@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
-from epf.run.residuals import LAGS, daily_errors, ljung_box
+from epf.run.ljung_box import LAGS, daily_errors, ljung_box
 
 
 def test_without_gaps_the_statistic_is_the_usual_ljung_box():

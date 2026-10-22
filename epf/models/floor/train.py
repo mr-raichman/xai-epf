@@ -23,7 +23,7 @@ FAMILIES = {
         "fixed": {"degree": FLOOR_DEGREE},
         "kept": 0,
         "searched_as": NAME,
-        "residuals_checked": True,
+        "ljung_box_tested": True,
     }
 }
 
