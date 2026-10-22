@@ -5,10 +5,6 @@ import sys
 
 from epf.terminal import ERASE_BELOW, UP, live
 
-# Les fallades que el bloc mostra; la resta es compten en una línia, perquè el bloc no
-# passi de la pantalla, per sobre de la qual el cursor no pot tornar.
-SHOWN_FAILURES = 5
-
 # El final d'una línia tallada.
 MORE = "..."
 
@@ -87,10 +83,12 @@ def aligned(columns):
 class Block:
     """El bloc d'una passada, que escriu a stderr.
 
-    `title` va a la primera línia. `planned` són les seeds de cada família, cada una amb
-    una parella `(unitats, acabades)` per tipus de `KINDS`, sense el que la família no
-    fa: els trials d'una família que es cerca, els ajustos d'una que s'ajusta. `failed`
-    són les seeds fallades, `(família, seed)`, en l'ordre en què han fallat.
+    `title` va a la primera línia, i a sota, cada seed que falla, sencera; el bloc que
+    es torna a escriure són les línies de les famílies. `planned` són les seeds de cada
+    família, cada una amb una parella `(unitats, acabades)` per tipus de `KINDS`, sense
+    el que la família no fa: els trials d'una família que es cerca, els ajustos d'una
+    que s'ajusta. `failed` són les seeds fallades, `(família, seed)`, en l'ordre en què
+    han fallat.
     """
 
     def __init__(self, title, planned):
@@ -111,14 +109,12 @@ class Block:
         }
         self.working = dict.fromkeys(planned, 0)
         self.failed = []
-        self.failures = []
         self.stream = sys.stderr
         self.live = live(self.stream)
         self.shown = 0
+        self._write(f"{title}\n\n")
         if self.live:
             self._draw()
-        else:
-            self._write(f"{title}\n\n")
 
     def start(self, family):
         """Compta un procés que comença una unitat d'una família."""
@@ -159,7 +155,10 @@ class Block:
             self.failed.append((family, seed))
             line = f"error: {family} seed {seed} ha fallat: {message}"
             if self.live:
-                self.failures.append(line)
+                # A sobre de les famílies, i ja no es torna a escriure: hi pot ocupar
+                # tantes files com li calguin.
+                self._write(self._erased() + line + "\n")
+                self.shown = 0
             else:
                 self._write(line + "\n")
         if self.live:
@@ -218,7 +217,8 @@ class Block:
         counts = aligned({family: self._columns(family) for family in self.units})
         # Les línies no fan la mateixa amplada.
         longest = max(len(count) for count in counts.values())
-        lines = [self.title, ""]
+        # Separades de les fallades de sobre.
+        lines = [""] if self.failed else []
         for family, line in counts.items():
             if self.working[family]:
                 line = f"{line:<{longest}}    {WORKER * self.working[family]}"
@@ -226,14 +226,6 @@ class Block:
             if count:
                 line += f", {count} {'ha' if count == 1 else 'han'} fallat"
             lines.append(line)
-        if self.failures:
-            lines.append("")
-            lines += self.failures[:SHOWN_FAILURES]
-            hidden = len(self.failures) - SHOWN_FAILURES
-            if hidden == 1:
-                lines.append("i 1 seed més ha fallat")
-            elif hidden > 1:
-                lines.append(f"i {hidden} seeds més han fallat")
         return lines
 
     def _draw(self, whole=False):
@@ -247,9 +239,12 @@ class Block:
             # un bloc més alt que la pantalla no es pot tornar a escriure.
             columns = os.get_terminal_size(self.stream.fileno()).columns
             lines = [_cut(line, columns) for line in lines]
-        back = UP.format(self.shown) + "\r" + ERASE_BELOW if self.shown else ""
-        self._write(back + "\n".join(lines) + "\n")
+        self._write(self._erased() + "\n".join(lines) + "\n")
         self.shown = len(lines)
+
+    def _erased(self):
+        """Torna el que puja el cursor a l'inici del bloc escrit i l'esborra."""
+        return UP.format(self.shown) + "\r" + ERASE_BELOW if self.shown else ""
 
     def _write(self, text):
         self.stream.write(text)

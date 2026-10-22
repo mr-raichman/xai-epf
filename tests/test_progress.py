@@ -30,8 +30,6 @@ def test_the_block_aligns_its_families_trials_and_fits():
     block.start("ddnn_jsu")
     block.start("ddnn_jsu")
     assert block._lines() == [
-        "Passada 2026-11-02_01",
-        "",
         "ddnn_jsu            3/10 seeds    212/500 trials      3/10  fits    ··",
         "lightgbm           10/10 seeds    500/500 trials    100/100 fits",
         "naive_similar_day  10/10 seeds                       10/10  fits",
