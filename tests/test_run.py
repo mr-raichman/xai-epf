@@ -19,6 +19,9 @@ from epf.run import families, figures, pool, run
 # torna a fer cap.
 GRID = (5, 0, 4, 1, 3, 2)
 
+# El minut en què comença tota passada nova.
+MINUTE = datetime.datetime(2026, 10, 22, 14, 30)
+
 
 @pytest.fixture
 def fake(tmp_path, monkeypatch):
@@ -106,8 +109,10 @@ def fake(tmp_path, monkeypatch):
         },
     )
     monkeypatch.setattr(families, "EVERY", tuple(trainer.FAMILIES))
-    monkeypatch.setattr(paths, "RUNS", tmp_path / "runs")
-    monkeypatch.setattr(paths, "SEARCHES", tmp_path / "searches")
+    monkeypatch.setattr(paths, "OUTPUT", tmp_path / "output")
+    monkeypatch.setattr(paths, "SMOKE_OUTPUT", tmp_path / "assaig_output")
+    clock = types.SimpleNamespace(now=lambda: MINUTE)
+    monkeypatch.setattr(run, "datetime", types.SimpleNamespace(datetime=clock))
     days = pd.date_range(DEVELOPMENT[0], periods=14, freq="D")
     built = types.SimpleNamespace(
         daily=(
@@ -172,14 +177,15 @@ def fake(tmp_path, monkeypatch):
     return state
 
 
-def _name(number):
-    """Torna el nom de la passada d'assaig d'avui que porta el número `number`."""
-    return f"{paths.SMOKE_PREFIX}{datetime.date.today().isoformat()}_{number:02d}"
+def _name():
+    """Torna el nom de la passada d'assaig que comença a `MINUTE`."""
+    return paths.next_run(True, MINUTE).name
 
 
-def _recorded(family, number=1):
-    """Torna el registre d'una família a la passada d'assaig d'avui `number`."""
-    path = paths.RUNS / _name(number) / family / paths.FAMILY_RECORD
+def _recorded(family, where=None):
+    """Torna el registre d'una família a la passada `where`, la de `MINUTE` sense."""
+    where = where or paths.next_run(True, MINUTE)
+    path = where / family / paths.FAMILY_RECORD
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -227,7 +233,7 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     fake.failing = {("first", 1, "trial"): RuntimeError}
     with pytest.raises(
         Refusal,
-        match=f"^la passada {_name(1)} no és acabada: 1 seed ha fallat, first seed 1$",
+        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1$",
     ):
         fake.main()
     assert [seed for kind, _, seed, _ in fake.calls if kind == "trial"] == [0] * 4 + [1]
@@ -270,7 +276,7 @@ def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
     found = json.loads(store.with_suffix(".json").read_text(encoding="utf-8"))
     assert found["trials"] == 4 and len(found["ranked"]) == 3
     assert len(_recorded("first")["configurations"]["0"]) == 2
-    log = paths.RUNS / _name(1) / paths.WORKERS_LOG
+    log = paths.runs(True) / _name() / paths.WORKERS_LOG
     assert log.read_text(encoding="utf-8") == "first seed 0 trial 1 ha divergit: nan\n"
 
 
@@ -294,7 +300,7 @@ def test_a_seed_whose_every_trial_diverged_fails_and_the_others_finish(fake, cap
     fake.diverging = {("first", 1, 0)}
     with pytest.raises(
         Refusal,
-        match=f"^la passada {_name(1)} no és acabada: 1 seed ha fallat, first seed 1$",
+        match=f"^la passada {_name()} no és acabada: 1 seed ha fallat, first seed 1$",
     ):
         fake.main()
     shown = capsys.readouterr().err
@@ -311,14 +317,19 @@ def test_a_seed_whose_every_trial_diverged_fails_and_the_others_finish(fake, cap
 
 
 def test_a_run_after_a_finished_one_asks_no_trial_and_fits_again(fake):
-    """Les cerques acabades no es tornen a fer, i la passada nova se'n planifica."""
+    """Les cerques acabades no es tornen a fer, i la passada nova se'n planifica.
+
+    La primera, desada amb un altre nom, ja no és cap passada que es continuï.
+    """
     fake.main()
+    first = paths.next_run(True, MINUTE)
+    kept = first.rename(first.with_name("kept"))
     fake.calls.clear()
     fake.main()
     assert [kind for kind, *_ in fake.calls] == ["fit"] * 8
     assert (
-        _recorded("first", 2)["configurations"]
-        == _recorded("first", 1)["configurations"]
+        _recorded("first")["configurations"]
+        == _recorded("first", kept)["configurations"]
     )
 
 
@@ -337,8 +348,8 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     ]
     assert _recorded("second")["configurations"] == planned
     shown = capsys.readouterr().err
-    assert f"Passada {_name(1)}\n" in shown
-    assert f"Passada {_name(1)}, continuada\n" in shown
+    assert f"Passada {_name()}\n" in shown
+    assert f"Continuant passada {_name()}\n" in shown
 
 
 def test_a_search_made_again_never_changes_a_recorded_plan(fake):
@@ -349,7 +360,7 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     planned = {
         family: _recorded(family)["configurations"] for family in ("first", "second")
     }
-    shutil.rmtree(paths.SEARCHES)
+    shutil.rmtree(paths.searches(True))
     fake.failing = {}
     fake.module.FAMILIES["first"]["kept"] = 1
     fake.main()
@@ -358,12 +369,13 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     } == planned
 
 
-def test_a_finished_run_is_never_continued(fake, capsys):
+def test_a_finished_run_is_refused_and_never_continued(fake):
     """Una passada acabada que es continués en barrejaria dues."""
     fake.main()
-    fake.main()
-    shown = capsys.readouterr().err
-    assert f"Passada {_name(1)}\n" in shown and f"Passada {_name(2)}\n" in shown
+    calls = len(fake.calls)
+    with pytest.raises(Refusal, match=f"^la passada {_name()} és acabada; esborrar "):
+        fake.main()
+    assert len(fake.calls) == calls
 
 
 def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake):
@@ -373,7 +385,7 @@ def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake):
     fake.failing = {}
     fake.fingerprints["code"] = "un altre codi"
     calls, opened = len(fake.calls), fake.opened
-    with pytest.raises(Refusal, match=f"la passada {_name(1)} .* un altre codi;"):
+    with pytest.raises(Refusal, match=f"la passada {_name()} .* un altre codi;"):
         fake.main()
     assert (len(fake.calls), fake.opened) == (calls, opened)
 

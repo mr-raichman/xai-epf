@@ -65,19 +65,12 @@ def run_arguments(parser):
 
 def figures_arguments(parser):
     """Declara a `parser` els arguments de `epf figures`, i el torna."""
-    # Una sola opció d'assaig, i no una per variant: les passades d'assaig de totes les
-    # variants porten el mateix prefix.
+    # Una sola opció d'assaig, i no una per variant: totes les variants escriuen la seva
+    # passada al mateix lloc.
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help="sense nom, l'última passada d'assaig acabada en lloc de la de mesura",
-    )
-    parser.add_argument(
-        "run",
-        metavar="PASSADA",
-        nargs="?",
-        help="el nom d'una passada, com 2026-10-14_01 o assaig_2026-10-14_01; "
-        "sense, l'última acabada",
+        help="la passada d'assaig, a assaig_output/, en lloc de la de mesura",
     )
     return parser
 
@@ -106,7 +99,7 @@ COMMANDS = {
     "figures": Command(
         "epf.run.figures",
         "main",
-        "torna a dibuixar les figures",
+        "torna a dibuixar les figures de la passada en disc",
         figures_arguments,
     ),
     "start": Command(

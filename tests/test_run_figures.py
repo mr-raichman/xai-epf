@@ -1,3 +1,4 @@
+import datetime
 import types
 
 import pytest
@@ -5,35 +6,34 @@ import pytest
 from epf import Refusal, paths
 from epf.run import families, figures
 
+MINUTE = datetime.datetime(2026, 10, 22, 14, 30)
 
-def test_with_no_name_the_latest_finished_run_of_its_kind_is_drawn(
-    tmp_path, monkeypatch
-):
-    """Una passada a mig fer, o de l'altre tipus, semblaria la que es demanava."""
-    # La més nova de mesura és a mig fer, i l'assaig, d'un altre comptador, en té una de
-    # més nova que cap de mesura.
-    monkeypatch.setattr(paths, "RUNS", tmp_path)
-    smoke = paths.SMOKE_PREFIX
-    for name in (
-        "2026-10-14_01",
-        "2026-10-15_01",
-        "2026-10-15_02",
-        f"{smoke}2026-10-15_03",
-    ):
-        (tmp_path / name).mkdir()
-    done = {"2026-10-14_01", "2026-10-15_01", f"{smoke}2026-10-15_03"}
-    monkeypatch.setattr(families, "finished", lambda where: where.name in done)
+
+@pytest.fixture
+def kinds(tmp_path, monkeypatch):
+    """Posa les passades a `tmp_path`, i torna les que es dibuixen."""
+    monkeypatch.setattr(paths, "OUTPUT", tmp_path / "output")
+    monkeypatch.setattr(paths, "SMOKE_OUTPUT", tmp_path / "assaig_output")
     drawn = []
-    monkeypatch.setattr(figures, "draw", lambda where: drawn.append(where.name))
-    figures.main(types.SimpleNamespace(run=None, smoke=False))
-    figures.main(types.SimpleNamespace(run=None, smoke=True))
-    assert drawn == ["2026-10-15_01", f"{smoke}2026-10-15_03"]
+    monkeypatch.setattr(figures, "draw", drawn.append)
+    return drawn
 
 
-def test_with_no_finished_run_of_its_kind_nothing_is_drawn(tmp_path, monkeypatch):
-    monkeypatch.setattr(paths, "RUNS", tmp_path)
-    (tmp_path / "2026-10-15_01").mkdir()
+def test_each_kind_draws_its_own_run(kinds, monkeypatch):
+    """Una passada de l'altre tipus semblaria la que es demanava."""
+    for smoke in (False, True):
+        paths.next_run(smoke, MINUTE).mkdir(parents=True)
+    monkeypatch.setattr(families, "finished", lambda where: True)
+    figures.main(types.SimpleNamespace(smoke=False))
+    figures.main(types.SimpleNamespace(smoke=True))
+    assert kinds == [paths.next_run(False, MINUTE), paths.next_run(True, MINUTE)]
+
+
+def test_no_run_or_an_unfinished_one_is_refused(kinds, monkeypatch):
+    with pytest.raises(Refusal, match="^no hi ha cap passada de mesura a "):
+        figures.main(types.SimpleNamespace(smoke=False))
+    paths.next_run(False, MINUTE).mkdir(parents=True)
     monkeypatch.setattr(families, "finished", lambda where: False)
-    monkeypatch.setattr(figures, "draw", lambda where: None)
-    with pytest.raises(Refusal, match="no hi ha cap passada de mesura acabada"):
-        figures.main(types.SimpleNamespace(run=None, smoke=False))
+    with pytest.raises(Refusal, match="^la passada 2026-10-22_14-30 no és acabada$"):
+        figures.main(types.SimpleNamespace(smoke=False))
+    assert not kinds

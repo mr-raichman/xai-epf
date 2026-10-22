@@ -2,3 +2,4 @@ api-keys
 .venv/
 __pycache__/
 /output/
+/assaig_output/

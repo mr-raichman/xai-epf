@@ -14,8 +14,9 @@ KEYS = ROOT / "api-keys"
 # La versió exacta de cada biblioteca, que `uv run` instal·la abans de cada comanda.
 LOCK = ROOT / "uv.lock"
 
-# Tot el que escriuen les comandes.
+# Tot el que escriuen les comandes, i a part, la passada i les cerques d'un assaig.
 OUTPUT = ROOT / "output"
+SMOKE_OUTPUT = ROOT / "assaig_output"
 
 # Els fitxers tal com els serveix ESIOS, on només escriu la baixada: una carpeta per
 # indicador, `output/downloads/<indicador>/<any>.json`.
@@ -27,9 +28,6 @@ DATA = OUTPUT / "data"
 DATASET = DATA / "dataset.csv"
 DATASET_RECORD = DATA / "dataset.json"
 DATA_FIGURES = DATA / "figures"
-
-RUNS = OUTPUT / "runs"
-SEARCHES = OUTPUT / "searches"
 
 # Els fitxers d'una passada: el model ajustat d'una seed i d'una configuració, pel lloc
 # de la configuració a la cerca de la seed, 0 la millor; el registre de la família, al
@@ -43,32 +41,35 @@ MATRIX = "matrix_{name}.csv"
 # les seves fallades.
 WORKERS_LOG = "workers.log"
 
-# Una passada es diu pel dia local en què va començar i pel seu número de dues xifres
-# dins del dia, `2026-10-14_01`. La d'un assaig, i la cerca d'assaig d'una família,
-# porten davant `SMOKE_PREFIX` i es compten a part.
+# Una passada es diu pel minut local en què va començar, `2026-10-22_14-30`, i la d'un
+# assaig porta davant `SMOKE_PREFIX`.
 SMOKE_PREFIX = "assaig_"
 
 
 def runs(smoke):
-    """Torna les passades d'assaig o de mesura, de la més antiga a la més nova."""
-    return sorted(RUNS.glob(f"{SMOKE_PREFIX if smoke else ''}????-??-??_??"))
+    """Torna la carpeta de les passades d'assaig o de mesura."""
+    return (SMOKE_OUTPUT if smoke else OUTPUT) / "runs"
 
 
-def next_run(smoke, day):
-    """Torna la carpeta de la passada següent d'assaig o de mesura del dia `day`.
+def searches(smoke):
+    """Torna la carpeta de les cerques d'assaig o de mesura, una carpeta per família."""
+    return (SMOKE_OUTPUT if smoke else OUTPUT) / "searches"
 
-    El seu número és el més alt del dia més u, o 01 si encara no n'hi ha cap.
+
+def named_runs(smoke):
+    """Torna les passades d'assaig o de mesura que porten un nom de la seva forma.
+
+    De la més antiga a la més nova. Cap altra carpeta de `runs(smoke)` no és una passada
+    que es pugui continuar.
     """
-    # shortcut: dues xifres, 99 passades d'un tipus per dia; la 100a tindria un nom fora
-    # del patró de `runs` i la següent hi tornaria a escriure. Una tercera xifra, si mai
-    # un dia en necessita més.
-    prefix = f"{SMOKE_PREFIX if smoke else ''}{day.isoformat()}_"
-    numbers = [
-        int(path.name.removeprefix(prefix))
-        for path in runs(smoke)
-        if path.name.startswith(prefix)
-    ]
-    return RUNS / f"{prefix}{max(numbers, default=0) + 1:02d}"
+    prefix = SMOKE_PREFIX if smoke else ""
+    return sorted(runs(smoke).glob(f"{prefix}????-??-??_??-??"))
+
+
+def next_run(smoke, minute):
+    """Torna la carpeta d'una passada que comença a `minute`, d'assaig si `smoke`."""
+    prefix = SMOKE_PREFIX if smoke else ""
+    return runs(smoke) / f"{prefix}{minute:%Y-%m-%d_%H-%M}"
 
 
 def relative(path):

@@ -27,17 +27,22 @@ COPIED = ("ljung_box_tested", "counter")
 
 
 def _where(smoke, fingerprints):
-    """Torna l'última passada del tipus si no és acabada, o la següent d'avui.
+    """Torna la passada del tipus si no és acabada, o una de nova d'aquest minut.
 
-    Refusa continuar-ne una que van començar un altre codi, un altre dataset o unes
-    altres biblioteques, perquè les seves famílies no es podrien comparar, i una
+    La passada és la més nova de les que porten un nom de la forma del tipus. Refusa una
+    passada acabada; i continuar-ne una que van començar un altre codi, un altre dataset
+    o unes altres biblioteques, perquè les seves famílies no es podrien comparar, i una
     d'assaig començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria
     els valors de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
     """
-    found = paths.runs(smoke)
-    if not found or families.finished(found[-1]):
-        return paths.next_run(smoke, datetime.date.today())
+    found = paths.named_runs(smoke)
+    if not found:
+        return paths.next_run(smoke, datetime.datetime.now())
     latest = found[-1]
+    if families.finished(latest):
+        raise Refusal(
+            f"la passada {latest.name} és acabada; esborrar {paths.relative(latest)}/"
+        )
     differ, begun = set(), set()
     for path in sorted(latest.glob(f"*/{paths.FAMILY_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
@@ -187,7 +192,7 @@ class Run:
         recorded = {family: families.recorded(where / family) for family in chosen}
         missing = {family: families.missing(where / family) for family in chosen}
         self.block = progress.Block(
-            f"Passada {where.name}{', continuada' if continued else ''}",
+            f"{'Continuant passada' if continued else 'Passada'} {where.name}",
             {
                 family: {
                     seed: self._units(family, seed, recorded, missing)
@@ -320,16 +325,16 @@ class Run:
 def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
-    Continua l'última del seu tipus si no és acabada. Cerca el que falta i, amb els
-    mateixos processos, ajusta cada configuració planificada que encara no té el seu
-    fitxer. Una seed d'una família que no es cerca rep el pla de seguida, i una d'una
-    que es cerca, les millors configuracions de la seva cerca quan la té acabada; el
-    pla queda al registre de la família i ja no canvia. Dibuixa les figures si cap seed
-    no ha fallat. Refusa abans d'escriure la passada el que no pot fer; un study
-    refusat deixa a `output/searches/` els que s'han obert abans, nous i sense cap
-    trial, que la passada següent reinicia en obrir-los. Acaba amb un refús si alguna
-    seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a alguna família li
-    falta el pla d'una seed o un fitxer.
+    Continua la del seu tipus si no és acabada, i refusa una d'acabada. Cerca el que
+    falta i, amb els mateixos processos, ajusta cada configuració planificada que encara
+    no té el seu fitxer. Una seed d'una família que no es cerca rep el pla de seguida, i
+    una d'una que es cerca, les millors configuracions de la seva cerca quan la té
+    acabada; el pla queda al registre de la família i ja no canvia. Dibuixa les figures
+    si cap seed no ha fallat. Refusa abans d'escriure la passada el que no pot fer; un
+    study refusat deixa a la carpeta de les cerques els que s'han obert abans, nous i
+    sense cap trial, que la passada següent reinicia en obrir-los. Acaba amb un refús si
+    alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a alguna
+    família li falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke, READ)
     chosen = families.named(arguments.family)

@@ -75,30 +75,18 @@ def draw(where):
 
 
 def main(arguments):
-    """Dibuixa de nou les figures d'una passada, la comanda `epf figures`.
+    """Dibuixa de nou les figures de la passada del seu tipus, la comanda `epf figures`.
 
-    La passada és la que es nomeni o, sense nom, l'última acabada del seu tipus, de
-    mesura si no és `--smoke`. Refusa un nom que no és cap passada i, sense nom, que no
-    n'hi hagi cap d'acabada.
+    De mesura, o d'assaig amb `--smoke`. Refusa que no n'hi hagi cap, o que no sigui
+    acabada.
     """
-    if arguments.run is None:
-        found = [
-            where for where in paths.runs(arguments.smoke) if families.finished(where)
-        ]
-        if not found:
-            kind = "d'assaig" if arguments.smoke else "de mesura"
-            raise Refusal(
-                f"no hi ha cap passada {kind} acabada a {paths.relative(paths.RUNS)}/"
-            )
-        where = found[-1]
-    else:
-        # Només el nom d'una passada que hi és, mai un camí: el que s'escriu no tria on.
-        found = {
-            path.name: path for smoke in (False, True) for path in paths.runs(smoke)
-        }
-        if arguments.run not in found:
-            runs = paths.relative(paths.RUNS)
-            raise Refusal(f'no hi ha cap passada "{arguments.run}" a {runs}/')
-        where = found[arguments.run]
+    found = paths.named_runs(arguments.smoke)
+    if not found:
+        kind = "d'assaig" if arguments.smoke else "de mesura"
+        runs = paths.relative(paths.runs(arguments.smoke))
+        raise Refusal(f"no hi ha cap passada {kind} a {runs}/")
+    where = found[-1]
+    if not families.finished(where):
+        raise Refusal(f"la passada {where.name} no és acabada")
     print(f"Passada {where.name}\n", file=sys.stderr)
     draw(where)

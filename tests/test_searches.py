@@ -108,7 +108,7 @@ def test_a_grid_with_more_trials_than_points_goes_on_and_draws_one_again(tmp_pat
 
 def _studied(tmp_path, monkeypatch, X, y):
     """Torna el study d'una cerca de dos trials de `fake` a la seed 0, a l'assaig."""
-    monkeypatch.setattr(paths, "SEARCHES", tmp_path)
+    monkeypatch.setattr(paths, "SMOKE_OUTPUT", tmp_path)
     where = folder(True, "fake")
     where.mkdir(parents=True)
     return _study(

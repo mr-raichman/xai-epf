@@ -30,7 +30,7 @@ RECORD = "seed_{seed}.json"
 
 def folder(smoke, family):
     """Torna la carpeta de la cerca d'una família, la d'assaig si `smoke`."""
-    return paths.SEARCHES / f"{paths.SMOKE_PREFIX if smoke else ''}{family}"
+    return paths.searches(smoke) / family
 
 
 def _dealt(seed):
