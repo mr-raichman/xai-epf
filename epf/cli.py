@@ -124,7 +124,7 @@ COMMANDS = {
     "start": Command(
         "epf.cli",
         "start",
-        "executa tot el mecanisme de manera seqüencial",
+        'fa "download", "dataset" i "run", en ordre',
         start_arguments,
     ),
 }
