@@ -11,7 +11,7 @@ import shutil
 import sys
 import time
 
-from epf import Refusal, parameters, paths, terminal
+from epf import Declined, Refusal, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
 from epf.contract.split import split, validation_parts
@@ -60,8 +60,7 @@ def _plans(chosen, values):
 def _otherwise(where, smoke, fingerprints):
     """Torna com es va començar una passada que no es pot continuar, o `None`.
 
-    Ho torna en dues parts, com es va començar i què faria falta per continuar-la. No
-    es pot continuar si la van començar un altre codi, un altre dataset o unes altres
+    No es pot continuar si la van començar un altre codi, un altre dataset o unes altres
     biblioteques, perquè les seves famílies no es podrien comparar, ni una d'assaig
     començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria els valors
     de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
@@ -75,15 +74,12 @@ def _otherwise(where, smoke, fingerprints):
         begun.add(made.get("smoke"))
     if differ:
         then = [record.DIFFERENT[name] for name in record.DIFFERENT if name in differ]
-        return (
-            f"es va començar amb {' i '.join(other for other, _ in then)}",
-            f"continuar amb {' i '.join(that for _, that in then)}",
-        )
+        return f"es va començar amb {' i '.join(then)}"
     variants = sorted(map(str, begun - {smoke}))
     if variants:
         flags = {name: flag for flag, name in parameters.variants().items()}
         flag = flags.get(variants[0], variants[0])
-        return f'es va començar amb "{flag}"', f'continuar amb "uv run epf run {flag}"'
+        return f'es va començar amb "{flag}"'
     return None
 
 
@@ -148,7 +144,7 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
             continue
         otherwise = _otherwise(path, smoke, fingerprints)
         if otherwise is not None:
-            found.append(([path], f"La passada {path.name} {otherwise[0]}"))
+            found.append(([path], f"La passada {path.name} {otherwise}"))
         else:
             found.append(([path], "\n".join([shown, *_progress(path, values)])))
     for family in searched:
@@ -198,49 +194,70 @@ def _replaced(found, smoke):
             path.unlink()
 
 
-def _where(smoke, values, searched, matrices, fingerprints):
+def _where(smoke, values, searched, matrices, fingerprints, answer):
     """Torna on es fa la passada: una de nova d'aquest minut, o la del tipus continuada.
 
     Sense res a la carpeta de les passades del tipus ni cap study fet d'una altra
     manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix:
-    `y` ho esborra i en fa una de nova; `n` continua la passada més nova de la forma
-    del tipus si no és acabada i es pot continuar, i si no, refusa. Refusa també sense
-    terminal o sense resposta, i llavors no esborra res.
+    amb `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma
+    del tipus no és acabada i es pot continuar, pregunta si es continua. Qualsevol altre
+    `n` atura la comanda. `answer`, `replace` o `continue`, respon les preguntes sense
+    terminal com les opcions del seu nom, i `None` les fa. Refusa sense terminal o sense
+    resposta, i llavors no esborra res.
     """
     found = _on_disk(smoke, values, searched, matrices, fingerprints)
-    if found:
-        for _, line in found:
-            print(line, file=sys.stderr)
-        if not terminal.interactive():
-            raise Refusal(
-                "sense terminal, no es pot preguntar si se substitueix el que hi ha "
-                "en disc"
-            )
-        answer = terminal.asked("Substituir el que hi ha en disc? [y/n] ")
+    if not found:
+        return paths.next_run(smoke, datetime.datetime.now())
+    print("\n\n".join(line for _, line in found) + "\n", file=sys.stderr)
+    flag = f"--{answer}" if answer else None
+    if flag is None and not terminal.interactive():
+        raise Refusal(
+            "sense terminal, no es pot preguntar si se substitueix el que hi ha en disc"
+        )
+    replaced = _answered(
+        "Substituir el que hi ha en disc? [y/n] ", flag, answer == "replace"
+    )
+    if replaced:
+        _replaced(found, smoke)
+        return paths.next_run(smoke, datetime.datetime.now())
+    latest = _continuable(smoke, fingerprints)
+    if latest is None or not _answered(
+        f"Continuar la passada {latest.name}? [y/n] ", flag, answer == "continue"
+    ):
+        raise Declined
+    return latest
+
+
+def _answered(question, flag, given):
+    """Torna la resposta a una pregunta de sí o no, i deixa una línia en blanc.
+
+    Amb l'opció `flag`, la resposta és `given`, que s'escriu darrere de la pregunta en
+    lloc de preguntar-la; sense, `None`, es pregunta. Refusa que l'entrada s'acabi
+    sense cap resposta.
+    """
+    if flag is not None:
+        print(f"{question}{'y' if given else 'n'} ({flag})", file=sys.stderr)
+        answer = given
+    else:
+        answer = terminal.asked(question)
         if answer is None:
             raise Refusal("sense resposta, es conserva el que hi ha en disc")
-        if not answer:
-            return _continued(smoke, fingerprints)
-        _replaced(found, smoke)
-    return paths.next_run(smoke, datetime.datetime.now())
+    print(file=sys.stderr)
+    return answer
 
 
-def _continued(smoke, fingerprints):
-    """Torna la passada més nova de la forma del tipus, si es pot continuar.
+def _continuable(smoke, fingerprints):
+    """Torna la passada més nova de la forma del tipus si es pot continuar, o `None`.
 
-    Refusa que no n'hi hagi cap, que sigui acabada, o que no es pugui continuar.
+    No es pot continuar si no n'hi ha cap, si és acabada o si es va començar d'una
+    altra manera.
     """
     named = paths.named_runs(smoke)
     if not named:
-        raise Refusal(
-            "no hi ha cap passada per continuar i es conserva el que hi ha en disc"
-        )
+        return None
     latest = named[-1]
-    if families.finished(latest):
-        raise Refusal(f"la passada {latest.name} és acabada i es conserva")
-    otherwise = _otherwise(latest, smoke, fingerprints)
-    if otherwise is not None:
-        raise Refusal(f"la passada {latest.name} {otherwise[0]}; {otherwise[1]}")
+    if families.finished(latest) or _otherwise(latest, smoke, fingerprints):
+        return None
     return latest
 
 
@@ -501,7 +518,9 @@ def main(arguments):
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     fingerprints = record.fingerprints()
     searched = _plans(chosen, values)[2]
-    where = _where(arguments.smoke, values, searched, matrices, fingerprints)
+    where = _where(
+        arguments.smoke, values, searched, matrices, fingerprints, arguments.answer
+    )
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
         run.tasks(),

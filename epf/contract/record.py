@@ -22,12 +22,11 @@ Fitted = collections.namedtuple(
     defaults=(0.0, None, None, None),
 )
 
-# Com diu un refús cada empremta que no és la d'ara: la que va començar la passada i
-# aquella amb què s'ha d'acabar.
+# Com es diu cada empremta que no és la d'ara, la que va començar la passada.
 DIFFERENT = {
-    "code": ("un altre codi", "aquell codi"),
-    "dataset": ("un altre dataset", "aquell dataset"),
-    "environment": ("unes altres biblioteques", "aquelles biblioteques"),
+    "code": "un altre codi",
+    "dataset": "un altre dataset",
+    "environment": "unes altres biblioteques",
 }
 
 
@@ -77,9 +76,7 @@ def refuse_changed(started):
     dataset nou a mitja passada hi entraria mentre els registres diuen les d'abans.
     """
     now = fingerprints()
-    then = [
-        other for name, (other, _) in DIFFERENT.items() if now[name] != started[name]
-    ]
+    then = [other for name, other in DIFFERENT.items() if now[name] != started[name]]
     if then:
         raise Refusal(f"la passada es va començar amb {' i '.join(then)}")
 

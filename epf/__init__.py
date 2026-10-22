@@ -10,3 +10,11 @@ class Refusal(ValueError):
     <missatge>`; qualsevol altra excepció és un error del codi, i en mostra el
     traceback.
     """
+
+
+class Declined(Exception):
+    """L'aturada d'una comanda perquè qui la fa ha respost que no.
+
+    La línia de comandes l'escriu com `Aturat`, com un Ctrl+C, però hi acaba com un
+    refús.
+    """

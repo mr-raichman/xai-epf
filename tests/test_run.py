@@ -11,7 +11,7 @@ import optuna
 import pandas as pd
 import pytest
 
-from epf import Refusal, parameters, paths, terminal
+from epf import Declined, Refusal, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.parameters import DEVELOPMENT
 from epf.run import families, figures, pool, run
@@ -176,8 +176,8 @@ def fake(tmp_path, monkeypatch):
     state.typed("")
     state.module = trainer
     state.searcher = searcher
-    state.main = lambda smoke="SMOKE": run.main(
-        types.SimpleNamespace(smoke=smoke, family=None)
+    state.main = lambda smoke="SMOKE", answer=None: run.main(
+        types.SimpleNamespace(smoke=smoke, family=None, answer=answer)
     )
     return state
 
@@ -253,7 +253,7 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     assert "1" not in _recorded("second")["configurations"]
     fake.failing = {}
     fake.calls.clear()
-    fake.typed("n\n")
+    fake.typed("n\ny\n")
     fake.main()
     assert [(kind, seed) for kind, _, seed, _ in fake.calls] == [("trial", 1)] * 4 + [
         ("fit", 1)
@@ -294,7 +294,7 @@ def test_a_continued_run_asks_no_trial_in_place_of_a_diverged_one(fake):
         fake.main()
     fake.failing = {}
     fake.calls.clear()
-    fake.typed("n\n")
+    fake.typed("n\ny\n")
     fake.main()
     assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
         ("fit", "second", 0)
@@ -342,7 +342,7 @@ def test_a_killed_run_is_continued_each_family_on_the_plan_it_recorded(fake, cap
     planned = _recorded("second")["configurations"]
     fake.failing = {}
     fake.calls.clear()
-    fake.typed("n\n")
+    fake.typed("n\ny\n")
     fake.module.FAMILIES["second"]["kept"] = 2
     fake.main()
     assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
@@ -364,7 +364,7 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     }
     shutil.rmtree(paths.searches(True))
     fake.failing = {}
-    fake.typed("n\n")
+    fake.typed("n\ny\n")
     fake.module.FAMILIES["first"]["kept"] = 1
     fake.main()
     assert {
@@ -372,19 +372,18 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     } == planned
 
 
-def test_a_finished_run_is_refused_and_never_continued(fake):
+def test_a_finished_run_kept_with_an_n_is_never_continued(fake, capsys):
     """Una passada acabada que es continués en barrejaria dues."""
     fake.main()
     calls = len(fake.calls)
     fake.typed("n\n")
-    with pytest.raises(
-        Refusal, match=f"^la passada {_name()} és acabada i es conserva$"
-    ):
+    with pytest.raises(Declined):
         fake.main()
     assert len(fake.calls) == calls
+    assert "Continuar la passada" not in capsys.readouterr().err
 
 
-def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake, capsys):
+def test_a_run_made_by_other_code_is_never_continued_nor_a_study_opened(fake, capsys):
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
@@ -392,15 +391,15 @@ def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake, ca
     fake.typed("n\n")
     fake.fingerprints["code"] = "un altre codi"
     calls, opened = len(fake.calls), fake.opened
-    with pytest.raises(Refusal, match=f"la passada {_name()} .* un altre codi;"):
+    with pytest.raises(Declined):
         fake.main()
     assert (len(fake.calls), fake.opened) == (calls, opened)
     shown = capsys.readouterr().err
     assert f"La passada {_name()} es va començar amb un altre codi\n" in shown
-    assert "first   " not in shown
+    assert "first   " not in shown and "Continuar la passada" not in shown
 
 
-def test_a_smoke_run_is_never_continued_under_another_variant(fake):
+def test_a_smoke_run_is_never_continued_under_another_variant(fake, capsys):
     """Triar la variant editant `parameters.py` canviava el codi, que ho refusava."""
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
@@ -408,9 +407,11 @@ def test_a_smoke_run_is_never_continued_under_another_variant(fake):
     fake.failing = {}
     fake.typed("n\n")
     calls = len(fake.calls)
-    with pytest.raises(Refusal, match='començar amb "--smoke"; continuar amb "uv run'):
+    with pytest.raises(Declined):
         fake.main("SMOKE_1")
     assert len(fake.calls) == calls
+    shown = capsys.readouterr().err
+    assert f'La passada {_name()} es va començar amb "--smoke"\n' in shown
 
 
 def test_each_fits_seconds_are_kept_as_soon_as_it_returns(fake):
@@ -462,10 +463,11 @@ def test_the_question_is_asked_again_until_y_or_n_in_either_case(fake, capsys):
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
     fake.failing = {}
-    fake.typed("x\nN\n")
+    fake.typed("x\nN\nY\n")
     fake.main()
     shown = capsys.readouterr().err
     assert shown.count("Substituir el que hi ha en disc? [y/n] ") == 2
+    assert shown.count(f"Continuar la passada {_name()}? [y/n] ") == 1
     assert (
         f"{_name()}/\nfirst   2/2 seeds    4/4 fits\nsecond  1/2 seeds    1/2 fits\n"
         "third   2/2 seeds    2/2 fits\n"
@@ -507,11 +509,43 @@ def test_without_a_terminal_or_an_answer_nothing_goes(
     assert paths.named_runs(True) == [paths.next_run(True, MINUTE)]
 
 
-def test_n_with_no_run_to_continue_is_refused_and_keeps_what_is_on_disk(fake):
+def test_an_n_with_no_run_to_continue_stops_and_keeps_what_is_on_disk(fake):
     fake.main()
     first = paths.next_run(True, MINUTE)
     kept = first.rename(first.with_name("kept"))
     fake.typed("n\n")
-    with pytest.raises(Refusal, match="^no hi ha cap passada per continuar"):
+    with pytest.raises(Declined):
         fake.main()
     assert kept.exists() and not paths.named_runs(True)
+
+
+def test_an_n_to_continuing_stops_and_fits_nothing(fake):
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = {}
+    calls = len(fake.calls)
+    fake.typed("n\nn\n")
+    with pytest.raises(Declined):
+        fake.main()
+    assert len(fake.calls) == calls
+
+
+def test_the_flags_answer_both_questions_without_a_terminal(fake, monkeypatch, capsys):
+    fake.failing = {("second", 0, "fit"): RuntimeError}
+    with pytest.raises(Refusal, match="no és acabada"):
+        fake.main()
+    fake.failing = {}
+    monkeypatch.setattr(terminal, "interactive", lambda: False)
+    fake.calls.clear()
+    fake.main(answer="continue")
+    assert [(kind, family) for kind, family, *_ in fake.calls] == [("fit", "second")]
+    with pytest.raises(Declined):
+        fake.main(answer="continue")
+    fake.calls.clear()
+    fake.main(answer="replace")
+    assert [kind for kind, *_ in fake.calls] == ["fit"] * 8
+    shown = capsys.readouterr().err
+    assert "Substituir el que hi ha en disc? [y/n] n (--continue)\n" in shown
+    assert f"Continuar la passada {_name()}? [y/n] y (--continue)\n" in shown
+    assert "Substituir el que hi ha en disc? [y/n] y (--replace)\n" in shown

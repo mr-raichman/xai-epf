@@ -31,9 +31,11 @@ NOTIFY = "EPF_NOTIFY"
 # Els arguments es declaren aquí, i no al mòdul de cada subcomanda: `argparse`
 # construeix totes les subcomandes abans de llegir-ne cap, i els importaria tots.
 def start_arguments(parser):
-    """Declara a `parser` una opció per variant d'assaig, i el torna.
+    """Declara a `parser` una opció per variant d'assaig i les respostes d'una passada.
 
-    Totes desen a `smoke` el nom de la seva variant, i se'n pot donar una o cap.
+    Les variants desen a `smoke` el nom de la seva, i se'n pot donar una o cap. Les
+    respostes, `--replace` i `--continue`, desen a `answer` el nom de la seva, i se'n
+    pot donar una o cap. Torna `parser`.
     """
     smoke = parser.add_mutually_exclusive_group()
     for flag, name in parameters.variants().items():
@@ -46,6 +48,23 @@ def start_arguments(parser):
             help=f"un assaig: els valors de {name} de parameters.py en lloc dels de la "
             "mesura",
         )
+    answer = parser.add_mutually_exclusive_group()
+    answer.add_argument(
+        "--replace",
+        dest="answer",
+        action="store_const",
+        const="replace",
+        default=None,
+        help="sense preguntar, substitueix el que hi ha en disc",
+    )
+    answer.add_argument(
+        "--continue",
+        dest="answer",
+        action="store_const",
+        const="continue",
+        default=None,
+        help="sense preguntar, continua la passada en disc si es pot i, si no, s'atura",
+    )
     return parser
 
 
@@ -115,7 +134,8 @@ def start(arguments):
     """Fa cada subcomanda de `SEQUENCE`, la comanda `epf start`.
 
     Les fa en ordre i s'atura a la primera que es refusa. Cada una rep els seus
-    arguments per defecte, amb l'opció d'assaig donada a `epf start` si ella en pren. Si
+    arguments per defecte, amb l'opció d'assaig i la resposta donades a `epf start` si
+    ella en pren. Si
     l'entorn té `NOTIFY`, n'executa el programa en acabar cada una menys l'última, i un
     programa que no es pot executar es diu.
     """
@@ -127,6 +147,7 @@ def start(arguments):
             function()
         else:
             given = [flags[arguments.smoke]] if arguments.smoke else []
+            given += [f"--{arguments.answer}"] if arguments.answer else []
             function(command.arguments(argparse.ArgumentParser()).parse_args(given))
         if position < len(SEQUENCE) - 1 and NOTIFY in os.environ:
             # Res del programa no arriba al terminal, on trencaria el rellotge.
@@ -183,6 +204,9 @@ def main():
                 function(arguments)
     except epf.Refusal as refusal:
         print(f"error: {refusal}", file=sys.stderr)
+        return 1
+    except epf.Declined:
+        print("Aturat", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("Aturat", file=sys.stderr)
