@@ -121,21 +121,18 @@ def seeded(label, *parts):
     return int.from_bytes(hashlib.sha256(text.encode()).digest()[:4], "big")
 
 
-def variants():
-    """Torna cada variant d'assaig per l'opció que la tria: `--smoke1`, `SMOKE_1`."""
-    return {
-        f"--{name.lower().replace('_', '')}": name
-        for name in globals()
-        if name == "SMOKE" or name.startswith("SMOKE_")
-    }
+def flag(variant):
+    """Torna l'opció que tria una variant d'assaig: `--smoke1` per `SMOKE_1`."""
+    return f"--{variant.lower().replace('_', '')}"
 
 
 def chosen(smoke, read):
     """Torna cada valor d'aquest fitxer pel seu nom, els de la variant d'assaig `smoke`.
 
     `smoke` és el nom d'una variant, `SMOKE_1`, o fals per a una mesura, i `read` els
-    noms que qui la crida llegeix del que torna. Refusa una variant que canvia un altre
-    valor: no canviaria res, i el registre de la passada el diria canviat.
+    noms que qui la crida llegeix del que torna. Refusa una variant que no hi és, i una
+    que canvia un altre valor: no canviaria res, i el registre de la passada el diria
+    canviat.
     """
     found = {
         name: value
@@ -144,6 +141,8 @@ def chosen(smoke, read):
     }
     if not smoke:
         return found
+    if smoke not in globals():
+        raise Refusal(f"no existeix {smoke}")
     unread = [name for name in globals()[smoke] if name not in read]
     if unread:
         changed = (

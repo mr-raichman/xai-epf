@@ -77,9 +77,7 @@ def _otherwise(where, smoke, fingerprints):
         return f"es va començar amb {' i '.join(then)}"
     variants = sorted(map(str, begun - {smoke}))
     if variants:
-        flags = {name: flag for flag, name in parameters.variants().items()}
-        flag = flags.get(variants[0], variants[0])
-        return f'es va començar amb "{flag}"'
+        return f'es va començar amb "{parameters.flag(variants[0])}"'
     return None
 
 

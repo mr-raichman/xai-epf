@@ -10,7 +10,8 @@ from epf.run import run
 
 def test_a_run_s_values_hold_no_smoke_variant():
     """Una variant d'assaig arribava al registre de cada passada, també de mesura."""
-    for smoke in (False, *parameters.variants().values()):
+    variants = [name for name in vars(parameters) if name.startswith("SMOKE")]
+    for smoke in (False, *variants):
         assert not [
             name
             for name in parameters.chosen(smoke, run.READ)

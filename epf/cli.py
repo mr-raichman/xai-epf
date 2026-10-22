@@ -5,6 +5,7 @@ import collections
 import importlib
 import importlib.metadata
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -30,24 +31,43 @@ NOTIFY = "EPF_NOTIFY"
 
 # Els arguments es declaren aquí, i no al mòdul de cada subcomanda: `argparse`
 # construeix totes les subcomandes abans de llegir-ne cap, i els importaria tots.
-def start_arguments(parser):
-    """Declara a `parser` una opció per variant d'assaig i les respostes d'una passada.
+# Una opció d'assaig amb número, `--smoke2`, que tria la variant `SMOKE_2`: argparse no
+# en declara cap pel seu patró, i `_parsed` la llegeix abans.
+NUMBERED_SMOKE = re.compile(r"--smoke(\d+)")
 
-    Les variants desen a `smoke` el nom de la seva, i se'n pot donar una o cap. Les
-    respostes, `--replace` i `--continue`, desen a `answer` el nom de la seva, i se'n
-    pot donar una o cap. Torna `parser`.
+
+def _parsed(parser, words):
+    """Torna els arguments de `words` per `parser`, amb la variant d'una `--smokeN`.
+
+    Una `--smokeN` hi entra com `--smoke`, i desa a `smoke` la variant `SMOKE_N`. No
+    se'n pot donar més d'una, ni amb `--smoke`.
     """
-    smoke = parser.add_mutually_exclusive_group()
-    for flag, name in parameters.variants().items():
-        smoke.add_argument(
-            flag,
-            dest="smoke",
-            action="store_const",
-            const=name,
-            default=False,
-            help=f"un assaig: els valors de {name} de parameters.py en lloc dels de la "
-            "mesura",
-        )
+    numbered = [NUMBERED_SMOKE.fullmatch(word) for word in words]
+    numbers = [found.group(1) for found in numbered if found]
+    if len(numbers) + words.count("--smoke") > 1:
+        parser.error("només es pot donar una opció d'assaig")
+    arguments = parser.parse_args(
+        ["--smoke" if found else word for found, word in zip(numbered, words)]
+    )
+    if numbers:
+        arguments.smoke = f"SMOKE_{numbers[0]}"
+    return arguments
+
+
+def start_arguments(parser):
+    """Declara a `parser` l'opció d'assaig i les respostes d'una passada, i el torna.
+
+    `--smoke` desa a `smoke` la variant `SMOKE`, i una `--smokeN`, la `SMOKE_N`
+    (`_parsed`). Les respostes, `--replace` i `--continue`, desen a `answer` el nom de
+    la seva, i se'n pot donar una o cap.
+    """
+    parser.add_argument(
+        "--smoke",
+        action="store_const",
+        const="SMOKE",
+        default=False,
+        help="els valors de SMOKE de parameters.py en lloc dels de la mesura",
+    )
     answer = parser.add_mutually_exclusive_group()
     answer.add_argument(
         "--replace",
@@ -55,7 +75,7 @@ def start_arguments(parser):
         action="store_const",
         const="replace",
         default=None,
-        help="sense preguntar, substitueix el que hi ha en disc",
+        help="substitueix el que hi ha en disc",
     )
     answer.add_argument(
         "--continue",
@@ -63,7 +83,7 @@ def start_arguments(parser):
         action="store_const",
         const="continue",
         default=None,
-        help="sense preguntar, continua la passada en disc si es pot i, si no, s'atura",
+        help="continua la passada en disc si es pot i, si no, s'atura",
     )
     return parser
 
@@ -77,7 +97,7 @@ def run_arguments(parser):
         # Repetir l'opció n'afegeix els valors en lloc de canviar-los.
         action="extend",
         metavar="NOM",
-        help="només aquestes famílies, o les famílies d'aquests models",
+        help="només aquestes famílies o models",
     )
     return parser
 
@@ -139,16 +159,15 @@ def start(arguments):
     l'entorn té `NOTIFY`, n'executa el programa en acabar cada una menys l'última, i un
     programa que no es pot executar es diu.
     """
-    flags = {variant: flag for flag, variant in parameters.variants().items()}
     for position, name in enumerate(SEQUENCE):
         command = COMMANDS[name]
         function = getattr(importlib.import_module(command.module), command.function)
         if command.arguments is None:
             function()
         else:
-            given = [flags[arguments.smoke]] if arguments.smoke else []
+            given = [parameters.flag(arguments.smoke)] if arguments.smoke else []
             given += [f"--{arguments.answer}"] if arguments.answer else []
-            function(command.arguments(argparse.ArgumentParser()).parse_args(given))
+            function(_parsed(command.arguments(argparse.ArgumentParser()), given))
         if position < len(SEQUENCE) - 1 and NOTIFY in os.environ:
             # Res del programa no arriba al terminal, on trencaria el rellotge.
             try:
@@ -190,7 +209,7 @@ def main():
         if command.arguments is not None:
             command.arguments(subcommand)
 
-    arguments = parser.parse_args()
+    arguments = _parsed(parser, sys.argv[1:])
     command = COMMANDS[arguments.command]
     signal.signal(signal.SIGINT, _stopped)
     try:
