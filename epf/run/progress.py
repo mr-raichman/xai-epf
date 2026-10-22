@@ -57,6 +57,33 @@ def counted(failed, order):
     return f"{len(failed)} seeds han fallat, la primera {first}"
 
 
+def aligned(columns):
+    """Torna la línia de recomptes de cada família, alineada amb les altres, pel nom.
+
+    `columns` dona de cada família, en ordre, el recompte de les seves seeds i el de
+    cada tipus de `KINDS`, `(acabades, total, paraula)`, o `None` el d'un tipus que no
+    fa: `floor  2/2 seeds    2/2 fits`.
+    """
+    width = max(len(family) for family in columns)
+    # Cada columna que alguna família té, amb les xifres del seu total més llarg i les
+    # lletres de la seva paraula més llarga, que l'alineen.
+    shown = []
+    for number in range(1 + len(KINDS)):
+        present = [found[number] for found in columns.values() if found[number]]
+        if present:
+            digits = max(len(str(total)) for _, total, _ in present)
+            letters = max(len(_word(word, total)) for _, total, word in present)
+            shown.append((number, digits, letters))
+    counts = {}
+    for family, found in columns.items():
+        parts = []
+        for number, digits, letters in shown:
+            text = _tally(*found[number], digits) if found[number] else ""
+            parts.append(f"{text:<{2 * digits + 2 + letters}}")
+        counts[family] = f"{family:<{width}}  {'    '.join(parts)}".rstrip()
+    return counts
+
+
 class Block:
     """El bloc d'una passada, que escriu a stderr.
 
@@ -188,24 +215,7 @@ class Block:
         )
 
     def _lines(self):
-        width = max(len(family) for family in self.units)
-        columns = {family: self._columns(family) for family in self.units}
-        # Cada columna que alguna família té, amb les xifres del seu total més llarg i
-        # les lletres de la seva paraula més llarga, que l'alineen.
-        shown = []
-        for number in range(1 + len(KINDS)):
-            present = [found[number] for found in columns.values() if found[number]]
-            if present:
-                digits = max(len(str(total)) for _, total, _ in present)
-                letters = max(len(_word(word, total)) for _, total, word in present)
-                shown.append((number, digits, letters))
-        counts = {}
-        for family, found in columns.items():
-            parts = []
-            for number, digits, letters in shown:
-                text = _tally(*found[number], digits) if found[number] else ""
-                parts.append(f"{text:<{2 * digits + 2 + letters}}")
-            counts[family] = f"{family:<{width}}  {'    '.join(parts)}".rstrip()
+        counts = aligned({family: self._columns(family) for family in self.units})
         # Les línies no fan la mateixa amplada.
         longest = max(len(count) for count in counts.values())
         lines = [self.title, ""]

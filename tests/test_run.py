@@ -384,7 +384,7 @@ def test_a_finished_run_is_refused_and_never_continued(fake):
     assert len(fake.calls) == calls
 
 
-def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake):
+def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake, capsys):
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
@@ -395,6 +395,9 @@ def test_a_run_made_by_other_code_is_refused_before_any_study_is_opened(fake):
     with pytest.raises(Refusal, match=f"la passada {_name()} .* un altre codi;"):
         fake.main()
     assert (len(fake.calls), fake.opened) == (calls, opened)
+    shown = capsys.readouterr().err
+    assert f"La passada {_name()} es va començar amb un altre codi\n" in shown
+    assert "first   " not in shown
 
 
 def test_a_smoke_run_is_never_continued_under_another_variant(fake):
@@ -463,7 +466,10 @@ def test_the_question_is_asked_again_until_y_or_n_in_either_case(fake, capsys):
     fake.main()
     shown = capsys.readouterr().err
     assert shown.count("Substituir el que hi ha en disc? [y/n] ") == 2
-    assert f"{_name()}/: 3 famílies, 7 models ajustats, no és acabada\n" in shown
+    assert (
+        f"{_name()}/\nfirst   2/2 seeds    4/4 fits\nsecond  1/2 seeds    1/2 fits\n"
+        "third   2/2 seeds    2/2 fits\n"
+    ) in shown
     assert f"Continuant passada {_name()}\n" in shown
 
 

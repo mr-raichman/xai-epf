@@ -92,13 +92,47 @@ def _counted(count, one, many):
     return f"{count} {one if count == 1 else many}"
 
 
-def _on_disk(smoke, searched, seeds, matrices, fingerprints):
+def _progress(where, values):
+    """Torna fins on ha arribat cada família d'una passada, com el bloc de la passada.
+
+    De cada família, les seeds acabades i els ajustos que té de tots els del seu pla,
+    amb `values`, els valors de `parameters.chosen` amb què es va començar: una seed
+    sense pla en té tants com en guardarà, i una família que encara no té registre,
+    tots per fer.
+    """
+    _, kept, _ = _plans(families.EVERY, values)
+    columns = {}
+    for family in families.EVERY:
+        recorded = families.recorded(where / family) or {}
+        absent = families.missing(where / family) if recorded else {}
+        # Una família que no es cerca n'ajusta una sola, sense números.
+        planned = min(kept[family], values["TRIALS"]) if kept[family] else 1
+        done = fits = 0
+        for seed in values["SEEDS"]:
+            configured = recorded.get(seed)
+            if configured is None:
+                fits += planned
+                continue
+            fits += len(configured)
+            done += len(configured) - len(absent.get(seed, []))
+        seeds = sum(seed in recorded and seed not in absent for seed in values["SEEDS"])
+        columns[family] = [
+            (seeds, len(values["SEEDS"]), "seed"),
+            None,
+            (done, fits, "fit"),
+        ]
+    return list(progress.aligned(columns).values())
+
+
+def _on_disk(smoke, values, searched, matrices, fingerprints):
     """Torna el que una passada nova substituiria: de cada cosa, els camins i una línia.
 
     És tot el que hi ha a la carpeta de les passades del tipus, i cada study que la
-    passada obriria, de les famílies de `searched` a les seeds de `seeds`, que es va fer
-    d'una altra manera, amb el seu registre. Llegeix els studies que hi són i no en crea
-    cap. `matrices` i `fingerprints` són les de la passada.
+    passada obriria, de les famílies de `searched` a les seeds de `values`, els valors
+    de `parameters.chosen`, que es va fer d'una altra manera, amb el seu registre. Una
+    passada que es podria continuar diu fins on ha arribat cada família, i una que no,
+    per què. Llegeix els studies que hi són i no en crea cap. `matrices` i
+    `fingerprints` són les de la passada.
     """
     found = []
     named = paths.named_runs(smoke)
@@ -112,27 +146,16 @@ def _on_disk(smoke, searched, seeds, matrices, fingerprints):
                 count = _counted(files, "fitxer", "fitxers") + ", "
             found.append(([path], f"{shown}: {count}no és cap passada"))
             continue
-        recorded = len(list(path.glob(f"*/{paths.FAMILY_RECORD}")))
-        models = len(list(path.glob(f"*/{paths.MODEL.format(seed='*', rank='*')}")))
         otherwise = _otherwise(path, smoke, fingerprints)
-        if families.finished(path):
-            state = "és acabada"
-        elif otherwise is not None:
-            state = otherwise[0]
+        if otherwise is not None:
+            found.append(([path], f"La passada {path.name} {otherwise[0]}"))
         else:
-            state = "no és acabada"
-        found.append(
-            (
-                [path],
-                f"{shown}: {_counted(recorded, 'família', 'famílies')}, "
-                f"{_counted(models, 'model ajustat', 'models ajustats')}, {state}",
-            )
-        )
+            found.append(([path], "\n".join([shown, *_progress(path, values)])))
     for family in searched:
         module = search.searcher(family)
         X, _ = getattr(matrices, module.MATRIX)
         folder = searches.folder(smoke, family)
-        for seed in seeds:
+        for seed in values["SEEDS"]:
             store = folder / searches.STUDY.format(seed=seed)
             study = searches.stored(store, family, seed)
             if study is None:
@@ -175,7 +198,7 @@ def _replaced(found, smoke):
             path.unlink()
 
 
-def _where(smoke, searched, seeds, matrices, fingerprints):
+def _where(smoke, values, searched, matrices, fingerprints):
     """Torna on es fa la passada: una de nova d'aquest minut, o la del tipus continuada.
 
     Sense res a la carpeta de les passades del tipus ni cap study fet d'una altra
@@ -184,7 +207,7 @@ def _where(smoke, searched, seeds, matrices, fingerprints):
     del tipus si no és acabada i es pot continuar, i si no, refusa. Refusa també sense
     terminal o sense resposta, i llavors no esborra res.
     """
-    found = _on_disk(smoke, searched, seeds, matrices, fingerprints)
+    found = _on_disk(smoke, values, searched, matrices, fingerprints)
     if found:
         for _, line in found:
             print(line, file=sys.stderr)
@@ -478,7 +501,7 @@ def main(arguments):
     validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
     fingerprints = record.fingerprints()
     searched = _plans(chosen, values)[2]
-    where = _where(arguments.smoke, searched, values["SEEDS"], matrices, fingerprints)
+    where = _where(arguments.smoke, values, searched, matrices, fingerprints)
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
         run.tasks(),
