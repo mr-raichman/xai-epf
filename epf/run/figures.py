@@ -54,31 +54,37 @@ def _performance(where, described, colours):
 
 
 def draw(where):
-    """Dibuixa totes les figures d'una passada, `where`, del que hi ha desat."""
+    """Dibuixa les figures de les famílies completes d'una passada, `where`.
+
+    Una família és completa quan cada seed del seu pla té els seus fitxers, i les
+    figures de totes juntes i el test de Ljung-Box són de les completes; `scores.csv`,
+    de cada model ajustat que hi ha. Refusa una passada sense cap família completa.
+    """
     colours = figure.family_colours(families.MODELS)
     described = {}
     folders = [path for path in where.iterdir() if path.is_dir()]
     # En l'ordre de les famílies; una carpeta d'una família que no hi és fa fallar el
     # dibuix, en lloc de quedar-se sense figures sense dir-ho.
     for folder in sorted(folders, key=lambda path: families.EVERY.index(path.name)):
-        models = figure.saved(folder)
-        if not models:
+        if not families.complete(folder):
             continue
+        models = figure.saved(folder)
         described[folder.name] = models
         module = families.MODULES[folder.name]["figures"]
         if module is not None:
             importlib.import_module(module).draw(folder, models, colours[folder.name])
-    if described:
-        _performance(where, described, colours)
-        ljung_box.report(where, described, colours)
-        tables.scores(where)
+    if not described:
+        raise Refusal(f"la passada {where.name} no té cap família completa")
+    _performance(where, described, colours)
+    ljung_box.report(where, described, colours)
+    tables.scores(where)
 
 
 def main(arguments):
     """Dibuixa de nou les figures de la passada del seu tipus, la comanda `epf figures`.
 
-    De mesura, o d'assaig amb `--smoke`. Refusa que no n'hi hagi cap, o que no sigui
-    acabada.
+    De mesura, o d'assaig amb `--smoke`, i de les seves famílies completes. Refusa que
+    no n'hi hagi cap.
     """
     found = paths.named_runs(arguments.smoke)
     if not found:
@@ -86,7 +92,5 @@ def main(arguments):
         runs = paths.relative(paths.runs(arguments.smoke))
         raise Refusal(f"no hi ha cap passada {kind} a {runs}/")
     where = found[-1]
-    if not families.finished(where):
-        raise Refusal(f"la passada {where.name} no és acabada")
     print(f"Passada {where.name}\n", file=sys.stderr)
     draw(where)
