@@ -77,24 +77,21 @@ class Search:
             if self.done[family, seed] >= trials:
                 self._saved(family, seed)
 
-    def next(self, stopped):
-        """Torna la tasca del trial següent, o `None` si no en queda cap per demanar.
+    def ask(self, family, seed):
+        """Torna la tasca del trial següent d'una família en una seed, o `None`.
 
-        Les famílies van en l'ordre de `searched` i, dins de cada una, les seeds. Salta
-        les seeds que `stopped(família, seed)` diu fallades i les que ja tenen demanats
-        tots els seus trials.
+        `None` si la seed ja té demanats tots els seus trials.
         """
-        for (family, seed), study in self.studies.items():
-            asked = self.done[family, seed] + sum(
-                label[:2] == (family, seed) for label in self.pending
-            )
-            if stopped(family, seed) or asked >= self.trials:
-                continue
-            optuna_trial, drawn = searches.asked(study, searcher(family), family)
-            label = (family, seed, "trial", optuna_trial.number)
-            self.pending[label] = optuna_trial
-            return label, _trial, (family, seed, drawn, self.fingerprints)
-        return None
+        asked = self.done[family, seed] + sum(
+            label[:2] == (family, seed) for label in self.pending
+        )
+        if asked >= self.trials:
+            return None
+        study = self.studies[family, seed]
+        optuna_trial, drawn = searches.asked(study, searcher(family), family)
+        label = (family, seed, "trial", optuna_trial.number)
+        self.pending[label] = optuna_trial
+        return label, _trial, (family, seed, drawn, self.fingerprints)
 
     def in_flight(self):
         """Diu si algun trial demanat encara no ha tornat."""

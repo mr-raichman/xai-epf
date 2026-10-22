@@ -221,15 +221,16 @@ def test_each_seed_fits_the_best_of_its_own_search(fake):
     assert _ranked(0)[:2] != _ranked(1)[:2]
 
 
-def test_a_seeds_fits_come_as_soon_as_its_search_has_every_trial(fake):
+def test_the_units_go_family_by_family_a_seeds_fits_right_after_its_search(fake):
     """Amb dues comandes, cap ajust no començava abans que s'acabés tota la cerca."""
     fake.main()
     assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == (
-        [("fit", "third", 0), ("fit", "third", 1)]
-        + [("trial", "first", 0)] * 4
-        + [("fit", "first", 0), ("fit", "first", 0), ("fit", "second", 0)]
+        [("trial", "first", 0)] * 4
+        + [("fit", "first", 0)] * 2
         + [("trial", "first", 1)] * 4
-        + [("fit", "first", 1), ("fit", "first", 1), ("fit", "second", 1)]
+        + [("fit", "first", 1)] * 2
+        + [("fit", "second", 0), ("fit", "second", 1)]
+        + [("fit", "third", 0), ("fit", "third", 1)]
     )
 
 

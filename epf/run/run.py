@@ -307,8 +307,8 @@ def _timed(folder, seed, rank, seconds):
 class Run:
     """Una passada: els plans de les famílies triades, la seva cerca i la cua d'ajustos.
 
-    Dona al pool els ajustos planificats abans que cap trial, i el pla d'una seed d'una
-    família que es cerca quan la seva cerca té tots els trials.
+    Dona al pool les tasques família per família, i el pla d'una seed d'una família que
+    es cerca quan la seva cerca té tots els trials.
     """
 
     def __init__(self, where, smoke, values, chosen, fingerprints, matrices):
@@ -429,32 +429,47 @@ class Run:
     def tasks(self):
         """Dona les tasques de la passada, un generador que el pool llegeix.
 
-        Primer els ajustos, després els trials, i `None` mentre els trials que falten
-        esperen els que encara no han tornat.
+        Cada una és la primera a punt de la primera família, en l'ordre de les
+        famílies, que en té alguna: de les seves seeds en ordre, els trials d'una seed i
+        després els seus ajustos. Una família que només en té de pendents se salta, i
+        `None` vol dir que cap no en té cap a punt mentre els trials que falten esperen
+        els que encara no han tornat.
         """
         while True:
-            while self.queue and self.block.stopped(*self.queue[0][:2]):
-                self.queue.pop(0)
-            if self.queue:
-                family, seed, configuration = self.queue.pop(0)
-                yield (
-                    (family, seed, "fit", configuration["rank"]),
-                    _train,
-                    (
-                        families.MODULES[family]["train"],
-                        family,
-                        self.where / family,
-                        seed,
-                        configuration,
-                        self.values["EXPLAINED_DAYS"],
-                        self.fingerprints,
-                    ),
-                )
-                continue
-            task = self.searching.next(self.block.stopped)
+            task = self._next()
             if task is None and not self.searching.in_flight():
                 return
             yield task
+
+    def _next(self):
+        """Torna la tasca següent de `tasks`, o `None` si cap no és a punt."""
+        for family in families.EVERY:
+            if family not in self.chosen and family not in self.searched:
+                continue
+            for seed in self.values["SEEDS"]:
+                if self.block.stopped(family, seed):
+                    continue
+                if family in self.searched:
+                    task = self.searching.ask(family, seed)
+                    if task is not None:
+                        return task
+                for position, (other, number, configuration) in enumerate(self.queue):
+                    if (other, number) == (family, seed):
+                        del self.queue[position]
+                        return (
+                            (family, seed, "fit", configuration["rank"]),
+                            _train,
+                            (
+                                families.MODULES[family]["train"],
+                                family,
+                                self.where / family,
+                                seed,
+                                configuration,
+                                self.values["EXPLAINED_DAYS"],
+                                self.fingerprints,
+                            ),
+                        )
+        return None
 
     def returned(self, label, result):
         """Desa el que torna una tasca: d'un ajust, els segons; d'un trial, el resultat.
@@ -472,7 +487,6 @@ class Run:
         if why is not None:
             self.block.stop(family, seed, why)
             return
-        # Els ajustos de la seed es fan abans que cap trial.
         for other in self.chosen:
             if (
                 self.kept[other]
