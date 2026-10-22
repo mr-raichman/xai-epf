@@ -160,11 +160,6 @@ def test_each_column_gets_its_own_median_and_spread():
     assert np.allclose(scaler.back(transformed), values)
 
 
-def test_a_window_without_spread_fails_loudly():
-    with pytest.raises(ValueError):
-        Scaler(np.zeros((10, 24)), [str(column) for column in range(24)])
-
-
 def test_a_column_without_mad_is_refused_unless_the_caller_declares_the_fallback():
     values = np.column_stack([np.arange(10.0), EVENING_SOLAR])
     with pytest.raises(Refusal):

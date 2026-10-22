@@ -7,8 +7,8 @@ from epf.models.lightgbm import search, train
 from epf.models.lightgbm.train import fit_rows, predict_rows
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, seeded
 
-# La forma de la finestra on dos ajustos van donar arbres diferents, 1085 dies de 24
-# hores i 98 columnes: una matriu petita no ho destapa mai.
+# Les files i les columnes de la matriu on dos ajustos van donar arbres diferents, 1085
+# dies de 24 hores i 98 columnes: una matriu petita no ho destapa mai.
 ROWS, COLUMNS, TREES = 1085 * 24, 98, 200
 
 # El punt amb què ho van fer: la taxa, inventada, i la resta, els valors per defecte de
