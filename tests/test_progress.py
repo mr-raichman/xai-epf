@@ -15,7 +15,7 @@ def test_the_block_aligns_its_families_trials_and_fits():
     trials = [50, 50, 50, 50, 12, 0, 0, 0, 0, 0]
     fits = [1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
     block = progress.Block(
-        "Passada 2026-11-02_01",
+        "Passada 2026-11-02_14-30",
         {
             "ddnn_jsu": {
                 seed: {"trial": (50, trials[seed]), "fit": (1, fits[seed])}

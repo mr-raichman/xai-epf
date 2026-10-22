@@ -15,8 +15,10 @@ def test_without_a_terminal_the_time_comes_once_after_a_blank_line(capsys):
         pass
     assert _shown(capsys) == "Temps transcorregut: h:mm:ss\n\n"
     with terminal.Clock():
-        print("Passada 2026-10-18_01\n", file=sys.stderr)
-    assert _shown(capsys) == "Passada 2026-10-18_01\n\nTemps transcorregut: h:mm:ss\n\n"
+        print("Passada 2026-10-18_14-30\n", file=sys.stderr)
+    assert (
+        _shown(capsys) == "Passada 2026-10-18_14-30\n\nTemps transcorregut: h:mm:ss\n\n"
+    )
     with terminal.Clock():
         print("lightgbm: 1/2 seeds    10/20 trials", file=sys.stderr)
     assert (
