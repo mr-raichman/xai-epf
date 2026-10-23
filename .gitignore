@@ -1,5 +1,17 @@
-api-keys
+# Secrets
+/api-keys
+
+# Environment
 .venv/
+
+# Python
 __pycache__/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.import_linter_cache/
+
+# Generated outputs
 /output/
 /assaig_output/
