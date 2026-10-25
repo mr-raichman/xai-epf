@@ -22,7 +22,8 @@ Fitted = collections.namedtuple(
     defaults=(0.0, None, None),
 )
 
-# Com es diu cada empremta que no és la d'ara, la que va començar la passada.
+# Com es diu cada empremta que no és la d'ara, la que va començar la passada o la
+# seva continuació.
 DIFFERENT = {
     "code": "un altre codi",
     "dataset": "un altre dataset",
@@ -72,8 +73,9 @@ def fingerprints():
 def refuse_changed(started):
     """Refusa una tasca si el codi, el dataset o les biblioteques ja no són els d'abans.
 
-    `started` són les empremtes amb què va començar la passada. Una edició o un
-    dataset nou a mitja passada hi entraria mentre els registres diuen les d'abans.
+    `started` són les empremtes amb què va començar la passada o la seva continuació.
+    Una edició o un dataset nou a mitja passada hi entraria mentre els registres diuen
+    les d'abans.
     """
     now = fingerprints()
     then = [other for name, other in DIFFERENT.items() if now[name] != started[name]]

@@ -386,20 +386,58 @@ def test_a_finished_run_kept_with_an_n_is_never_continued(fake, capsys):
     assert "Continuar la passada" not in capsys.readouterr().err
 
 
-def test_a_run_made_by_other_code_is_never_continued_nor_a_study_opened(fake, capsys):
+def _failed_once(fake):
+    """Fa una passada a la qual només falta l'ajust de `second` a la seed 0."""
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
     fake.failing = {}
-    fake.typed("n\n")
-    fake.fingerprints["code"] = "un altre codi"
-    calls, opened = len(fake.calls), fake.opened
-    with pytest.raises(Declined):
-        fake.main()
-    assert (len(fake.calls), fake.opened) == (calls, opened)
+    fake.calls.clear()
+
+
+def test_a_run_begun_with_other_code_is_asked_and_keeps_each_fits_code(fake, capsys):
+    """Una edició, encara que fos un comentari, impedia continuar cap passada."""
+    _failed_once(fake)
+    fake.fingerprints["code"] = "editat"
+    fake.typed("n\ny\n")
+    fake.main()
+    assert [(kind, family, seed) for kind, family, seed, _ in fake.calls] == [
+        ("fit", "second", 0)
+    ]
     shown = capsys.readouterr().err
-    assert f"La passada {_name()} es va començar amb un altre codi\n" in shown
-    assert "first   " not in shown and "Continuar la passada" not in shown
+    assert (
+        f"{_name()}/, començada amb un altre codi\nfirst   2/2 seeds    4/4 fits\n"
+        "second  1/2 seeds    1/2 fits\nthird   2/2 seeds    2/2 fits\n"
+    ) in shown
+    assert f"Continuar la passada {_name()} amb un altre codi? [y/n] " in shown
+    assert _recorded("second")["codes"] == {"0": {"0": "editat"}, "1": {"0": "codi"}}
+
+
+def test_continue_answers_the_question_on_other_code_without_a_terminal(
+    fake, monkeypatch, capsys
+):
+    _failed_once(fake)
+    fake.fingerprints["code"] = "editat"
+    monkeypatch.setattr(terminal, "interactive", lambda: False)
+    fake.main(answer="continue")
+    assert [(kind, family) for kind, family, *_ in fake.calls] == [("fit", "second")]
+    assert (
+        f"Continuar la passada {_name()} amb un altre codi? [y/n] y (--continue)\n"
+        in capsys.readouterr().err
+    )
+
+
+def test_a_run_recorded_without_each_fits_code_is_continued(fake):
+    """Cap passada d'abans que es desés el codi de cada ajust no en té cap."""
+    _failed_once(fake)
+    for family in ("first", "second", "third"):
+        path = paths.next_run(True, MINUTE) / family / paths.FAMILY_RECORD
+        found = json.loads(path.read_text(encoding="utf-8"))
+        del found["codes"]
+        paths.write_record(path, found)
+    fake.typed("n\ny\n")
+    fake.main()
+    assert _recorded("second")["codes"] == {"0": {"0": "codi"}}
 
 
 def test_a_smoke_run_is_never_continued_under_another_variant(fake, capsys):
@@ -523,16 +561,14 @@ def test_an_n_with_no_run_to_continue_stops_and_keeps_what_is_on_disk(fake):
     assert kept.exists() and not paths.named_runs(True)
 
 
-def test_an_n_to_continuing_stops_and_fits_nothing(fake):
-    fake.failing = {("second", 0, "fit"): RuntimeError}
-    with pytest.raises(Refusal, match="no és acabada"):
-        fake.main()
-    fake.failing = {}
-    calls = len(fake.calls)
+@pytest.mark.parametrize("code", ["codi", "editat"], ids=["el codi", "un altre codi"])
+def test_an_n_to_continuing_stops_and_fits_nothing(fake, code):
+    _failed_once(fake)
+    fake.fingerprints["code"] = code
     fake.typed("n\nn\n")
     with pytest.raises(Declined):
         fake.main()
-    assert len(fake.calls) == calls
+    assert not fake.calls
 
 
 def test_the_flags_answer_both_questions_without_a_terminal(fake, monkeypatch, capsys):

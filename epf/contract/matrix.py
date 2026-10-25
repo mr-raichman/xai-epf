@@ -207,7 +207,8 @@ def write(found, folder):
 
     A la diària, el del dia, de `price_h00` a `price_h23`, i a la per hora, el de
     l'hora, `price`. Una que ja hi és no es torna a escriure: una passada que es
-    continua és del mateix codi i del mateix dataset que la van començar.
+    continua és del mateix dataset que la va començar, i les seves matrius, les del codi
+    que la va començar.
     """
     (X, y), (rows, target) = found.daily, found.hourly
     for name, frame in (

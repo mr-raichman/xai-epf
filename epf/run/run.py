@@ -60,16 +60,19 @@ def _plans(chosen, values):
 def _otherwise(where, smoke, fingerprints):
     """Torna com es va començar una passada que no es pot continuar, o `None`.
 
-    No es pot continuar si la van començar un altre codi, un altre dataset o unes altres
-    biblioteques, perquè les seves famílies no es podrien comparar, ni una d'assaig
-    començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria els valors
-    de dues. Un registre sense una de les empremtes d'ara és d'un altre codi.
+    No es pot continuar si la van començar un altre dataset o unes altres biblioteques,
+    perquè les seves famílies no es podrien comparar, ni una d'assaig començada amb una
+    altra variant que la d'ara, `smoke`, que hi barrejaria els valors de dues. Un altre
+    codi no ho impedeix: si el canvi és de mètode, i no un comentari, una figura o un
+    flux ja fet, ho ha de saber qui la continua.
     """
     differ, begun = set(), set()
     for path in sorted(where.glob(f"*/{paths.FAMILY_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
         differ |= {
-            name for name, value in fingerprints.items() if made.get(name) != value
+            name
+            for name, value in fingerprints.items()
+            if name != "code" and made.get(name) != value
         }
         begun.add(made.get("smoke"))
     if differ:
@@ -79,6 +82,14 @@ def _otherwise(where, smoke, fingerprints):
     if variants:
         return f'es va començar amb "{parameters.flag(variants[0])}"'
     return None
+
+
+def _other_code(where, fingerprints):
+    """Diu si alguna família d'una passada es va començar amb un altre codi."""
+    return any(
+        json.loads(path.read_text(encoding="utf-8")).get("code") != fingerprints["code"]
+        for path in where.glob(f"*/{paths.FAMILY_RECORD}")
+    )
 
 
 def _counted(count, one, many):
@@ -124,9 +135,9 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
     És tot el que hi ha a la carpeta de les passades del tipus, i cada study que la
     passada obriria, de les famílies de `searched` a les seeds de `values`, els valors
     de `parameters.chosen`, que es va fer d'una altra manera, amb el seu registre. Una
-    passada que es podria continuar diu fins on ha arribat cada família, i una que no,
-    per què. Llegeix els studies que hi són i no en crea cap. `matrices` i
-    `fingerprints` són les de la passada.
+    passada que es podria continuar diu fins on ha arribat cada família, i si es va
+    començar amb un altre codi, i una que no, per què. Llegeix els studies que hi són i
+    no en crea cap. `matrices` i `fingerprints` són les de la passada.
     """
     found = []
     named = paths.named_runs(smoke)
@@ -143,8 +154,10 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
         otherwise = _otherwise(path, smoke, fingerprints)
         if otherwise is not None:
             found.append(([path], f"La passada {path.name} {otherwise}"))
-        else:
-            found.append(([path], "\n".join([shown, *_progress(path, values)])))
+            continue
+        if _other_code(path, fingerprints):
+            shown += ", començada amb un altre codi"
+        found.append(([path], "\n".join([shown, *_progress(path, values)])))
     for family in searched:
         module = search.searcher(family)
         X, _ = getattr(matrices, module.MATRIX)
@@ -199,7 +212,8 @@ def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
     manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb
     `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma del
     tipus es pot continuar i alguna família de `chosen`, les triades, no hi és completa,
-    pregunta si es continua. Qualsevol altre `n` atura la comanda. `answer`, `replace` o
+    pregunta si es continua, dient-ne l'altre codi si es va començar amb un altre.
+    Qualsevol altre `n` atura la comanda. `answer`, `replace` o
     `continue`, respon les preguntes sense terminal com les opcions del seu nom, i
     `None` les fa. Refusa sense terminal o sense resposta, i llavors no esborra res.
     """
@@ -219,8 +233,11 @@ def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
         _replaced(found, smoke)
         return paths.next_run(smoke, datetime.datetime.now())
     latest = _continuable(smoke, chosen, fingerprints)
-    if latest is None or not _answered(
-        f"Continuar la passada {latest.name}? [y/n] ", flag, answer == "continue"
+    if latest is None:
+        raise Declined
+    other = " amb un altre codi" if _other_code(latest, fingerprints) else ""
+    if not _answered(
+        f"Continuar la passada {latest.name}{other}? [y/n] ", flag, answer == "continue"
     ):
         raise Declined
     return latest
@@ -248,7 +265,8 @@ def _continuable(smoke, chosen, fingerprints):
     """Torna la passada més nova de la forma del tipus si es pot continuar, o `None`.
 
     No es pot continuar si no n'hi ha cap, si totes les famílies de `chosen`, les
-    triades, hi són completes, o si es va començar d'una altra manera.
+    triades, hi són completes, o si es va començar d'una altra manera, com diu
+    `_otherwise`.
     """
     named = paths.named_runs(smoke)
     if not named:
@@ -266,7 +284,7 @@ def _train(module, family, folder, seed, configuration, explained_days, fingerpr
 
     Crida el `train` del mòdul del model, `module`. Torna quants segons ha trigat, sense
     importar-lo. Refusa un codi, un dataset o unes biblioteques que no són els de
-    `fingerprints`, les empremtes de la passada.
+    `fingerprints`, les empremtes amb què es va començar o continuar la passada.
     """
     record.refuse_changed(fingerprints)
     train = importlib.import_module(module).train
@@ -291,14 +309,21 @@ def _planned(folder, seed, configurations):
     paths.write_record(path, found)
 
 
-def _timed(folder, seed, rank, seconds):
-    """Desa al registre d'una família els segons d'un ajust, al costat dels altres."""
+def _timed(folder, seed, rank, seconds, code):
+    """Desa al registre d'una família els segons d'un ajust i el codi que l'ha fet.
+
+    Cada un al costat dels dels altres ajustos, per seed i lloc; `code` és l'empremta
+    del codi.
+    """
     path = folder / paths.FAMILY_RECORD
     found = json.loads(path.read_text(encoding="utf-8"))
-    ranks = found["seconds"].setdefault(str(seed), {})
-    ranks[str(rank)] = round(seconds, 1)
-    found["seconds"][str(seed)] = _ordered(ranks)
-    found["seconds"] = _ordered(found["seconds"])
+    # El registre d'una passada començada abans que es desés el codi de cada ajust.
+    found.setdefault("codes", {})
+    for field, value in (("seconds", round(seconds, 1)), ("codes", code)):
+        ranks = found[field].setdefault(str(seed), {})
+        ranks[str(rank)] = value
+        found[field][str(seed)] = _ordered(ranks)
+        found[field] = _ordered(found[field])
     paths.write_record(path, found)
 
 
@@ -354,6 +379,7 @@ class Run:
                         },
                         "configurations": {},
                         "seconds": {},
+                        "codes": {},
                         "settings": written,
                     },
                 )
@@ -470,14 +496,15 @@ class Run:
         return None
 
     def returned(self, label, result):
-        """Desa el que torna una tasca: d'un ajust, els segons; d'un trial, el resultat.
+        """Desa el que torna una tasca, un ajust o un trial.
 
-        Quan amb el trial la cerca de la seed ja és acabada, planifica cada família
-        triada que la llegeix, i en posa els ajustos a la cua.
+        D'un ajust, els segons i el codi que l'ha fet. Quan amb el trial la cerca de la
+        seed ja és acabada, planifica cada família triada que la llegeix, i en posa els
+        ajustos a la cua.
         """
         family, seed, kind, rank = label
         if kind == "fit":
-            _timed(self.where / family, seed, rank, result)
+            _timed(self.where / family, seed, rank, result, self.fingerprints["code"])
             return
         if self.searching.returned(label, result) is None:
             return
@@ -513,11 +540,12 @@ def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
     Abans d'escriure res, pregunta si se substitueix o es continua el que hi ha en disc,
-    com diu `_where`. Cerca el que falta i, amb els mateixos processos, ajusta cada
-    configuració planificada que encara no té el seu fitxer. Una seed d'una família que
-    no es cerca rep el pla de seguida, i una d'una que es cerca, les millors
-    configuracions de la seva cerca quan la té acabada; el pla queda al registre de la
-    família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si no,
+    com diu `_where`, també una passada començada amb un altre codi. Cerca el que falta
+    i, amb els mateixos processos, ajusta cada configuració planificada que encara no té
+    el seu fitxer, i en desa al registre de la família el codi que l'ha fet. Una seed
+    d'una família que no es cerca rep el pla de seguida, i una d'una que es cerca, les
+    millors configuracions de la seva cerca quan la té acabada; el pla queda al registre
+    de la família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si no,
     n'escriu la taula de puntuacions. Refusa abans d'escriure la passada el que no pot
     fer; un study refusat deixa a la carpeta de les cerques els que s'han obert abans,
     nous i sense cap trial, que la passada següent reinicia en obrir-los. Acaba amb un

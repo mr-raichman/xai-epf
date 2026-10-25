@@ -62,9 +62,13 @@ def draw(where):
     """
     colours = figure.family_colours(families.MODELS)
     described = {}
-    folders = [path for path in where.iterdir() if path.is_dir()]
-    # En l'ordre de les famílies; una carpeta d'una família que no hi és fa fallar el
-    # dibuix, en lloc de quedar-se sense figures sense dir-ho.
+    # En l'ordre de les famílies; la carpeta d'una família que el codi ja no té, d'una
+    # passada començada amb un altre codi, queda fora.
+    folders = [
+        path
+        for path in where.iterdir()
+        if path.is_dir() and path.name in families.EVERY
+    ]
     for folder in sorted(folders, key=lambda path: families.EVERY.index(path.name)):
         if not families.complete(folder):
             continue

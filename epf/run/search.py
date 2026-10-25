@@ -19,7 +19,8 @@ def _trial(family, seed, drawn, fingerprints):
     """Ajusta els valors d'un trial d'una família en una seed, una tasca de `pool`.
 
     Torna els números i la puntuació. Refusa un codi, un dataset o unes biblioteques
-    que no són els de `fingerprints`, les empremtes de la passada.
+    que no són els de `fingerprints`, les empremtes amb què es va començar o continuar
+    la passada.
     """
     record.refuse_changed(fingerprints)
     module = searcher(family)
