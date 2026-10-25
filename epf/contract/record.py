@@ -13,13 +13,13 @@ from epf.contract.metrics import scored
 # El que surt d'ajustar una família en una seed i una configuració: la predicció i el
 # preu de les files de prova en el mateix ordre, el que es desa de l'explicació, el
 # pitjor residu de l'explicació contra la predicció que explica, amb el marge que li
-# toca, de les que prediuen una distribució les puntuacions de la distribució, i, de les
-# explicades, les sumes que es tornen a fer sobre el fitxer desat. Un banc de comparació
-# no explica res i deixa el residu a zero, que el seu fitxer també desa.
+# toca, i, de les explicades, les sumes que es tornen a fer sobre el fitxer desat. Un
+# banc de comparació no explica res i deixa el residu a zero, que el seu fitxer també
+# desa.
 Fitted = collections.namedtuple(
     "Fitted",
-    "predicted actual arrays gap tolerance scores stored",
-    defaults=(0.0, None, None, None),
+    "predicted actual arrays gap tolerance stored",
+    defaults=(0.0, None, None),
 )
 
 # Com es diu cada empremta que no és la d'ara, la que va començar la passada.
@@ -105,19 +105,18 @@ def save_model(path, parts, explained, fitted, rank):
     que torna el que explica: l'explicació ha de tornar la predicció abans d'escriure'l,
     i les sumes es tornen a fer sobre el que s'ha escrit; un que no ho fa es refusa.
     `explained` són els dies explicats, i `None` en una família que no explica res, que
-    no en desa cap ni es comprova. Les puntuacions són l'R² i el MAE, amb les de la
-    distribució que porti `fitted`. Les taules de més d'una dimensió es desen en
-    `float32`. `rank` és el lloc de la configuració.
+    no en desa cap ni es comprova. Les puntuacions són l'R² i el MAE. Les taules de més
+    d'una dimensió es desen en `float32`. `rank` és el lloc de la configuració.
     """
     if explained is not None:
         check(fitted, rank)
-    scores = scored(fitted.predicted, fitted.actual) | (fitted.scores or {})
+    scores = scored(fitted.predicted, fitted.actual)
     arrays = {f"days_{part}": _days(days) for part, days in parts._asdict().items()}
     if explained is not None:
         arrays["days_explained"] = _days(explained)
     arrays |= {
         "rank": rank,
-        # Les xarxes la donen en `float32`: un sol tipus a totes les famílies.
+        # La xarxa neuronal la dona en `float32`: un sol tipus a totes les famílies.
         "predicted": np.asarray(fitted.predicted, dtype=np.float64),
         "actual": fitted.actual,
         "gap": fitted.gap,

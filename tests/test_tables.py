@@ -18,22 +18,12 @@ def _recorded(where, family, **fields):
     paths.write_record(where / family / paths.FAMILY_RECORD, fields)
 
 
-def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_path):
+def test_the_scores_follow_the_families_order(tmp_path):
     # En un altre ordre que el de la taula.
     _saved(tmp_path, TREE, 1, 0, r2=0.75, mae=9.0)
     _saved(tmp_path, TREE, 0, 1, r2=0.125, mae=13.0)
     _saved(tmp_path, TREE, 0, 0, r2=0.25, mae=12.0)
-    _saved(
-        tmp_path,
-        "ddnn_jsu",
-        0,
-        0,
-        r2=0.5,
-        mae=10.0,
-        crps=4.0,
-        kupiec_50=23,
-        kupiec_90=20,
-    )
+    _saved(tmp_path, "dnn", 0, 0, r2=0.5, mae=10.0)
     # Mitjanes del valor absolut 1, 2 i 2: la part del comptador és 2 de 5.
     _saved(
         tmp_path,
@@ -46,15 +36,15 @@ def test_the_scores_follow_the_families_order_and_write_each_count_whole(tmp_pat
         r2=0.5,
         mae=7.0,
     )
-    for family in (TREE, "ddnn_jsu"):
+    for family in (TREE, "dnn"):
         _recorded(tmp_path, family, ljung_box_tested=True)
     _recorded(tmp_path, "date_probe", ljung_box_tested=True, counter=DAY_COUNTER)
     tables.scores(tmp_path)
     assert (tmp_path / tables.SCORES).read_text(encoding="utf-8").splitlines() == [
-        "family,seed,rank,r2,mae,crps,kupiec_50,kupiec_90,counter_share",
-        "ddnn_jsu,0,0,0.5,10.0,4.0,23,20,",
-        "lightgbm,0,0,0.25,12.0,,,,",
-        "lightgbm,0,1,0.125,13.0,,,,",
-        "lightgbm,1,0,0.75,9.0,,,,",
-        "date_probe,0,0,0.5,7.0,,,,0.4",
+        "family,seed,rank,r2,mae,counter_share",
+        "dnn,0,0,0.5,10.0,",
+        "lightgbm,0,0,0.25,12.0,",
+        "lightgbm,0,1,0.125,13.0,",
+        "lightgbm,1,0,0.75,9.0,",
+        "date_probe,0,0,0.5,7.0,0.4",
     ]

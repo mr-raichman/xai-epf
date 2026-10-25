@@ -57,7 +57,7 @@ def _fitted(X, y, parts, explained, numbers):
                 [group(column) for column in explanation.values.columns]
             ),
             "inputs": X.loc[shown, explanation.values.columns].to_numpy(),
-            "units": np.array([TRANSFORMED_UNITS]),
+            "unit": TRANSFORMED_UNITS,
             "values": explanation.values.to_numpy(),
             "base": explanation.base.to_numpy(),
             "transformed": explanation.transformed.to_numpy(),

@@ -66,7 +66,6 @@ BACKGROUND = rgb(255, 255, 255)
 # El color de cada model. Les seves famílies en prenen tons, en l'ordre en què el model
 # les fa, cada una `SHADE` més a prop del blanc que l'anterior.
 MODEL_COLOURS = {
-    "ddnn": rgb(106, 66, 140),
     "dnn": rgb(12, 115, 208),
     "elastic_net": rgb(66, 131, 95),
     "lightgbm": rgb(171, 97, 37),
@@ -231,13 +230,11 @@ def shade(model, number):
 def family_colours(models):
     """Torna el color de cada família, pel seu nom.
 
-    `models` dona les famílies de cada model, en ordre. Un model sense color, que només
-    n'agrupa d'altres, no hi entra.
+    `models` dona les famílies de cada model, en ordre.
     """
     return {
         family: shade(model, number)
         for model, families in models.items()
-        if model in MODEL_COLOURS
         for number, family in enumerate(families)
     }
 
@@ -405,9 +402,7 @@ CALENDAR_LABELS = {
 
 # Com es diu cada família a les figures.
 FAMILY_LABELS = {
-    "ddnn_jsu": "DDNN Johnson SU",
-    "ddnn_normal": "DDNN normal",
-    "dnn": "xarxa de punt",
+    "dnn": "xarxa neuronal",
     "elastic_net": "elastic net",
     "lightgbm": "arbre",
     "date_probe": "sonda de datació",
@@ -415,16 +410,6 @@ FAMILY_LABELS = {
     "naive_similar_day": "dia similar",
     "naive_previous_week": "setmana anterior",
     "naive_previous_day": "dia anterior",
-}
-
-# Com es diu cada paràmetre explicat d'una xarxa distribucional, i la contribució de les
-# famílies que n'expliquen un de sol.
-OUTPUT_LABELS = {
-    "": "contribució",
-    "location": "localització",
-    "scale": "escala",
-    "skewness": "asimetria",
-    "tail_weight": "pes de la cua",
 }
 
 # El valor p més petit que una figura escriu; un de menor s'hi escriu `p < 0,001`.
@@ -470,19 +455,15 @@ def saved(folder):
     return [np.load(path) for path in fitted_files(folder).values()]
 
 
-def outputs(model):
-    """Torna les contribucions de cada sortida explicada, `(files, columnes)`, pel nom.
+def contributions(model):
+    """Torna les contribucions d'un model ajustat, `(files, columnes)`.
 
-    La xarxa distribucional en té una per paràmetre, amb una fila per dia i hora, i
-    l'arbre i l'elastic net, una per fila.
+    Les de la xarxa neuronal, `(dies, columnes, 24)`, amb una fila per dia i hora.
     """
     values = model["values"]
     if values.ndim == 2:
-        return {"": values}
-    return {
-        str(name): values[..., number].transpose(0, 2, 1).reshape(-1, values.shape[1])
-        for number, name in enumerate(model["names"])
-    }
+        return values
+    return values.transpose(0, 2, 1).reshape(-1, values.shape[1])
 
 
 ### Importància ###
@@ -491,8 +472,7 @@ def outputs(model):
 # Columnes que mostra la importància per columna; la resta compten al seu grup.
 SHOWN = 20
 
-# L'alçada de cada panell de la importància, un per fila amb els noms de les columnes
-# drets a sota, en mm.
+# L'alçada de la importància, amb els noms de les columnes drets a sota, en mm.
 IMPORTANCE_HEIGHT = 70
 
 
@@ -518,31 +498,22 @@ def importances(values, groups):
 def importance(folder, models, colour):
     """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
-    Un panell per sortida, una fila cada un. De les columnes, les `SHOWN` que més pesen,
-    de la que més a l'esquerra; dels grups, tots en el seu ordre. La mitjana, en barres
-    de `colour`, el color de la família, i cada model ajustat, en un punt. Un model
-    ajustat sense cap contribució en una sortida, que no depèn de les entrades, no hi
-    entra, i el títol diu llavors quants models hi entren de quants.
+    De les columnes, les `SHOWN` que més pesen, de la que més a l'esquerra; dels grups,
+    tots en el seu ordre. La mitjana, en barres de `colour`, el color de la família, i
+    cada model ajustat, en un punt. Un model ajustat sense cap contribució, que no
+    depèn de les entrades, no hi entra, i el títol diu llavors quants models hi entren
+    de quants.
     """
-    explained = list(outputs(models[0]))
     groups = models[0]["groups"]
     columns = models[0]["columns"]
+    # La seva part seria zero entre zero.
+    kept = [model for model in models if np.any(contributions(model))]
+    found = [importances(contributions(model), groups) for model in kept]
     for kind in ("columns", "groups"):
-        panels, axes = plt.subplots(
-            len(explained), 1, figsize=size(len(explained) * IMPORTANCE_HEIGHT)
-        )
-        for axis, output in zip(np.atleast_1d(axes), explained, strict=True):
-            # La seva part seria zero entre zero.
-            kept = [model for model in models if np.any(outputs(model)[output])]
-            # Una família d'una sola sortida no en dona el nom, que no hi afegiria res.
-            title = OUTPUT_LABELS[output] if len(explained) > 1 else ""
-            if len(kept) < len(models):
-                counted = f"models ajustats: {len(kept)} de {len(models)}"
-                title = f"{title}, {counted}" if title else counted
-            axis.set_title(title)
-            if not kept:
-                continue
-            found = [importances(outputs(model)[output], groups) for model in kept]
+        panels, axis = plt.subplots(figsize=size(IMPORTANCE_HEIGHT))
+        if len(kept) < len(models):
+            axis.set_title(f"models ajustats: {len(kept)} de {len(models)}")
+        if found:
             if kind == "columns":
                 table = np.array([by_column for by_column, _ in found])
                 order = np.argsort(-table.mean(axis=0), kind="stable")[:SHOWN]
@@ -610,7 +581,7 @@ def pairs(model, values, name):
     found = members(model, name)
     if len(found) == 1:
         return inputs[:, found[0]], values[:, found[0]]
-    # La xarxa distribucional: a la fila del dia d i l'hora h, la columna de l'hora h.
+    # La xarxa neuronal: a la fila del dia d i l'hora h, la columna de l'hora h.
     x = inputs[:, found]
     y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[
         :, np.arange(len(found)), found
@@ -624,31 +595,25 @@ def dependence(folder, models, present, colour):
     Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
     model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
     i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
-    (2023). Una figura per sortida explicada, amb un panell per sèrie i
-    `DEPENDENCE_PER_ROW` per fila: `dependence.svg` la d'una família que n'explica una
-    de sola, i `dependence_<sortida>.svg` les de la xarxa distribucional.
+    (2023). Un panell per sèrie, `DEPENDENCE_PER_ROW` per fila, a `dependence.svg`.
     """
-    explained = list(outputs(models[0]))
-    units = dict(zip(explained, models[0]["units"], strict=True))
-    for output in explained:
-        panels, axes = panel_grid(len(present), DEPENDENCE_PER_ROW, DEPENDENCE_ASPECT)
-        for axis, name in zip(axes.flat, present, strict=False):
-            slopes = []
-            for count, model in enumerate(models):
-                x, y = pairs(model, outputs(model)[output], name)
-                slope, intercept = np.polyfit(x / PER_GW, y, 1)
-                slopes.append(slope)
-                if count == 0:
-                    axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
-                    span = np.array([x.min(), x.max()]) / PER_GW
-                    axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
-            axis.set_xlabel(unit_label(GROUP_LABELS[name], "GW"))
-            first_slope = catalan(f"{slopes[0]:.2g}")
-            mean = catalan(f"{np.mean(slopes):.2g}")
-            spread = catalan(f"{np.std(slopes):.2g}")
-            axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
-        panels.supylabel(
-            unit_label(OUTPUT_LABELS[output], units[output]), fontsize=AXIS_TEXT_SIZE
-        )
-        name = "dependence" if len(explained) == 1 else f"dependence_{output}"
-        save(panels, folder, name)
+    panels, axes = panel_grid(len(present), DEPENDENCE_PER_ROW, DEPENDENCE_ASPECT)
+    for axis, name in zip(axes.flat, present, strict=False):
+        slopes = []
+        for count, model in enumerate(models):
+            x, y = pairs(model, contributions(model), name)
+            slope, intercept = np.polyfit(x / PER_GW, y, 1)
+            slopes.append(slope)
+            if count == 0:
+                axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
+                span = np.array([x.min(), x.max()]) / PER_GW
+                axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
+        axis.set_xlabel(unit_label(GROUP_LABELS[name], "GW"))
+        first_slope = catalan(f"{slopes[0]:.2g}")
+        mean = catalan(f"{np.mean(slopes):.2g}")
+        spread = catalan(f"{np.std(slopes):.2g}")
+        axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
+    panels.supylabel(
+        unit_label("contribució", str(models[0]["unit"])), fontsize=AXIS_TEXT_SIZE
+    )
+    save(panels, folder, "dependence")

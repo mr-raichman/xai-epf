@@ -38,8 +38,8 @@ INFORMATION = {
     "hydro_sched": (SCHEDULE_LAG,),
 }
 
-# El dia de la setmana, en set dummies, com les llegeixen l'arbre i l'elastic net; les
-# xarxes en fan una sola columna, `DAY_OF_WEEK`, a `models/nn/network.py`.
+# El dia de la setmana, en set dummies, com les llegeixen l'arbre i l'elastic net; la
+# xarxa neuronal en fa una sola columna, `DAY_OF_WEEK`, a `models/dnn/network.py`.
 DAY_OF_WEEK = "day_of_week"
 DAY_OF_WEEK_COLUMNS = [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)]
 
@@ -168,9 +168,9 @@ def matrices(series):
     """Torna les dues matrius de l'information set, `INFORMATION`, i el preu real.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
-    la diària, la de les xarxes, amb les 24 hores de cada sèrie, i la per hora, la de
-    l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu del dia
-    abans hi és amb les seves 24 hores a totes dues.
+    la diària, la de la xarxa neuronal, amb les 24 hores de cada sèrie, i la per hora,
+    la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu del
+    dia abans hi és amb les seves 24 hores a totes dues.
     """
     daily = build(series, INFORMATION)
     at_the_hour = tuple(

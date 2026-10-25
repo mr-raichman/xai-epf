@@ -8,7 +8,6 @@ from epf.contract.record import Fitted, save_model
 from epf.contract.split import Split
 from epf.models.elastic_net import attribution as net
 from epf.models.lightgbm import attribution as tree
-from epf.models.nn.ddnn import attribution as network
 from epf.parameters import HOURS_PER_DAY
 
 
@@ -59,7 +58,7 @@ def test_a_file_off_only_by_float32_rounding_takes_its_name(tmp_path):
 def test_a_fit_whose_explanation_misses_its_margin_is_refused_before_any_file(
     tmp_path,
 ):
-    """Com l'ajust d'una DDNN normal que se n'allunyava 0.0011, amb marge 0.001."""
+    """Com l'ajust d'una xarxa que se n'allunyava 0.0011, amb marge 0.001."""
     values = np.zeros((2 * HOURS_PER_DAY, 3))
     with pytest.raises(
         Refusal, match="se n'allunya 0.0011, més que el marge de 0.001$"
@@ -135,19 +134,6 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
         },
         _tree(values),
         lambda found: tree.sums(found, with_interactions=True),
-    ).exists()
-    # La xarxa distribucional: contribucions per fila, columna, hora i paràmetre, i els
-    # paràmetres de tots els dies de prova.
-    values = rng.normal(0, 10, (2, 5, HOURS_PER_DAY, 2))
-    base = rng.normal(0, 10, (HOURS_PER_DAY, 2))
-    parameters = np.concatenate(
-        [base + values.sum(axis=1), np.zeros((1, HOURS_PER_DAY, 2))]
-    )
-    assert _saved(
-        tmp_path,
-        {"values": values, "base": base, "parameters": parameters},
-        np.zeros(3 * HOURS_PER_DAY),
-        network.sums,
     ).exists()
     # L'elastic net, a l'espai transformat.
     values = rng.normal(0, 1, (2 * HOURS_PER_DAY, 6))

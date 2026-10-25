@@ -1,8 +1,6 @@
-"""La cerca de les xarxes, sobre l'espai del codi de Marcjasz et al. (2023)."""
+"""La cerca de la xarxa neuronal, sobre l'espai del codi de Marcjasz et al. (2023)."""
 
-from epf.models.nn import hyperparameters, network
-from epf.models.nn.ddnn.distributions import DISTRIBUTIONS
-from epf.models.nn.dnn import train as dnn
+from epf.models.dnn import hyperparameters, network
 
 # La matriu de la cerca, la diària, com la de la passada.
 MATRIX = "daily"
@@ -11,7 +9,7 @@ MATRIX = "daily"
 GRID = None
 
 # L'espai de `Python/nn.py`, el fitxer de la cerca del codi de Marcjasz et al. (2023),
-# sense els seus selectors de blocs d'entrada, perquè cada xarxa llegeix totes les
+# sense els seus selectors de blocs d'entrada, perquè la xarxa llegeix totes les
 # columnes, ni `softmax`, a través de la qual l'explicació de DeepExplainer no torna la
 # predicció.
 LAYERS = 2
@@ -22,7 +20,7 @@ L1 = (1e-5, 10.0)
 LEARNING_RATE = (1e-5, 0.1)
 
 # Com es cerca, que el study desa i compara amb el d'ara: l'espai, i els números
-# fixos de les xarxes.
+# fixos de la xarxa.
 FIXED = hyperparameters.FIXED
 SPACE = {
     "layers": LAYERS,
@@ -45,20 +43,12 @@ def penalty(optuna_trial, name):
     return optuna_trial.suggest_float(f"{name}_l1", *L1, log=True)
 
 
-def _output(family):
-    """Torna la sortida d'una família, la seva distribució o els preus de la de punt."""
-    return dnn.POINT if family == dnn.NAME else DISTRIBUTIONS[family]
-
-
 def drawn(family, optuna_trial):
     """Torna els números d'un trial, en la forma en què els llegeix `network.build`.
 
-    A la xarxa de punt, com a l'article, la sortida no té cap L1 i no se'n cerca cap.
-    L'L1 de cada paràmetre es demana pel nom que té a la seva distribució, i en el seu
-    ordre, i no en el del codi de l'article, que posa el pes de la cua de Johnson SU
-    abans de l'asimetria.
+    Com a la xarxa de punt de Marcjasz et al. (2023), la sortida no té cap L1 i no se'n
+    cerca cap.
     """
-    names = _output(family).names
     layers = range(1, LAYERS + 1)
     # El sampler els treu tots d'un sol flux, i en un altre ordre en treuria uns altres.
     return {
@@ -78,11 +68,6 @@ def drawn(family, optuna_trial):
         "activity_l1": [
             penalty(optuna_trial, f"h{layer}_activation") for layer in layers
         ],
-        "parameter_l1": (
-            [0.0] * len(names)
-            if family == dnn.NAME
-            else [penalty(optuna_trial, name) for name in names]
-        ),
         "learning_rate": optuna_trial.suggest_float(
             "learning_rate", *LEARNING_RATE, log=True
         ),
@@ -92,12 +77,12 @@ def drawn(family, optuna_trial):
 def trial(family, drawn, train, validate, seed):
     """Ajusta els números d'un trial, `drawn`, i els puntua per la pèrdua de validació.
 
-    S'ajusta amb la sortida de la família i les files d'entrenament, `train`, amb early
-    stopping sobre tota la validació, `validate`. La pèrdua és la de Keras, amb les L1 a
-    dins, com la que puntua el codi de l'article. Torna els números i la puntuació.
+    S'ajusta amb les files d'entrenament, `train`, amb early stopping sobre tota la
+    validació, `validate`. La pèrdua és la de Keras, amb les L1 a dins, com la que
+    puntua el codi de l'article. Torna els números i la puntuació.
     """
     X_validate, y_validate = validate
-    fitted = network.fit_rows(_output(family), train, validate, drawn, seed)
+    fitted = network.fit_rows(train, validate, drawn, seed)
     return drawn, float(
         fitted.evaluate(
             network.inputs(X_validate).to_numpy(),

@@ -15,10 +15,10 @@ dependencies = [
     "lightgbm==4.7.0",
     "shap==0.52.0",
     "matplotlib==3.11.2",
-    # Les xarxes de Marcjasz et al. (2023) i la cerca dels seus hiperparàmetres.
-    # `tensorflow-cpu`, la compilació només per a CPU, perquè les xarxes s'ajusten a la
-    # CPU i aquesta no busca CUDA en arrencar; no es publica per a macOS ni per a Linux
-    # ARM, on hi va `tensorflow`.
+    # La xarxa neuronal i la cerca dels seus hiperparàmetres. `tensorflow-cpu`, la
+    # compilació només per a CPU, perquè la xarxa s'ajusta a la CPU i aquesta no busca
+    # CUDA en arrencar; no es publica per a macOS ni per a Linux ARM, on hi va
+    # `tensorflow`.
     "tensorflow-cpu==2.21.0 ; platform_machine != 'aarch64' and sys_platform != 'darwin'",
     "tensorflow==2.21.0 ; platform_machine == 'aarch64' or sys_platform == 'darwin'",
     "optuna==5.0.0",

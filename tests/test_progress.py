@@ -17,7 +17,7 @@ def test_the_block_aligns_its_families_trials_and_fits():
     block = progress.Block(
         "Passada 2026-11-02_14-30",
         {
-            "ddnn_jsu": {
+            "dnn": {
                 seed: {"trial": (50, trials[seed]), "fit": (1, fits[seed])}
                 for seed in range(10)
             },
@@ -27,10 +27,10 @@ def test_the_block_aligns_its_families_trials_and_fits():
             "naive_similar_day": {seed: {"fit": (1, 1)} for seed in range(10)},
         },
     )
-    block.start("ddnn_jsu")
-    block.start("ddnn_jsu")
+    block.start("dnn")
+    block.start("dnn")
     assert block._lines() == [
-        "ddnn_jsu            3/10 seeds    212/500 trials      3/10  fits    ··",
+        "dnn                 3/10 seeds    212/500 trials      3/10  fits    ··",
         "lightgbm           10/10 seeds    500/500 trials    100/100 fits",
         "naive_similar_day  10/10 seeds                       10/10  fits",
     ]

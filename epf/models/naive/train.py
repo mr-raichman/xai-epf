@@ -7,7 +7,6 @@ import numpy as np
 
 from epf import paths
 from epf.contract import matrix
-from epf.contract.metrics import scored_distribution
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
@@ -18,11 +17,6 @@ WEEKDAYS_FROM_YESTERDAY = (1, 2, 3, 4)
 
 WEEK_LAG = 7
 DAY_LAG = 1
-
-# Les parts de la seed d'on la predicció ingènua pren els errors per fer-se
-# probabilística: el que Marcjasz et al. (2023) diuen dins la mostra, l'entrenament i la
-# validació, on la còpia no tria res.
-IN_SAMPLE = ("training", "validation")
 
 
 def _copied(price, days, lag):
@@ -47,19 +41,6 @@ def previous_day(price, days):
     return _copied(price, days, DAY_LAG)
 
 
-def bootstrapped(copied, errors, probabilities):
-    """Torna els quantils de la còpia amb els seus errors dins la mostra.
-
-    `copied` és `(dies, hores)`, `errors` `(dies de la mostra, hores)` i el que torna
-    `(dies, hores, probabilitats)`. Marcjasz et al. (2023) sumen a la còpia els errors
-    d'un dia sencer, trets a l'atzar amb reemplaçament; aquí es prenen a cada hora els
-    quantils exactes dels seus errors, la inversa de la distribució empírica, on van a
-    parar els de les mostres com més n'hi ha.
-    """
-    spread = np.quantile(errors, probabilities, axis=0, method="inverted_cdf")
-    return copied[:, :, None] + spread.T
-
-
 # Cada predicció és una família, amb la funció que copia i els dies que copia, que és el
 # que en diu el registre.
 FORECASTS = {
@@ -75,15 +56,11 @@ FORECASTS = {
     "naive_previous_day": (previous_day, {"lag": DAY_LAG}),
 }
 
-# La que Marcjasz et al. (2023) fan probabilística, amb els errors de la mostra.
-BOOTSTRAPPED = "naive_similar_day"
-
 # Cada família, com la planifica una passada: els dies que copia, i cap cerca. No se'n
 # fa el test de Ljung-Box dels errors, perquè no ajusten res.
 FAMILIES = {
     name: {
-        "fixed": numbers
-        | ({"bootstrap_from": IN_SAMPLE} if name == BOOTSTRAPPED else {}),
+        "fixed": numbers,
         "kept": 0,
         "searched_as": name,
         "ljung_box_tested": False,
@@ -93,28 +70,11 @@ FAMILIES = {
 
 
 def _fitted(family, price, y, parts):
-    """Copia la predicció de la família als dies de prova de la matriu.
-
-    La del dia similar torna també la seva distribució puntuada, i els errors dels dies
-    de `IN_SAMPLE`, que es desen.
-    """
+    """Copia la predicció de la família als dies de prova de la matriu."""
     forecast, _ = FORECASTS[family]
     # Els dies de prova de la matriu, sobre els quals es puntuen totes les famílies.
     days = y.index[y.index.isin(parts.test)]
-    copied = forecast(price, days)
-    actual = y.loc[days]
-    if family != BOOTSTRAPPED:
-        return Fitted(copied.ravel(), actual.to_numpy().ravel(), {})
-    sample = y.index[
-        np.any([y.index.isin(getattr(parts, part)) for part in IN_SAMPLE], axis=0)
-    ]
-    errors = y.loc[sample].to_numpy() - forecast(price, sample)
-    scores = scored_distribution(
-        actual, lambda probabilities: bootstrapped(copied, errors, probabilities)
-    )
-    return Fitted(
-        copied.ravel(), actual.to_numpy().ravel(), {"errors": errors}, scores=scores
-    )
+    return Fitted(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {})
 
 
 def train(family, folder, seed, configuration, explained_days):

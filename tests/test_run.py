@@ -101,7 +101,7 @@ def fake(tmp_path, monkeypatch):
         "MODULES",
         {
             family: {
-                "models": (family,),
+                "model": family,
                 "train": "fake_trainer",
                 "search": "fake_searcher" if family == "first" else None,
                 "figures": None,

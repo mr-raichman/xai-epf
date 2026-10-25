@@ -126,7 +126,7 @@ def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
         "columns": np.array(X.columns, dtype=str),
         "groups": groups,
         "inputs": X[shown].to_numpy(),
-        "units": np.array([PRICE_UNITS]),
+        "unit": PRICE_UNITS,
         "values": values,
         "base": base,
         "trees": model.best_iteration_,

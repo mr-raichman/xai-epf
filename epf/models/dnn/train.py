@@ -1,28 +1,15 @@
-"""La passada de la xarxa de punt de Marcjasz et al. (2023).
+"""La passada de la xarxa neuronal.
 
 Es puntua i no s'explica.
 """
-
-import keras
 
 from epf import paths
 from epf.contract import matrix
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
-from epf.models.nn import network
-from epf.models.nn.hyperparameters import FIXED
+from epf.models.dnn import network
+from epf.models.dnn.hyperparameters import FIXED
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
-
-# La sortida de la xarxa de punt de l'article: els 24 preus tal com surten, i l'error
-# absolut, la pèrdua `'mae'` del seu codi. No és cap distribució, però la xarxa la
-# construeix i l'ajusta igual que les altres dues.
-POINT = network.Distribution(
-    names=("price",),
-    loss=keras.losses.mean_absolute_error,
-    flat=lambda raw: raw,
-    point=lambda parameters: parameters[..., 0],
-    quantiles=None,
-)
 
 # Nom del model i de la seva família.
 NAME = "dnn"
@@ -39,14 +26,13 @@ def _fitted(X, y, parts, seed, numbers):
     """Ajusta la xarxa d'una configuració i en prediu les setmanes de prova."""
     training, validation, test = (X.index.isin(days) for days in parts)
     fitted = network.fit_rows(
-        POINT,
         (X[training], y[training]),
         (X[validation], y[validation]),
         numbers,
         seed,
     )
     return Fitted(
-        network.predict_rows(POINT, fitted, X[test]).ravel(),
+        network.predict_rows(fitted, X[test]).ravel(),
         y[test].to_numpy().ravel(),
         {},
     )

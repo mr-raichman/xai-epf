@@ -4,67 +4,54 @@ import json
 
 from epf import Refusal, paths
 
-# Cada família, en l'ordre en què es fan, es mostren i s'escriuen a tot arreu, amb els
-# models que la tenen i els mòduls del seu model que l'ajusten, la cerquen i la
-# dibuixen, o `None` si no en té cap, que s'importen quan es fan servir. Les xarxes són
-# un model, `nn`, i cada una de les seves dues carpetes, `ddnn` i `dnn`, també.
+# Cada família, en l'ordre en què es fan, es mostren i s'escriuen a tot arreu, amb el
+# model que la té i els mòduls del model que l'ajusten, la cerquen i la dibuixen, o
+# `None` si no en té cap, que s'importen quan es fan servir.
 MODULES = {
-    "ddnn_jsu": {
-        "models": ("nn", "ddnn"),
-        "train": "epf.models.nn.ddnn.train",
-        "search": "epf.models.nn.search",
-        "figures": "epf.models.nn.ddnn.figures",
-    },
-    "ddnn_normal": {
-        "models": ("nn", "ddnn"),
-        "train": "epf.models.nn.ddnn.train",
-        "search": "epf.models.nn.search",
-        "figures": "epf.models.nn.ddnn.figures",
-    },
     "dnn": {
-        "models": ("nn", "dnn"),
-        "train": "epf.models.nn.dnn.train",
-        "search": "epf.models.nn.search",
+        "model": "dnn",
+        "train": "epf.models.dnn.train",
+        "search": "epf.models.dnn.search",
         "figures": None,
     },
     "elastic_net": {
-        "models": ("elastic_net",),
+        "model": "elastic_net",
         "train": "epf.models.elastic_net.train",
         "search": "epf.models.elastic_net.search",
         "figures": "epf.models.elastic_net.figures",
     },
     "lightgbm": {
-        "models": ("lightgbm",),
+        "model": "lightgbm",
         "train": "epf.models.lightgbm.train",
         "search": "epf.models.lightgbm.search",
         "figures": "epf.models.lightgbm.figures",
     },
     "date_probe": {
-        "models": ("lightgbm",),
+        "model": "lightgbm",
         "train": "epf.models.lightgbm.date_probe",
         "search": None,
         "figures": "epf.models.lightgbm.figures",
     },
     "floor": {
-        "models": ("floor",),
+        "model": "floor",
         "train": "epf.models.floor.train",
         "search": None,
         "figures": "epf.models.floor.figures",
     },
     "naive_similar_day": {
-        "models": ("naive",),
+        "model": "naive",
         "train": "epf.models.naive.train",
         "search": None,
         "figures": None,
     },
     "naive_previous_week": {
-        "models": ("naive",),
+        "model": "naive",
         "train": "epf.models.naive.train",
         "search": None,
         "figures": None,
     },
     "naive_previous_day": {
-        "models": ("naive",),
+        "model": "naive",
         "train": "epf.models.naive.train",
         "search": None,
         "figures": None,
@@ -75,10 +62,8 @@ EVERY = tuple(MODULES)
 
 # Les famílies de cada model, en ordre.
 MODELS = {
-    model: tuple(family for family in EVERY if model in MODULES[family]["models"])
-    for model in dict.fromkeys(
-        model for found in MODULES.values() for model in found["models"]
-    )
+    model: tuple(family for family in EVERY if MODULES[family]["model"] == model)
+    for model in dict.fromkeys(found["model"] for found in MODULES.values())
 }
 
 
