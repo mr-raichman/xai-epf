@@ -12,7 +12,7 @@ MODULES = {
         "model": "dnn",
         "train": "epf.models.dnn.train",
         "search": "epf.models.dnn.search",
-        "figures": None,
+        "figures": "epf.models.dnn.figures",
     },
     "elastic_net": {
         "model": "elastic_net",

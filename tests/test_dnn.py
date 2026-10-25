@@ -6,6 +6,7 @@ from epf.contract.matrix import DAY_OF_WEEK_COLUMNS
 from epf.contract.split import split
 from epf.models.dnn import network, search
 from epf.models.dnn import train as dnn
+from epf.models.dnn.attribution import attribute_rows
 from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, HOUR_COLUMNS
 
 # Una xarxa petita i un entrenament curt: el que es comprova és la suma, que no depèn de
@@ -40,6 +41,19 @@ def rows(count, seed=0):
     return pd.concat([X, days], axis="columns"), y
 
 
+def test_the_base_and_contributions_add_up_to_the_prediction():
+    # La base i les contribucions de DeepExplainer contra la predicció de la xarxa, a
+    # través de la normalització per lots de l'entrada.
+    X, y = rows(150)
+    fitted = network.fit_rows(
+        (X[:120], y[:120]), (X[120:], y[120:]), TUNED, 0, batch=16, epochs=5, patience=2
+    )
+    explained = attribute_rows(fitted, X[:5], background=X[:120])
+    assert explained.values.shape == (5, 7, 24)
+    rebuilt = explained.base + explained.values.sum(axis=1)
+    assert np.allclose(rebuilt, network.predict_rows(fitted, X[:5]), atol=1e-3)
+
+
 def test_a_trial_and_the_run_hand_the_networks_fit_the_same_seed(monkeypatch):
     """Amb una altra seed, la passada no ajustaria el que la cerca va puntuar."""
 
@@ -57,7 +71,7 @@ def test_a_trial_and_the_run_hand_the_networks_fit_the_same_seed(monkeypatch):
     parts = split(3, DEVELOPMENT, BLACKOUT_WEEK)
     for fit in (
         lambda: search.trial(dnn.NAME, TUNED, (X, y), (X, y), 3),
-        lambda: dnn._fitted(X, y, parts, 3, TUNED),
+        lambda: dnn._fitted(X, y, parts, parts.test, 3, TUNED),
     ):
         with pytest.raises(Stopped):
             fit()

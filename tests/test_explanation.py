@@ -6,6 +6,7 @@ from epf import Refusal
 from epf.contract.explanation import TOLERANCE
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import Split
+from epf.models.dnn import attribution as network
 from epf.models.elastic_net import attribution as net
 from epf.models.lightgbm import attribution as tree
 from epf.parameters import HOURS_PER_DAY
@@ -134,6 +135,16 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
         },
         _tree(values),
         lambda found: tree.sums(found, with_interactions=True),
+    ).exists()
+    # La xarxa neuronal: contribucions per dia, columna i hora, i la predicció de tots
+    # els dies de prova.
+    values = rng.normal(0, 10, (2, 5, HOURS_PER_DAY))
+    base = rng.normal(0, 10, HOURS_PER_DAY)
+    predicted = np.concatenate(
+        [(base + values.sum(axis=1)).ravel(), np.zeros(HOURS_PER_DAY)]
+    )
+    assert _saved(
+        tmp_path, {"values": values, "base": base}, predicted, network.sums
     ).exists()
     # L'elastic net, a l'espai transformat.
     values = rng.normal(0, 1, (2 * HOURS_PER_DAY, 6))
