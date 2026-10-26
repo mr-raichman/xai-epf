@@ -3,6 +3,7 @@
 Les dels models explicats es dibuixen dels models ajustats que la passada va desar.
 """
 
+import collections
 import math
 
 import matplotlib
@@ -63,14 +64,18 @@ DPI = 300
 TEXT_COLOUR = rgb(0, 0, 0)
 BACKGROUND = rgb(255, 255, 255)
 
+# El color dels bancs de comparació, el sòl i les còpies.
+BENCHMARK_COLOUR = rgb(106, 66, 140)
+
 # El color de cada model. Les seves famílies en prenen tons, en l'ordre en què el model
-# les fa, cada una `SHADE` més a prop del blanc que l'anterior.
+# les fa, cada una `SHADE` més a prop del blanc que l'anterior; les d'un model del color
+# d'un altre segueixen els tons de les de l'altre.
 MODEL_COLOURS = {
     "dnn": rgb(12, 115, 208),
     "elastic_net": rgb(66, 131, 95),
     "lightgbm": rgb(171, 97, 37),
-    "floor": rgb(60, 60, 60),
-    "naive": rgb(91, 91, 91),
+    "floor": BENCHMARK_COLOUR,
+    "naive": BENCHMARK_COLOUR,
 }
 SHADE = 0.32
 
@@ -232,11 +237,13 @@ def family_colours(models):
 
     `models` dona les famílies de cada model, en ordre.
     """
-    return {
-        family: shade(model, number)
-        for model, families in models.items()
-        for number, family in enumerate(families)
-    }
+    taken = collections.Counter()
+    found = {}
+    for model, families in models.items():
+        for family in families:
+            found[family] = shade(model, taken[MODEL_COLOURS[model]])
+            taken[MODEL_COLOURS[model]] += 1
+    return found
 
 
 def catalan(text):
