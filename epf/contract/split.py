@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 
 from epf import Refusal
-from epf.information import GAP
 from epf.parameters import DAYS_PER_WEEK, SHARES, seeded
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
@@ -89,7 +88,7 @@ def _days_of(days, weeks):
     ]
 
 
-def split(seed, period, deleted, shares=SHARES, gap=GAP):
+def split(seed, period, deleted, gap, shares=SHARES):
     """Torna els dies d'entrenament, de validació i de prova d'una seed.
 
     Surt de l'entrenament tot dia que tingui un dia retingut a `gap` dies o menys, a

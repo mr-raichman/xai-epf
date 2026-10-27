@@ -9,8 +9,8 @@ from lightgbm import LGBMRegressor, early_stopping
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group
-from epf.contract.record import Fitted, save_model
-from epf.contract.split import VALIDATION_PARTS, split, validation_parts
+from epf.contract.record import Fitted, priced, save_model
+from epf.contract.split import VALIDATION_PARTS, validation_parts
 from epf.models.lightgbm import attribution
 from epf.models.lightgbm.hyperparameters import (
     MIN_CHILD_WEIGHT,
@@ -147,15 +147,15 @@ def fitted(X, y, groups, parts, deleted, explained, seed, numbers, with_interact
     )
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
+    les matrius de la passada.
     """
-    built = matrix.matrices(matrix.series())
     X, y = built.hourly
     groups = np.array([group(column) for column in X.columns])
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     found = fitted(
@@ -169,5 +169,6 @@ def train(family, folder, seed, configuration, explained_days):
         configuration["numbers"],
         with_interactions=rank == 0,
     )
+    found = priced(found, built, parts.test)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, found, rank)

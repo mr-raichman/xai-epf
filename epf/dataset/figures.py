@@ -6,7 +6,7 @@ import pandas as pd
 from epf import paths
 from epf.contract import figure
 from epf.contract.figure import plt
-from epf.information import INFORMATION
+from epf import information
 from epf.parameters import HOURS_PER_DAY
 
 # L'alçada de la figura, en mm.
@@ -32,7 +32,7 @@ def draw(name, frame):
         **figure.line_style(values.size, overlapping=False),
     )
 
-    title, unit = INFORMATION[name].title, figure.GROUP_UNITS[name]
+    title, unit = information.SERIES[name].title, figure.GROUP_UNITS[name]
     axis.set_title(f"{title}, de {frame.index[0].year} a {frame.index[-1].year}")
     axis.set_ylabel(figure.unit_label("valor horari", unit))
     axis.set_xlim(instants[0], instants[-1])

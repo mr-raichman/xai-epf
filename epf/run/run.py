@@ -14,7 +14,7 @@ import time
 from epf import Declined, Refusal, information, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
-from epf.contract.split import NO_WHOLE_WEEK, WEEK, split, validation_parts
+from epf.contract.split import NO_WHOLE_WEEK, WEEK, validation_parts
 from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search, tables
 
@@ -60,19 +60,19 @@ def _plans(chosen, values):
 def _otherwise(where, smoke, fingerprints):
     """Torna com es va començar una passada que no es pot continuar, o `None`.
 
-    No es pot continuar si la van començar un altre dataset o unes altres biblioteques,
-    perquè les seves famílies no es podrien comparar, ni una d'assaig començada amb una
-    altra variant que la d'ara, `smoke`, que hi barrejaria els valors de dues. Un altre
-    codi no ho impedeix: si el canvi és de mètode, i no un comentari, una figura o un
-    flux ja fet, ho ha de saber qui la continua.
+    No es pot continuar si la van començar unes altres matrius o unes altres
+    biblioteques, perquè les seves famílies no es podrien comparar, ni una d'assaig
+    començada amb una altra variant que la d'ara, `smoke`, que hi barrejaria els valors
+    de dues. Un altre codi no ho impedeix: si el canvi és de mètode, i no un comentari,
+    una figura o un flux ja fet, ho ha de saber qui la continua.
     """
     differ, begun = set(), set()
     for path in sorted(where.glob(f"*/{paths.FAMILY_RECORD}")):
         made = json.loads(path.read_text(encoding="utf-8"))
         differ |= {
             name
-            for name, value in fingerprints.items()
-            if name != "code" and made.get(name) != value
+            for name in record.DIFFERENT
+            if name != "code" and made.get(name) != fingerprints[name]
         }
         begun.add(made.get("smoke"))
     if differ:
@@ -137,11 +137,13 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
     de `parameters.chosen`, que es va fer d'una altra manera, amb el seu registre. Una
     passada que es podria continuar diu fins on ha arribat cada família, i si es va
     començar amb un altre codi, i una que no, per què. Llegeix els studies que hi són i
-    no en crea cap. `matrices` i `fingerprints` són les de la passada.
+    no en crea cap. `matrices` i `fingerprints` són les de la passada, i les passades i
+    els studies, els del seu information set.
     """
     found = []
-    named = paths.named_runs(smoke)
-    runs = paths.runs(smoke)
+    set_name = matrices.information.name
+    named = paths.named_runs(smoke, set_name)
+    runs = paths.runs(smoke, set_name)
     for path in sorted(runs.iterdir()) if runs.exists() else []:
         shown = paths.relative(path) + ("/" if path.is_dir() else "")
         if path not in named:
@@ -161,7 +163,7 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
     for family in searched:
         module = search.searcher(family)
         X, _ = getattr(matrices, module.MATRIX)
-        folder = searches.folder(smoke, family)
+        folder = searches.folder(smoke, set_name, family)
         for seed in values["SEEDS"]:
             store = folder / searches.STUDY.format(seed=seed)
             study = searches.stored(store, family, seed)
@@ -170,10 +172,10 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
             why = searches.made_otherwise(
                 study,
                 X.columns,
-                matrices.deleted,
+                matrices,
                 seed,
                 module,
-                fingerprints["dataset"],
+                fingerprints["matrices"],
             )
             if why is None:
                 continue
@@ -189,13 +191,14 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
     return found
 
 
-def _replaced(found, smoke):
-    """Esborra cada camí de `found`, un cop vist que tots són del tipus `smoke`.
+def _replaced(found, smoke, set_name):
+    """Esborra cada camí de `found`, un cop vist que tots són del tipus i del set.
 
-    Abans d'esborrar-ne cap, falla si algun no hi és o no és a la carpeta de les
-    passades o de les cerques del tipus: no esborra mai res de fora.
+    El tipus és `smoke`, i el set, l'information set `set_name`. Abans d'esborrar-ne
+    cap, falla si algun no hi és o no és a la carpeta de les passades o de les cerques
+    del tipus i del set: no esborra mai res de fora.
     """
-    roots = (paths.runs(smoke), paths.searches(smoke))
+    roots = (paths.runs(smoke, set_name), paths.searches(smoke, set_name))
     every = [path for held, _ in found for path in held]
     for path in every:
         if not path.exists() or not any(path.is_relative_to(root) for root in roots):
@@ -211,10 +214,11 @@ def _replaced(found, smoke):
 
 
 def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
-    """Torna on es fa la passada: una de nova d'aquest minut, o la del tipus continuada.
+    """Torna on es fa la passada: una de nova d'avui, o la del tipus continuada.
 
-    Sense res a la carpeta de les passades del tipus ni cap study fet d'una altra
-    manera, és una de nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb
+    Les passades i els studies són els de l'information set de `matrices`. Sense res a
+    la carpeta de les passades del tipus ni cap study fet d'una altra manera, és una de
+    nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb
     `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma del
     tipus es pot continuar i alguna família de `chosen`, les triades, no hi és completa,
     pregunta si es continua, dient-ne l'altre codi si es va començar amb un altre.
@@ -222,9 +226,10 @@ def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
     `continue`, respon les preguntes sense terminal com les opcions del seu nom, i
     `None` les fa. Refusa sense terminal o sense resposta, i llavors no esborra res.
     """
+    set_name = matrices.information.name
     found = _on_disk(smoke, values, searched, matrices, fingerprints)
     if not found:
-        return paths.next_run(smoke, datetime.datetime.now())
+        return paths.next_run(smoke, set_name, datetime.datetime.now())
     print("\n\n".join(line for _, line in found) + "\n", file=sys.stderr)
     flag = f"--{answer}" if answer else None
     if flag is None and not terminal.interactive():
@@ -235,9 +240,9 @@ def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
         "Substituir el que hi ha en disc? [y/n] ", flag, answer == "replace"
     )
     if replaced:
-        _replaced(found, smoke)
-        return paths.next_run(smoke, datetime.datetime.now())
-    latest = _continuable(smoke, chosen, fingerprints)
+        _replaced(found, smoke, set_name)
+        return paths.next_run(smoke, set_name, datetime.datetime.now())
+    latest = _continuable(smoke, set_name, chosen, fingerprints)
     if latest is None:
         raise Declined
     other = " amb un altre codi" if _other_code(latest, fingerprints) else ""
@@ -266,14 +271,14 @@ def _answered(question, flag, given):
     return answer
 
 
-def _continuable(smoke, chosen, fingerprints):
-    """Torna la passada més nova de la forma del tipus si es pot continuar, o `None`.
+def _continuable(smoke, set_name, chosen, fingerprints):
+    """Torna l'última passada del tipus i de l'information set si es pot continuar.
 
-    No es pot continuar si no n'hi ha cap, si totes les famílies de `chosen`, les
-    triades, hi són completes, o si es va començar d'una altra manera, com diu
-    `_otherwise`.
+    Si no, `None`. No es pot continuar si no n'hi ha cap, si totes les famílies de
+    `chosen`, les triades, hi són completes, o si es va començar d'una altra manera, com
+    diu `_otherwise`.
     """
-    named = paths.named_runs(smoke)
+    named = paths.named_runs(smoke, set_name)
     if not named:
         return None
     latest = named[-1]
@@ -282,6 +287,25 @@ def _continuable(smoke, chosen, fingerprints):
     if _otherwise(latest, smoke, fingerprints):
         return None
     return latest
+
+
+def _readable(chosen, matrices):
+    """Torna les famílies de `chosen` que es poden ajustar amb unes matrius.
+
+    Una família que declara les columnes que llegeix, `reads`, no s'ajusta si a la
+    matriu per hora de `matrices` li'n falta alguna. Torna també una línia per cada una
+    que no, que ho diu.
+    """
+    columns = set(matrices.hourly[0].columns)
+    kept, said = [], []
+    for family in chosen:
+        plan = importlib.import_module(families.MODULES[family]["train"]).FAMILIES
+        missing = [one for one in plan[family].get("reads", ()) if one not in columns]
+        if missing:
+            said.append(f"{family}: no s'ajusta, sense {', '.join(missing)}")
+        else:
+            kept.append(family)
+    return kept, said
 
 
 def _said(deleted):
@@ -314,19 +338,22 @@ def _said(deleted):
     return lines
 
 
-def _train(module, family, folder, seed, configuration, explained_days, fingerprints):
+def _train(
+    module, family, folder, seed, configuration, explained_days, fingerprints, set_name
+):
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
-    Crida el `train` del mòdul del model, `module`. Torna quants segons ha trigat, sense
-    importar-lo. Refusa un codi, un dataset o unes biblioteques que no són els de
-    `fingerprints`, les empremtes amb què es va començar o continuar la passada.
+    Crida el `train` del mòdul del model, `module`, amb les matrius de l'information
+    set `set_name`. Torna quants segons ha trigat, sense importar-lo. Refusa un codi,
+    unes matrius o unes biblioteques que no són els de `fingerprints`, les empremtes amb
+    què es va començar o continuar la passada.
     """
-    record.refuse_changed(fingerprints)
+    built = record.built_for(set_name, fingerprints)
     train = importlib.import_module(module).train
     # Un procés l'importa a la seva primera tasca del model, i només en un assaig això
     # passa sovint en un ajust.
     started = time.time()
-    train(family, folder, seed, configuration, explained_days)
+    train(family, folder, seed, configuration, explained_days, built)
     return time.time() - started
 
 
@@ -379,6 +406,7 @@ class Run:
         """
         self.where, self.values, self.chosen = where, values, chosen
         self.fingerprints = fingerprints
+        self.set_name = matrices.information.name
         continued = where.exists()
         self.plans, self.kept, self.searched = _plans(chosen, values)
         self.searching = search.Search(
@@ -415,8 +443,8 @@ class Run:
                         "configurations": {},
                         "seconds": {},
                         "codes": {},
-                        "information": information.recorded(),
-                        "gap": information.GAP,
+                        "information": information.recorded(matrices.information),
+                        "gap": matrices.information.gap,
                         "deleted": matrices.deleted,
                         "settings": written,
                     },
@@ -529,6 +557,7 @@ class Run:
                                 configuration,
                                 self.values["EXPLAINED_DAYS"],
                                 self.fingerprints,
+                                self.set_name,
                             ),
                         )
         return None
@@ -579,7 +608,8 @@ def main(arguments):
 
     Abans d'escriure res, pregunta si se substitueix o es continua el que hi ha en disc,
     com diu `_where`, també una passada començada amb un altre codi, i diu els dies
-    suprimits del període. Cerca el que falta
+    suprimits del període i les famílies triades que les matrius de l'information set
+    no deixen ajustar, que en surten. Cerca el que falta
     i, amb els mateixos processos, ajusta cada configuració planificada que encara no té
     el seu fitxer, i en desa al registre de la família el codi que l'ha fet. Una seed
     d'una família que no es cerca rep el pla de seguida, i una d'una que es cerca, les
@@ -592,12 +622,17 @@ def main(arguments):
     alguna família li falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke, READ)
-    chosen = families.named(arguments.family)
-    matrices = matrix.matrices(matrix.series())
+    information_set = information.resolved(arguments.set_name)
+    matrices = matrix.matrices(matrix.series(), information_set)
+    chosen, skipped = _readable(families.named(arguments.family), matrices)
+    if not chosen:
+        raise Refusal(
+            f"cap família triada no es pot ajustar amb {information_set.name}"
+        )
     # La partició i les parts de validació, només per refusar-les abans d'escriure res.
-    split(values["SEEDS"][0], DEVELOPMENT, matrices.deleted)
+    matrix.partition(matrices, values["SEEDS"][0])
     validation_parts(values["SEEDS"][0], DEVELOPMENT, matrices.deleted)
-    fingerprints = record.fingerprints()
+    fingerprints = record.fingerprints(matrices)
     searched = _plans(chosen, values)[2]
     where = _where(
         arguments.smoke,
@@ -608,8 +643,9 @@ def main(arguments):
         fingerprints,
         arguments.answer,
     )
-    if matrices.deleted:
-        print("\n".join(_said(matrices.deleted)) + "\n", file=sys.stderr)
+    said = (_said(matrices.deleted) if matrices.deleted else []) + skipped
+    if said:
+        print("\n".join(said) + "\n", file=sys.stderr)
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
         run.tasks(),

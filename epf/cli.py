@@ -54,13 +54,27 @@ def _parsed(parser, words):
     return arguments
 
 
-def start_arguments(parser):
-    """Declara a `parser` l'opció d'assaig i les respostes d'una passada, i el torna.
+def set_argument(parser):
+    """Declara a `parser` l'information set, `--set`, que sempre s'ha de donar."""
+    parser.add_argument(
+        "--set",
+        dest="set_name",
+        required=True,
+        metavar="NOM",
+        help="l'information set d'aquest nom a information.py",
+    )
+    return parser
 
-    `--smoke` desa a `smoke` la variant `SMOKE`, i una `--smokeN`, la `SMOKE_N`
-    (`_parsed`). Les respostes, `--replace` i `--continue`, desen a `answer` el nom de
-    la seva, i se'n pot donar una o cap.
+
+def start_arguments(parser):
+    """Declara a `parser` l'information set, l'assaig i les respostes, i el torna.
+
+    `--set` desa a `set_name` el nom de l'information set. `--smoke` desa a
+    `smoke` la variant `SMOKE`, i una `--smokeN`, la `SMOKE_N` (`_parsed`). Les
+    respostes, `--replace` i `--continue`, desen a `answer` el nom de la seva, i se'n
+    pot donar una o cap.
     """
+    set_argument(parser)
     parser.add_argument(
         "--smoke",
         action="store_const",
@@ -111,7 +125,7 @@ def figures_arguments(parser):
         action="store_true",
         help="la passada d'assaig, a assaig_output/, en lloc de la de mesura",
     )
-    return parser
+    return set_argument(parser)
 
 
 COMMANDS = {
@@ -154,8 +168,8 @@ def start(arguments):
     """Fa cada subcomanda de `SEQUENCE`, la comanda `epf start`.
 
     Les fa en ordre i s'atura a la primera que es refusa. Cada una rep els seus
-    arguments per defecte, amb l'opció d'assaig i la resposta donades a `epf start` si
-    ella en pren. Si
+    arguments per defecte, amb l'information set, l'opció d'assaig i la resposta donades
+    a `epf start` si ella en pren. Si
     l'entorn té `NOTIFY`, n'executa el programa en acabar cada una menys l'última, i un
     programa que no es pot executar es diu.
     """
@@ -165,7 +179,8 @@ def start(arguments):
         if command.arguments is None:
             function()
         else:
-            given = [parameters.flag(arguments.smoke)] if arguments.smoke else []
+            given = ["--set", arguments.set_name]
+            given += [parameters.flag(arguments.smoke)] if arguments.smoke else []
             given += [f"--{arguments.answer}"] if arguments.answer else []
             function(_parsed(command.arguments(argparse.ArgumentParser()), given))
         if position < len(SEQUENCE) - 1 and NOTIFY in os.environ:

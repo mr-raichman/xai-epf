@@ -15,8 +15,7 @@ import pandas as pd
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import DATE, group
-from epf.contract.record import save_model
-from epf.contract.split import split
+from epf.contract.record import priced, save_model
 from epf.models.lightgbm import hyperparameters
 from epf.models.lightgbm.hyperparameters import DAY_COUNTER
 from epf.models.lightgbm.train import FAMILIES as TREE
@@ -34,19 +33,19 @@ FAMILIES = {
 }
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
+    les matrius de la passada.
     """
-    built = matrix.matrices(matrix.series())
     rows, y = built.hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
     groups = np.array(
         [DATE if column == DAY_COUNTER else group(column) for column in X.columns]
     )
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     found = fitted(
@@ -60,5 +59,6 @@ def train(family, folder, seed, configuration, explained_days):
         configuration["numbers"],
         with_interactions=False,
     )
+    found = priced(found, built, parts.test)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, found, rank)

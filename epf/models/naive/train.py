@@ -8,9 +8,6 @@ import numpy as np
 from epf import paths
 from epf.contract import matrix
 from epf.contract.record import Fitted, save_model
-from epf.contract.split import split
-from epf.information import PRICE
-from epf.parameters import DEVELOPMENT
 
 # Dies en què la predicció similar pren el dia anterior; la resta prenen la setmana
 # anterior. Dilluns és 0.
@@ -78,17 +75,16 @@ def _fitted(family, price, y, parts):
     return Fitted(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {})
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Copia, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` no hi fa res, perquè la família no explica res.
+    `explained_days` no hi fa res, perquè la família no explica res, i `built` són les
+    matrius de la passada.
     """
-    series = matrix.series()
     # El preu es copia de la sèrie, i no de la matriu, on la setmana anterior no és cap
     # entrada.
-    built = matrix.matrices(series)
-    price, y = series[PRICE], built.actual
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    price, y = built.price, built.actual
+    parts = matrix.partition(built, seed)
     rank = configuration["rank"]
     fitted = _fitted(family, price, y, parts)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)

@@ -5,8 +5,6 @@ import importlib
 import optuna
 
 from epf.contract import matrix, record, searches
-from epf.contract.split import split
-from epf.parameters import DEVELOPMENT
 from epf.run import families
 
 
@@ -15,18 +13,17 @@ def searcher(family):
     return importlib.import_module(families.MODULES[family]["search"])
 
 
-def _trial(family, seed, drawn, fingerprints):
+def _trial(family, seed, drawn, fingerprints, set_name):
     """Ajusta els valors d'un trial d'una família en una seed, una tasca de `pool`.
 
-    Torna els números i la puntuació. Refusa un codi, un dataset o unes biblioteques
+    Torna els números i la puntuació. Refusa un codi, unes matrius o unes biblioteques
     que no són els de `fingerprints`, les empremtes amb què es va començar o continuar
-    la passada.
+    la passada, les matrius les de l'information set `set_name`.
     """
-    record.refuse_changed(fingerprints)
+    built = record.built_for(set_name, fingerprints)
     module = searcher(family)
-    built = matrix.matrices(matrix.series())
     X, y = getattr(built, module.MATRIX)
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    parts = matrix.partition(built, seed)
     return searches.tried(module, family, drawn, X, y, parts, built.deleted, seed)
 
 
@@ -37,23 +34,25 @@ class Search:
     té tots els seus trials.
     """
 
-    def __init__(self, smoke, searched, seeds, trials, matrices, fingerprints, log):
+    def __init__(self, smoke, searched, seeds, trials, built, fingerprints, log):
         """Obre el study de cada família de `searched` a cada seed de `seeds`.
 
-        `trials` són els trials de cada seed, `matrices` i `fingerprints` les matrius i
-        les empremtes de la passada, i `log`, el fitxer dels seus processos, on va cada
-        trial que divergeix. Refusa un study fet d'una altra manera abans de desar cap
-        registre, i desa el de cada seed que ja té tots els seus trials.
+        `trials` són els trials de cada seed, `built` i `fingerprints` les matrius i les
+        empremtes de la passada, i `log`, el fitxer dels seus processos, on va cada
+        trial que divergeix. Els studies són els de l'information set de les matrius.
+        Refusa un study fet d'una altra manera abans de desar cap registre, i desa el de
+        cada seed que ja té tots els seus trials.
         """
         # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         self.smoke, self.trials, self.fingerprints = smoke, trials, fingerprints
+        self.set_name = built.information.name
         self.log = log
         self.studies = {}
         for family in searched:
             module = searcher(family)
-            X, _ = getattr(matrices, module.MATRIX)
-            folder = searches.folder(smoke, family)
+            X, _ = getattr(built, module.MATRIX)
+            folder = searches.folder(smoke, self.set_name, family)
             folder.mkdir(parents=True, exist_ok=True)
             for seed in seeds:
                 self.studies[family, seed] = searches.opened(
@@ -62,8 +61,8 @@ class Search:
                     module,
                     seed,
                     X.columns,
-                    matrices.deleted,
-                    fingerprints["dataset"],
+                    built,
+                    fingerprints["matrices"],
                 )
         # Els trials que té cada seed, i el trial demanat per cada tasca que encara no
         # ha tornat. Un trial que divergeix hi compta, com a la cerca de Marcjasz et al.
@@ -93,7 +92,7 @@ class Search:
         optuna_trial, drawn = searches.asked(study, searcher(family), family)
         label = (family, seed, "trial", optuna_trial.number)
         self.pending[label] = optuna_trial
-        return label, _trial, (family, seed, drawn, self.fingerprints)
+        return label, _trial, (family, seed, drawn, self.fingerprints, self.set_name)
 
     def in_flight(self):
         """Diu si algun trial demanat encara no ha tornat."""
@@ -152,6 +151,6 @@ class Search:
     def _saved(self, family, seed):
         """Desa el registre d'una seed que ja té tots els seus trials, i el torna."""
         found = searches.record(self.studies[family, seed], family, seed, self.smoke)
-        searches.save(found, self.smoke)
+        searches.save(found, self.smoke, self.set_name)
         self.records[family, seed] = found
         return found

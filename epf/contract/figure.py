@@ -12,7 +12,7 @@ import numpy as np
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
 from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS, HOUR
 from epf.contract.record import fitted_files
-from epf.information import INFORMATION, KINDS
+from epf.information import KINDS, SERIES
 from epf.parameters import HOUR_COLUMNS
 
 # El motor sense finestra, triat abans d'importar `pyplot`: qui importa aquest mòdul ja
@@ -358,7 +358,7 @@ def save(drawing, folder, name):
 ### Noms i unitats ###
 
 
-# L'ordre en què les sèries es mostren a les figures.
+# L'ordre en què es mostren les sèries a les figures.
 FIGURE_ORDER = (
     "price",
     "demand_fcst",
@@ -371,14 +371,14 @@ FIGURE_ORDER = (
 
 # Com es diu cada grup de columnes a les figures, en l'ordre en què es mostren.
 GROUP_LABELS = {
-    **{name: INFORMATION[name].label for name in FIGURE_ORDER},
+    **{name: SERIES[name].label for name in FIGURE_ORDER},
     CALENDAR: "calendari",
     DATE: "comptador de dies",
 }
 
 # La unitat de cada grup de columnes, la de la seva sèrie al dataset.
 GROUP_UNITS = {
-    **{name: KINDS[row.kind].unit for name, row in INFORMATION.items()},
+    **{name: KINDS[row.kind].unit for name, row in SERIES.items()},
     CALENDAR: UNITLESS,
     DATE: "dies",
 }
@@ -546,7 +546,7 @@ def importance(folder, models, colour):
 # a l'hora de la fila, un valor per fila, les previsions com a Trebbien et al. (2023) i
 # el programa igual, en MW o en MWh.
 DEPENDENCE = tuple(
-    name for name in FIGURE_ORDER if KINDS[INFORMATION[name].kind].at_the_hour
+    name for name in FIGURE_ORDER if KINDS[SERIES[name].kind].at_the_hour
 )
 
 # Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.

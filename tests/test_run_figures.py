@@ -23,15 +23,17 @@ def kinds(tmp_path, monkeypatch):
 def test_each_kind_draws_its_own_run(kinds):
     """Una passada de l'altre tipus semblaria la que es demanava."""
     for smoke in (False, True):
-        paths.next_run(smoke, MINUTE).mkdir(parents=True)
-    figures.main(types.SimpleNamespace(smoke=False))
-    figures.main(types.SimpleNamespace(smoke=True))
-    assert kinds == [paths.next_run(False, MINUTE), paths.next_run(True, MINUTE)]
+        paths.next_run(smoke, "WITH_PRICE", MINUTE).mkdir(parents=True)
+    for smoke in (False, True):
+        figures.main(types.SimpleNamespace(smoke=smoke, set_name="WITH_PRICE"))
+    assert kinds == [
+        paths.next_run(smoke, "WITH_PRICE", MINUTE) for smoke in (False, True)
+    ]
 
 
 def test_no_run_is_refused(kinds):
     with pytest.raises(Refusal, match="^no hi ha cap passada de mesura a "):
-        figures.main(types.SimpleNamespace(smoke=False))
+        figures.main(types.SimpleNamespace(smoke=False, set_name="WITH_PRICE"))
     assert not kinds
 
 

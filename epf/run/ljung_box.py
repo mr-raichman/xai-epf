@@ -12,7 +12,6 @@ from scipy import stats
 
 from epf import paths
 from epf.contract import figure
-from epf.information import GAP
 from epf.parameters import DAYS_PER_WEEK, HOUR_COLUMNS
 from epf.run import families
 
@@ -97,8 +96,11 @@ def report(where, described, colours):
         if family not in described:
             continue
         record = where / family / paths.FAMILY_RECORD
-        if json.loads(record.read_text(encoding="utf-8"))["ljung_box_tested"]:
+        made = json.loads(record.read_text(encoding="utf-8"))
+        if made["ljung_box_tested"]:
             checked.append(family)
+            # El mateix a cada família d'una passada, el del seu information set.
+            gap = made["gap"]
     if not checked:
         return
     panels, axes = figure.panel_grid(
@@ -126,7 +128,7 @@ def report(where, described, colours):
             alpha=figure.BAND_OPACITY,
             linewidth=0,
         )
-        for lag in (GAP, DAYS_PER_WEEK):
+        for lag in (gap, DAYS_PER_WEEK):
             axis.axvline(lag, **figure.REFERENCE_LINE)
         axis.axhline(0, **figure.REFERENCE_LINE)
         axis.set_xlabel(figure.unit_label("retard", "dies"))

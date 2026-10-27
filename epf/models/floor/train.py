@@ -4,12 +4,11 @@ Un polinomi cúbic de la càrrega residual prevista a l'hora. Es puntua i no s'e
 """
 
 import numpy as np
+import pandas as pd
 
 from epf import paths
 from epf.contract import matrix
 from epf.contract.record import Fitted, save_model
-from epf.contract.split import split
-from epf.parameters import DEVELOPMENT
 
 # Nom del model i de la seva família.
 NAME = "floor"
@@ -17,13 +16,17 @@ NAME = "floor"
 # Grau del polinomi, el cúbic de Trebbien et al. (2023).
 FLOOR_DEGREE = 3
 
-# La família, com la planifica una passada: el grau, i cap cerca.
+# Les columnes que llegeix de la matriu per hora, sense les quals no s'ajusta.
+READS = ("demand_fcst", "wind_fcst", "solar_fcst")
+
+# La família, com la planifica una passada: el grau, cap cerca, i el que llegeix.
 FAMILIES = {
     NAME: {
         "fixed": {"degree": FLOOR_DEGREE},
         "kept": 0,
         "searched_as": NAME,
         "ljung_box_tested": True,
+        "reads": READS,
     }
 }
 
@@ -34,7 +37,8 @@ def _fitted(X, y, parts):
     Torna també els coeficients i les files d'entrenament, que dibuixa la figura.
     """
     training, test = X.index.isin(parts.training), X.index.isin(parts.test)
-    load = (X["demand_fcst"] - X["wind_fcst"] - X["solar_fcst"]).to_numpy()
+    demand, wind, solar = READS
+    load = (X[demand] - X[wind] - X[solar]).to_numpy()
     coefficients = np.polyfit(load[training], y[training].to_numpy(), FLOOR_DEGREE)
     return Fitted(
         np.polyval(coefficients, load[test]),
@@ -47,14 +51,17 @@ def _fitted(X, y, parts):
     )
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` no hi fa res, perquè la família no explica res.
+    `explained_days` no hi fa res, perquè la família no explica res, i `built` són les
+    matrius de la passada.
     """
-    built = matrix.matrices(matrix.series())
-    X, y = built.hourly
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    X, _ = built.hourly
+    # El preu de cada fila, que el sòl prediu també on les altres famílies prediuen la
+    # distància a la referència.
+    y = pd.Series(built.actual.to_numpy().ravel(), index=X.index)
+    parts = matrix.partition(built, seed)
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)

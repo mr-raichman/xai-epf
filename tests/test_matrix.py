@@ -16,11 +16,11 @@ from epf.contract.matrix import (
     per_hour,
 )
 from epf.dataset import build as dataset
-from epf.information import INFORMATION, PRICE
+from epf.information import PRICE, SERIES, WITH_PRICE, resolved
 from epf.parameters import HOUR_COLUMNS
 
 # Només el preu, als seus retards.
-PREVIOUS_DAY = INFORMATION[PRICE].lags
+PREVIOUS_DAY = WITH_PRICE.series[PRICE]
 PRICE_ONLY = {PRICE: PREVIOUS_DAY}
 
 
@@ -36,7 +36,8 @@ def frame_of(days, start=datetime.date(2020, 1, 1)):
 def every_series(days=range(30)):
     """Torna cada sèrie de l'information set, el preu per un nombre diferent."""
     return {
-        name: frame_of(days) * (number + 1) for number, name in enumerate(INFORMATION)
+        name: frame_of(days) * (number + 1)
+        for number, name in enumerate(WITH_PRICE.series)
     }
 
 
@@ -115,7 +116,7 @@ def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
     """
     series = every_series()
     price, demand = series[PRICE], series["demand_fcst"]
-    found = matrices(series)
+    found = matrices(series, resolved("WITH_PRICE"))
     (X, _), (rows, target) = found.daily, found.hourly
     day = X.index[10]
     for hour, column in enumerate(HOUR_COLUMNS):
@@ -137,7 +138,7 @@ def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():
     """
     series = every_series()
     nuclear = series["nuclear_sched"]
-    found = matrices(series)
+    found = matrices(series, resolved("WITH_PRICE"))
     (X, _), (rows, _) = found.daily, found.hourly
     day = X.index[10]
     before = day - pd.Timedelta(days=1)
@@ -191,7 +192,10 @@ def test_a_dataset_that_is_not_the_one_written_is_refused(downloaded):
 def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
     """Una matriu desada que tornés uns altres decimals no ho diria."""
     # Valors amb tots els decimals d'un float, com els del dataset.
-    found = matrices({name: frame / 7 for name, frame in every_series().items()})
+    found = matrices(
+        {name: frame / 7 for name, frame in every_series().items()},
+        resolved("WITH_PRICE"),
+    )
     matrix.write(found, tmp_path)
     for name, (X, y), target in (
         ("daily", found.daily, [f"price_{hour}" for hour in HOUR_COLUMNS]),
@@ -217,19 +221,23 @@ def test_the_blackout_deletes_its_week_by_the_two_days_that_read_its_schedule():
     El dia abans, el llegeixen el 29 i el 30, de la setmana del 29 al 5 de maig.
     """
     period = (datetime.date(2025, 4, 22), datetime.date(2025, 5, 12))
-    information = {name: row.lags for name, row in INFORMATION.items()}
+    needed = [(PRICE, 0)] + [
+        (name, lag) for name, lags in WITH_PRICE.series.items() for lag in lags
+    ]
     series = {
         name: frame_of(range(22), start=datetime.date(2025, 4, 21)).astype(float)
-        for name in INFORMATION
+        for name in WITH_PRICE.series
     }
-    schedule = [name for name, row in INFORMATION.items() if row.kind == "schedule"]
+    schedule = [name for name in WITH_PRICE.series if SERIES[name].kind == "schedule"]
     for name in schedule:
         series[name].loc["2025-04-28", "h12":] = np.nan
         series[name].loc["2025-04-29"] = np.nan
     days = pd.date_range(*period, freq="D")
-    found = split.deleted(period, lacking(series, information, days))
+    found = split.deleted(period, lacking(series, needed, days))
     assert list(found) == list(pd.date_range("2025-04-29", "2025-05-05").date)
-    read = [matrix.column(name, lag) for name in schedule for lag in information[name]]
+    read = [
+        matrix.column(name, lag) for name in schedule for lag in WITH_PRICE.series[name]
+    ]
     assert (
         found[datetime.date(2025, 4, 29)] == found[datetime.date(2025, 4, 30)] == read
     )
@@ -251,9 +259,26 @@ def test_a_series_beginning_on_the_period_s_first_day_deletes_its_first_week_at_
     }
     days = pd.date_range(*period, freq="D")
     found = split.deleted(
-        period, lacking(series, {PRICE: (1,), "demand_fcst": (0, 1)}, days)
+        period,
+        lacking(
+            series,
+            [(PRICE, 0), (PRICE, 1), ("demand_fcst", 0), ("demand_fcst", 1)],
+            days,
+        ),
     )
     assert found == {
         datetime.date(2019, 1, 1): ["demand_fcst_lag1"],
         **{day: split.WEEK for day in pd.date_range("2019-01-02", "2019-01-07").date},
     }
+
+
+def test_the_reference_is_d_minus_1_s_price_weighed_by_d_minus_1_s_demand_forecast():
+    """Pesada per la previsió del dia mateix, o del seu preu, seria plausible."""
+    days = pd.date_range("2024-03-04", periods=2, freq="D", name="day")
+    price = pd.DataFrame(100.0, index=days, columns=HOUR_COLUMNS)
+    price.iloc[0] = 0.0
+    price.iloc[0, :2] = (10.0, 30.0)
+    weights = pd.DataFrame(1.0, index=days, columns=HOUR_COLUMNS)
+    weights.iloc[0] = 0.0
+    weights.iloc[0, :2] = (1.0, 3.0)
+    assert matrix.references(price, weights).loc[days[1]] == (10 * 1 + 30 * 3) / 4

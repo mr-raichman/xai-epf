@@ -9,12 +9,11 @@ from epf.contract.explanation import (
     TRANSFORMED_UNITS,
     group,
 )
-from epf.contract.record import Fitted, save_model
-from epf.contract.split import split
+from epf.contract.record import Fitted, priced, save_model
 from epf.models.elastic_net import attribution, regression
 from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
 from epf.models.elastic_net.scaling import NORMAL_CONSISTENCY
-from epf.parameters import DEVELOPMENT, THREADS
+from epf.parameters import THREADS
 
 # La família, com la planifica una passada: tots els números fixos que llegeixen els
 # seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
@@ -68,16 +67,18 @@ def _fitted(X, y, parts, explained, numbers):
     )
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
+    les matrius de la passada.
     """
-    built = matrix.matrices(matrix.series())
     X, y = built.hourly
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
-    fitted = _fitted(X, y, parts, explained, configuration["numbers"])
+    fitted = priced(
+        _fitted(X, y, parts, explained, configuration["numbers"]), built, parts.test
+    )
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)

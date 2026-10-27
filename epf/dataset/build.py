@@ -6,11 +6,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-from epf import Refusal, paths
+from epf import Refusal, information, paths
 from epf.dataset import esios, figures
 from epf.dataset.check import checks, outliers
 from epf.dataset.esios import Indicator
-from epf.information import INFORMATION, KINDS
+from epf.information import KINDS, REFERENCE_LAG
 from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOURS_PER_DAY
 
 # Les dues columnes que diuen de quin dia local i de quina hora és cada fila.
@@ -31,18 +31,25 @@ ANCHOR = FOLDER.format(series="wind_sched", id=ANCHOR_ID)
 BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 
 
-def span(information):
+def span(sets):
     """Torna el primer i l'últim dia que es baixen i que té el dataset.
 
-    És el període i, abans, el retard més llarg de les sèries d'`information` o, si és
-    més curt, la setmana que copia la predicció ingènua de la setmana anterior.
+    És el període i, abans, el retard més llarg dels information sets resolts, `sets`,
+    els de la referència inclosos, o, si és més curt, la setmana que copia la predicció
+    ingènua de la setmana anterior.
     """
-    longest = max(lag for series in information.values() for lag in series.lags)
-    before = datetime.timedelta(days=max(longest, DAYS_PER_WEEK))
+    lags = [
+        lag for one in sets.values() for read in one.series.values() for lag in read
+    ]
+    lags += [REFERENCE_LAG for one in sets.values() if one.reference]
+    before = datetime.timedelta(days=max([*lags, DAYS_PER_WEEK]))
     return DEVELOPMENT[0] - before, DEVELOPMENT[1]
 
 
-SPAN = span(INFORMATION)
+SPAN = span(information.every())
+
+# Cada sèrie del dataset, una columna.
+SERIES = information.in_dataset()
 
 
 def declared():
@@ -57,7 +64,7 @@ def declared():
             ANCHOR_ID, schedule.aggregation, schedule.geography, schedule.only, None
         )
     }
-    for name, row in INFORMATION.items():
+    for name, row in SERIES.items():
         kind = KINDS[row.kind]
         for number in row.ids:
             found[FOLDER.format(series=name, id=number)] = Indicator(
@@ -151,7 +158,7 @@ def series(frames):
     seus indicadors va publicar, com el de l'apagada, hi queda buit.
     """
     found = {}
-    for name, row in INFORMATION.items():
+    for name, row in SERIES.items():
         parts = [frames[FOLDER.format(series=name, id=number)] for number in row.ids]
         total = sum(parts[1:], parts[0])
         total = total.loc[pd.Timestamp(SPAN[0]) : pd.Timestamp(SPAN[1])]
@@ -163,7 +170,7 @@ def series(frames):
 
 def gaps(name):
     """Torna les hores d'una sèrie que la font no va publicar."""
-    if KINDS[INFORMATION[name].kind].anchored:
+    if KINDS[SERIES[name].kind].anchored:
         return BLACKOUT
     return pd.DatetimeIndex([])
 
@@ -208,7 +215,7 @@ def write(rows, read):
             float_precision="round_trip",
             encoding="utf-8",
         ),
-        {name: gaps(name) for name in INFORMATION},
+        {name: gaps(name) for name in SERIES},
     )
     partial.replace(paths.DATASET)
     record = {
@@ -233,5 +240,5 @@ def main():
     for name, frame in found.items():
         (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
         figures.draw(name, frame)
-        title = INFORMATION[name].title
+        title = SERIES[name].title
         outliers.draw(name, title, frame, *outliers.report(name, frame))

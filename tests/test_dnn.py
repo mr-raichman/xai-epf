@@ -68,7 +68,7 @@ def test_a_trial_and_the_run_hand_the_networks_fit_the_same_seed(monkeypatch):
 
     monkeypatch.setattr(network, "fit_rows", recorded)
     X, y = rows(10)
-    parts = split(3, DEVELOPMENT, {})
+    parts = split(3, DEVELOPMENT, {}, 1)
     for fit in (
         lambda: search.trial(dnn.NAME, TUNED, (X, y), (X, y), 3, {}),
         lambda: dnn._fitted(X, y, parts, parts.test, 3, TUNED),

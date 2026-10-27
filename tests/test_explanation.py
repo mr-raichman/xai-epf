@@ -1,10 +1,12 @@
+import types
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from epf import Refusal
 from epf.contract.explanation import TOLERANCE
-from epf.contract.record import Fitted, save_model
+from epf.contract.record import Fitted, priced, save_model
 from epf.contract.split import Split
 from epf.models.dnn import attribution as network
 from epf.models.elastic_net import attribution as net
@@ -155,3 +157,33 @@ def test_each_explained_familys_sums_read_its_own_arrays(tmp_path):
         np.zeros(3 * HOURS_PER_DAY),
         net.sums,
     ).exists()
+
+
+def test_a_file_with_a_reference_adds_up_once_the_reference_is_taken_away(tmp_path):
+    """El fitxer desa la predicció en preu, i explica la distància a la referència."""
+    values = np.random.default_rng(0).normal(0, 10, (2 * HOURS_PER_DAY, 20))
+    built = types.SimpleNamespace(
+        reference=pd.Series([60.0, 70.0, 80.0], index=TEST_DAYS),
+        actual=pd.DataFrame(
+            np.arange(3 * HOURS_PER_DAY, dtype=float).reshape(3, -1), index=TEST_DAYS
+        ),
+    )
+    none = TEST_DAYS[:0]
+    fitted = Fitted(
+        _tree(values),
+        np.zeros(3 * HOURS_PER_DAY),
+        {"values": values, "base": 50.0},
+        0.0,
+        TOLERANCE,
+        stored=lambda found: tree.sums(found, with_interactions=False),
+    )
+    with_reference = priced(fitted, built, TEST_DAYS)
+    path = tmp_path / "seed_0_0.npz"
+    save_model(path, Split(none, none, TEST_DAYS), EXPLAINED, with_reference, 0)
+    assert path.exists()
+    # La mateixa predicció en preu, sense la referència desada, no sumaria.
+    lost = with_reference._replace(arrays={"values": values, "base": 50.0})
+    with pytest.raises(Refusal, match="desada de la configuració 0 no torna"):
+        save_model(
+            tmp_path / "seed_0_1.npz", Split(none, none, TEST_DAYS), EXPLAINED, lost, 0
+        )

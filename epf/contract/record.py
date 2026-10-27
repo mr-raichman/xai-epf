@@ -6,9 +6,11 @@ import json
 
 import numpy as np
 
-from epf import Refusal, paths
+from epf import Refusal, information, paths
+from epf.contract import matrix
 from epf.contract.explanation import check, read_back
 from epf.contract.metrics import scored
+from epf.parameters import HOURS_PER_DAY
 
 # El que surt d'ajustar una família en una seed i una configuració: la predicció i el
 # preu de les files de prova en el mateix ordre, el que es desa de l'explicació, el
@@ -23,10 +25,11 @@ Fitted = collections.namedtuple(
 )
 
 # Com es diu cada empremta que no és la d'ara, la que va començar la passada o la
-# seva continuació.
+# seva continuació. La del dataset es desa i no s'hi compara: un dataset nou amb una
+# sèrie d'un altre information set no canvia les matrius d'aquest.
 DIFFERENT = {
     "code": "un altre codi",
-    "dataset": "un altre dataset",
+    "matrices": "unes altres matrius",
     "environment": "unes altres biblioteques",
 }
 
@@ -57,30 +60,43 @@ def environment(lock):
     return hashlib.sha256(lock.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
-def fingerprints():
-    """Torna les empremtes del codi, del dataset i de les biblioteques.
+def fingerprints(built):
+    """Torna les empremtes del codi, del dataset, de les matrius i de les biblioteques.
 
-    La del dataset és la que desa `output/data/dataset.json`.
+    La del dataset és la que desa `output/data/dataset.json`, i la de les matrius, la
+    de `built`, com la fa `matrix.fingerprint`.
     """
     dataset = json.loads(paths.DATASET_RECORD.read_text(encoding="utf-8"))["dataset"]
     return {
         "code": code(paths.PACKAGE),
         "dataset": dataset,
+        "matrices": matrix.fingerprint(built),
         "environment": environment(paths.LOCK),
     }
 
 
-def refuse_changed(started):
-    """Refusa una tasca si el codi, el dataset o les biblioteques ja no són els d'abans.
+def refuse_changed(started, built):
+    """Refusa una tasca si el codi, les matrius o les biblioteques no són els d'abans.
 
-    `started` són les empremtes amb què va començar la passada o la seva continuació.
-    Una edició o un dataset nou a mitja passada hi entraria mentre els registres diuen
-    les d'abans.
+    `started` són les empremtes amb què va començar la passada o la seva continuació, i
+    `built` les matrius que la tasca ha fet. Una edició o unes altres matrius a mitja
+    passada hi entrarien mentre els registres diuen les d'abans.
     """
-    now = fingerprints()
+    now = fingerprints(built)
     then = [other for name, other in DIFFERENT.items() if now[name] != started[name]]
     if then:
         raise Refusal(f"la passada es va començar amb {' i '.join(then)}")
+
+
+def built_for(set_name, started):
+    """Torna les matrius de l'information set `set_name` que fa una tasca.
+
+    Les fa del dataset, i refusa la tasca com `refuse_changed` amb les empremtes
+    `started`.
+    """
+    built = matrix.matrices(matrix.series(), information.resolved(set_name))
+    refuse_changed(started, built)
+    return built
 
 
 def _days(index):
@@ -98,6 +114,24 @@ def fitted_files(folder):
         for path in folder.glob(paths.MODEL.format(seed="*", rank="*"))
     }
     return dict(sorted(found.items()))
+
+
+def priced(fitted, built, days):
+    """Torna un model ajustat amb la predicció en preu, si les matrius tenen referència.
+
+    `days` són els dies de prova, cada un amb les seves 24 hores en ordre a la predicció
+    de `fitted`, la distància a la referència del seu dia. La predicció en preu és la
+    suma, el preu real el de les matrius, `built`, i el model ajustat desa la referència
+    de cada fila. Sense referència, torna `fitted` tal qual.
+    """
+    if built.reference is None:
+        return fitted
+    reference = np.repeat(built.reference.loc[days].to_numpy(), HOURS_PER_DAY)
+    return fitted._replace(
+        predicted=reference + np.asarray(fitted.predicted, dtype=np.float64),
+        actual=built.actual.loc[days].to_numpy().ravel(),
+        arrays=fitted.arrays | {"reference": reference},
+    )
 
 
 def save_model(path, parts, explained, fitted, rank):

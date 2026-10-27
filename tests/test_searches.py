@@ -19,13 +19,23 @@ from epf.contract.searches import (
     tried,
 )
 from epf.contract.split import split
+from epf.information import resolved
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
 DELETED = tuple(pd.date_range("2019-04-30", "2019-05-06", freq="D").date)
 
+# Les matrius d'una cerca, de les quals els studies llegeixen els dies suprimits i
+# l'information set.
+BUILT = types.SimpleNamespace(deleted=DELETED, information=resolved("WITH_PRICE"))
+
 # Les empremtes que desa cada trial.
-FINGERPRINTS = {"code": "codi", "dataset": "conjunt", "environment": "biblioteques"}
+FINGERPRINTS = {
+    "code": "codi",
+    "dataset": "conjunt",
+    "matrices": "matrius",
+    "environment": "biblioteques",
+}
 
 
 def _table():
@@ -65,7 +75,7 @@ def _searcher(grid, seen):
 def _study(store, searcher, X, y, parts, seed, trials):
     """Fa en aquest procés els trials que falten fins a `trials`, com una cerca."""
     study = opened(
-        store, "fake", searcher, seed, X.columns, DELETED, FINGERPRINTS["dataset"]
+        store, "fake", searcher, seed, X.columns, BUILT, FINGERPRINTS["matrices"]
     )
     while len(completed(study)) < trials:
         optuna_trial, drawn = asked(study, searcher, "fake")
@@ -77,7 +87,7 @@ def _study(store, searcher, X, y, parts, seed, trials):
 def test_a_trial_sees_the_training_and_validation_days_and_no_test_day():
     """Un trial que veiés la prova en triaria els números."""
     X, y = _table()
-    parts = split(0, PERIOD, DELETED)
+    parts = split(0, PERIOD, DELETED, 1)
     seen = []
     tried(
         _searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, DELETED, 0
@@ -92,7 +102,7 @@ def test_a_trial_sees_the_training_and_validation_days_and_no_test_day():
 )
 def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
     X, y = _table()
-    parts = split(0, PERIOD, DELETED)
+    parts = split(0, PERIOD, DELETED, 1)
     searcher = _searcher(grid, [])
     _study(tmp_path / "study.db", searcher, X, y, parts, 0, 3)
     study = _study(tmp_path / "study.db", searcher, X, y, parts, 0, 6)
@@ -103,7 +113,7 @@ def test_a_continued_search_does_not_repeat_its_trials(tmp_path, grid):
 def test_a_grid_with_more_trials_than_points_goes_on_and_draws_one_again(tmp_path):
     """La graella d'Optuna s'atura amb `study.stop`, que fora d'`optimize` falla."""
     X, y = _table()
-    parts = split(0, PERIOD, DELETED)
+    parts = split(0, PERIOD, DELETED, 1)
     searcher = _searcher({"value": (3, 1, 2)}, [])
     study = _study(tmp_path / "study.db", searcher, X, y, parts, 0, 5)
     values = [one.params["value"] for one in completed(study)]
@@ -113,29 +123,29 @@ def test_a_grid_with_more_trials_than_points_goes_on_and_draws_one_again(tmp_pat
 def _studied(tmp_path, monkeypatch, X, y):
     """Torna el study d'una cerca de dos trials de `fake` a la seed 0, a l'assaig."""
     monkeypatch.setattr(paths, "SMOKE_OUTPUT", tmp_path)
-    where = folder(True, "fake")
+    where = folder(True, "WITH_PRICE", "fake")
     where.mkdir(parents=True)
     return _study(
         where / "seed_0.db",
         _searcher({"value": (3, 1, 2)}, []),
         X,
         y,
-        split(0, PERIOD, DELETED),
+        split(0, PERIOD, DELETED, 1),
         0,
         2,
     )
 
 
-def _continued(searcher, columns, dataset=FINGERPRINTS["dataset"]):
+def _continued(searcher, columns, matrices=FINGERPRINTS["matrices"]):
     """Torna a obrir el study de `fake` a la seed 0 amb el que es cerca ara."""
     return opened(
-        folder(True, "fake") / "seed_0.db",
+        folder(True, "WITH_PRICE", "fake") / "seed_0.db",
         "fake",
         searcher,
         0,
         columns,
-        DELETED,
-        dataset,
+        BUILT,
+        matrices,
     )
 
 
@@ -171,12 +181,12 @@ def test_a_search_made_on_another_deal_is_not_continued(tmp_path, monkeypatch):
         _continued(_searcher({"value": (3, 1, 2)}, []), X.columns)
 
 
-def test_a_search_made_on_another_dataset_is_not_continued(tmp_path, monkeypatch):
+def test_a_search_made_on_other_matrices_is_not_continued(tmp_path, monkeypatch):
     """Uns trials puntuats sobre unes altres dades es compararien amb els d'ara."""
     X, y = _table()
     _studied(tmp_path, monkeypatch, X, y)
-    with pytest.raises(Refusal, match="amb un altre dataset"):
-        _continued(_searcher({"value": (3, 1, 2)}, []), X.columns, "un altre")
+    with pytest.raises(Refusal, match="sobre unes altres matrius"):
+        _continued(_searcher({"value": (3, 1, 2)}, []), X.columns, "unes altres")
 
 
 def test_a_search_made_on_another_space_or_fixed_numbers_is_not_continued(
@@ -195,7 +205,9 @@ def test_a_search_made_on_another_space_or_fixed_numbers_is_not_continued(
 
 
 @pytest.mark.parametrize("score", [math.nan, math.inf, -math.inf])
-def test_a_trial_without_a_finite_score_diverges_and_keeps_its_dataset(tmp_path, score):
+def test_a_trial_without_a_finite_score_diverges_and_keeps_its_matrices(
+    tmp_path, score
+):
     """Optuna acceptava un infinit, i el classificava; i un trial que divergeix compta.
 
     Comptat, un trial fet sobre unes altres dades no pot continuar el study.
@@ -204,13 +216,13 @@ def test_a_trial_without_a_finite_score_diverges_and_keeps_its_dataset(tmp_path,
     searcher = _searcher({"value": (3, 1, 2)}, [])
     store = tmp_path / "seed_0.db"
     study = opened(
-        store, "fake", searcher, 0, X.columns, DELETED, FINGERPRINTS["dataset"]
+        store, "fake", searcher, 0, X.columns, BUILT, FINGERPRINTS["matrices"]
     )
     optuna_trial, drawn = asked(study, searcher, "fake")
     assert told(study, optuna_trial, {"value": drawn}, score, FINGERPRINTS)
     assert [one.state.name for one in study.trials] == ["FAIL"]
-    with pytest.raises(Refusal, match="amb un altre dataset"):
-        opened(store, "fake", searcher, 0, X.columns, DELETED, "un altre")
+    with pytest.raises(Refusal, match="sobre unes altres matrius"):
+        opened(store, "fake", searcher, 0, X.columns, BUILT, "unes altres")
 
 
 def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(
@@ -223,7 +235,7 @@ def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(
         _searcher({"value": (4, 1, 3, 2)}, []),
         X,
         y,
-        split(0, PERIOD, DELETED),
+        split(0, PERIOD, DELETED, 1),
         0,
         4,
     )

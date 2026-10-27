@@ -5,11 +5,9 @@ import numpy as np
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group, summed
-from epf.contract.record import Fitted, save_model
-from epf.contract.split import split
+from epf.contract.record import Fitted, priced, save_model
 from epf.models.dnn import attribution, network
 from epf.models.dnn.hyperparameters import FIXED
-from epf.parameters import DEVELOPMENT
 
 # Nom del model i de la seva família.
 NAME = "dnn"
@@ -70,16 +68,20 @@ def _fitted(X, y, parts, explained, seed, numbers):
     )
 
 
-def train(family, folder, seed, configuration, explained_days):
+def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
-    `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
+    `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
+    les matrius de la passada.
     """
-    built = matrix.matrices(matrix.series())
     X, y = built.daily
-    parts = split(seed, DEVELOPMENT, built.deleted)
+    parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
-    fitted = _fitted(X, y, parts, explained, seed, configuration["numbers"])
+    fitted = priced(
+        _fitted(X, y, parts, explained, seed, configuration["numbers"]),
+        built,
+        parts.test,
+    )
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)

@@ -64,7 +64,7 @@ def test_a_trial_and_the_run_hand_the_fit_the_same_seed(monkeypatch):
     days = pd.date_range(DEVELOPMENT[0], periods=14, freq="D")
     X = pd.DataFrame({"x": np.arange(len(days), dtype=float)}, index=days)
     y = pd.Series(np.zeros(len(days)), index=days)
-    parts = split(3, DEVELOPMENT, {})
+    parts = split(3, DEVELOPMENT, {}, 1)
     with pytest.raises(Stopped):
         search.trial("lightgbm", POINT, (X, y), (X, y), 3, {})
     with pytest.raises(Stopped):

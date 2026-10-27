@@ -8,7 +8,7 @@ import sys
 
 import numpy as np
 
-from epf import Refusal, paths
+from epf import Refusal, information, paths
 from epf.contract import figure
 from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
@@ -87,13 +87,15 @@ def draw(where):
 def main(arguments):
     """Dibuixa de nou les figures de la passada del seu tipus, la comanda `epf figures`.
 
-    De mesura, o d'assaig amb `--smoke`, i de les seves famílies completes. Refusa que
-    no n'hi hagi cap.
+    De mesura, o d'assaig amb `--smoke`, de l'information set `--set`, i de les
+    seves famílies completes. Refusa un information set que no existeix i que no hi
+    hagi cap passada.
     """
-    found = paths.named_runs(arguments.smoke)
+    set_name = information.resolved(arguments.set_name).name
+    found = paths.named_runs(arguments.smoke, set_name)
     if not found:
         kind = "d'assaig" if arguments.smoke else "de mesura"
-        runs = paths.relative(paths.runs(arguments.smoke))
+        runs = paths.relative(paths.runs(arguments.smoke, set_name))
         raise Refusal(f"no hi ha cap passada {kind} a {runs}/")
     where = found[-1]
     print(f"Passada {where.name}\n", file=sys.stderr)

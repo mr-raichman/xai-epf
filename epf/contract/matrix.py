@@ -6,6 +6,7 @@ encara que es publiqui més tard.
 """
 
 import collections
+import hashlib
 import json
 
 import numpy as np
@@ -13,7 +14,7 @@ import pandas as pd
 
 from epf import Refusal, paths
 from epf.contract import split
-from epf.information import INFORMATION, KINDS, PRICE
+from epf.information import KINDS, PRICE, REFERENCE_LAG, SERIES, column
 from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOUR_COLUMNS, HOURS_PER_DAY
 
 DAY = "day"
@@ -24,16 +25,16 @@ HOUR = "hour"
 DAY_OF_WEEK = "day_of_week"
 DAY_OF_WEEK_COLUMNS = [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)]
 
-# Les dues matrius d'un information set, el preu real amb què es comparen i els dies del
-# període que no es reparteixen. `daily` i `hourly` són les parelles `(X, y)` que una
-# família pren; `actual` és el `y` de la diària; `deleted`, els dies amb el seu motiu,
-# com els torna `split.deleted`.
-Matrices = collections.namedtuple("Matrices", "daily hourly actual deleted")
-
-
-def column(name, lag):
-    """Torna el nom d'una sèrie a un retard, `price_lag1`, o tal qual al retard 0."""
-    return f"{name}_lag{lag}" if lag else name
+# Les dues matrius d'un information set i el que en llegeixen les famílies a més de
+# les entrades. `daily` i `hourly` són les parelles `(X, y)` que una família pren, el
+# `y` el preu o, amb una referència, la distància de cada hora a la del seu dia;
+# `actual`, el preu de les files de la diària; `price`, la sèrie del preu sencera, de
+# la qual copien les còpies; `reference`, la referència de cada fila de la diària, o
+# `None`; `deleted`, els dies suprimits amb el seu motiu, com els torna
+# `split.deleted`; i `information`, l'information set resolt.
+Matrices = collections.namedtuple(
+    "Matrices", "daily hourly actual price reference deleted information"
+)
 
 
 def build(series, information):
@@ -146,17 +147,13 @@ def series():
     return found
 
 
-def lacking(series, information, days):
+def lacking(series, needed, days):
     """Torna, de cada dia de `days` al qual falta alguna columna, les que li falten.
 
-    Una columna és la d'una sèrie d'`information` a un retard, com les diu `column`, o
-    el preu del mateix dia, `price`, que és el que es prediu. `series` i `information`
-    són com a `build`, i els dies són els de `days`.
+    `needed` són les parelles `(sèrie, retard)` que llegeix cada dia, i una columna es
+    diu com la diu `column`. `series` són les sèries per nom, com a `build`.
     """
     found = {}
-    needed = [(PRICE, 0)] + [
-        (name, lag) for name, lags in information.items() for lag in lags
-    ]
     for name, lag in needed:
         shifted = series[name].shift(lag, freq="D").reindex(days)
         for day in days[shifted.isna().any(axis="columns").to_numpy()]:
@@ -164,45 +161,104 @@ def lacking(series, information, days):
     return found
 
 
-def matrices(series):
-    """Torna les dues matrius de l'information set, el preu real i els dies suprimits.
+def references(price, weights):
+    """Torna la referència de cada dia: la mitjana del preu del dia abans.
+
+    Cada hora hi pesa per la previsió de `weights` de la mateixa hora i el mateix dia.
+    Un dia al qual falta alguna hora de qualsevol de les dues no en té.
+    """
+    before = price.shift(REFERENCE_LAG, freq="D")
+    weighing = weights.shift(REFERENCE_LAG, freq="D").reindex(before.index).to_numpy()
+    values = (before.to_numpy() * weighing).sum(axis=1) / weighing.sum(axis=1)
+    return pd.Series(values, index=before.index)
+
+
+def matrices(series, information_set):
+    """Torna les matrius d'un information set resolt, `information_set`, com `Matrices`.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
     la diària, la de la xarxa neuronal, amb les 24 hores de cada sèrie, i la per hora,
-    la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu del
-    dia abans hi és amb les seves 24 hores a totes dues. Els dies suprimits són els de
-    `DEVELOPMENT` que no es reparteixen, com diu `split.deleted`.
+    la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu, si
+    hi entra, hi és amb les seves 24 hores a totes dues. Una fila sense referència, en
+    un information set que en té, no hi és. Els dies suprimits són els de `DEVELOPMENT`
+    que no es reparteixen, com diu `split.deleted`.
     """
-    information = {name: row.lags for name, row in INFORMATION.items()}
-    daily = build(series, information)
+    lags, weights = information_set.series, information_set.reference
+    X, price = build(series, lags)
+    reference = None
+    if weights:
+        reference = references(series[PRICE], series[weights]).reindex(X.index)
+        kept = reference.notna().to_numpy()
+        X, price, reference = X[kept], price[kept], reference[kept]
+    y = price if reference is None else price.sub(reference, axis="index")
     at_the_hour = tuple(
         column(name, lag)
-        for name, row in INFORMATION.items()
-        if KINDS[row.kind].at_the_hour
-        for lag in row.lags
+        for name, read in lags.items()
+        if KINDS[SERIES[name].kind].at_the_hour
+        for lag in read
     )
+    # El preu del mateix dia, el que es prediu, també.
+    needed = [(PRICE, 0)] + [(name, lag) for name, read in lags.items() for lag in read]
+    if weights:
+        needed += [(PRICE, REFERENCE_LAG), (weights, REFERENCE_LAG)]
     days = pd.date_range(*DEVELOPMENT, freq="D")
     return Matrices(
-        daily,
-        per_hour(*daily, at_the_hour=at_the_hour),
-        daily[1],
-        split.deleted(DEVELOPMENT, lacking(series, information, days)),
+        (X, y),
+        per_hour(X, y, at_the_hour=at_the_hour),
+        price,
+        series[PRICE],
+        reference,
+        split.deleted(DEVELOPMENT, lacking(series, dict.fromkeys(needed), days)),
+        information_set,
     )
+
+
+def partition(built, seed):
+    """Torna la partició d'una seed sobre unes matrius, `built`, com `split.split`.
+
+    Sense els seus dies suprimits, i amb el gap del seu information set.
+    """
+    return split.split(seed, DEVELOPMENT, built.deleted, built.information.gap)
+
+
+def fingerprint(built):
+    """Torna l'empremta d'unes matrius, `built`, la SHA-256 de tot el que en llegeixen.
+
+    De cada taula, les columnes, els dies i els valors en `float64`: les dues matrius,
+    el preu de les seves files, la sèrie del preu i la referència; i els dies suprimits
+    amb el seu motiu.
+    """
+    digest = hashlib.sha256()
+    (X, y), (rows, target) = built.daily, built.hourly
+    for part in (X, y, rows, target, built.actual, built.price, built.reference):
+        if part is None:
+            digest.update(b"None")
+            continue
+        names = part.columns if isinstance(part, pd.DataFrame) else [part.name]
+        digest.update(json.dumps([str(name) for name in names]).encode())
+        digest.update(part.index.asi8.tobytes())
+        digest.update(part.to_numpy(dtype=np.float64).tobytes())
+    digest.update(json.dumps(paths.plain(built.deleted)).encode())
+    return digest.hexdigest()
 
 
 def write(found, folder):
     """Desa a `folder` les dues matrius, `found`, amb el preu que se'n prediu.
 
     A la diària, el del dia, de `price_h00` a `price_h23`, i a la per hora, el de
-    l'hora, `price`. Una que ja hi és no es torna a escriure: una passada que es
-    continua és del mateix dataset que la va començar, i les seves matrius, les del codi
-    que la va començar.
+    l'hora, `price`; i, amb una referència, la del dia de cada fila, `reference`, de la
+    qual la família prediu la distància. Una que ja hi és no es torna a escriure: una
+    passada que es continua és de les mateixes matrius que la va començar.
     """
-    (X, y), (rows, target) = found.daily, found.hourly
-    for name, frame in (
-        ("daily", X.join(y.add_prefix(f"{PRICE}_"))),
-        ("hourly", rows.assign(**{PRICE: target})),
-    ):
+    X, rows = found.daily[0], found.hourly[0]
+    daily = X.join(found.actual.add_prefix(f"{PRICE}_"))
+    hourly = rows.assign(**{PRICE: found.actual.to_numpy().ravel()})
+    if found.reference is not None:
+        daily = daily.assign(reference=found.reference)
+        hourly = hourly.assign(
+            reference=np.repeat(found.reference.to_numpy(), HOURS_PER_DAY)
+        )
+    for name, frame in (("daily", daily), ("hourly", hourly)):
         path = folder / paths.MATRIX.format(name=name)
         if not path.exists():
             paths.write_whole(path, frame.to_csv(index_label=DAY, lineterminator="\n"))

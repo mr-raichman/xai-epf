@@ -5,7 +5,7 @@ from sklearn.linear_model import ElasticNetCV
 
 from epf import Refusal
 from epf.contract.matrix import HOUR, matrices
-from epf.information import PRICE
+from epf.information import PRICE, resolved
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler
@@ -39,7 +39,7 @@ def per_hour_table(days=120, seed=0):
         "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
         "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24))),
     }
-    return matrices(series).hourly
+    return matrices(series, resolved("WITH_PRICE")).hourly
 
 
 def test_each_hours_model_reads_only_the_rows_of_its_hour():

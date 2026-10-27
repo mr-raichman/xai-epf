@@ -8,7 +8,7 @@ amb el mateix marge més el que hi pot haver mogut l'arrodoniment a `float32`.
 import numpy as np
 
 from epf import Refusal
-from epf.information import INFORMATION
+from epf.information import SERIES
 
 # Les unitats d'una contribució: un preu, o un preu a l'espai de la transformació de
 # Lago et al. (2021), on la base més les contribucions no són un preu. I les d'una
@@ -41,7 +41,7 @@ def group(column):
 
     Una columna que només afegeix un model en dona el grup ell mateix.
     """
-    for name in INFORMATION:
+    for name in SERIES:
         if column == name or column.startswith(f"{name}_"):
             return name
     return CALENDAR
@@ -84,6 +84,18 @@ def explained_rows(found, per_day):
             "els dies explicats del fitxer no són els primers dels seus dies de prova"
         )
     return slice(0, per_day * len(explained))
+
+
+def explained_prediction(found, per_day):
+    """Torna la predicció que explica un fitxer, `found`, a les seves files explicades.
+
+    És la de la família: la desada, en preu, menys la referència de cada fila si el
+    fitxer en porta. `per_day` són les files de cada dia, com a `explained_rows`.
+    """
+    rows = explained_rows(found, per_day)
+    if "reference" not in found:
+        return found["predicted"][rows]
+    return found["predicted"][rows] - found["reference"][rows]
 
 
 def read_back(path, stored, tolerance):

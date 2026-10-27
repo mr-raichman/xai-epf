@@ -7,8 +7,9 @@ desa tots, del millor al pitjor, en la forma en què els pren l'ajust, sobre qui
 files es van fer, l'information set, les columnes de la matriu, la partició i els seus
 dies, amb quina `PROJECT_SEED`, i sobre quin espai i amb quins números fixos. Una cerca
 continua sobre un altre codi o unes altres biblioteques, i cada trial en desa les
-empremtes, però no sobre un altre dataset, unes altres files, un altre espai o uns
-altres números fixos, ni amb una altra `PROJECT_SEED`.
+empremtes, però no sobre unes altres matrius, unes altres files, un altre espai o uns
+altres números fixos, ni amb una altra `PROJECT_SEED`. Cada information set té les
+seves cerques.
 """
 
 import hashlib
@@ -20,8 +21,9 @@ import optuna
 
 from epf import Refusal, paths
 from epf.paths import plain, write_record
-from epf.contract.split import split, validation_parts
-from epf.information import GAP, recorded
+from epf.contract import matrix
+from epf.contract.split import validation_parts
+from epf.information import recorded
 from epf.parameters import DEVELOPMENT, PROJECT_SEED, SHARES, seeded
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
@@ -29,44 +31,47 @@ STUDY = "seed_{seed}.db"
 RECORD = "seed_{seed}.json"
 
 
-def folder(smoke, family):
-    """Torna la carpeta de la cerca d'una família, la d'assaig si `smoke`."""
-    return paths.searches(smoke) / family
+def folder(smoke, set_name, family):
+    """Torna la carpeta de la cerca d'una família en un information set.
+
+    La d'assaig si `smoke`.
+    """
+    return paths.searches(smoke, set_name) / family
 
 
-def _dealt(seed, deleted):
+def _dealt(seed, built):
     """Torna la SHA-256 dels dies que una seed reparteix a cada part, en ISO.
 
     Les parts són l'entrenament, cada part de la validació en l'ordre de la seed, i la
-    prova, sense els dies suprimits, `deleted`.
+    prova, de la partició de les matrius `built`.
     """
-    parts = split(seed, DEVELOPMENT, deleted)
+    parts = matrix.partition(built, seed)
     every = [
         parts.training,
-        *validation_parts(seed, DEVELOPMENT, deleted),
+        *validation_parts(seed, DEVELOPMENT, built.deleted),
         parts.test,
     ]
     text = json.dumps([days.strftime("%Y-%m-%d").tolist() for days in every])
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def made_on(columns, deleted, seed):
+def made_on(columns, built, seed):
     """Torna les files de la cerca d'una seed.
 
-    Són l'information set, les columnes de la matriu, `columns`, la partició, sense els
-    dies suprimits, `deleted`, i els dies que la seed hi reparteix.
+    Són l'information set de les matrius `built`, les columnes de la matriu, `columns`,
+    la partició, sense els seus dies suprimits, i els dies que la seed hi reparteix.
     """
     return plain(
         {
-            "information": recorded(),
+            "information": recorded(built.information),
             "columns": list(columns),
             "period": DEVELOPMENT,
-            "deleted": list(deleted),
+            "deleted": list(built.deleted),
             "shares": SHARES,
-            "gap": GAP,
+            "gap": built.information.gap,
             # Els dies mateixos: una altra derivació, o una altra versió de NumPy, en
             # repartiria uns altres amb la mateixa seed.
-            "split": _dealt(seed, deleted),
+            "split": _dealt(seed, built),
         }
     )
 
@@ -82,19 +87,19 @@ def diverged(study):
     return [one for one in study.trials if one.user_attrs.get("diverged")]
 
 
-def made_otherwise(study, columns, deleted, seed, searcher, dataset):
+def made_otherwise(study, columns, built, seed, searcher, matrices):
     """Torna en què es va fer diferent el study d'una seed, o `None` si no ho va fer.
 
-    `columns` són les columnes de la matriu sobre la qual es cerca, `deleted` els dies
-    suprimits del període, `searcher` el
-    `search.py` d'ara, amb l'espai i els números fixos, i `dataset` l'empremta del
-    dataset d'ara. Diferent vol dir sobre unes altres files, un altre espai o uns altres
-    números fixos, amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset:
-    els seus trials no es podrien comparar amb els d'ara. Un study que no diu la seva
+    `columns` són les columnes de la matriu sobre la qual es cerca, `built` les matrius
+    d'ara, `searcher` el `search.py` d'ara, amb l'espai i els números fixos, i
+    `matrices` l'empremta de les matrius d'ara. Diferent vol dir sobre unes altres
+    files, un altre espai o uns altres números fixos, amb una altra `PROJECT_SEED` o amb
+    algun trial d'unes altres matrius: els seus trials no es podrien comparar amb els
+    d'ara. Un study que no diu la seva
     `PROJECT_SEED`, el seu espai o els seus números fixos es va fer amb uns altres.
     """
     made = study.user_attrs
-    if made.get("made_on") != made_on(columns, deleted, seed):
+    if made.get("made_on") != made_on(columns, built, seed):
         return "sobre altres files"
     if made.get("space") != plain(searcher.SPACE):
         return "sobre un altre espai"
@@ -102,11 +107,11 @@ def made_otherwise(study, columns, deleted, seed, searcher, dataset):
         return "amb uns altres números fixos"
     if made.get("PROJECT_SEED") != PROJECT_SEED:
         return "amb una altra PROJECT_SEED"
-    datasets = {
-        one.user_attrs.get("dataset") for one in completed(study) + diverged(study)
+    found = {
+        one.user_attrs.get("matrices") for one in completed(study) + diverged(study)
     }
-    if datasets - {dataset}:
-        return "amb un altre dataset"
+    if found - {matrices}:
+        return "sobre unes altres matrius"
     return None
 
 
@@ -162,13 +167,12 @@ def stored(store, family, seed):
     return optuna.load_study(study_name=_name(family, seed), storage=_storage(store))
 
 
-def opened(store, family, searcher, seed, columns, deleted, dataset):
+def opened(store, family, searcher, seed, columns, built, matrices):
     """Torna el study d'una família en una seed, i el crea si encara no hi és.
 
     `searcher` és el `search.py` del model de la família, `columns` les columnes de la
-    matriu sobre la qual es cerca, `deleted` els dies suprimits del període, i `dataset`
-    l'empremta del dataset d'ara. Refusa un study fet d'una altra manera, com diu
-    `made_otherwise`.
+    matriu sobre la qual es cerca, `built` les matrius d'ara i `matrices` la seva
+    empremta. Refusa un study fet d'una altra manera, com diu `made_otherwise`.
     """
     study = optuna.create_study(
         study_name=_name(family, seed),
@@ -177,11 +181,11 @@ def opened(store, family, searcher, seed, columns, deleted, dataset):
         load_if_exists=True,
     )
     if not study.trials:
-        study.set_user_attr("made_on", made_on(columns, deleted, seed))
+        study.set_user_attr("made_on", made_on(columns, built, seed))
         study.set_user_attr("space", plain(searcher.SPACE))
         study.set_user_attr("fixed", plain(searcher.FIXED))
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
-    why = made_otherwise(study, columns, deleted, seed, searcher, dataset)
+    why = made_otherwise(study, columns, built, seed, searcher, matrices)
     if why:
         raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
     study.sampler = _sampler(searcher, family, seed, study)
@@ -212,8 +216,8 @@ def told(study, optuna_trial, numbers, score, fingerprints):
     """Desa al study el resultat d'un trial i el dona per acabat.
 
     Hi desa els números, la càrrega de la màquina i les empremtes, `fingerprints`, del
-    codi, del dataset i de les biblioteques que el fan. Un trial sense una puntuació
-    finita ha divergit: el dona per fallat, marcat, i diu si ho ha fet.
+    codi, del dataset, de les matrius i de les biblioteques que el fan. Un trial sense
+    una puntuació finita ha divergit: el dona per fallat, marcat, i diu si ho ha fet.
     """
     optuna_trial.set_user_attr("numbers", plain(numbers))
     # La càrrega quan el trial torna; Windows no la dona, i hi queda buida.
@@ -259,6 +263,7 @@ def record(study, family, seed, smoke):
                 "trial": one.number,
                 "code": one.user_attrs["code"],
                 "dataset": one.user_attrs["dataset"],
+                "matrices": one.user_attrs["matrices"],
                 "environment": one.user_attrs["environment"],
             }
             for one in done
@@ -266,10 +271,11 @@ def record(study, family, seed, smoke):
     }
 
 
-def save(found, smoke):
+def save(found, smoke, set_name):
     """Desa el registre d'una cerca acabada, `found`, sencer o gens."""
     write_record(
-        folder(smoke, found["family"]) / RECORD.format(seed=found["seed"]), found
+        folder(smoke, set_name, found["family"]) / RECORD.format(seed=found["seed"]),
+        found,
     )
 
 

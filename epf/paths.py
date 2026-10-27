@@ -19,7 +19,7 @@ OUTPUT = ROOT / "output"
 SMOKE_OUTPUT = ROOT / "assaig_output"
 
 # Els fitxers tal com els serveix ESIOS, on només escriu la baixada: una carpeta per
-# indicador, `output/downloads/<indicador>/<any>.json`.
+# indicador, `output/downloads/<sèrie>_<número>/<any>.json`.
 DOWNLOADS = OUTPUT / "downloads"
 
 # El dataset, el registre dels fitxers baixats d'on es va fer, i les figures que el
@@ -41,35 +41,42 @@ MATRIX = "matrix_{name}.csv"
 # les seves fallades.
 WORKERS_LOG = "workers.log"
 
-# Una passada es diu pel minut local en què va començar, `2026-10-22_14-30`, i la d'un
-# assaig porta davant `SMOKE_PREFIX`.
+# Una passada es diu pel seu information set, en minúscules, i el dia i el mes locals
+# en què va començar, `information_27-10`, i la d'un assaig porta davant
+# `SMOKE_PREFIX`.
 SMOKE_PREFIX = "assaig_"
 
 
-def runs(smoke):
-    """Torna la carpeta de les passades d'assaig o de mesura."""
-    return (SMOKE_OUTPUT if smoke else OUTPUT) / "runs"
+def runs(smoke, set_name):
+    """Torna la carpeta de les passades d'assaig o de mesura d'un information set."""
+    return (SMOKE_OUTPUT if smoke else OUTPUT) / "runs" / set_name.lower()
 
 
-def searches(smoke):
-    """Torna la carpeta de les cerques d'assaig o de mesura, una carpeta per família."""
-    return (SMOKE_OUTPUT if smoke else OUTPUT) / "searches"
+def searches(smoke, set_name):
+    """Torna la carpeta de les cerques d'assaig o de mesura d'un information set.
+
+    Hi ha una carpeta per família.
+    """
+    return (SMOKE_OUTPUT if smoke else OUTPUT) / "searches" / set_name.lower()
 
 
-def named_runs(smoke):
-    """Torna les passades d'assaig o de mesura que porten un nom de la seva forma.
+def named_runs(smoke, set_name):
+    """Torna les passades d'assaig o de mesura d'un information set amb nom de passada.
 
-    De la més antiga a la més nova. Cap altra carpeta de `runs(smoke)` no és una passada
-    que es pugui continuar.
+    Per ordre de nom. Cap altra carpeta de `runs(smoke, set_name)` no és una passada que
+    es pugui continuar.
     """
     prefix = SMOKE_PREFIX if smoke else ""
-    return sorted(runs(smoke).glob(f"{prefix}????-??-??_??-??"))
+    return sorted(runs(smoke, set_name).glob(f"{prefix}{set_name.lower()}_??-??"))
 
 
-def next_run(smoke, minute):
-    """Torna la carpeta d'una passada que comença a `minute`, d'assaig si `smoke`."""
+def next_run(smoke, set_name, day):
+    """Torna la carpeta d'una passada d'un information set que comença el dia `day`.
+
+    D'assaig si `smoke`.
+    """
     prefix = SMOKE_PREFIX if smoke else ""
-    return runs(smoke) / f"{prefix}{minute:%Y-%m-%d_%H-%M}"
+    return runs(smoke, set_name) / f"{prefix}{set_name.lower()}_{day:%d-%m}"
 
 
 def relative(path):

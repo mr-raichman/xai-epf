@@ -3,7 +3,7 @@
 import numpy as np
 import shap
 
-from epf.contract.explanation import explained_rows, summed
+from epf.contract.explanation import explained_prediction, summed
 from epf.parameters import HOURS_PER_DAY
 
 
@@ -35,7 +35,7 @@ def sums(found, with_interactions):
     found_sums = [
         (
             *summed(found["base"], found["values"], 1),
-            found["predicted"][explained_rows(found, HOURS_PER_DAY)],
+            explained_prediction(found, HOURS_PER_DAY),
         )
     ]
     if with_interactions:

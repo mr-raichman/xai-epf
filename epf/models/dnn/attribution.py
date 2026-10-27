@@ -5,7 +5,7 @@ import collections
 import numpy as np
 import shap
 
-from epf.contract.explanation import explained_rows, summed
+from epf.contract.explanation import explained_prediction, summed
 from epf.models.dnn.network import inputs
 from epf.parameters import HOURS_PER_DAY
 
@@ -51,6 +51,6 @@ def sums(found):
         (
             total.ravel(),
             magnitude.ravel(),
-            found["predicted"][explained_rows(found, HOURS_PER_DAY)],
+            explained_prediction(found, HOURS_PER_DAY),
         )
     ]

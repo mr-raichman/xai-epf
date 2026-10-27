@@ -11,7 +11,7 @@ import optuna
 import pandas as pd
 import pytest
 
-from epf import Declined, Refusal, parameters, paths, terminal
+from epf import Declined, Refusal, information, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.parameters import DEVELOPMENT
 from epf.run import families, figures, pool, run, tables
@@ -20,8 +20,9 @@ from epf.run import families, figures, pool, run, tables
 # torna a fer cap.
 GRID = (5, 0, 4, 1, 3, 2)
 
-# El minut en què comença tota passada nova.
+# El minut en què comença tota passada nova, i el seu information set.
 MINUTE = datetime.datetime(2026, 10, 22, 14, 30)
+SET = "WITH_PRICE"
 
 
 @pytest.fixture
@@ -43,7 +44,12 @@ def fake(tmp_path, monkeypatch):
         failing={},
         diverging=set(),
         opened=0,
-        fingerprints={"code": "codi", "dataset": "conjunt", "environment": "llibres"},
+        fingerprints={
+            "code": "codi",
+            "dataset": "conjunt",
+            "matrices": "matrius",
+            "environment": "llibres",
+        },
         values={"SEEDS": (0, 1), "TRIALS": 4, "BEST": 2},
     )
 
@@ -51,7 +57,7 @@ def fake(tmp_path, monkeypatch):
         if (family, seed, kind) in state.failing:
             raise state.failing[family, seed, kind]("interrompuda")
 
-    def train(family, folder, seed, configuration, explained_days):
+    def train(family, folder, seed, configuration, explained_days, built):
         state.calls.append(("fit", family, seed, configuration.get("numbers")))
         raised(family, seed, "fit")
         path = folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])
@@ -115,17 +121,26 @@ def fake(tmp_path, monkeypatch):
     clock = types.SimpleNamespace(now=lambda: MINUTE)
     monkeypatch.setattr(run, "datetime", types.SimpleNamespace(datetime=clock))
     days = pd.date_range(DEVELOPMENT[0], periods=14, freq="D")
+    table = (
+        pd.DataFrame({"x": np.zeros(len(days))}, index=days),
+        pd.Series(np.zeros(len(days)), index=days),
+    )
     built = types.SimpleNamespace(
-        daily=(
-            pd.DataFrame({"x": np.zeros(len(days))}, index=days),
-            pd.Series(np.zeros(len(days)), index=days),
-        ),
+        daily=table,
+        hourly=table,
         deleted={},
+        information=information.resolved(SET),
     )
     monkeypatch.setattr(matrix, "series", lambda: None)
-    monkeypatch.setattr(matrix, "matrices", lambda series: built)
+    monkeypatch.setattr(
+        matrix,
+        "matrices",
+        lambda series, information_set: types.SimpleNamespace(
+            **vars(built) | {"information": information_set}
+        ),
+    )
     monkeypatch.setattr(matrix, "write", lambda found, folder: None)
-    monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
+    monkeypatch.setattr(record, "fingerprints", lambda built: dict(state.fingerprints))
     monkeypatch.setattr(figures, "draw", lambda where: None)
     opened = searches.opened
 
@@ -174,27 +189,29 @@ def fake(tmp_path, monkeypatch):
     state.typed("")
     state.module = trainer
     state.searcher = searcher
-    state.main = lambda smoke="SMOKE", answer=None, family=None: run.main(
-        types.SimpleNamespace(smoke=smoke, family=family, answer=answer)
+    state.main = lambda smoke="SMOKE", answer=None, family=None, set_name=SET: run.main(
+        types.SimpleNamespace(
+            smoke=smoke, family=family, answer=answer, set_name=set_name
+        )
     )
     return state
 
 
 def _name():
     """Torna el nom de la passada d'assaig que comença a `MINUTE`."""
-    return paths.next_run(True, MINUTE).name
+    return paths.next_run(True, SET, MINUTE).name
 
 
 def _recorded(family, where=None):
     """Torna el registre d'una família a la passada `where`, la de `MINUTE` sense."""
-    where = where or paths.next_run(True, MINUTE)
+    where = where or paths.next_run(True, SET, MINUTE)
     path = where / family / paths.FAMILY_RECORD
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _ranked(seed):
     """Torna els valors de la cerca de `first` a una seed, del millor al pitjor."""
-    path = searches.folder("SMOKE", "first") / searches.RECORD.format(seed=seed)
+    path = searches.folder("SMOKE", SET, "first") / searches.RECORD.format(seed=seed)
     found = json.loads(path.read_text(encoding="utf-8"))
     return [one["numbers"]["value"] for one in found["ranked"]]
 
@@ -258,7 +275,7 @@ def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     assert [(kind, seed) for kind, _, seed, _ in fake.calls] == [("trial", 1)] * 4 + [
         ("fit", 1)
     ] * 3
-    store = searches.folder("SMOKE", "first") / searches.STUDY.format(seed=1)
+    store = searches.folder("SMOKE", SET, "first") / searches.STUDY.format(seed=1)
     study = optuna.load_study(study_name="first_seed_1", storage=f"sqlite:///{store}")
     assert [one.state.name for one in study.trials] == ["FAIL"] + ["COMPLETE"] * 4
 
@@ -270,7 +287,7 @@ def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
     """
     fake.diverging = {("first", 0, 1)}
     fake.main()
-    store = searches.folder("SMOKE", "first") / searches.STUDY.format(seed=0)
+    store = searches.folder("SMOKE", SET, "first") / searches.STUDY.format(seed=0)
     study = optuna.load_study(study_name="first_seed_0", storage=f"sqlite:///{store}")
     assert [one.state.name for one in study.trials] == [
         "COMPLETE",
@@ -282,7 +299,7 @@ def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
     found = json.loads(store.with_suffix(".json").read_text(encoding="utf-8"))
     assert found["trials"] == 4 and len(found["ranked"]) == 3
     assert len(_recorded("first")["configurations"]["0"]) == 2
-    log = paths.runs(True) / _name() / paths.WORKERS_LOG
+    log = paths.runs(True, SET) / _name() / paths.WORKERS_LOG
     assert log.read_text(encoding="utf-8") == "first seed 0 trial 1 ha divergit: nan\n"
 
 
@@ -363,7 +380,7 @@ def test_a_search_made_again_never_changes_a_recorded_plan(fake):
     planned = {
         family: _recorded(family)["configurations"] for family in ("first", "second")
     }
-    shutil.rmtree(paths.searches(True))
+    shutil.rmtree(paths.searches(True, SET))
     fake.failing = {}
     fake.typed("n\ny\n")
     fake.module.FAMILIES["first"]["kept"] = 1
@@ -429,7 +446,7 @@ def test_a_run_recorded_without_each_fits_code_is_continued(fake):
     """Cap passada d'abans que es desés el codi de cada ajust no en té cap."""
     _failed_once(fake)
     for family in ("first", "second", "third"):
-        path = paths.next_run(True, MINUTE) / family / paths.FAMILY_RECORD
+        path = paths.next_run(True, SET, MINUTE) / family / paths.FAMILY_RECORD
         found = json.loads(path.read_text(encoding="utf-8"))
         del found["codes"]
         paths.write_record(path, found)
@@ -473,7 +490,7 @@ def test_a_family_reading_a_search_none_makes_ends_in_an_error(fake, monkeypatch
     with pytest.raises(RuntimeError, match="1 família no és completa, second$"):
         fake.main()
     assert not drawn
-    assert (paths.next_run(True, MINUTE) / tables.SCORES).exists()
+    assert (paths.next_run(True, SET, MINUTE) / tables.SCORES).exists()
 
 
 def test_a_fit_that_saves_no_file_is_not_taken_for_done(fake, monkeypatch):
@@ -546,17 +563,17 @@ def test_without_a_terminal_or_an_answer_nothing_goes(
     fake.typed(typed)
     with pytest.raises(Refusal, match=f"^{why}"):
         fake.main()
-    assert paths.named_runs(True) == [paths.next_run(True, MINUTE)]
+    assert paths.named_runs(True, SET) == [paths.next_run(True, SET, MINUTE)]
 
 
 def test_an_n_with_no_run_to_continue_stops_and_keeps_what_is_on_disk(fake):
     fake.main()
-    first = paths.next_run(True, MINUTE)
+    first = paths.next_run(True, SET, MINUTE)
     kept = first.rename(first.with_name("kept"))
     fake.typed("n\n")
     with pytest.raises(Declined):
         fake.main()
-    assert kept.exists() and not paths.named_runs(True)
+    assert kept.exists() and not paths.named_runs(True, SET)
 
 
 @pytest.mark.parametrize("code", ["codi", "editat"], ids=["el codi", "un altre codi"])
@@ -609,7 +626,7 @@ def test_a_run_with_a_failed_seed_leaves_the_others_scores(fake):
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
-    path = paths.next_run(True, MINUTE) / tables.SCORES
+    path = paths.next_run(True, SET, MINUTE) / tables.SCORES
     rows = [row.split(",")[:3] for row in path.read_text(encoding="utf-8").splitlines()]
     assert rows[1:] == [
         ["first", "0", "0"],
@@ -620,3 +637,24 @@ def test_a_run_with_a_failed_seed_leaves_the_others_scores(fake):
         ["third", "0", "0"],
         ["third", "1", "0"],
     ]
+
+
+def test_a_set_s_run_replaces_its_own_run_and_studies_alone(fake):
+    """Una passada d'un information set substituïa la de qualsevol altre."""
+    fake.main()
+    for _ in range(2):
+        fake.main(set_name="WITHOUT_PRICE", answer="replace")
+    for set_name in (SET, "WITHOUT_PRICE"):
+        assert paths.named_runs(True, set_name) == [
+            paths.next_run(True, set_name, MINUTE)
+        ]
+        assert (searches.folder("SMOKE", set_name, "first") / "seed_0.db").exists()
+
+
+def test_a_family_whose_columns_the_set_lacks_is_left_out_and_said():
+    """El preu sol no té les previsions, que el sòl llegeix pel seu nom."""
+    rows = pd.DataFrame(columns=["price_lag1_h00", "hour"])
+    built = types.SimpleNamespace(hourly=(rows, None))
+    kept, said = run._readable(["floor", "naive_previous_day"], built)
+    assert kept == ["naive_previous_day"]
+    assert said == ["floor: no s'ajusta, sense demand_fcst, wind_fcst, solar_fcst"]
