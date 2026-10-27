@@ -11,7 +11,7 @@ from epf.models.lightgbm.hyperparameters import (
     NAME,
 )
 from epf.models.lightgbm.train import FAMILIES, fit_rows, predict_rows
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import DEVELOPMENT
 
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
@@ -40,15 +40,16 @@ def drawn(family, optuna_trial):
     }
 
 
-def trial(family, drawn, train, validate, seed):
+def trial(family, drawn, train, validate, seed, deleted):
     """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de tota la validació.
 
     S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan
     qualsevol de les `VALIDATION_PARTS` parts de la validació, `validate`, deixa de
-    millorar, com a la passada. Torna el punt i la puntuació.
+    millorar, com a la passada, les que la seed reparteix sense els dies suprimits,
+    `deleted`. Torna el punt i la puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
-    weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    weeks = validation_parts(seed, DEVELOPMENT, deleted)
     parts = [X_validate.index.isin(days) for days in weeks]
     model = fit_rows(
         X,

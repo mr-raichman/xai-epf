@@ -9,7 +9,7 @@ from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
 from epf.models.dnn import attribution, network
 from epf.models.dnn.hyperparameters import FIXED
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import DEVELOPMENT
 
 # Nom del model i de la seva família.
 NAME = "dnn"
@@ -75,8 +75,9 @@ def train(family, folder, seed, configuration, explained_days):
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
-    X, y = matrix.matrices(matrix.series()).daily
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    built = matrix.matrices(matrix.series())
+    X, y = built.daily
+    parts = split(seed, DEVELOPMENT, built.deleted)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts, explained, seed, configuration["numbers"])

@@ -57,7 +57,7 @@ def fake(tmp_path, monkeypatch):
         path = folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])
         np.savez(path, r2=np.float64(0.5), mae=np.float64(1.0))
 
-    def trial(family, drawn, train, validate, seed):
+    def trial(family, drawn, train, validate, seed, deleted):
         order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
         state.calls.append(("trial", family, seed, drawn))
         raised(family, seed, "trial")
@@ -119,14 +119,12 @@ def fake(tmp_path, monkeypatch):
         daily=(
             pd.DataFrame({"x": np.zeros(len(days))}, index=days),
             pd.Series(np.zeros(len(days)), index=days),
-        )
+        ),
+        deleted={},
     )
     monkeypatch.setattr(matrix, "series", lambda: None)
     monkeypatch.setattr(matrix, "matrices", lambda series: built)
     monkeypatch.setattr(matrix, "write", lambda found, folder: None)
-    monkeypatch.setattr(
-        matrix, "refuse_missing_days", lambda found, period, deleted: None
-    )
     monkeypatch.setattr(record, "fingerprints", lambda: dict(state.fingerprints))
     monkeypatch.setattr(figures, "draw", lambda where: None)
     opened = searches.opened

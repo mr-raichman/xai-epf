@@ -12,41 +12,23 @@ import numpy as np
 import pandas as pd
 
 from epf import Refusal, paths
-from epf.parameters import (
-    DAYS_PER_WEEK,
-    FORECAST_LAG,
-    HOUR_COLUMNS,
-    HOURS_PER_DAY,
-    PREVIOUS_DAY,
-    SCHEDULE_LAG,
-)
+from epf.contract import split
+from epf.information import INFORMATION, KINDS, PRICE
+from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOUR_COLUMNS, HOURS_PER_DAY
 
 DAY = "day"
 HOUR = "hour"
-PRICE = "price"
-
-# L'information set: cada sèrie del dataset que entra a les matrius, en l'ordre de les
-# seves columnes, amb els dies abans del lliurament en què hi entra. El preu, que és
-# també el que es prediu, hi entra amb les 24 hores de cada retard.
-INFORMATION = {
-    PRICE: PREVIOUS_DAY,
-    "demand_fcst": (FORECAST_LAG,),
-    "wind_fcst": (FORECAST_LAG,),
-    "solar_fcst": (FORECAST_LAG,),
-    "nuclear_sched": (SCHEDULE_LAG,),
-    "coal_gas_sched": (SCHEDULE_LAG,),
-    "hydro_sched": (SCHEDULE_LAG,),
-}
 
 # El dia de la setmana, en set dummies, com les llegeixen l'arbre i l'elastic net; la
 # xarxa neuronal en fa una sola columna, `DAY_OF_WEEK`, a `models/dnn/network.py`.
 DAY_OF_WEEK = "day_of_week"
 DAY_OF_WEEK_COLUMNS = [f"{DAY_OF_WEEK}_{number}" for number in range(DAYS_PER_WEEK)]
 
-# Les dues matrius d'un information set i el preu real amb què es comparen. `daily` i
-# `hourly` són les parelles `(X, y)` que una família pren; `actual` és el `y` de la
-# diària.
-Matrices = collections.namedtuple("Matrices", "daily hourly actual")
+# Les dues matrius d'un information set, el preu real amb què es comparen i els dies del
+# període que no es reparteixen. `daily` i `hourly` són les parelles `(X, y)` que una
+# família pren; `actual` és el `y` de la diària; `deleted`, els dies amb el seu motiu,
+# com els torna `split.deleted`.
+Matrices = collections.namedtuple("Matrices", "daily hourly actual deleted")
 
 
 def column(name, lag):
@@ -59,8 +41,8 @@ def build(series, information):
 
     Un dia absent elimina les files que el necessiten en lloc de desplaçar-les. `series`
     són les sèries per nom, cada una amb les 24 hores de cada dia, i `information` diu
-    quines entren i a quins retards, com `INFORMATION`. Falla si el preu no té les
-    columnes `HOUR_COLUMNS`.
+    quines entren i a quins retards, els de cada sèrie pel seu nom. Falla si el preu no
+    té les columnes `HOUR_COLUMNS`.
     """
     price = series[PRICE]
     if list(price.columns) != HOUR_COLUMNS:
@@ -164,42 +146,48 @@ def series():
     return found
 
 
+def lacking(series, information, days):
+    """Torna, de cada dia de `days` al qual falta alguna columna, les que li falten.
+
+    Una columna és la d'una sèrie d'`information` a un retard, com les diu `column`, o
+    el preu del mateix dia, `price`, que és el que es prediu. `series` i `information`
+    són com a `build`, i els dies són els de `days`.
+    """
+    found = {}
+    needed = [(PRICE, 0)] + [
+        (name, lag) for name, lags in information.items() for lag in lags
+    ]
+    for name, lag in needed:
+        shifted = series[name].shift(lag, freq="D").reindex(days)
+        for day in days[shifted.isna().any(axis="columns").to_numpy()]:
+            found.setdefault(day, []).append(column(name, lag))
+    return found
+
+
 def matrices(series):
-    """Torna les dues matrius de l'information set, `INFORMATION`, i el preu real.
+    """Torna les dues matrius de l'information set, el preu real i els dies suprimits.
 
     Cada família pren les previsions i el programa com la seva font pren una previsió:
     la diària, la de la xarxa neuronal, amb les 24 hores de cada sèrie, i la per hora,
     la de l'arbre i la dels models d'una hora, amb la de l'hora de la fila. El preu del
-    dia abans hi és amb les seves 24 hores a totes dues.
+    dia abans hi és amb les seves 24 hores a totes dues. Els dies suprimits són els de
+    `DEVELOPMENT` que no es reparteixen, com diu `split.deleted`.
     """
-    daily = build(series, INFORMATION)
+    information = {name: row.lags for name, row in INFORMATION.items()}
+    daily = build(series, information)
     at_the_hour = tuple(
         column(name, lag)
-        for name, lags in INFORMATION.items()
-        if name != PRICE
-        for lag in lags
+        for name, row in INFORMATION.items()
+        if KINDS[row.kind].at_the_hour
+        for lag in row.lags
     )
-    return Matrices(daily, per_hour(*daily, at_the_hour=at_the_hour), daily[1])
-
-
-def refuse_missing_days(found, period, deleted):
-    """Refusa unes matrius, `found`, a les quals falta algun dia del període.
-
-    `build` en treu sense dir-ho cada dia amb alguna entrada absent, com en trauria els
-    d'abans del primer dia d'una sèrie que comencés tard; la setmana suprimida,
-    `deleted`, no hi compta, perquè no és de cap part.
-    """
-    days = pd.date_range(*period, freq="D")
-    wanted = days[(days < pd.Timestamp(deleted[0])) | (days > pd.Timestamp(deleted[1]))]
-    missing = wanted.difference(found.daily[0].index)
-    if len(missing):
-        first = f"{missing[0]:%Y-%m-%d}"
-        raise Refusal(
-            f"les matrius no tenen 1 dia del període, el {first}"
-            if len(missing) == 1
-            else f"les matrius no tenen {len(missing)} dies del període, el primer "
-            f"{first}"
-        )
+    days = pd.date_range(*DEVELOPMENT, freq="D")
+    return Matrices(
+        daily,
+        per_hour(*daily, at_the_hour=at_the_hour),
+        daily[1],
+        split.deleted(DEVELOPMENT, lacking(series, information, days)),
+    )
 
 
 def write(found, folder):

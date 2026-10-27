@@ -11,11 +11,11 @@ import shutil
 import sys
 import time
 
-from epf import Declined, Refusal, parameters, paths, terminal
+from epf import Declined, Refusal, information, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
-from epf.contract.split import split, validation_parts
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS, WORKERS
+from epf.contract.split import NO_WHOLE_WEEK, WEEK, split, validation_parts
+from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search, tables
 
 # Els valors que una passada llegeix de `parameters.chosen`, els únics que una variant
@@ -168,7 +168,12 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
             if study is None:
                 continue
             why = searches.made_otherwise(
-                study, X.columns, seed, module, fingerprints["dataset"]
+                study,
+                X.columns,
+                matrices.deleted,
+                seed,
+                module,
+                fingerprints["dataset"],
             )
             if why is None:
                 continue
@@ -279,6 +284,36 @@ def _continuable(smoke, chosen, fingerprints):
     return latest
 
 
+def _said(deleted):
+    """Torna les línies que diuen els dies suprimits del període, `deleted`.
+
+    Primer quants són, i quantes setmanes de quantes; després, una línia per tram de
+    dies seguits amb el mateix motiu.
+    """
+    days = (DEVELOPMENT[1] - DEVELOPMENT[0]).days + 1
+    weeks = sum(why != NO_WHOLE_WEEK for why in deleted.values()) // DAYS_PER_WEEK
+    lines = [
+        f"{_counted(len(deleted), 'dia suprimit', 'dies suprimits')} del període, "
+        f"{_counted(weeks, 'setmana', 'setmanes')} de {days // DAYS_PER_WEEK}"
+    ]
+    stretches = []
+    for day, why in deleted.items():
+        if stretches and stretches[-1][2] == why and (day - stretches[-1][1]).days == 1:
+            stretches[-1][1] = day
+        else:
+            stretches.append([day, day, why])
+    for first, last, why in stretches:
+        shown = f"{first}" if first == last else f"de {first} a {last}"
+        if why == WEEK:
+            said = "la seva setmana"
+        elif why == NO_WHOLE_WEEK:
+            said = "cap setmana sencera"
+        else:
+            said = f"sense {', '.join(why)}"
+        lines.append(f"{shown}: {said}")
+    return lines
+
+
 def _train(module, family, folder, seed, configuration, explained_days, fingerprints):
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
@@ -380,6 +415,9 @@ class Run:
                         "configurations": {},
                         "seconds": {},
                         "codes": {},
+                        "information": information.recorded(),
+                        "gap": information.GAP,
+                        "deleted": matrices.deleted,
                         "settings": written,
                     },
                 )
@@ -540,7 +578,8 @@ def main(arguments):
     """Fa una passada, la comanda `epf run`.
 
     Abans d'escriure res, pregunta si se substitueix o es continua el que hi ha en disc,
-    com diu `_where`, també una passada començada amb un altre codi. Cerca el que falta
+    com diu `_where`, també una passada començada amb un altre codi, i diu els dies
+    suprimits del període. Cerca el que falta
     i, amb els mateixos processos, ajusta cada configuració planificada que encara no té
     el seu fitxer, i en desa al registre de la família el codi que l'ha fet. Una seed
     d'una família que no es cerca rep el pla de seguida, i una d'una que es cerca, les
@@ -555,10 +594,9 @@ def main(arguments):
     values = parameters.chosen(arguments.smoke, READ)
     chosen = families.named(arguments.family)
     matrices = matrix.matrices(matrix.series())
-    matrix.refuse_missing_days(matrices, DEVELOPMENT, BLACKOUT_WEEK)
     # La partició i les parts de validació, només per refusar-les abans d'escriure res.
-    split(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
-    validation_parts(values["SEEDS"][0], DEVELOPMENT, BLACKOUT_WEEK)
+    split(values["SEEDS"][0], DEVELOPMENT, matrices.deleted)
+    validation_parts(values["SEEDS"][0], DEVELOPMENT, matrices.deleted)
     fingerprints = record.fingerprints()
     searched = _plans(chosen, values)[2]
     where = _where(
@@ -570,6 +608,8 @@ def main(arguments):
         fingerprints,
         arguments.answer,
     )
+    if matrices.deleted:
+        print("\n".join(_said(matrices.deleted)) + "\n", file=sys.stderr)
     run = Run(where, arguments.smoke, values, chosen, fingerprints, matrices)
     pool.done(
         run.tasks(),

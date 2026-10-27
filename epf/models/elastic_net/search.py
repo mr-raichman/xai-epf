@@ -45,11 +45,12 @@ def drawn(family, optuna_trial):
     )
 
 
-def trial(family, drawn, train, validate, seed):
+def trial(family, drawn, train, validate, seed, deleted):
     """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de la validació.
 
     El càstig del seu pas es calcula sobre les files d'entrenament, `train`. Torna el
-    càstig i la barreja, i la puntuació.
+    càstig i la barreja, i la puntuació. `deleted` no hi fa res, perquè la validació no
+    es parteix.
     """
     (X, y), (X_validate, y_validate) = train, validate
     mixing, step = drawn

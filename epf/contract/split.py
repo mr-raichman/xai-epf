@@ -2,7 +2,8 @@
 
 Les setmanes del període es reparteixen en entrenament, validació i prova. A diferència
 del seu article, el preu del dia abans és una entrada, i per això l'entrenament perd el
-dia de cada costat d'una setmana retinguda.
+dia de cada costat d'una setmana retinguda; i una setmana amb un dia que alguna entrada
+no pot omplir no es reparteix.
 """
 
 import collections
@@ -11,7 +12,8 @@ import numpy as np
 import pandas as pd
 
 from epf import Refusal
-from epf.parameters import DAYS_PER_WEEK, GAP, SHARES, seeded
+from epf.information import GAP
+from epf.parameters import DAYS_PER_WEEK, SHARES, seeded
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
 Split = collections.namedtuple("Split", "training validation test")
@@ -20,33 +22,47 @@ Split = collections.namedtuple("Split", "training validation test")
 # d'elles deixa de millorar, les de Trebbien et al. (2023).
 VALIDATION_PARTS = 4
 
+# Per què surt del període un dia al qual no falta res: la seva setmana en surt, o és
+# dels últims, que no fan cap setmana sencera.
+WEEK = "week"
+NO_WHOLE_WEEK = "no_whole_week"
 
-def _deal(seed, period, deleted, shares):
-    """Torna els dies del període i les setmanes de cada part, en l'ordre de la seed.
 
-    El període es talla en setmanes de set dies des del primer, i la setmana `deleted`
-    en surt i no és de cap part. La resta es barregen amb la seed i es reparteixen en
-    l'ordre de `Split`: a la validació, la seva part de `shares` arrodonida a un
-    múltiple de `VALIDATION_PARTS`, perquè es parteixi en parts iguals; a la prova, la
-    seva arrodonida; i a l'entrenament, la resta. Refusa un període que no és de
-    setmanes senceres i una setmana `deleted` que no és cap de les seves.
+def deleted(period, lacking):
+    """Torna els dies del període que no es reparteixen, cada un amb el seu motiu.
+
+    Les setmanes es compten des del primer dia del període, i en surt tota la que té
+    algun dia de `lacking`, les columnes que li falten per dia; i també els últims dies,
+    que no fan cap setmana sencera. El motiu d'un dia de `lacking` són les seves
+    columnes, i el de cada altre, `WEEK` o `NO_WHOLE_WEEK`. Els dies són
+    `datetime.date`, en ordre.
     """
     days = pd.date_range(*period, freq="D")
-    weeks, remainder = divmod(len(days), DAYS_PER_WEEK)
-    if remainder:
-        raise Refusal(f"els {len(days)} dies del període no són setmanes senceres")
-    first = days.get_indexer([pd.Timestamp(deleted[0])])[0]
-    if (
-        first < 0
-        or first % DAYS_PER_WEEK
-        or (pd.Timestamp(deleted[1]) - pd.Timestamp(deleted[0])).days
-        != DAYS_PER_WEEK - 1
-    ):
-        raise Refusal(
-            f"la setmana que s'exclou, de {deleted[0]} a {deleted[1]}, no és cap de "
-            f"les setmanes del període"
-        )
-    kept = np.delete(np.arange(weeks), first // DAYS_PER_WEEK)
+    whole = len(days) - len(days) % DAYS_PER_WEEK
+    found = {}
+    for start in range(0, whole, DAYS_PER_WEEK):
+        week = days[start : start + DAYS_PER_WEEK]
+        if any(day in lacking for day in week):
+            found |= {day.date(): lacking.get(day, WEEK) for day in week}
+    found |= {day.date(): NO_WHOLE_WEEK for day in days[whole:]}
+    return found
+
+
+def _deal(seed, period, deleted, shares):
+    """Torna els dies que es reparteixen i les setmanes de cada part, en ordre de seed.
+
+    El període es talla en setmanes de set dies des del primer, i en surten els últims
+    dies, que no en fan cap de sencera, i tota setmana amb algun dia de `deleted`. La
+    resta es barregen amb la seed i es reparteixen en l'ordre de `Split`: a la
+    validació, la seva part de `shares` arrodonida a un múltiple de `VALIDATION_PARTS`,
+    perquè es parteixi en parts iguals; a la prova, la seva arrodonida; i a
+    l'entrenament, la resta.
+    """
+    days = pd.date_range(*period, freq="D")
+    weeks = len(days) // DAYS_PER_WEEK
+    days = days[: weeks * DAYS_PER_WEEK]
+    gone = days.isin(pd.to_datetime(list(deleted))).reshape(weeks, DAYS_PER_WEEK)
+    kept = np.flatnonzero(~gone.any(axis=1))
     order = np.random.default_rng(seeded("split", seed)).permutation(kept)
     _, validation_share, test_share = shares
     validation = VALIDATION_PARTS * round(
@@ -77,7 +93,7 @@ def split(seed, period, deleted, shares=SHARES, gap=GAP):
     """Torna els dies d'entrenament, de validació i de prova d'una seed.
 
     Surt de l'entrenament tot dia que tingui un dia retingut a `gap` dies o menys, a
-    qualsevol costat, i no és de cap part. La setmana suprimida, `deleted`, no és
+    qualsevol costat, i no és de cap part. Una setmana amb algun dia de `deleted` no és
     retinguda: els dies del seu costat es reparteixen com qualsevol altre.
     """
     days, dealt = _deal(seed, period, deleted, shares)

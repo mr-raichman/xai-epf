@@ -4,7 +4,8 @@ import pytest
 from sklearn.linear_model import ElasticNetCV
 
 from epf import Refusal
-from epf.contract.matrix import HOUR, PRICE, matrices
+from epf.contract.matrix import HOUR, matrices
+from epf.information import PRICE
 from epf.models.elastic_net.attribution import attribute_rows
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler

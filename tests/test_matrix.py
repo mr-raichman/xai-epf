@@ -5,22 +5,22 @@ import pandas as pd
 import pytest
 
 from epf import Refusal, paths
-from epf.contract import matrix
+from epf.contract import matrix, split
 from epf.contract.matrix import (
     DAY,
     DAY_OF_WEEK_COLUMNS,
     HOUR,
-    INFORMATION,
-    PRICE,
     build,
+    lacking,
     matrices,
     per_hour,
-    refuse_missing_days,
 )
 from epf.dataset import build as dataset
-from epf.parameters import HOUR_COLUMNS, PREVIOUS_DAY
+from epf.information import INFORMATION, PRICE
+from epf.parameters import HOUR_COLUMNS
 
 # Només el preu, als seus retards.
+PREVIOUS_DAY = INFORMATION[PRICE].lags
 PRICE_ONLY = {PRICE: PREVIOUS_DAY}
 
 
@@ -211,15 +211,49 @@ def test_the_stored_matrices_read_back_as_the_ones_the_models_read(tmp_path):
         )
 
 
-def test_a_period_day_the_matrices_lost_is_refused_unless_it_is_the_deleted_week():
-    # Una sèrie en blanc abans del seu primer dia, com la del gas de vapor abans que
-    # s'hi comptessin zeros, treia de les matrius els dies d'abans sense dir-ho.
-    period = (datetime.date(2020, 1, 2), datetime.date(2020, 1, 30))
-    deleted = (datetime.date(2020, 1, 10), datetime.date(2020, 1, 16))
-    inside = matrices(every_series([d for d in range(30) if d != 12]))
-    refuse_missing_days(inside, period, deleted)
-    outside = matrices(every_series([d for d in range(30) if d != 20]))
-    with pytest.raises(
-        Refusal, match="no tenen 2 dies del període, el primer 2020-01-21"
-    ):
-        refuse_missing_days(outside, period, deleted)
+def test_the_blackout_deletes_its_week_by_the_two_days_that_read_its_schedule():
+    """ESIOS no publica el programa de 2025-04-28 12:00 a 2025-04-29 23:00.
+
+    El dia abans, el llegeixen el 29 i el 30, de la setmana del 29 al 5 de maig.
+    """
+    period = (datetime.date(2025, 4, 22), datetime.date(2025, 5, 12))
+    information = {name: row.lags for name, row in INFORMATION.items()}
+    series = {
+        name: frame_of(range(22), start=datetime.date(2025, 4, 21)).astype(float)
+        for name in INFORMATION
+    }
+    schedule = [name for name, row in INFORMATION.items() if row.kind == "schedule"]
+    for name in schedule:
+        series[name].loc["2025-04-28", "h12":] = np.nan
+        series[name].loc["2025-04-29"] = np.nan
+    days = pd.date_range(*period, freq="D")
+    found = split.deleted(period, lacking(series, information, days))
+    assert list(found) == list(pd.date_range("2025-04-29", "2025-05-05").date)
+    read = [matrix.column(name, lag) for name in schedule for lag in information[name]]
+    assert (
+        found[datetime.date(2025, 4, 29)] == found[datetime.date(2025, 4, 30)] == read
+    )
+    assert {found[day] for day in pd.date_range("2025-05-01", "2025-05-05").date} == {
+        split.WEEK
+    }
+
+
+def test_a_series_beginning_on_the_period_s_first_day_deletes_its_first_week_at_d_1():
+    """Les previsions de Red Eléctrica comencen el primer dia del període.
+
+    Una sèrie en blanc abans del seu primer dia, com la del gas de vapor abans que s'hi
+    comptessin zeros, treia de les matrius els dies d'abans sense dir-ho.
+    """
+    period = (datetime.date(2019, 1, 1), datetime.date(2019, 1, 21))
+    series = {
+        PRICE: frame_of(range(22), start=datetime.date(2018, 12, 31)),
+        "demand_fcst": frame_of(range(21), start=period[0]),
+    }
+    days = pd.date_range(*period, freq="D")
+    found = split.deleted(
+        period, lacking(series, {PRICE: (1,), "demand_fcst": (0, 1)}, days)
+    )
+    assert found == {
+        datetime.date(2019, 1, 1): ["demand_fcst_lag1"],
+        **{day: split.WEEK for day in pd.date_range("2019-01-02", "2019-01-07").date},
+    }

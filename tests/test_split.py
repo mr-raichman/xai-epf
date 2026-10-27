@@ -2,13 +2,15 @@ import datetime
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from epf import Refusal, parameters
-from epf.contract.split import _deal, split, validation_parts
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, SEEDS, SHARES
+from epf import parameters
+from epf.contract.split import NO_WHOLE_WEEK, _deal, deleted, split, validation_parts
+from epf.parameters import DEVELOPMENT, SEEDS, SHARES
 
 ONE_DAY = pd.Timedelta(days=1)
+
+# La setmana de l'apagada, l'única que l'entrada d'ara suprimeix del període.
+BLACKOUT_WEEK = tuple(pd.date_range("2025-04-29", "2025-05-05", freq="D").date)
 
 
 def test_each_part_is_dealt_its_count_of_weeks():
@@ -37,14 +39,14 @@ def test_the_held_out_parts_are_whole_weeks_in_their_shares():
 
 def test_no_day_is_in_two_parts_and_only_a_day_beside_a_held_out_week_is_in_none():
     every_day = pd.date_range(*DEVELOPMENT, freq="D")
-    deleted = pd.date_range(*BLACKOUT_WEEK, freq="D")
+    gone = pd.DatetimeIndex(BLACKOUT_WEEK)
     for seed in SEEDS:
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
         held_out = parts.validation.union(parts.test)
         assert parts.validation.intersection(parts.test).empty
         assert parts.training.intersection(held_out).empty
         for day in every_day.difference(parts.training.union(held_out)).difference(
-            deleted
+            gone
         ):
             assert day - ONE_DAY in held_out or day + ONE_DAY in held_out
 
@@ -55,12 +57,12 @@ def test_the_deleted_week_is_in_no_part_and_the_days_beside_it_are_dealt_as_any_
     Si ho fes, el dilluns abans i el dimarts després, que comparteixen setmana amb els
     seus altres veïns, sortirien de l'entrenament sense cap setmana retinguda al costat.
     """
-    deleted = pd.date_range(*BLACKOUT_WEEK, freq="D")
+    gone = pd.DatetimeIndex(BLACKOUT_WEEK)
     for seed in SEEDS:
         parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
         every_part = parts.training.union(parts.validation).union(parts.test)
-        assert every_part.intersection(deleted).empty
-        assert {deleted[0] - ONE_DAY, deleted[-1] + ONE_DAY} <= set(every_part)
+        assert every_part.intersection(gone).empty
+        assert {gone[0] - ONE_DAY, gone[-1] + ONE_DAY} <= set(every_part)
 
 
 def test_no_training_day_is_next_to_a_held_out_day():
@@ -88,10 +90,23 @@ def test_a_seeds_deal_changes_with_PROJECT_SEED(monkeypatch):
     assert not np.array_equal(first[0], other[0])
 
 
-def test_a_period_of_broken_weeks_is_refused():
-    # Les setmanes de calendari deixarien una primera de sis dies i una última d'un.
-    with pytest.raises(Refusal, match="setmanes senceres"):
-        split(0, (datetime.date(2019, 1, 1), datetime.date(2024, 9, 29)), BLACKOUT_WEEK)
+def test_the_last_days_that_make_no_whole_week_are_deleted_and_in_no_part():
+    """Les setmanes de calendari deixaven una primera de sis dies i una última d'un."""
+    # Del dimarts 2019-01-01 al diumenge 2024-09-29: sobren els sis dies de l'última.
+    period = (datetime.date(2019, 1, 1), datetime.date(2024, 9, 29))
+    whole = (period[0], datetime.date(2024, 9, 23))
+    assert deleted(period, {}) == {
+        day: NO_WHOLE_WEEK for day in pd.date_range("2024-09-24", period[1]).date
+    }
+    for seed in (0, 1):
+        assert all(
+            a.equals(b)
+            for a, b in zip(
+                split(seed, period, BLACKOUT_WEEK),
+                split(seed, whole, BLACKOUT_WEEK),
+                strict=True,
+            )
+        )
 
 
 def test_the_validation_parts_are_whole_weeks_that_share_out_the_validation_days():

@@ -5,7 +5,7 @@ import pytest
 from epf.contract.split import split
 from epf.models.lightgbm import search, train
 from epf.models.lightgbm.train import fit_rows, predict_rows
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, seeded
+from epf.parameters import DEVELOPMENT, seeded
 
 # Les files i les columnes de la matriu on dos ajustos van donar arbres diferents, 1085
 # dies de 24 hores i 98 columnes: una matriu petita no ho destapa mai.
@@ -64,9 +64,9 @@ def test_a_trial_and_the_run_hand_the_fit_the_same_seed(monkeypatch):
     days = pd.date_range(DEVELOPMENT[0], periods=14, freq="D")
     X = pd.DataFrame({"x": np.arange(len(days), dtype=float)}, index=days)
     y = pd.Series(np.zeros(len(days)), index=days)
-    parts = split(3, DEVELOPMENT, BLACKOUT_WEEK)
+    parts = split(3, DEVELOPMENT, {})
     with pytest.raises(Stopped):
-        search.trial("lightgbm", POINT, (X, y), (X, y), 3)
+        search.trial("lightgbm", POINT, (X, y), (X, y), 3, {})
     with pytest.raises(Stopped):
-        train.fitted(X, y, np.array(["x"]), parts, parts.test, 3, POINT, False)
+        train.fitted(X, y, np.array(["x"]), parts, {}, parts.test, 3, POINT, False)
     assert seen == [3, 3]

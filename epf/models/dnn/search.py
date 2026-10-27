@@ -74,12 +74,13 @@ def drawn(family, optuna_trial):
     }
 
 
-def trial(family, drawn, train, validate, seed):
+def trial(family, drawn, train, validate, seed, deleted):
     """Ajusta els números d'un trial, `drawn`, i els puntua per la pèrdua de validació.
 
     S'ajusta amb les files d'entrenament, `train`, amb early stopping sobre tota la
     validació, `validate`. La pèrdua és la de Keras, amb les L1 a dins, com la que
-    puntua el codi de l'article. Torna els números i la puntuació.
+    puntua el codi de l'article. Torna els números i la puntuació. `deleted` no hi fa
+    res, perquè la validació no es parteix.
     """
     X_validate, y_validate = validate
     fitted = network.fit_rows(train, validate, drawn, seed)

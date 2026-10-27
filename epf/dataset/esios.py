@@ -32,12 +32,9 @@ PUBLICATION_MARGIN = datetime.timedelta(days=2)
 
 # Com serveix ESIOS un indicador: el seu número; com n'agrega el servidor cada hora,
 # `average` o `sum`, el seu `time_agg`; la geografia que se'n pren i, amb `only`, si ha
-# de ser l'única del fitxer o, sense, si es tria entre les que porta; el nom de
-# l'indicador que li fa d'àncora, o `None`; i les hores que ESIOS no hi va publicar, que
-# no s'omplen.
-Indicator = collections.namedtuple(
-    "Indicator", "id aggregation geography only anchor gaps"
-)
+# de ser l'única del fitxer o, sense, si es tria entre les que porta; i el nom de
+# l'indicador que li fa d'àncora, o `None`.
+Indicator = collections.namedtuple("Indicator", "id aggregation geography only anchor")
 
 
 def years(span):

@@ -12,7 +12,8 @@ from scipy import stats
 
 from epf import paths
 from epf.contract import figure
-from epf.parameters import DAYS_PER_WEEK, GAP, HOUR_COLUMNS
+from epf.information import GAP
+from epf.parameters import DAYS_PER_WEEK, HOUR_COLUMNS
 from epf.run import families
 
 # Retards del test, dues vegades el període setmanal, com aconsellen Hyndman i

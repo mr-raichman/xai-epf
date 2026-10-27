@@ -26,34 +26,12 @@ HOUR_COLUMNS = [f"h{hour:02d}" for hour in range(HOURS_PER_DAY)]
 # les dades baixades, en setmanes de dimarts a dilluns. Totes les tries s'hi fan.
 DEVELOPMENT = (datetime.date(2019, 1, 1), datetime.date(2026, 9, 28))
 
-# La setmana que surt del període i no és de cap part: ESIOS no publica el programa del
-# 2025-04-28 a les 12:00 al 2025-04-29 a les 23:00, l'apagada, i els dies que el
-# necessiten, el 29 i el 30, són d'aquesta setmana.
-BLACKOUT_WEEK = (datetime.date(2025, 4, 29), datetime.date(2025, 5, 5))
-
 # Percentatges de les setmanes que van a entrenament, a validació i a prova, els de
 # Trebbien et al. (2023).
 SHARES = (48, 32, 20)
 
-# Dies que surten de l'entrenament a cada costat d'una setmana retinguda. El preu del
-# dia abans és una entrada, de manera que una setmana retinguda i el dia de cada costat
-# es miren l'un a l'altre.
-GAP = 1
-
 # Una partició per seed.
 SEEDS = tuple(range(10))
-
-
-### Information set ###
-
-# Retards de preu de l'information set: el dia abans, les seves 24 hores.
-PREVIOUS_DAY = (1,)
-
-# El dia de cada sèrie d'entrada, en dies abans del lliurament: les previsions D+1, del
-# mateix dia que es lliura, i el programa del dia abans, tancat dos dies abans i a
-# l'abast de tothom abans del tancament de la subhasta.
-FORECAST_LAG = 0
-SCHEDULE_LAG = 1
 
 
 ### Ajust i cerca ###

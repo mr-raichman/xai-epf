@@ -9,7 +9,8 @@ from epf import paths
 from epf.contract import matrix
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.information import PRICE
+from epf.parameters import DEVELOPMENT
 
 # Dies en què la predicció similar pren el dia anterior; la resta prenen la setmana
 # anterior. Dilluns és 0.
@@ -85,8 +86,9 @@ def train(family, folder, seed, configuration, explained_days):
     series = matrix.series()
     # El preu es copia de la sèrie, i no de la matriu, on la setmana anterior no és cap
     # entrada.
-    price, y = series[matrix.PRICE], matrix.matrices(series).actual
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    built = matrix.matrices(series)
+    price, y = series[PRICE], built.actual
+    parts = split(seed, DEVELOPMENT, built.deleted)
     rank = configuration["rank"]
     fitted = _fitted(family, price, y, parts)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)

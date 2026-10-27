@@ -4,11 +4,11 @@ Optuna desa cada trial en un study SQLite, de manera que una cerca interrompuda 
 on era. Només el procés pare hi escriu: en demana cada trial i en desa el resultat, i
 un altre procés l'ajusta. Quan una seed té tots els seus trials, el seu registre els
 desa tots, del millor al pitjor, en la forma en què els pren l'ajust, sobre quines
-files es van fer, les columnes de la matriu, la partició i els seus dies, amb quina
-`PROJECT_SEED`, i sobre quin espai i amb quins números fixos. Una cerca continua sobre
-un altre codi o unes altres biblioteques, i cada trial en desa les empremtes, però no
-sobre un altre dataset, unes altres files, un altre espai o uns altres números fixos,
-ni amb una altra `PROJECT_SEED`.
+files es van fer, l'information set, les columnes de la matriu, la partició i els seus
+dies, amb quina `PROJECT_SEED`, i sobre quin espai i amb quins números fixos. Una cerca
+continua sobre un altre codi o unes altres biblioteques, i cada trial en desa les
+empremtes, però no sobre un altre dataset, unes altres files, un altre espai o uns
+altres números fixos, ni amb una altra `PROJECT_SEED`.
 """
 
 import hashlib
@@ -21,7 +21,8 @@ import optuna
 from epf import Refusal, paths
 from epf.paths import plain, write_record
 from epf.contract.split import split, validation_parts
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, GAP, PROJECT_SEED, SHARES, seeded
+from epf.information import GAP, recorded
+from epf.parameters import DEVELOPMENT, PROJECT_SEED, SHARES, seeded
 
 # Els fitxers d'una cerca, per seed: el study d'Optuna i el registre del que ha triat.
 STUDY = "seed_{seed}.db"
@@ -33,38 +34,39 @@ def folder(smoke, family):
     return paths.searches(smoke) / family
 
 
-def _dealt(seed):
+def _dealt(seed, deleted):
     """Torna la SHA-256 dels dies que una seed reparteix a cada part, en ISO.
 
     Les parts són l'entrenament, cada part de la validació en l'ordre de la seed, i la
-    prova.
+    prova, sense els dies suprimits, `deleted`.
     """
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    parts = split(seed, DEVELOPMENT, deleted)
     every = [
         parts.training,
-        *validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK),
+        *validation_parts(seed, DEVELOPMENT, deleted),
         parts.test,
     ]
     text = json.dumps([days.strftime("%Y-%m-%d").tolist() for days in every])
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def made_on(columns, seed):
+def made_on(columns, deleted, seed):
     """Torna les files de la cerca d'una seed.
 
-    Són les columnes de la matriu, `columns`, la partició i els dies que la seed hi
-    reparteix.
+    Són l'information set, les columnes de la matriu, `columns`, la partició, sense els
+    dies suprimits, `deleted`, i els dies que la seed hi reparteix.
     """
     return plain(
         {
+            "information": recorded(),
             "columns": list(columns),
             "period": DEVELOPMENT,
-            "deleted": BLACKOUT_WEEK,
+            "deleted": list(deleted),
             "shares": SHARES,
             "gap": GAP,
             # Els dies mateixos: una altra derivació, o una altra versió de NumPy, en
             # repartiria uns altres amb la mateixa seed.
-            "split": _dealt(seed),
+            "split": _dealt(seed, deleted),
         }
     )
 
@@ -80,10 +82,11 @@ def diverged(study):
     return [one for one in study.trials if one.user_attrs.get("diverged")]
 
 
-def made_otherwise(study, columns, seed, searcher, dataset):
+def made_otherwise(study, columns, deleted, seed, searcher, dataset):
     """Torna en què es va fer diferent el study d'una seed, o `None` si no ho va fer.
 
-    `columns` són les columnes de la matriu sobre la qual es cerca, `searcher` el
+    `columns` són les columnes de la matriu sobre la qual es cerca, `deleted` els dies
+    suprimits del període, `searcher` el
     `search.py` d'ara, amb l'espai i els números fixos, i `dataset` l'empremta del
     dataset d'ara. Diferent vol dir sobre unes altres files, un altre espai o uns altres
     números fixos, amb una altra `PROJECT_SEED` o amb algun trial d'un altre dataset:
@@ -91,7 +94,7 @@ def made_otherwise(study, columns, seed, searcher, dataset):
     `PROJECT_SEED`, el seu espai o els seus números fixos es va fer amb uns altres.
     """
     made = study.user_attrs
-    if made.get("made_on") != made_on(columns, seed):
+    if made.get("made_on") != made_on(columns, deleted, seed):
         return "sobre altres files"
     if made.get("space") != plain(searcher.SPACE):
         return "sobre un altre espai"
@@ -159,12 +162,13 @@ def stored(store, family, seed):
     return optuna.load_study(study_name=_name(family, seed), storage=_storage(store))
 
 
-def opened(store, family, searcher, seed, columns, dataset):
+def opened(store, family, searcher, seed, columns, deleted, dataset):
     """Torna el study d'una família en una seed, i el crea si encara no hi és.
 
     `searcher` és el `search.py` del model de la família, `columns` les columnes de la
-    matriu sobre la qual es cerca, i `dataset` l'empremta del dataset d'ara. Refusa un
-    study fet d'una altra manera, com diu `made_otherwise`.
+    matriu sobre la qual es cerca, `deleted` els dies suprimits del període, i `dataset`
+    l'empremta del dataset d'ara. Refusa un study fet d'una altra manera, com diu
+    `made_otherwise`.
     """
     study = optuna.create_study(
         study_name=_name(family, seed),
@@ -173,11 +177,11 @@ def opened(store, family, searcher, seed, columns, dataset):
         load_if_exists=True,
     )
     if not study.trials:
-        study.set_user_attr("made_on", made_on(columns, seed))
+        study.set_user_attr("made_on", made_on(columns, deleted, seed))
         study.set_user_attr("space", plain(searcher.SPACE))
         study.set_user_attr("fixed", plain(searcher.FIXED))
         study.set_user_attr("PROJECT_SEED", PROJECT_SEED)
-    why = made_otherwise(study, columns, seed, searcher, dataset)
+    why = made_otherwise(study, columns, deleted, seed, searcher, dataset)
     if why:
         raise Refusal(f"el study es va fer {why}; esborrar {paths.relative(store)}")
     study.sampler = _sampler(searcher, family, seed, study)
@@ -190,16 +194,17 @@ def asked(study, searcher, family):
     return optuna_trial, searcher.drawn(family, optuna_trial)
 
 
-def tried(searcher, family, drawn, X, y, parts, seed):
+def tried(searcher, family, drawn, X, y, parts, deleted, seed):
     """Ajusta els valors d'un trial, `drawn`, i en torna els números i la puntuació.
 
     S'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de validació,
-    i la matriu no n'hi dona cap altra. Els números són els valors en la forma en què
-    els pren l'ajust.
+    i la matriu no n'hi dona cap altra. `deleted` són els dies suprimits del període,
+    d'on es fa la partició. Els números són els valors en la forma en què els pren
+    l'ajust.
     """
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
     return searcher.trial(
-        family, drawn, (X[train], y[train]), (X[validate], y[validate]), seed
+        family, drawn, (X[train], y[train]), (X[validate], y[validate]), seed, deleted
     )
 
 

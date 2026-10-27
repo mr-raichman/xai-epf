@@ -10,14 +10,9 @@ import matplotlib
 import numpy as np
 
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
-from epf.contract.matrix import (
-    DAY_OF_WEEK,
-    DAY_OF_WEEK_COLUMNS,
-    HOUR,
-    INFORMATION,
-    PRICE,
-)
+from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS, HOUR
 from epf.contract.record import fitted_files
+from epf.information import INFORMATION, KINDS
 from epf.parameters import HOUR_COLUMNS
 
 # El motor sense finestra, triat abans d'importar `pyplot`: qui importa aquest mòdul ja
@@ -363,29 +358,27 @@ def save(drawing, folder, name):
 ### Noms i unitats ###
 
 
-# Com es diu cada grup de columnes a les figures, en l'ordre en què les sèries es
-# mostren a tot arreu.
+# L'ordre en què les sèries es mostren a les figures.
+FIGURE_ORDER = (
+    "price",
+    "demand_fcst",
+    "solar_fcst",
+    "wind_fcst",
+    "nuclear_sched",
+    "hydro_sched",
+    "coal_gas_sched",
+)
+
+# Com es diu cada grup de columnes a les figures, en l'ordre en què es mostren.
 GROUP_LABELS = {
-    "price": "preu del dia abans",
-    "demand_fcst": "demanda prevista",
-    "solar_fcst": "fotovoltaica prevista",
-    "wind_fcst": "eòlica prevista",
-    "nuclear_sched": "nuclear programada",
-    "hydro_sched": "hidràulica programada",
-    "coal_gas_sched": "carbó i gas programats",
+    **{name: INFORMATION[name].label for name in FIGURE_ORDER},
     CALENDAR: "calendari",
     DATE: "comptador de dies",
 }
 
 # La unitat de cada grup de columnes, la de la seva sèrie al dataset.
 GROUP_UNITS = {
-    "price": "EUR/MWh",
-    "demand_fcst": "MW",
-    "solar_fcst": "MW",
-    "wind_fcst": "MW",
-    "nuclear_sched": "MWh",
-    "hydro_sched": "MWh",
-    "coal_gas_sched": "MWh",
+    **{name: KINDS[row.kind].unit for name, row in INFORMATION.items()},
     CALENDAR: UNITLESS,
     DATE: "dies",
 }
@@ -549,11 +542,11 @@ def importance(folder, models, colour):
 ### Dependència ###
 
 
-# Les sèries que tenen panells de dependència, en el seu ordre: totes les de
-# l'information set menys el preu, les previsions com a Trebbien et al. (2023) i el
-# programa igual.
+# Les sèries que tenen panells de dependència, en el seu ordre: les que l'arbre llegeix
+# a l'hora de la fila, un valor per fila, les previsions com a Trebbien et al. (2023) i
+# el programa igual, en MW o en MWh.
 DEPENDENCE = tuple(
-    name for name in GROUP_LABELS if name in INFORMATION and name != PRICE
+    name for name in FIGURE_ORDER if KINDS[INFORMATION[name].kind].at_the_hour
 )
 
 # Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.

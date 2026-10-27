@@ -9,7 +9,7 @@ from epf import paths
 from epf.contract import matrix
 from epf.contract.record import Fitted, save_model
 from epf.contract.split import split
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import DEVELOPMENT
 
 # Nom del model i de la seva família.
 NAME = "floor"
@@ -52,8 +52,9 @@ def train(family, folder, seed, configuration, explained_days):
 
     `explained_days` no hi fa res, perquè la família no explica res.
     """
-    X, y = matrix.matrices(matrix.series()).hourly
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    built = matrix.matrices(matrix.series())
+    X, y = built.hourly
+    parts = split(seed, DEVELOPMENT, built.deleted)
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)

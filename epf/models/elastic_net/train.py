@@ -14,7 +14,7 @@ from epf.contract.split import split
 from epf.models.elastic_net import attribution, regression
 from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
 from epf.models.elastic_net.scaling import NORMAL_CONSISTENCY
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT, THREADS
+from epf.parameters import DEVELOPMENT, THREADS
 
 # La família, com la planifica una passada: tots els números fixos que llegeixen els
 # seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
@@ -73,8 +73,9 @@ def train(family, folder, seed, configuration, explained_days):
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
-    X, y = matrix.matrices(matrix.series()).hourly
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    built = matrix.matrices(matrix.series())
+    X, y = built.hourly
+    parts = split(seed, DEVELOPMENT, built.deleted)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     fitted = _fitted(X, y, parts, explained, configuration["numbers"])

@@ -8,7 +8,7 @@ amb el mateix marge més el que hi pot haver mogut l'arrodoniment a `float32`.
 import numpy as np
 
 from epf import Refusal
-from epf.contract.matrix import INFORMATION
+from epf.information import INFORMATION
 
 # Les unitats d'una contribució: un preu, o un preu a l'espai de la transformació de
 # Lago et al. (2021), on la base més les contribucions no són un preu. I les d'una

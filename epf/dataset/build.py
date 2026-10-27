@@ -10,75 +10,67 @@ from epf import Refusal, paths
 from epf.dataset import esios, figures
 from epf.dataset.check import checks, outliers
 from epf.dataset.esios import Indicator
+from epf.information import INFORMATION, KINDS
 from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOURS_PER_DAY
 
 # Les dues columnes que diuen de quin dia local i de quina hora és cada fila.
 DAY, HOUR = "day", "hour"
 
-# El primer i l'últim dia que es baixen i que té el dataset: el període i, abans, la
-# setmana que en llegeix el retard més llarg, el de les prediccions ingènues que copien
-# la setmana anterior.
-SPAN = (DEVELOPMENT[0] - datetime.timedelta(days=DAYS_PER_WEEK), DEVELOPMENT[1])
+# La carpeta de cada indicador a `output/downloads/`, la de la seva sèrie i el seu
+# número.
+FOLDER = "{series}_{id}"
+
+# L'eòlica programada, que no val mai zero, és l'àncora del programa: una hora que
+# l'àncora publica i un indicador del programa no, hi val zero, també abans del primer
+# dia de l'indicador i passat l'últim. No és cap sèrie.
+ANCHOR_ID = 12
+ANCHOR = FOLDER.format(series="wind_sched", id=ANCHOR_ID)
 
 # Les hores de l'apagada, que ESIOS no publica en cap indicador del programa, l'àncora
 # inclosa. És l'única llacuna que es declara, i no s'omple.
 BLACKOUT = pd.date_range("2025-04-28 12:00", "2025-04-29 23:00", freq="h")
 
-# Cada indicador, pel nom de la seva carpeta a `output/downloads/`, i com el serveix
-# ESIOS. El preu, el del mercat diari en EUR/MWh, es tria entre les sis geografies que
-# porta el seu fitxer. Les previsions D+1 de demanda, eòlica i fotovoltaica, en MW, són
-# de Red Eléctrica, i la solar és només la fotovoltaica. El programa base de
-# funcionament (PBF), en MWh per hora, es demana com la suma de cada hora: des del
-# 2025-10-01 ESIOS el serveix com a energia per quart d'hora, i la mitjana en seria la
-# quarta part. L'eòlica programada, que no val mai zero, és l'àncora de la resta del
-# programa: una hora que l'àncora publica i un altre indicador no, hi val zero, també
-# abans del primer dia de l'indicador i passat l'últim. L'hidràulica és la de les
-# unitats de gestió hidràulica (UGH) i la de fora d'elles, i el bombeig, el seu
-# turbinatge.
-INDICATORS = {
-    "price": Indicator(600, "average", "España", False, None, ()),
-    "demand_fcst": Indicator(1775, "average", "Península", True, None, ()),
-    "wind_fcst": Indicator(1777, "average", "Península", True, None, ()),
-    "solar_fcst": Indicator(1779, "average", "Península", True, None, ()),
-    "wind_sched": Indicator(12, "sum", "Península", True, None, BLACKOUT),
-    "nuclear_sched": Indicator(4, "sum", "Península", True, "wind_sched", BLACKOUT),
-    "anthracite_sched": Indicator(7, "sum", "Península", True, "wind_sched", BLACKOUT),
-    "subbituminous_sched": Indicator(
-        8, "sum", "Península", True, "wind_sched", BLACKOUT
-    ),
-    "combined_cycle_sched": Indicator(
-        9, "sum", "Península", True, "wind_sched", BLACKOUT
-    ),
-    "gas_steam_sched": Indicator(11, "sum", "Península", True, "wind_sched", BLACKOUT),
-    "cogeneration_sched": Indicator(
-        17, "sum", "Península", True, "wind_sched", BLACKOUT
-    ),
-    "hydro_ugh_sched": Indicator(1, "sum", "Península", True, "wind_sched", BLACKOUT),
-    "hydro_non_ugh_sched": Indicator(
-        2, "sum", "Península", True, "wind_sched", BLACKOUT
-    ),
-    "pumped_storage_sched": Indicator(
-        3, "sum", "Península", True, "wind_sched", BLACKOUT
-    ),
-}
 
-# Cada columna del dataset, en el seu ordre, amb els indicadors que suma, en l'ordre en
-# què se sumen. L'eòlica programada no és cap columna: només fa d'àncora.
-SERIES = {
-    "price": ("price",),
-    "demand_fcst": ("demand_fcst",),
-    "wind_fcst": ("wind_fcst",),
-    "solar_fcst": ("solar_fcst",),
-    "nuclear_sched": ("nuclear_sched",),
-    "coal_gas_sched": (
-        "anthracite_sched",
-        "subbituminous_sched",
-        "combined_cycle_sched",
-        "gas_steam_sched",
-        "cogeneration_sched",
-    ),
-    "hydro_sched": ("hydro_ugh_sched", "hydro_non_ugh_sched", "pumped_storage_sched"),
-}
+def span(information):
+    """Torna el primer i l'últim dia que es baixen i que té el dataset.
+
+    És el període i, abans, el retard més llarg de les sèries d'`information` o, si és
+    més curt, la setmana que copia la predicció ingènua de la setmana anterior.
+    """
+    longest = max(lag for series in information.values() for lag in series.lags)
+    before = datetime.timedelta(days=max(longest, DAYS_PER_WEEK))
+    return DEVELOPMENT[0] - before, DEVELOPMENT[1]
+
+
+SPAN = span(INFORMATION)
+
+
+def declared():
+    """Torna cada indicador, pel nom de la seva carpeta, com el serveix ESIOS.
+
+    L'àncora és el primer, perquè `indicators` l'ha de llegir abans que els que hi estan
+    ancorats.
+    """
+    schedule = KINDS["schedule"]
+    found = {
+        ANCHOR: Indicator(
+            ANCHOR_ID, schedule.aggregation, schedule.geography, schedule.only, None
+        )
+    }
+    for name, row in INFORMATION.items():
+        kind = KINDS[row.kind]
+        for number in row.ids:
+            found[FOLDER.format(series=name, id=number)] = Indicator(
+                number,
+                kind.aggregation,
+                kind.geography,
+                kind.only,
+                ANCHOR if kind.anchored else None,
+            )
+    return found
+
+
+INDICATORS = declared()
 
 
 def download():
@@ -152,14 +144,16 @@ def indicators(directory):
 
 
 def series(frames):
-    """Torna cada sèrie de `SERIES`, la suma dels seus indicadors, en dies per hores.
+    """Torna cada sèrie, la suma dels seus indicadors, en dies per hores.
 
-    Va del seu primer dia dins de `SPAN` a l'últim sense cap dia que falti: un dia que
-    cap dels seus indicadors va publicar, com el de l'apagada, hi queda buit.
+    `frames` són els indicadors, pel nom de la seva carpeta. Cada sèrie va del seu
+    primer dia dins de `SPAN` a l'últim sense cap dia que falti: un dia que cap dels
+    seus indicadors va publicar, com el de l'apagada, hi queda buit.
     """
     found = {}
-    for name, parts in SERIES.items():
-        total = sum((frames[part] for part in parts[1:]), frames[parts[0]])
+    for name, row in INFORMATION.items():
+        parts = [frames[FOLDER.format(series=name, id=number)] for number in row.ids]
+        total = sum(parts[1:], parts[0])
         total = total.loc[pd.Timestamp(SPAN[0]) : pd.Timestamp(SPAN[1])]
         found[name] = total.reindex(
             pd.date_range(total.index[0], total.index[-1], freq="D", name="day")
@@ -169,9 +163,9 @@ def series(frames):
 
 def gaps(name):
     """Torna les hores d'una sèrie que la font no va publicar."""
-    return pd.DatetimeIndex(
-        sorted({hour for part in SERIES[name] for hour in INDICATORS[part].gaps})
-    )
+    if KINDS[INFORMATION[name].kind].anchored:
+        return BLACKOUT
+    return pd.DatetimeIndex([])
 
 
 def table(found):
@@ -214,7 +208,7 @@ def write(rows, read):
             float_precision="round_trip",
             encoding="utf-8",
         ),
-        {name: gaps(name) for name in SERIES},
+        {name: gaps(name) for name in INFORMATION},
     )
     partial.replace(paths.DATASET)
     record = {
@@ -239,4 +233,5 @@ def main():
     for name, frame in found.items():
         (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
         figures.draw(name, frame)
-        outliers.draw(name, figures.LABELS[name], frame, *outliers.report(name, frame))
+        title = INFORMATION[name].title
+        outliers.draw(name, title, frame, *outliers.report(name, frame))

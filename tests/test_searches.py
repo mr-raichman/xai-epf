@@ -22,7 +22,7 @@ from epf.contract.split import split
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
-DELETED = (datetime.date(2019, 4, 30), datetime.date(2019, 5, 6))
+DELETED = tuple(pd.date_range("2019-04-30", "2019-05-06", freq="D").date)
 
 # Les empremtes que desa cada trial.
 FINGERPRINTS = {"code": "codi", "dataset": "conjunt", "environment": "biblioteques"}
@@ -48,7 +48,7 @@ def _searcher(grid, seen):
             return optuna_trial.suggest_float("value", 0.0, 1.0)
         return optuna_trial.suggest_categorical("value", grid["value"])
 
-    def trial(family, drawn, train, validate, seed):
+    def trial(family, drawn, train, validate, seed, deleted):
         seen.append((train[0].index, validate[0].index))
         return {"value": drawn}, float(drawn)
 
@@ -64,10 +64,12 @@ def _searcher(grid, seen):
 
 def _study(store, searcher, X, y, parts, seed, trials):
     """Fa en aquest procés els trials que falten fins a `trials`, com una cerca."""
-    study = opened(store, "fake", searcher, seed, X.columns, FINGERPRINTS["dataset"])
+    study = opened(
+        store, "fake", searcher, seed, X.columns, DELETED, FINGERPRINTS["dataset"]
+    )
     while len(completed(study)) < trials:
         optuna_trial, drawn = asked(study, searcher, "fake")
-        numbers, score = tried(searcher, "fake", drawn, X, y, parts, seed)
+        numbers, score = tried(searcher, "fake", drawn, X, y, parts, DELETED, seed)
         told(study, optuna_trial, numbers, score, FINGERPRINTS)
     return study
 
@@ -77,7 +79,9 @@ def test_a_trial_sees_the_training_and_validation_days_and_no_test_day():
     X, y = _table()
     parts = split(0, PERIOD, DELETED)
     seen = []
-    tried(_searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, 0)
+    tried(
+        _searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, DELETED, 0
+    )
     ((train, validate),) = seen
     assert train.equals(parts.training) and validate.equals(parts.validation)
     assert not train.isin(parts.test).any() and not validate.isin(parts.test).any()
@@ -125,7 +129,13 @@ def _studied(tmp_path, monkeypatch, X, y):
 def _continued(searcher, columns, dataset=FINGERPRINTS["dataset"]):
     """Torna a obrir el study de `fake` a la seed 0 amb el que es cerca ara."""
     return opened(
-        folder(True, "fake") / "seed_0.db", "fake", searcher, 0, columns, dataset
+        folder(True, "fake") / "seed_0.db",
+        "fake",
+        searcher,
+        0,
+        columns,
+        DELETED,
+        dataset,
     )
 
 
@@ -193,12 +203,14 @@ def test_a_trial_without_a_finite_score_diverges_and_keeps_its_dataset(tmp_path,
     X, y = _table()
     searcher = _searcher({"value": (3, 1, 2)}, [])
     store = tmp_path / "seed_0.db"
-    study = opened(store, "fake", searcher, 0, X.columns, FINGERPRINTS["dataset"])
+    study = opened(
+        store, "fake", searcher, 0, X.columns, DELETED, FINGERPRINTS["dataset"]
+    )
     optuna_trial, drawn = asked(study, searcher, "fake")
     assert told(study, optuna_trial, {"value": drawn}, score, FINGERPRINTS)
     assert [one.state.name for one in study.trials] == ["FAIL"]
     with pytest.raises(Refusal, match="amb un altre dataset"):
-        opened(store, "fake", searcher, 0, X.columns, "un altre")
+        opened(store, "fake", searcher, 0, X.columns, DELETED, "un altre")
 
 
 def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(

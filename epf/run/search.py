@@ -6,7 +6,7 @@ import optuna
 
 from epf.contract import matrix, record, searches
 from epf.contract.split import split
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import DEVELOPMENT
 from epf.run import families
 
 
@@ -24,10 +24,10 @@ def _trial(family, seed, drawn, fingerprints):
     """
     record.refuse_changed(fingerprints)
     module = searcher(family)
-    X, y = getattr(matrix.matrices(matrix.series()), module.MATRIX)
-    return searches.tried(
-        module, family, drawn, X, y, split(seed, DEVELOPMENT, BLACKOUT_WEEK), seed
-    )
+    built = matrix.matrices(matrix.series())
+    X, y = getattr(built, module.MATRIX)
+    parts = split(seed, DEVELOPMENT, built.deleted)
+    return searches.tried(module, family, drawn, X, y, parts, built.deleted, seed)
 
 
 class Search:
@@ -62,6 +62,7 @@ class Search:
                     module,
                     seed,
                     X.columns,
+                    matrices.deleted,
                     fingerprints["dataset"],
                 )
         # Els trials que té cada seed, i el trial demanat per cada tasca que encara no

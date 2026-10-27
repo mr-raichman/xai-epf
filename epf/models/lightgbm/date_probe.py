@@ -21,7 +21,7 @@ from epf.models.lightgbm import hyperparameters
 from epf.models.lightgbm.hyperparameters import DAY_COUNTER
 from epf.models.lightgbm.train import FAMILIES as TREE
 from epf.models.lightgbm.train import fitted
-from epf.parameters import BLACKOUT_WEEK, DEVELOPMENT
+from epf.parameters import DEVELOPMENT
 
 # Nom de la família.
 NAME = "date_probe"
@@ -39,13 +39,14 @@ def train(family, folder, seed, configuration, explained_days):
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
-    rows, y = matrix.matrices(matrix.series()).hourly
+    built = matrix.matrices(matrix.series())
+    rows, y = built.hourly
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
     groups = np.array(
         [DATE if column == DAY_COUNTER else group(column) for column in X.columns]
     )
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    parts = split(seed, DEVELOPMENT, built.deleted)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     found = fitted(
@@ -53,6 +54,7 @@ def train(family, folder, seed, configuration, explained_days):
         y,
         groups,
         parts,
+        built.deleted,
         explained,
         seed,
         configuration["numbers"],

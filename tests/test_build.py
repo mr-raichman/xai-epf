@@ -24,7 +24,8 @@ def test_each_series_is_the_sum_of_its_indicators():
 
 
 def test_every_schedule_indicator_is_asked_for_the_hours_sum(monkeypatch):
-    # Un indicador del programa es diu pel seu tipus al darrere, `_sched`.
+    # Un indicador del programa es diu pel tipus de la seva sèrie, `_sched`, davant del
+    # seu número.
     asked = {}
     monkeypatch.setattr(esios, "missing", lambda folder, span: [folder])
     monkeypatch.setattr(esios, "session_for", lambda: None)
@@ -38,7 +39,7 @@ def test_every_schedule_indicator_is_asked_for_the_hours_sum(monkeypatch):
     build.download()
     assert set(asked) == set(build.INDICATORS)
     assert {name for name, aggregation in asked.items() if aggregation == "sum"} == {
-        name for name in asked if name.endswith("_sched")
+        name for name in asked if name.rsplit("_", 1)[0].endswith("_sched")
     }
 
 
@@ -48,7 +49,7 @@ def test_a_forecast_served_for_another_geography_too_is_refused():
         for value, name in ((25000.0, "Península"), (5000.0, "Portugal"))
     ]
     with pytest.raises(Refusal, match="geografies"):
-        esios.admissible(values, build.INDICATORS["demand_fcst"])
+        esios.admissible(values, build.INDICATORS["demand_fcst_1775"])
 
 
 def test_an_indicator_with_no_value_is_refused_by_name(tmp_path, monkeypatch):
@@ -57,8 +58,8 @@ def test_an_indicator_with_no_value_is_refused_by_name(tmp_path, monkeypatch):
         build,
         "INDICATORS",
         {
-            "anchor": esios.Indicator(12, "sum", "Península", True, None, ()),
-            "anchored": esios.Indicator(4, "sum", "Península", True, "anchor", ()),
+            "anchor": esios.Indicator(12, "sum", "Península", True, None),
+            "anchored": esios.Indicator(4, "sum", "Península", True, "anchor"),
         },
     )
     held = {

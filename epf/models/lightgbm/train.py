@@ -19,13 +19,7 @@ from epf.models.lightgbm.hyperparameters import (
     PATIENCE,
     SUBSAMPLE_FREQ,
 )
-from epf.parameters import (
-    BLACKOUT_WEEK,
-    DEVELOPMENT,
-    INTERACTION_ROWS,
-    THREADS,
-    seeded,
-)
+from epf.parameters import DEVELOPMENT, INTERACTION_ROWS, THREADS, seeded
 
 # La família, com la planifica una passada: tots els números fixos que llegeixen els
 # seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
@@ -103,18 +97,19 @@ def predict_rows(model, X):
     return model.predict(X)
 
 
-def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
+def fitted(X, y, groups, parts, deleted, explained, seed, numbers, with_interactions):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
     L'early stopping l'atura quan qualsevol de les `VALIDATION_PARTS` parts de la
-    validació deixa de millorar. Amb `with_interactions`, explica també les interaccions
-    d'una mostra de `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada
-    columna de `X`, i `numbers` el punt de la configuració.
+    validació deixa de millorar, les que la seed reparteix sense els dies suprimits,
+    `deleted`. Amb `with_interactions`, explica també les interaccions d'una mostra de
+    `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna de `X`, i
+    `numbers` el punt de la configuració.
     """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)
     )
-    weeks = validation_parts(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    weeks = validation_parts(seed, DEVELOPMENT, deleted)
     validation = [(X[part], y[part]) for part in (X.index.isin(days) for days in weeks)]
     model = fit_rows(
         X[training], y[training], numbers, MOST_TREES, seed, validation=validation
@@ -157,9 +152,10 @@ def train(family, folder, seed, configuration, explained_days):
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`.
     """
-    X, y = matrix.matrices(matrix.series()).hourly
+    built = matrix.matrices(matrix.series())
+    X, y = built.hourly
     groups = np.array([group(column) for column in X.columns])
-    parts = split(seed, DEVELOPMENT, BLACKOUT_WEEK)
+    parts = split(seed, DEVELOPMENT, built.deleted)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     found = fitted(
@@ -167,6 +163,7 @@ def train(family, folder, seed, configuration, explained_days):
         y,
         groups,
         parts,
+        built.deleted,
         explained,
         seed,
         configuration["numbers"],
