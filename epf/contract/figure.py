@@ -362,8 +362,8 @@ def save(drawing, folder, name):
 # Cada grup que fa algun information set, amb la seva sèrie i el seu retard.
 GROUPS = information.groups()
 
-# Com es diu cada grup de columnes a les figures: el nom de la seva sèrie, i al retard
-# 1 seguit de ", D-1".
+# Com es diu cada grup de columnes a les figures: el nom de la seva sèrie, i a un
+# retard seguit del dia, ", D-1".
 GROUP_LABELS = {
     **{
         name: SERIES[series].label + (f", D-{lag}" if lag else "")
@@ -431,7 +431,7 @@ def p_value(value):
 def column_label(column, group):
     """Torna com es diu una columna a les figures, del seu grup, `group`, i l'hora.
 
-    `price_lag1_h23`, del grup `price`, és `preu del dia abans, 23 h`.
+    `price_lag1_h23`, del grup `price_lag1`, és `preu, D-1, 23 h`.
     """
     if column in CALENDAR_LABELS:
         return CALENDAR_LABELS[column]
@@ -496,10 +496,10 @@ def importance(folder, models, colour):
     """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
 
     De les columnes, les `SHOWN` que més pesen, de la que més a l'esquerra; dels grups,
-    tots en el seu ordre. La mitjana, en barres de `colour`, el color de la família, i
-    cada model ajustat, en un punt. Un model ajustat sense cap contribució, que no
-    depèn de les entrades, no hi entra, i el títol diu llavors quants models hi entren
-    de quants.
+    tots, els de les sèries en l'ordre del seu information set i el calendari al final.
+    La mitjana, en barres de `colour`, el color de la família, i cada model ajustat, en
+    un punt. Un model ajustat sense cap contribució, que no depèn de les entrades, no hi
+    entra, i el títol diu llavors quants models hi entren de quants.
     """
     groups = models[0]["groups"]
     columns = models[0]["columns"]

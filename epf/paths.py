@@ -42,7 +42,7 @@ MATRIX = "matrix_{name}.csv"
 WORKERS_LOG = "workers.log"
 
 # Una passada es diu pel seu information set, en minúscules, i el dia i el mes locals
-# en què va començar, `information_27-10`, i la d'un assaig porta davant
+# en què va començar, `with_price_27-10`, i la d'un assaig porta davant
 # `SMOKE_PREFIX`.
 SMOKE_PREFIX = "assaig_"
 

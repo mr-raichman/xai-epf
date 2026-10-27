@@ -28,8 +28,8 @@ FAMILIES = {
 def _fitted(X, y, parts, explained, seed, numbers, information_set):
     """Ajusta la xarxa d'una configuració i n'explica les files explicades.
 
-    Explica el preu de cada hora contra els dies d'entrenament, cada columna en el seu
-    grup de l'information set resolt `information_set`.
+    Explica la predicció de cada hora contra els dies d'entrenament, cada columna en el
+    seu grup de l'information set resolt `information_set`.
     """
     training, validation, test, shown = (
         X.index.isin(days) for days in (*parts, explained)

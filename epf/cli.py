@@ -169,9 +169,8 @@ def start(arguments):
 
     Les fa en ordre i s'atura a la primera que es refusa. Cada una rep els seus
     arguments per defecte, amb l'information set, l'opció d'assaig i la resposta donades
-    a `epf start` si ella en pren. Si
-    l'entorn té `NOTIFY`, n'executa el programa en acabar cada una menys l'última, i un
-    programa que no es pot executar es diu.
+    a `epf start` si ella en pren. Si l'entorn té `NOTIFY`, n'executa el programa en
+    acabar cada una menys l'última, i un programa que no es pot executar es diu.
     """
     for position, name in enumerate(SEQUENCE):
         command = COMMANDS[name]

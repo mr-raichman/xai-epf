@@ -132,12 +132,3 @@ def complete(folder):
         return False
     planned = {int(seed) for seed in found["configurations"]}
     return planned >= set(found["settings"]["SEEDS"]) and not missing(folder)
-
-
-def finished(where):
-    """Diu si una passada és acabada, amb tots els fitxers del pla de cada família.
-
-    Les famílies són les de tots els models. Es llegeix dels fitxers cada vegada, i no
-    es desa enlloc.
-    """
-    return all(complete(where / family) for family in EVERY)

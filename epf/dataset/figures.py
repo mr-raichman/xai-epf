@@ -3,10 +3,9 @@
 import numpy as np
 import pandas as pd
 
-from epf import paths
+from epf import information, paths
 from epf.contract import figure
 from epf.contract.figure import plt
-from epf import information
 from epf.parameters import HOURS_PER_DAY
 
 # L'alçada de la figura, en mm.

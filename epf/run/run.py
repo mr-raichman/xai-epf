@@ -97,17 +97,17 @@ def _counted(count, one, many):
     return f"{count} {one if count == 1 else many}"
 
 
-def _progress(where, values):
+def _progress(where, values, readable):
     """Torna fins on ha arribat cada família d'una passada, com el bloc de la passada.
 
-    De cada família, les seeds acabades i els ajustos que té de tots els del seu pla,
-    amb `values`, els valors de `parameters.chosen` amb què es va començar: una seed
-    sense pla en té tants com en guardarà, i una família que encara no té registre,
-    tots per fer.
+    De cada família de `readable`, les que les matrius de la passada deixen ajustar, les
+    seeds acabades i els ajustos que té de tots els del seu pla, amb `values`, els
+    valors de `parameters.chosen` amb què es va començar: una seed sense pla en té
+    tants com en guardarà, i una família que encara no té registre, tots per fer.
     """
     _, kept, _ = _plans(families.EVERY, values)
     columns = {}
-    for family in families.EVERY:
+    for family in readable:
         recorded = families.recorded(where / family) or {}
         absent = families.missing(where / family) if recorded else {}
         # Una família que no es cerca n'ajusta una sola, sense números.
@@ -142,6 +142,7 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
     """
     found = []
     set_name = matrices.information.name
+    readable, _ = _readable(families.EVERY, matrices)
     named = paths.named_runs(smoke, set_name)
     runs = paths.runs(smoke, set_name)
     for path in sorted(runs.iterdir()) if runs.exists() else []:
@@ -159,7 +160,7 @@ def _on_disk(smoke, values, searched, matrices, fingerprints):
             continue
         if _other_code(path, fingerprints):
             shown += ", començada amb un altre codi"
-        found.append(([path], "\n".join([shown, *_progress(path, values)])))
+        found.append(([path], "\n".join([shown, *_progress(path, values, readable)])))
     for family in searched:
         module = search.searcher(family)
         X, _ = getattr(matrices, module.MATRIX)
@@ -217,12 +218,12 @@ def _where(smoke, values, chosen, searched, matrices, fingerprints, answer):
     """Torna on es fa la passada: una de nova d'avui, o la del tipus continuada.
 
     Les passades i els studies són els de l'information set de `matrices`. Sense res a
-    la carpeta de les passades del tipus ni cap study fet d'una altra manera, és una de
-    nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb
-    `y`, ho esborra i en fa una de nova; amb `n`, si la passada més nova de la forma del
-    tipus es pot continuar i alguna família de `chosen`, les triades, no hi és completa,
-    pregunta si es continua, dient-ne l'altre codi si es va començar amb un altre.
-    Qualsevol altre `n` atura la comanda. `answer`, `replace` o
+    la carpeta de les passades del tipus ni cap study fet d'una altra manera, és una
+    de nova. Si no, en mostra cada cosa i pregunta si se substitueix: amb `y`, ho
+    esborra i en fa una de nova; amb `n`, si la passada més nova de la forma del
+    tipus es pot continuar i alguna família de `chosen`, les triades, no hi és
+    completa, pregunta si es continua, dient-ne l'altre codi si es va començar amb
+    un altre. Qualsevol altre `n` atura la comanda. `answer`, `replace` o
     `continue`, respon les preguntes sense terminal com les opcions del seu nom, i
     `None` les fa. Refusa sense terminal o sense resposta, i llavors no esborra res.
     """
@@ -608,18 +609,18 @@ def main(arguments):
 
     Abans d'escriure res, pregunta si se substitueix o es continua el que hi ha en disc,
     com diu `_where`, també una passada començada amb un altre codi, i diu els dies
-    suprimits del període i les famílies triades que les matrius de l'information set
-    no deixen ajustar, que en surten. Cerca el que falta
-    i, amb els mateixos processos, ajusta cada configuració planificada que encara no té
-    el seu fitxer, i en desa al registre de la família el codi que l'ha fet. Una seed
-    d'una família que no es cerca rep el pla de seguida, i una d'una que es cerca, les
-    millors configuracions de la seva cerca quan la té acabada; el pla queda al registre
-    de la família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si no,
-    n'escriu la taula de puntuacions. Refusa abans d'escriure la passada el que no pot
-    fer; un study refusat deixa a la carpeta de les cerques els que s'han obert abans,
-    nous i sense cap trial, que la passada següent reinicia en obrir-los. Acaba amb un
-    refús si alguna seed ha fallat, i amb un `RuntimeError` si, sense cap fallada, a
-    alguna família li falta el pla d'una seed o un fitxer.
+    suprimits del període i les famílies triades que les matrius de l'information
+    set no deixen ajustar, que en surten. Cerca el que falta i, amb els mateixos
+    processos, ajusta cada configuració planificada que encara no té el seu fitxer,
+    i en desa al registre de la família el codi que l'ha fet. Una seed d'una família
+    que no es cerca rep el pla de seguida, i una d'una que es cerca, les millors
+    configuracions de la seva cerca quan la té acabada; el pla queda al registre de
+    la família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si
+    no, n'escriu la taula de puntuacions. Refusa abans d'escriure la passada el que
+    no pot fer; un study refusat deixa a la carpeta de les cerques els que s'han
+    obert abans, nous i sense cap trial, que la passada següent reinicia en
+    obrir-los. Acaba amb un refús si alguna seed ha fallat, i amb un `RuntimeError`
+    si, sense cap fallada, a alguna família li falta el pla d'una seed o un fitxer.
     """
     values = parameters.chosen(arguments.smoke, READ)
     information_set = information.resolved(arguments.set_name)

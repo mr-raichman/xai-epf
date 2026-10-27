@@ -20,7 +20,7 @@ from epf.run import families, figures, pool, run, tables
 # torna a fer cap.
 GRID = (5, 0, 4, 1, 3, 2)
 
-# El minut en què comença tota passada nova, i el seu information set.
+# L'instant en què comença tota passada nova, i el seu information set.
 MINUTE = datetime.datetime(2026, 10, 22, 14, 30)
 SET = "WITH_PRICE"
 

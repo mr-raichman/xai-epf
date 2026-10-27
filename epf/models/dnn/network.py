@@ -25,7 +25,7 @@ def inputs(X):
 def build(columns, tuned):
     """Torna la xarxa compilada d'uns números, `tuned`, sobre `columns` entrades."""
     entry = keras.Input(shape=(columns,))
-    # L'únic escalador, com al codi de l'article; els preus que prediu no s'escalen.
+    # L'únic escalador, com al codi de l'article; el que prediu no s'escala.
     tensor = keras.layers.BatchNormalization()(entry)
     if tuned["dropout"] > 0:
         tensor = keras.layers.Dropout(tuned["dropout"])(tensor)
@@ -92,5 +92,5 @@ def fit_rows(
 
 
 def predict_rows(fitted, X):
-    """Torna el preu de cada fila de `X` i cada hora, `(files, 24)`."""
+    """Torna la predicció de cada fila de `X` i cada hora, `(files, 24)`."""
     return fitted.predict(inputs(X).to_numpy(), verbose=0)

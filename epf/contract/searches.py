@@ -95,8 +95,8 @@ def made_otherwise(study, columns, built, seed, searcher, matrices):
     `matrices` l'empremta de les matrius d'ara. Diferent vol dir sobre unes altres
     files, un altre espai o uns altres números fixos, amb una altra `PROJECT_SEED` o amb
     algun trial d'unes altres matrius: els seus trials no es podrien comparar amb els
-    d'ara. Un study que no diu la seva
-    `PROJECT_SEED`, el seu espai o els seus números fixos es va fer amb uns altres.
+    d'ara. Un study que no diu la seva `PROJECT_SEED`, el seu espai o els seus números
+    fixos es va fer amb uns altres.
     """
     made = study.user_attrs
     if made.get("made_on") != made_on(columns, built, seed):

@@ -9,17 +9,17 @@ from epf.contract.explanation import explained_prediction, summed
 from epf.models.dnn.network import inputs
 from epf.parameters import HOURS_PER_DAY
 
-# L'atribució del preu de cada hora, en EUR/MWh: `base` és `(24,)`, `values`
+# L'atribució de la predicció de cada hora, en EUR/MWh: `base` és `(24,)`, `values`
 # `(files, columnes, 24)`, i `inputs` les entrades explicades, una columna per a cada
 # una de `columns`.
 Explanation = collections.namedtuple("Explanation", "columns inputs values base")
 
 
 def attribute_rows(fitted, X, background):
-    """Torna l'atribució del preu de cada fila de `X` i cada hora, amb DeepExplainer.
+    """Torna l'atribució de la predicció de cada fila de `X` i hora, amb DeepExplainer.
 
     La base és la predicció mitjana sobre les files de `background`. Com que la xarxa
-    no escala el preu, l'atribució surt ja en EUR/MWh.
+    no escala el que prediu, l'atribució surt ja en EUR/MWh.
     """
     # `shap` avisa que retalla el fons a 100 files, però l'avís és de la seva classe
     # base: DeepExplainer les pren totes. Avisa també, de qualsevol model, que des de
