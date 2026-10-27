@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from epf import Refusal
-from epf.contract.explanation import TOLERANCE
+from epf import Refusal, information
+from epf.contract.explanation import CALENDAR, TOLERANCE, group
 from epf.contract.record import Fitted, priced, save_model
 from epf.contract.split import Split
 from epf.models.dnn import attribution as network
@@ -187,3 +187,18 @@ def test_a_file_with_a_reference_adds_up_once_the_reference_is_taken_away(tmp_pa
         save_model(
             tmp_path / "seed_0_1.npz", Split(none, none, TEST_DAYS), EXPLAINED, lost, 0
         )
+
+
+def test_a_column_s_group_is_its_series_at_its_lag_and_no_other():
+    """La demanda del dia abans començava pel nom de la del dia, i n'entrava al grup."""
+    with_price = information.resolved("WITH_PRICE")
+    assert group("demand_fcst_lag1_h05", with_price) == "demand_fcst_lag1"
+    assert group("demand_fcst_lag1", with_price) == "demand_fcst_lag1"
+    assert group("demand_fcst_h05", with_price) == "demand_fcst"
+    assert group("price_lag1_h23", with_price) == "price_lag1"
+    assert group("day_of_week_3", with_price) == CALENDAR
+    # Una sèrie que comença pel nom del preu entrava al grup del preu.
+    other = information.Resolved(
+        "OTHER", {information.PRICE: [1], "price_spread": [0]}, None, 1
+    )
+    assert group("price_spread_h03", other) == "price_spread"

@@ -128,7 +128,7 @@ def test_day_d_forecasts_sit_on_day_d_in_both_matrices():
             row[f"price_lag1_{column}"] == price.loc[day - pd.Timedelta(days=1), column]
         )
         assert target.loc[day].iloc[hour] == price.loc[day, column]
-    assert not any(column.startswith("demand_fcst_") for column in rows.columns)
+    assert not any(column.startswith("demand_fcst_h") for column in rows.columns)
 
 
 def test_d_minus_one_schedule_sits_on_day_d_in_both_matrices():

@@ -30,16 +30,9 @@ KINDS = {
 }
 
 # El que es prediu: el número d'ESIOS del preu; el nom de la seva sèrie; com es diu a
-# les figures dels models i el títol de la seva figura del dataset; i la sèrie que pesa
-# cada hora a la referència.
-Target = collections.namedtuple("Target", "id name label title weights")
-TARGET = Target(
-    600,
-    "price",
-    "preu del dia abans",
-    "Preu horari del mercat diari espanyol",
-    "demand_fcst",
-)
+# les figures; i la sèrie que pesa cada hora a la referència.
+Target = collections.namedtuple("Target", "id name label weights")
+TARGET = Target(600, "price", "preu", "demand_fcst")
 PRICE = TARGET.name
 
 # El dia que llegeix la referència, en dies abans del lliurament: la mitjana del preu
@@ -47,71 +40,56 @@ PRICE = TARGET.name
 REFERENCE_LAG = 1
 
 # Una sèrie: els indicadors d'ESIOS que suma, en l'ordre en què se sumen; el seu tipus;
-# com es diu a les figures dels models, i el títol de la seva figura del dataset.
-Series = collections.namedtuple("Series", "ids kind label title")
+# i com es diu a les figures, la del dataset amb la primera lletra en majúscula.
+Series = collections.namedtuple("Series", "ids kind label")
 
 # Cada sèrie, una sola vegada, en l'ordre de les columnes del dataset. La solar és
 # només la fotovoltaica. L'hidràulica és la de les unitats de gestió hidràulica (UGH) i
-# la de fora d'elles, i el bombeig, el seu turbinatge.
+# la de fora d'elles, amb el turbinatge del bombeig menys el seu consum, que ESIOS desa
+# en negatiu. El gas és el cicle combinat, les centrals de vapor i la cogeneració, i el
+# carbó, l'antracita i la subbituminosa.
 SERIES = {
-    PRICE: Series([TARGET.id], "price", TARGET.label, TARGET.title),
-    "demand_fcst": Series(
-        [1775], "forecast", "demanda prevista", "Previsió D+1 de la demanda"
-    ),
-    "wind_fcst": Series(
-        [1777], "forecast", "eòlica prevista", "Previsió D+1 de l'eòlica"
-    ),
-    "solar_fcst": Series(
-        [1779],
-        "forecast",
-        "fotovoltaica prevista",
-        "Previsió D+1 de la fotovoltaica",
-    ),
-    "nuclear_sched": Series(
-        [4], "schedule", "nuclear programada", "Generació nuclear programada (PBF)"
-    ),
-    "coal_gas_sched": Series(
-        [7, 8, 9, 11, 17],
-        "schedule",
-        "carbó i gas programats",
-        "Generació de carbó i gas programada (PBF)",
-    ),
-    "hydro_sched": Series(
-        [1, 2, 3],
-        "schedule",
-        "hidràulica programada",
-        "Generació hidràulica programada, amb el turbinatge de bombeig (PBF)",
-    ),
+    PRICE: Series([TARGET.id], "price", TARGET.label),
+    "demand_fcst": Series([1775], "forecast", "demanda prevista"),
+    "solar_fcst": Series([1779], "forecast", "fotovoltaica prevista"),
+    "wind_fcst": Series([1777], "forecast", "eòlica prevista"),
+    "hydro_sched": Series([1, 2, 3, 25], "schedule", "hidràulica programada"),
+    "nuclear_sched": Series([4], "schedule", "nuclear programada"),
+    "gas_sched": Series([9, 11, 17], "schedule", "gas programat"),
+    "coal_sched": Series([7, 8], "schedule", "carbó programat"),
 }
 
 # Un information set: les sèries de `SERIES` que llegeix, en l'ordre de les seves
 # columnes a les matrius, cada una amb els dies abans del lliurament en què hi entra; i
-# si les famílies explicades hi prediuen la distància de cada hora a la referència. Les
-# previsions D+1 són del mateix dia que es lliura, i el programa, del dia abans, tancat
-# dos dies abans i a l'abast de tothom abans del tancament de la subhasta.
+# si les famílies explicades hi prediuen la distància de cada hora a la referència.
 InformationSet = collections.namedtuple("InformationSet", "series reference")
 
-# Cada information set, pel nom que pren `--set`.
+# Cada information set, pel nom que pren `--set`. Les previsions D+1 hi entren el dia
+# que es lliura i el dia abans, perquè un model compari el que va fer el preu del dia
+# abans amb el que farà el del dia; el programa, el dia abans, tancat dos dies abans i
+# a l'abast de tothom abans del tancament de la subhasta.
 WITH_PRICE = InformationSet(
     {
         PRICE: [1],
-        "demand_fcst": [0],
-        "wind_fcst": [0],
-        "solar_fcst": [0],
-        "nuclear_sched": [1],
-        "coal_gas_sched": [1],
+        "demand_fcst": [0, 1],
+        "solar_fcst": [0, 1],
+        "wind_fcst": [0, 1],
         "hydro_sched": [1],
+        "nuclear_sched": [1],
+        "gas_sched": [1],
+        "coal_sched": [1],
     },
     reference=False,
 )
 WITHOUT_PRICE = InformationSet(
     {
-        "demand_fcst": [0],
-        "wind_fcst": [0],
-        "solar_fcst": [0],
-        "nuclear_sched": [1],
-        "coal_gas_sched": [1],
+        "demand_fcst": [0, 1],
+        "solar_fcst": [0, 1],
+        "wind_fcst": [0, 1],
         "hydro_sched": [1],
+        "nuclear_sched": [1],
+        "gas_sched": [1],
+        "coal_sched": [1],
     },
     reference=True,
 )
@@ -204,6 +182,19 @@ def resolved(name):
             f"{', '.join(found)}"
         )
     return found[name]
+
+
+def groups():
+    """Torna cada grup que fa algun information set, amb la seva sèrie i el seu retard.
+
+    Un grup es diu com la columna d'una sèrie a un retard, com la diu `column`.
+    """
+    return {
+        column(name, lag): (name, lag)
+        for one in every().values()
+        for name, lags in one.series.items()
+        for lag in lags
+    }
 
 
 def in_dataset():

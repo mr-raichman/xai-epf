@@ -9,6 +9,7 @@ import math
 import matplotlib
 import numpy as np
 
+from epf import information
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
 from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS, HOUR
 from epf.contract.record import fitted_files
@@ -358,27 +359,23 @@ def save(drawing, folder, name):
 ### Noms i unitats ###
 
 
-# L'ordre en què es mostren les sèries a les figures.
-FIGURE_ORDER = (
-    "price",
-    "demand_fcst",
-    "solar_fcst",
-    "wind_fcst",
-    "nuclear_sched",
-    "hydro_sched",
-    "coal_gas_sched",
-)
+# Cada grup que fa algun information set, amb la seva sèrie i el seu retard.
+GROUPS = information.groups()
 
-# Com es diu cada grup de columnes a les figures, en l'ordre en què es mostren.
+# Com es diu cada grup de columnes a les figures: el nom de la seva sèrie, i al retard
+# 1 seguit de ", D-1".
 GROUP_LABELS = {
-    **{name: SERIES[name].label for name in FIGURE_ORDER},
+    **{
+        name: SERIES[series].label + (f", D-{lag}" if lag else "")
+        for name, (series, lag) in GROUPS.items()
+    },
     CALENDAR: "calendari",
     DATE: "comptador de dies",
 }
 
 # La unitat de cada grup de columnes, la de la seva sèrie al dataset.
 GROUP_UNITS = {
-    **{name: KINDS[row.kind].unit for name, row in SERIES.items()},
+    **{name: KINDS[SERIES[series].kind].unit for name, (series, _) in GROUPS.items()},
     CALENDAR: UNITLESS,
     DATE: "dies",
 }
@@ -519,14 +516,16 @@ def importance(folder, models, colour):
                 order = np.argsort(-table.mean(axis=0), kind="stable")[:SHOWN]
                 names = [column_label(columns[j], groups[j]) for j in order]
             else:
-                # Un grup sense nom hi falla, com a `column_label`, i no en queda fora
-                # amb la seva part al total.
-                place = {name: number for number, name in enumerate(GROUP_LABELS)}
-                labels = sorted(found[0][1], key=lambda name: place[name])
+                # Les sèries en l'ordre del seu information set, i el calendari i el
+                # comptador de dies després: les matrius els barregen amb les sèries.
+                labels = [name for name in found[0][1] if name not in (CALENDAR, DATE)]
+                labels += [name for name in (CALENDAR, DATE) if name in found[0][1]]
                 table = np.array(
                     [[by_group[name] for name in labels] for _, by_group in found]
                 )
                 order = np.arange(len(labels))
+                # Un grup sense nom hi falla, com a `column_label`, i no en queda fora
+                # amb la seva part al total.
                 names = [GROUP_LABELS[name] for name in labels]
             positions = np.arange(len(order))
             axis.bar(
@@ -542,12 +541,14 @@ def importance(folder, models, colour):
 ### Dependència ###
 
 
-# Les sèries que tenen panells de dependència, en el seu ordre: les que l'arbre llegeix
-# a l'hora de la fila, un valor per fila, les previsions com a Trebbien et al. (2023) i
+# Els grups que tenen panells de dependència: els de les sèries que l'arbre llegeix a
+# l'hora de la fila, un valor per fila, les previsions com a Trebbien et al. (2023) i
 # el programa igual, en MW o en MWh.
-DEPENDENCE = tuple(
-    name for name in FIGURE_ORDER if KINDS[SERIES[name].kind].at_the_hour
-)
+DEPENDENCE = {
+    name
+    for name, (series, _) in GROUPS.items()
+    if KINDS[SERIES[series].kind].at_the_hour
+}
 
 # Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.
 DEPENDENCE_PER_ROW = 2
@@ -555,13 +556,12 @@ DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
 def present(model):
-    """Torna les sèries de `DEPENDENCE` que porta un model ajustat."""
-    names = set(model["groups"])
-    return [name for name in DEPENDENCE if name in names]
+    """Torna els grups de `DEPENDENCE` que porta un model ajustat, en el seu ordre."""
+    return [str(name) for name in dict.fromkeys(model["groups"]) if name in DEPENDENCE]
 
 
 def members(model, name):
-    """Torna les posicions de les columnes de la sèrie `name` en un model ajustat.
+    """Torna les posicions de les columnes del grup `name` en un model ajustat.
 
     Les troba pel grup que la passada hi va desar: una a la matriu per hora, la de
     l'hora de la fila, i les 24 de la diària en ordre d'hora.
@@ -576,7 +576,7 @@ def members(model, name):
 
 
 def pairs(model, values, name):
-    """Torna el valor de la sèrie `name` i la seva contribució a l'hora de cada fila."""
+    """Torna el valor del grup `name` i la seva contribució a l'hora de cada fila."""
     inputs = model["inputs"]
     found = members(model, name)
     if len(found) == 1:
@@ -590,12 +590,12 @@ def pairs(model, values, name):
 
 
 def dependence(folder, models, present, colour):
-    """Dibuixa la contribució de cada sèrie de `present` contra el seu valor.
+    """Dibuixa la contribució de cada grup de `present` contra el seu valor.
 
     Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
     model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
     i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
-    (2023). Un panell per sèrie, `DEPENDENCE_PER_ROW` per fila, a `dependence.svg`.
+    (2023). Un panell per grup, `DEPENDENCE_PER_ROW` per fila, a `dependence.svg`.
     """
     panels, axes = panel_grid(len(present), DEPENDENCE_PER_ROW, DEPENDENCE_ASPECT)
     for axis, name in zip(axes.flat, present, strict=False):

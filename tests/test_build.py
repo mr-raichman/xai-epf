@@ -19,8 +19,9 @@ def test_each_series_is_the_sum_of_its_indicators():
     }
     found = build.series(frames)
     assert (found["nuclear_sched"] == 4.0).all().all()
-    assert (found["coal_gas_sched"] == 7.0 + 8.0 + 9.0 + 11.0 + 17.0).all().all()
-    assert (found["hydro_sched"] == 1.0 + 2.0 + 3.0).all().all()
+    assert (found["gas_sched"] == 9.0 + 11.0 + 17.0).all().all()
+    assert (found["coal_sched"] == 7.0 + 8.0).all().all()
+    assert (found["hydro_sched"] == 1.0 + 2.0 + 3.0 + 25.0).all().all()
 
 
 def test_every_schedule_indicator_is_asked_for_the_hours_sum(monkeypatch):

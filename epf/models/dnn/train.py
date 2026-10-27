@@ -25,10 +25,11 @@ FAMILIES = {
 }
 
 
-def _fitted(X, y, parts, explained, seed, numbers):
+def _fitted(X, y, parts, explained, seed, numbers, information_set):
     """Ajusta la xarxa d'una configuració i n'explica les files explicades.
 
-    Explica el preu de cada hora contra els dies d'entrenament.
+    Explica el preu de cada hora contra els dies d'entrenament, cada columna en el seu
+    grup de l'information set resolt `information_set`.
     """
     training, validation, test, shown = (
         X.index.isin(days) for days in (*parts, explained)
@@ -56,7 +57,9 @@ def _fitted(X, y, parts, explained, seed, numbers):
         y[test].to_numpy().ravel(),
         {
             "columns": np.array(explanation.columns),
-            "groups": np.array([group(column) for column in explanation.columns]),
+            "groups": np.array(
+                [group(column, information_set) for column in explanation.columns]
+            ),
             "inputs": explanation.inputs,
             "unit": PRICE_UNITS,
             "values": explanation.values,
@@ -79,7 +82,9 @@ def train(family, folder, seed, configuration, explained_days, built):
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     fitted = priced(
-        _fitted(X, y, parts, explained, seed, configuration["numbers"]),
+        _fitted(
+            X, y, parts, explained, seed, configuration["numbers"], built.information
+        ),
         built,
         parts.test,
     )

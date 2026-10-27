@@ -13,6 +13,15 @@ from epf.parameters import HOURS_PER_DAY
 HEIGHT = 46
 
 
+def title(name):
+    """Torna com es diu una sèrie a les figures del dataset.
+
+    Com a les dels models, amb la primera lletra en majúscula.
+    """
+    label = information.SERIES[name].label
+    return label[0].upper() + label[1:]
+
+
 def draw(name, frame):
     """Dibuixa cada valor horari d'una sèrie, `frame` en dies per hores.
 
@@ -32,8 +41,8 @@ def draw(name, frame):
         **figure.line_style(values.size, overlapping=False),
     )
 
-    title, unit = information.SERIES[name].title, figure.GROUP_UNITS[name]
-    axis.set_title(f"{title}, de {frame.index[0].year} a {frame.index[-1].year}")
+    unit = information.KINDS[information.SERIES[name].kind].unit
+    axis.set_title(f"{title(name)}, de {frame.index[0].year} a {frame.index[-1].year}")
     axis.set_ylabel(figure.unit_label("valor horari", unit))
     axis.set_xlim(instants[0], instants[-1])
     figure.save(panels, paths.DATA_FIGURES / name, name)

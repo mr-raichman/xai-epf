@@ -71,7 +71,7 @@ def test_a_trial_and_the_run_hand_the_networks_fit_the_same_seed(monkeypatch):
     parts = split(3, DEVELOPMENT, {}, 1)
     for fit in (
         lambda: search.trial(dnn.NAME, TUNED, (X, y), (X, y), 3, {}),
-        lambda: dnn._fitted(X, y, parts, parts.test, 3, TUNED),
+        lambda: dnn._fitted(X, y, parts, parts.test, 3, TUNED, None),
     ):
         with pytest.raises(Stopped):
             fit()

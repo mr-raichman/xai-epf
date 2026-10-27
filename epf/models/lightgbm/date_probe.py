@@ -43,7 +43,10 @@ def train(family, folder, seed, configuration, explained_days, built):
     counter = (rows.index - pd.Timestamp(DEVELOPMENT[0])).days
     X = rows.assign(**{DAY_COUNTER: counter.to_numpy()})
     groups = np.array(
-        [DATE if column == DAY_COUNTER else group(column) for column in X.columns]
+        [
+            DATE if column == DAY_COUNTER else group(column, built.information)
+            for column in X.columns
+        ]
     )
     parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]

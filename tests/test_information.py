@@ -19,8 +19,8 @@ def _other(monkeypatch, series, reference=False):
             "^l'indicador 4 és a dues sèries de OTHER, nuclear_sched i nuclear_again$",
         ),
         (
-            {"gas_sched": [1]},
-            "^OTHER llegeix la sèrie gas_sched, que SERIES no té$",
+            {"oil_sched": [1]},
+            "^OTHER llegeix la sèrie oil_sched, que SERIES no té$",
         ),
         (
             {PRICE: [1], "price_lag1": [0]},
@@ -49,7 +49,7 @@ def test_a_set_that_cannot_be_used_is_refused_whichever_set_is_asked_for(
     # Les sèries d'un sol cas, a la llista de totes.
     added = {
         "nuclear_again": SERIES["nuclear_sched"],
-        "price_lag1": Series([99], "forecast", "", ""),
+        "price_lag1": Series([99], "forecast", ""),
     }
     monkeypatch.setattr(
         information,

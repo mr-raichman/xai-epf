@@ -7,8 +7,8 @@ amb el mateix marge més el que hi pot haver mogut l'arrodoniment a `float32`.
 
 import numpy as np
 
-from epf import Refusal
-from epf.information import SERIES
+from epf import Refusal, information
+from epf.parameters import HOUR_COLUMNS
 
 # Les unitats d'una contribució: un preu, o un preu a l'espai de la transformació de
 # Lago et al. (2021), on la base més les contribucions no són un preu. I les d'una
@@ -36,14 +36,20 @@ TRANSFORMED_TOLERANCE = 1e-5
 ROUNDING = np.finfo(np.float32).eps / 2
 
 
-def group(column):
-    """Torna el grup d'una columna: la sèrie d'on surt, o el calendari.
+def group(column, information_set):
+    """Torna el grup d'una columna: la sèrie a un retard d'on surt, o el calendari.
 
-    Una columna que només afegeix un model en dona el grup ell mateix.
+    Els grups són les columnes de les sèries d'`information_set` a cada retard, com les
+    diu `information.column`, `price_lag1`; un grup té la columna del seu nom i les de
+    les seves hores, `price_lag1_h05`, i cap altra. Una columna que només afegeix un
+    model en dona el grup ell mateix.
     """
-    for name in SERIES:
-        if column == name or column.startswith(f"{name}_"):
-            return name
+    for name, lags in information_set.series.items():
+        for lag in lags:
+            found = information.column(name, lag)
+            hour = column.removeprefix(f"{found}_")
+            if column == found or (hour != column and hour in HOUR_COLUMNS):
+                return found
     return CALENDAR
 
 

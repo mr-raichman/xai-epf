@@ -39,7 +39,7 @@ def test_the_networks_forecast_is_paired_with_its_own_hour():
 
 def test_a_model_with_no_contribution_is_left_out_of_the_importance(tmp_path):
     """Una xarxa amb tots els pesos d'entrada a zero ho prediu tot igual."""
-    groups = np.array(["price", "price", "calendar"])
+    groups = np.array(["price_lag1", "price_lag1", "calendar"])
     model = {
         "values": np.array([[1.0, -1.0, 2.0]]),
         "groups": groups,

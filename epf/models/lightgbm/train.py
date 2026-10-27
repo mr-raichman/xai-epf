@@ -154,7 +154,7 @@ def train(family, folder, seed, configuration, explained_days, built):
     les matrius de la passada.
     """
     X, y = built.hourly
-    groups = np.array([group(column) for column in X.columns])
+    groups = np.array([group(column, built.information) for column in X.columns])
     parts = matrix.partition(built, seed)
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]

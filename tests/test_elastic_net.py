@@ -36,7 +36,8 @@ def per_hour_table(days=120, seed=0):
         "solar_fcst": frame(solar),
         PRICE: frame(rng.uniform(-2, 200, (days, 24))),
         "nuclear_sched": frame(rng.uniform(4000, 7000, (days, 24))),
-        "coal_gas_sched": frame(rng.uniform(2000, 15000, (days, 24))),
+        "gas_sched": frame(rng.uniform(1000, 12000, (days, 24))),
+        "coal_sched": frame(rng.uniform(0, 3000, (days, 24))),
         "hydro_sched": frame(rng.uniform(1000, 10000, (days, 24))),
     }
     return matrices(series, resolved("WITH_PRICE")).hourly

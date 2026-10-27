@@ -32,10 +32,11 @@ FAMILIES = {
 }
 
 
-def _fitted(X, y, parts, explained, numbers):
+def _fitted(X, y, parts, explained, numbers, information_set):
     """Ajusta els 24 models d'una configuració i n'explica les files explicades.
 
-    El càstig i la barreja són els de `numbers`.
+    El càstig i la barreja són els de `numbers`, i els grups de les columnes, els de
+    l'information set resolt `information_set`.
     """
     training, test, shown = (
         X.index.isin(days) for days in (parts.training, parts.test, explained)
@@ -53,7 +54,10 @@ def _fitted(X, y, parts, explained, numbers):
         {
             "columns": np.array(explanation.values.columns, dtype=str),
             "groups": np.array(
-                [group(column) for column in explanation.values.columns]
+                [
+                    group(column, information_set)
+                    for column in explanation.values.columns
+                ]
             ),
             "inputs": X.loc[shown, explanation.values.columns].to_numpy(),
             "unit": TRANSFORMED_UNITS,
@@ -78,7 +82,9 @@ def train(family, folder, seed, configuration, explained_days, built):
     explained = parts.test if explained_days is None else parts.test[:explained_days]
     rank = configuration["rank"]
     fitted = priced(
-        _fitted(X, y, parts, explained, configuration["numbers"]), built, parts.test
+        _fitted(X, y, parts, explained, configuration["numbers"], built.information),
+        built,
+        parts.test,
     )
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)
