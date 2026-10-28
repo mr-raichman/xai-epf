@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,10 +15,8 @@ from epf.parameters import DEVELOPMENT, HOUR_COLUMNS
 TUNED = {
     "hidden": [8, 8],
     "activation": ["relu", "softplus"],
-    "dropout": 0.1,
-    "l1": [0.0, 1e-4],
-    "activity_l1": [1e-4, 0.0],
     "learning_rate": 0.01,
+    "batch": 16,
 }
 
 
@@ -46,7 +45,7 @@ def test_the_base_and_contributions_add_up_to_the_prediction():
     # través de la normalització per lots de l'entrada.
     X, y = rows(150)
     fitted = network.fit_rows(
-        (X[:120], y[:120]), (X[120:], y[120:]), TUNED, 0, batch=16, epochs=5, patience=2
+        (X[:120], y[:120]), (X[120:], y[120:]), TUNED, 0, epochs=5, patience=2
     )
     explained = attribute_rows(fitted, X[:5], background=X[:120])
     assert explained.values.shape == (5, 7, 24)
@@ -76,3 +75,24 @@ def test_a_trial_and_the_run_hand_the_networks_fit_the_same_seed(monkeypatch):
         with pytest.raises(Stopped):
             fit()
     assert seen == [3, 3]
+
+
+def test_a_fit_waits_as_many_weight_updates_at_any_batch(monkeypatch):
+    """A batch 256, 50 èpoques aturaven una xarxa encara al seu altiplà inicial."""
+    assert [network.patience_at(batch) for batch in (32, 64, 128, 256)] == [
+        50,
+        100,
+        200,
+        400,
+    ]
+    seen = []
+
+    class Recorded(keras.callbacks.EarlyStopping):
+        def __init__(self, **keywords):
+            seen.append(keywords["patience"])
+            super().__init__(**keywords)
+
+    monkeypatch.setattr(keras.callbacks, "EarlyStopping", Recorded)
+    X, y = rows(40)
+    network.fit_rows((X[:30], y[:30]), (X[30:], y[30:]), TUNED | {"batch": 64}, 0, 1)
+    assert seen == [100]

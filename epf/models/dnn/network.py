@@ -6,7 +6,7 @@ Es construeix com al codi de l'article, sobre la matriu diària.
 import keras
 
 from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS
-from epf.models.dnn.hyperparameters import BATCH, EPOCHS, PATIENCE
+from epf.models.dnn.hyperparameters import EPOCHS, PATIENCE, PATIENCE_BATCH
 from epf.parameters import HOURS_PER_DAY, seeded
 
 
@@ -27,21 +27,8 @@ def build(columns, tuned):
     entry = keras.Input(shape=(columns,))
     # L'únic escalador, com al codi de l'article; el que prediu no s'escala.
     tensor = keras.layers.BatchNormalization()(entry)
-    if tuned["dropout"] > 0:
-        tensor = keras.layers.Dropout(tuned["dropout"])(tensor)
-    for neurons, activation, weights, outputs in zip(
-        tuned["hidden"],
-        tuned["activation"],
-        tuned["l1"],
-        tuned["activity_l1"],
-        strict=True,
-    ):
-        tensor = keras.layers.Dense(
-            neurons,
-            activation=activation,
-            kernel_regularizer=keras.regularizers.L1(weights),
-            activity_regularizer=keras.regularizers.L1(outputs),
-        )(tensor)
+    for neurons, activation in zip(tuned["hidden"], tuned["activation"], strict=True):
+        tensor = keras.layers.Dense(neurons, activation=activation)(tensor)
     model = keras.Model(entry, keras.layers.Dense(HOURS_PER_DAY)(tensor))
     # L'error absolut, la pèrdua `'mae'` del codi de l'article.
     model.compile(
@@ -51,31 +38,33 @@ def build(columns, tuned):
     return model
 
 
-def fit_rows(
-    train,
-    validate,
-    tuned,
-    seed,
-    batch=BATCH,
-    epochs=EPOCHS,
-    patience=PATIENCE,
-):
+def patience_at(batch):
+    """Torna la paciència de l'early stopping en èpoques a un batch de `batch` dies.
+
+    Són les èpoques que fan tantes actualitzacions dels pesos com `PATIENCE` èpoques a
+    `PATIENCE_BATCH`.
+    """
+    return PATIENCE * batch // PATIENCE_BATCH
+
+
+def fit_rows(train, validate, tuned, seed, epochs=EPOCHS, patience=None):
     """Ajusta una xarxa amb `train`, amb early stopping sobre `validate`.
 
-    Tots dos són parelles `(X, y)`. Torna la xarxa amb els pesos de la millor època.
+    Tots dos són parelles `(X, y)`. El batch és el de `tuned`, i `patience`, en èpoques,
+    la d'aquest batch si és `None`. Torna la xarxa amb els pesos de la millor època.
     Buida l'estat de Keras i fixa totes les seeds globals amb la de l'ajust de la
     partició `seed`.
     """
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
-    # Sense això, un ajust amb dropout depèn del que el mateix procés va ajustar abans.
+    # Perquè l'ajust no depengui del que el mateix procés va ajustar abans.
     keras.backend.clear_session()
     keras.utils.set_random_seed(seeded("fit", seed))
     model = build(values.shape[1], tuned)
     model.fit(
         values,
         y.to_numpy(dtype=float),
-        batch_size=batch,
+        batch_size=tuned["batch"],
         epochs=epochs,
         validation_data=(
             inputs(X_validate).to_numpy(),
@@ -83,7 +72,9 @@ def fit_rows(
         ),
         callbacks=[
             keras.callbacks.EarlyStopping(
-                monitor="val_loss", patience=patience, restore_best_weights=True
+                monitor="val_loss",
+                patience=patience_at(tuned["batch"]) if patience is None else patience,
+                restore_best_weights=True,
             )
         ],
         verbose=0,
