@@ -22,7 +22,6 @@ import optuna
 from epf import Refusal, paths
 from epf.paths import plain, write_record
 from epf.contract import matrix
-from epf.contract.split import validation_parts
 from epf.information import recorded
 from epf.parameters import DEVELOPMENT, PROJECT_SEED, SHARES, seeded
 
@@ -42,16 +41,11 @@ def folder(smoke, set_name, family):
 def _dealt(seed, built):
     """Torna la SHA-256 dels dies que una seed reparteix a cada part, en ISO.
 
-    Les parts són l'entrenament, cada part de la validació en l'ordre de la seed, i la
-    prova, de la partició de les matrius `built`.
+    Les parts són l'entrenament, la validació i la prova de la partició de les matrius
+    `built`.
     """
     parts = matrix.partition(built, seed)
-    every = [
-        parts.training,
-        *validation_parts(seed, DEVELOPMENT, built.deleted),
-        parts.test,
-    ]
-    text = json.dumps([days.strftime("%Y-%m-%d").tolist() for days in every])
+    text = json.dumps([days.strftime("%Y-%m-%d").tolist() for days in parts])
     return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -198,17 +192,16 @@ def asked(study, searcher, family):
     return optuna_trial, searcher.drawn(family, optuna_trial)
 
 
-def tried(searcher, family, drawn, X, y, parts, deleted, seed):
+def tried(searcher, family, drawn, X, y, parts, seed):
     """Ajusta els valors d'un trial, `drawn`, i en torna els números i la puntuació.
 
     S'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de validació,
-    i la matriu no n'hi dona cap altra. `deleted` són els dies suprimits del període,
-    d'on es fa la partició. Els números són els valors en la forma en què els pren
-    l'ajust.
+    i la matriu no n'hi dona cap altra. Els números són els valors en la forma en què
+    els pren l'ajust.
     """
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
     return searcher.trial(
-        family, drawn, (X[train], y[train]), (X[validate], y[validate]), seed, deleted
+        family, drawn, (X[train], y[train]), (X[validate], y[validate]), seed
     )
 
 

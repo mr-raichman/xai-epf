@@ -24,7 +24,7 @@ def _trial(family, seed, drawn, fingerprints, set_name):
     module = searcher(family)
     X, y = getattr(built, module.MATRIX)
     parts = matrix.partition(built, seed)
-    return searches.tried(module, family, drawn, X, y, parts, built.deleted, seed)
+    return searches.tried(module, family, drawn, X, y, parts, seed)
 
 
 class Search:

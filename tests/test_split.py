@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from epf import parameters
-from epf.contract.split import NO_WHOLE_WEEK, _deal, deleted, split, validation_parts
+from epf.contract.split import NO_WHOLE_WEEK, _deal, deleted, split
 from epf.information import resolved
 from epf.parameters import DEVELOPMENT, SEEDS, SHARES
 
@@ -20,17 +20,16 @@ GAP = resolved("WITH_PRICE").gap
 
 
 def test_each_part_is_dealt_its_count_of_weeks():
-    # 402 setmanes: la validació en múltiples de quatre per a les quatre parts de
-    # l'arbre, la prova arrodonida i l'entrenament la resta.
+    # 402 setmanes: la validació i la prova arrodonides, i l'entrenament la resta.
     for seed in SEEDS:
         _, dealt = _deal(seed, DEVELOPMENT, DELETED, SHARES)
-        assert [len(weeks) for weeks in dealt] == [194, 128, 80]
+        assert [len(weeks) for weeks in dealt] == [193, 129, 80]
 
 
 def test_the_held_out_parts_are_whole_weeks_in_their_shares():
     for seed in SEEDS:
         parts = split(seed, DEVELOPMENT, DELETED, GAP)
-        assert (len(parts.validation), len(parts.test)) == (128 * 7, 80 * 7)
+        assert (len(parts.validation), len(parts.test)) == (129 * 7, 80 * 7)
         for days in (parts.validation, parts.test):
             # Una setmana va de dimarts a dilluns: cada dimarts retingut porta els sis
             # dies següents a la mateixa part.
@@ -111,12 +110,3 @@ def test_the_last_days_that_make_no_whole_week_are_deleted_and_in_no_part():
                 strict=True,
             )
         )
-
-
-def test_the_validation_parts_are_whole_weeks_that_share_out_the_validation_days():
-    for seed in SEEDS:
-        parts = validation_parts(seed, DEVELOPMENT, DELETED)
-        assert [len(part) for part in parts] == [32 * 7] * 4
-        joined = parts[0].append(parts[1:]).sort_values()
-        assert joined.is_unique
-        assert joined.equals(split(seed, DEVELOPMENT, DELETED, GAP).validation)

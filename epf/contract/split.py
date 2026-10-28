@@ -11,15 +11,10 @@ import collections
 import numpy as np
 import pandas as pd
 
-from epf import Refusal
 from epf.parameters import DAYS_PER_WEEK, SHARES, seeded
 
 # Els dies de cada part d'una partició, en l'ordre en què es reparteixen les setmanes.
 Split = collections.namedtuple("Split", "training validation test")
-
-# Parts en què es parteix la validació perquè l'entrenament s'aturi quan qualsevol
-# d'elles deixa de millorar, les de Trebbien et al. (2023).
-VALIDATION_PARTS = 4
 
 # Per què surt del període un dia al qual no falta res: la seva setmana en surt, o és
 # dels últims, que no fan cap setmana sencera.
@@ -52,10 +47,8 @@ def _deal(seed, period, deleted, shares):
 
     El període es talla en setmanes de set dies des del primer, i en surten els últims
     dies, que no en fan cap de sencera, i tota setmana amb algun dia de `deleted`. La
-    resta es barregen amb la seed i es reparteixen en l'ordre de `Split`: a la
-    validació, la seva part de `shares` arrodonida a un múltiple de `VALIDATION_PARTS`,
-    perquè es parteixi en parts iguals; a la prova, la seva arrodonida; i a
-    l'entrenament, la resta.
+    resta es barregen amb la seed i es reparteixen en l'ordre de `Split`: a la validació
+    i a la prova, la seva part de `shares` arrodonida, i a l'entrenament, la resta.
     """
     days = pd.date_range(*period, freq="D")
     weeks = len(days) // DAYS_PER_WEEK
@@ -64,27 +57,11 @@ def _deal(seed, period, deleted, shares):
     kept = np.flatnonzero(~gone.any(axis=1))
     order = np.random.default_rng(seeded("split", seed)).permutation(kept)
     _, validation_share, test_share = shares
-    validation = VALIDATION_PARTS * round(
-        len(kept) * validation_share / 100 / VALIDATION_PARTS
-    )
+    validation = round(len(kept) * validation_share / 100)
     test = round(len(kept) * test_share / 100)
     ends = np.cumsum([len(kept) - validation - test, validation, test])
     return days, [
         order[start:end] for start, end in zip([0, *ends[:-1]], ends, strict=True)
-    ]
-
-
-def _days_of(days, weeks):
-    """Torna els dies de les setmanes `weeks`, en ordre de data."""
-    return days[
-        np.sort(
-            np.concatenate(
-                [
-                    np.arange(week * DAYS_PER_WEEK, (week + 1) * DAYS_PER_WEEK)
-                    for week in weeks
-                ]
-            )
-        )
     ]
 
 
@@ -110,19 +87,3 @@ def split(seed, period, deleted, gap, shares=SHARES):
     return Split(
         days[training & ~beside], days[part_of_day == 1], days[part_of_day == 2]
     )
-
-
-def validation_parts(seed, period, deleted, count=VALIDATION_PARTS, shares=SHARES):
-    """Torna els dies de validació d'una seed en `count` parts iguals de setmanes.
-
-    Les parts segueixen l'ordre en què la seed ha repartit les setmanes, de manera que
-    cada una és de setmanes a l'atzar. Refusa unes setmanes de validació que no fan
-    `count` parts iguals.
-    """
-    days, dealt = _deal(seed, period, deleted, shares)
-    weeks = dealt[Split._fields.index("validation")]
-    if len(weeks) % count:
-        raise Refusal(
-            f"les {len(weeks)} setmanes de validació no fan {count} parts iguals"
-        )
-    return [_days_of(days, chunk) for chunk in np.split(weeks, count)]

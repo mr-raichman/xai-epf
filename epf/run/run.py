@@ -14,7 +14,7 @@ import time
 from epf import Declined, Refusal, information, parameters, paths, terminal
 from epf.contract import matrix, record, searches
 from epf.contract.searches import configurations
-from epf.contract.split import NO_WHOLE_WEEK, WEEK, validation_parts
+from epf.contract.split import NO_WHOLE_WEEK, WEEK
 from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, THREADS, WORKERS
 from epf.run import families, figures, pool, progress, search, tables
 
@@ -630,9 +630,6 @@ def main(arguments):
         raise Refusal(
             f"cap família triada no es pot ajustar amb {information_set.name}"
         )
-    # La partició i les parts de validació, només per refusar-les abans d'escriure res.
-    matrix.partition(matrices, values["SEEDS"][0])
-    validation_parts(values["SEEDS"][0], DEVELOPMENT, matrices.deleted)
     fingerprints = record.fingerprints(matrices)
     searched = _plans(chosen, values)[2]
     where = _where(

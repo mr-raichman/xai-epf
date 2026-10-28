@@ -56,7 +56,6 @@ def train(family, folder, seed, configuration, explained_days, built):
         y,
         groups,
         parts,
-        built.deleted,
         explained,
         seed,
         configuration["numbers"],

@@ -63,7 +63,7 @@ def fake(tmp_path, monkeypatch):
         path = folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])
         np.savez(path, r2=np.float64(0.5), mae=np.float64(1.0))
 
-    def trial(family, drawn, train, validate, seed, deleted):
+    def trial(family, drawn, train, validate, seed):
         order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
         state.calls.append(("trial", family, seed, drawn))
         raised(family, seed, "trial")

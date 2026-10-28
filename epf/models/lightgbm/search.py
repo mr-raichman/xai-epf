@@ -5,13 +5,11 @@ graella és la del codi de dos dels seus autors per a un altre problema, amb Lig
 """
 
 from epf.contract.metrics import mae
-from epf.contract.split import validation_parts
 from epf.models.lightgbm.hyperparameters import (
     MOST_TREES,
     NAME,
 )
 from epf.models.lightgbm.train import FAMILIES, fit_rows, predict_rows
-from epf.parameters import DEVELOPMENT
 
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
@@ -40,23 +38,13 @@ def drawn(family, optuna_trial):
     }
 
 
-def trial(family, drawn, train, validate, seed, deleted):
-    """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de tota la validació.
+def trial(family, drawn, train, validate, seed):
+    """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de la validació.
 
-    S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan
-    qualsevol de les `VALIDATION_PARTS` parts de la validació, `validate`, deixa de
-    millorar, com a la passada, les que la seed reparteix sense els dies suprimits,
-    `deleted`. Torna el punt i la puntuació.
+    S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan la
+    validació, `validate`, deixa de millorar, com a la passada. Torna el punt i la
+    puntuació.
     """
     (X, y), (X_validate, y_validate) = train, validate
-    weeks = validation_parts(seed, DEVELOPMENT, deleted)
-    parts = [X_validate.index.isin(days) for days in weeks]
-    model = fit_rows(
-        X,
-        y,
-        drawn,
-        MOST_TREES,
-        seed,
-        validation=[(X_validate[part], y_validate[part]) for part in parts],
-    )
+    model = fit_rows(X, y, drawn, MOST_TREES, seed, validation=validate)
     return drawn, mae(predict_rows(model, X_validate), y_validate)

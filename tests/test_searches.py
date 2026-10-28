@@ -58,7 +58,7 @@ def _searcher(grid, seen):
             return optuna_trial.suggest_float("value", 0.0, 1.0)
         return optuna_trial.suggest_categorical("value", grid["value"])
 
-    def trial(family, drawn, train, validate, seed, deleted):
+    def trial(family, drawn, train, validate, seed):
         seen.append((train[0].index, validate[0].index))
         return {"value": drawn}, float(drawn)
 
@@ -79,7 +79,7 @@ def _study(store, searcher, X, y, parts, seed, trials):
     )
     while len(completed(study)) < trials:
         optuna_trial, drawn = asked(study, searcher, "fake")
-        numbers, score = tried(searcher, "fake", drawn, X, y, parts, DELETED, seed)
+        numbers, score = tried(searcher, "fake", drawn, X, y, parts, seed)
         told(study, optuna_trial, numbers, score, FINGERPRINTS)
     return study
 
@@ -89,9 +89,7 @@ def test_a_trial_sees_the_training_and_validation_days_and_no_test_day():
     X, y = _table()
     parts = split(0, PERIOD, DELETED, 1)
     seen = []
-    tried(
-        _searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, DELETED, 0
-    )
+    tried(_searcher({"value": tuple(range(8))}, seen), "fake", 3, X, y, parts, 0)
     ((train, validate),) = seen
     assert train.equals(parts.training) and validate.equals(parts.validation)
     assert not train.isin(parts.test).any() and not validate.isin(parts.test).any()

@@ -10,7 +10,6 @@ from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group
 from epf.contract.record import Fitted, priced, save_model
-from epf.contract.split import VALIDATION_PARTS, validation_parts
 from epf.models.lightgbm import attribution
 from epf.models.lightgbm.hyperparameters import (
     MIN_CHILD_WEIGHT,
@@ -19,7 +18,7 @@ from epf.models.lightgbm.hyperparameters import (
     PATIENCE,
     SUBSAMPLE_FREQ,
 )
-from epf.parameters import DEVELOPMENT, INTERACTION_ROWS, THREADS, seeded
+from epf.parameters import INTERACTION_ROWS, THREADS, seeded
 
 # La família, com la planifica una passada: tots els números fixos que llegeixen els
 # seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
@@ -31,7 +30,6 @@ FAMILIES = {
             "patience": PATIENCE,
             "subsample_freq": SUBSAMPLE_FREQ,
             "min_child_weight": MIN_CHILD_WEIGHT,
-            "validation_parts": VALIDATION_PARTS,
             "threads": THREADS,
         },
         "kept": "BEST",
@@ -69,26 +67,24 @@ def lightgbm(point, trees, seed):
     )
 
 
-def fit_rows(X, y, point, trees, seed, validation=()):
+def fit_rows(X, y, point, trees, seed, validation=None):
     """Ajusta i torna un model d'un punt de la graella amb les files donades.
 
     `seed` és la de la partició, d'on surt la de l'ajust. Sense `validation` fa
-    `trees` arbres, ni un més ni un menys. Amb `validation`,
-    parelles `(X, y)`, `trees` és el sostre, i l'early stopping atura l'entrenament quan
-    qualsevol d'elles porta `PATIENCE` arbres sense millorar, i el model es queda amb el
-    millor arbre d'aquella: amb quatre parelles és l'early stopping de Trebbien et al.
-    (2023), que parteix la validació en quatre. Cada crida fa un regressor nou, de
-    manera que cap ajust no hereta res de l'anterior.
+    `trees` arbres, ni un més ni un menys. Amb `validation`, una parella `(X, y)`,
+    `trees` és el sostre, i l'early stopping atura l'entrenament quan porta `PATIENCE`
+    arbres sense millorar, i el model es queda amb el millor. Cada crida fa un
+    regressor nou, de manera que cap ajust no hereta res de l'anterior.
     """
     model = lightgbm(point, trees, seed)
-    if not validation:
+    if validation is None:
         return model.fit(X, y)
-    parts, targets = zip(*validation, strict=True)
+    X_validate, y_validate = validation
     return model.fit(
         X,
         y,
-        eval_X=parts,
-        eval_y=targets,
+        eval_X=X_validate,
+        eval_y=y_validate,
         callbacks=[early_stopping(PATIENCE, verbose=False)],
     )
 
@@ -97,22 +93,24 @@ def predict_rows(model, X):
     return model.predict(X)
 
 
-def fitted(X, y, groups, parts, deleted, explained, seed, numbers, with_interactions):
+def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
-    L'early stopping l'atura quan qualsevol de les `VALIDATION_PARTS` parts de la
-    validació deixa de millorar, les que la seed reparteix sense els dies suprimits,
-    `deleted`. Amb `with_interactions`, explica també les interaccions d'una mostra de
+    L'early stopping l'atura quan la validació deixa de millorar. Amb
+    `with_interactions`, explica també les interaccions d'una mostra de
     `INTERACTION_ROWS` d'aquelles files. `groups` és el grup de cada columna de `X`, i
     `numbers` el punt de la configuració.
     """
-    training, test, shown = (
-        X.index.isin(days) for days in (parts.training, parts.test, explained)
+    training, validation, test, shown = (
+        X.index.isin(days) for days in (*parts, explained)
     )
-    weeks = validation_parts(seed, DEVELOPMENT, deleted)
-    validation = [(X[part], y[part]) for part in (X.index.isin(days) for days in weeks)]
     model = fit_rows(
-        X[training], y[training], numbers, MOST_TREES, seed, validation=validation
+        X[training],
+        y[training],
+        numbers,
+        MOST_TREES,
+        seed,
+        validation=(X[validation], y[validation]),
     )
     values, base = attribution.attribute_rows(model, X[shown])
     # La base més les contribucions torna la predicció.
@@ -163,7 +161,6 @@ def train(family, folder, seed, configuration, explained_days, built):
         y,
         groups,
         parts,
-        built.deleted,
         explained,
         seed,
         configuration["numbers"],
