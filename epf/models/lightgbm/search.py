@@ -15,11 +15,13 @@ from epf.models.lightgbm.train import FAMILIES, fit_rows, predict_rows
 MATRIX = "hourly"
 
 # La graella del codi de Kruse, Schäfer i Witthaut (2022) per a l'activació de la
-# reserva secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`.
+# reserva secundària, `scripts/6_model_fit.py` de `johkruse/XAI-for-aFRR-activation`; la
+# mostra de files 0.75 en lloc del seu 0.9, que deixa fora les files de quart en quart
+# fins a la meitat.
 GRID = {
     "num_leaves": (10, 30, 200, 900),
     "max_depth": (10, 5),
-    "subsample": (1.0, 0.9, 0.5),
+    "subsample": (1.0, 0.75, 0.5),
     "learning_rate": (0.001, 0.05, 0.01, 0.1),
     "min_child_samples": (50, 100, 500),
 }

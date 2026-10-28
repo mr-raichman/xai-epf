@@ -6,10 +6,13 @@ NAME = "lightgbm"
 # La columna del comptador de la sonda de datació, els dies des del primer del període.
 DAY_COUNTER = "day_counter"
 
-# Arbres com a molt d'un ajust amb early stopping, i rondes sense millorar abans
-# d'aturar-lo: els del codi de Kruse et al. (2022), que la graella de la cerca
+# Arbres com a molt d'un ajust amb early stopping, tants que només la paciència l'atura:
+# amb els 1000 del codi de Kruse et al. (2022), s'hi aturaven ajustos que encara
+# milloraven.
+MOST_TREES = 50000
+
+# Rondes sense millorar abans d'aturar-lo: les d'aquell codi, que la graella de la cerca
 # acompanya.
-MOST_TREES = 1000
 PATIENCE = 20
 
 # El que aquell codi fixa a cada punt de la graella: la mostra de files es pren a cada
