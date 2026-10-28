@@ -57,7 +57,8 @@ def fit_rows(train, validate, tuned, seed, epochs=EPOCHS, patience=None):
     """
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
-    # Perquè l'ajust no depengui del que el mateix procés va ajustar abans.
+    # Allibera l'estat global de Keras, que segons la seva documentació creix en memòria
+    # amb cada model que el procés construeix.
     keras.backend.clear_session()
     keras.utils.set_random_seed(seeded("fit", seed))
     model = build(values.shape[1], tuned)
