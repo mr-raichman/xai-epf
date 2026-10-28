@@ -16,7 +16,8 @@ def searcher(family):
 def _trial(family, seed, drawn, fingerprints, set_name):
     """Ajusta els valors d'un trial d'una família en una seed, una tasca de `pool`.
 
-    Torna els números i la puntuació. Refusa un codi, unes matrius o unes biblioteques
+    Torna els números, la puntuació i on s'ha aturat l'ajust. Refusa un codi, unes
+    matrius o unes biblioteques
     que no són els de `fingerprints`, les empremtes amb què es va començar o continuar
     la passada, les matrius les de l'information set `set_name`.
     """
@@ -113,28 +114,32 @@ class Search:
         return bool(self.pending)
 
     def returned(self, label, result):
-        """Desa al seu study el que torna un trial, els números i la puntuació.
+        """Desa al seu study el que torna un trial.
 
-        `result` és el que torna. Torna el registre de la seed si amb aquest trial ja
-        els té tots, i si no, `None`.
+        `result` és el que torna, els números, la puntuació i on s'ha aturat l'ajust.
+        Torna el registre de la seed si amb aquest trial ja els té tots, i ho diu al
+        fitxer dels processos, i si no, `None`.
         """
         family, seed, _, number = label
-        numbers, score = result
+        numbers, score, stop = result
         if searches.told(
             self.studies[family, seed],
             self.pending.pop(label),
             numbers,
             score,
+            stop,
             self.fingerprints,
         ):
-            with open(self.log, "a", encoding="utf-8") as handle:
-                handle.write(
-                    f"{family} seed {seed} trial {number} ha divergit: {score}\n"
-                )
+            self._logged(f"{family} seed {seed} trial {number} ha divergit: {score}")
         self.done[family, seed] += 1
-        if self.done[family, seed] == self.trials[family]:
-            return self._saved(family, seed)
-        return None
+        if self.done[family, seed] < self.trials[family]:
+            return None
+        trials = self.trials[family]
+        self._logged(
+            f"{family} seed {seed}: cerca acabada amb "
+            + ("el seu trial" if trials == 1 else f"els seus {trials} trials")
+        )
+        return self._saved(family, seed)
 
     def failed(self, label):
         """Dona per fallat al seu study un trial que no ha tornat cap resultat."""
@@ -161,6 +166,11 @@ class Search:
     def counts(self, family, seed):
         """Torna els trials d'una seed i els que ja té, `(trials, fets)`."""
         return self.trials[family], min(self.done[family, seed], self.trials[family])
+
+    def _logged(self, line):
+        """Afegeix una línia al fitxer dels processos de la passada."""
+        with open(self.log, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
 
     def _saved(self, family, seed):
         """Desa el registre d'una seed que ja té tots els seus trials, i el torna."""

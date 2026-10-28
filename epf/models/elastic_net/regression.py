@@ -83,6 +83,21 @@ def fit_rows(X, y, penalty, mixing):
     )
 
 
+def iterations(model):
+    """Torna les iteracions del descens de coordenades del model de cada hora."""
+    return [int(fitted.model.n_iter_) for fitted in model]
+
+
+def stopped(iterations):
+    """Torna per què s'aturen els models de les hores, i les iteracions del més llarg.
+
+    `iterations` són les de cada hora. Per `"ceiling"`, `MAX_ITER`, si alguna hi arriba,
+    i si no per `"tolerance"`, la del descens de coordenades.
+    """
+    most = max(iterations)
+    return ("ceiling" if most >= MAX_ITER else "tolerance"), most
+
+
 def largest_penalty(X, y, mixing):
     """Torna el càstig més petit que deixa a zero tots els coeficients de les 24 hores.
 

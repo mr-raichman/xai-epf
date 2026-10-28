@@ -7,6 +7,7 @@ from epf import Refusal
 from epf.contract.matrix import HOUR, matrices
 from epf.information import PRICE, resolved
 from epf.models.elastic_net.attribution import attribute_rows
+from epf.models.elastic_net import regression
 from epf.models.elastic_net.regression import _prepared, by_hour, fit_rows, predict_rows
 from epf.models.elastic_net.scaling import Scaler
 from epf.models.elastic_net.search import penalties
@@ -175,3 +176,14 @@ def test_the_fallback_still_refuses_a_column_that_never_moves():
     flat = np.column_stack([np.arange(10.0), np.zeros(10)])
     with pytest.raises(Refusal, match="1 columna no té dispersió .*, b$"):
         Scaler(flat, ["a", "b"], std_where_flat=True)
+
+
+@pytest.mark.parametrize("ceiling, why", [(1, "ceiling"), (None, "tolerance")])
+def test_a_fits_stop_follows_from_its_hours_iterations(monkeypatch, ceiling, why):
+    if ceiling is not None:
+        monkeypatch.setattr(regression, "MAX_ITER", ceiling)
+    X, y = per_hour_table()
+    found, _ = regression.stopped(
+        regression.iterations(fit_rows(X, y, PENALTY, MIXING))
+    )
+    assert found == why

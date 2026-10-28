@@ -9,7 +9,7 @@ from lightgbm import LGBMRegressor, early_stopping
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group
-from epf.contract.record import Fitted, priced, save_model
+from epf.contract.record import STOPPED, Fitted, priced, save_model
 from epf.models.lightgbm import attribution
 from epf.models.lightgbm.hyperparameters import (
     MIN_CHILD_WEIGHT,
@@ -93,6 +93,23 @@ def predict_rows(model, X):
     return model.predict(X)
 
 
+def stopped(trees):
+    """Torna per què s'atura un ajust que es queda `trees` arbres, i quants en fa.
+
+    Per `"ceiling"`, `MOST_TREES`, si amb `PATIENCE` arbres més el passaria, i si no per
+    `"patience"`.
+    """
+    if trees + PATIENCE > MOST_TREES:
+        return "ceiling", MOST_TREES
+    return "patience", trees + PATIENCE
+
+
+def said(trees):
+    """Torna com s'ha aturat un ajust que es queda `trees` arbres, en una línia."""
+    why, grown = stopped(trees)
+    return f"{grown} arbres, el millor el {trees}; {STOPPED[why]}"
+
+
 def fitted(X, y, groups, parts, explained, seed, numbers, with_interactions):
     """Ajusta l'arbre d'una configuració i n'explica les files dels dies explicats.
 
@@ -149,7 +166,7 @@ def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
-    les matrius de la passada.
+    les matrius de la passada. Torna com s'ha aturat l'ajust, com `said`.
     """
     X, y = built.hourly
     groups = np.array([group(column, built.information) for column in X.columns])
@@ -169,3 +186,4 @@ def train(family, folder, seed, configuration, explained_days, built):
     found = priced(found, built, parts.test)
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, found, rank)
+    return said(int(found.arrays["trees"]))

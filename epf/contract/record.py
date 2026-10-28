@@ -24,6 +24,13 @@ Fitted = collections.namedtuple(
     defaults=(0.0, None, None),
 )
 
+# Per què s'ha aturat un ajust, en les paraules del fitxer dels processos de la passada.
+STOPPED = {
+    "patience": "aturat per la paciència",
+    "ceiling": "aturat pel sostre",
+    "tolerance": "aturat per la tolerància",
+}
+
 # Com es diu cada empremta que no és la d'ara, la que va començar la passada o la
 # seva continuació. La del dataset es desa i no s'hi compara: un dataset nou amb una
 # sèrie d'un altre information set no canvia les matrius d'aquest.

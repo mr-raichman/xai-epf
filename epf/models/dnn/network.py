@@ -47,13 +47,24 @@ def patience_at(batch):
     return PATIENCE * batch // PATIENCE_BATCH
 
 
+def stopped(epochs, batch):
+    """Torna per què s'atura un ajust que es queda l'època `epochs`, i quantes en fa.
+
+    Per `"ceiling"`, `EPOCHS`, si amb la paciència del seu batch, `batch`, el passaria,
+    i si no per `"patience"`.
+    """
+    if epochs + patience_at(batch) > EPOCHS:
+        return "ceiling", EPOCHS
+    return "patience", epochs + patience_at(batch)
+
+
 def fit_rows(train, validate, tuned, seed, epochs=EPOCHS, patience=None):
     """Ajusta una xarxa amb `train`, amb early stopping sobre `validate`.
 
     Tots dos són parelles `(X, y)`. El batch és el de `tuned`, i `patience`, en èpoques,
-    la d'aquest batch si és `None`. Torna la xarxa amb els pesos de la millor època.
-    Buida l'estat de Keras i fixa totes les seeds globals amb la de l'ajust de la
-    partició `seed`.
+    la d'aquest batch si és `None`. Torna la xarxa amb els pesos de la millor època, i
+    aquesta època, comptada des d'1. Buida l'estat de Keras i fixa totes les seeds
+    globals amb la de l'ajust de la partició `seed`.
     """
     (X, y), (X_validate, y_validate) = train, validate
     values = inputs(X).to_numpy()
@@ -62,6 +73,11 @@ def fit_rows(train, validate, tuned, seed, epochs=EPOCHS, patience=None):
     keras.backend.clear_session()
     keras.utils.set_random_seed(seeded("fit", seed))
     model = build(values.shape[1], tuned)
+    stop = keras.callbacks.EarlyStopping(
+        monitor="val_loss",
+        patience=patience_at(tuned["batch"]) if patience is None else patience,
+        restore_best_weights=True,
+    )
     model.fit(
         values,
         y.to_numpy(dtype=float),
@@ -71,16 +87,10 @@ def fit_rows(train, validate, tuned, seed, epochs=EPOCHS, patience=None):
             inputs(X_validate).to_numpy(),
             y_validate.to_numpy(dtype=float),
         ),
-        callbacks=[
-            keras.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=patience_at(tuned["batch"]) if patience is None else patience,
-                restore_best_weights=True,
-            )
-        ],
+        callbacks=[stop],
         verbose=0,
     )
-    return model
+    return model, stop.best_epoch + 1
 
 
 def predict_rows(fitted, X):

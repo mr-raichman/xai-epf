@@ -9,7 +9,7 @@ from epf.contract.explanation import (
     TRANSFORMED_UNITS,
     group,
 )
-from epf.contract.record import Fitted, priced, save_model
+from epf.contract.record import STOPPED, Fitted, priced, save_model
 from epf.models.elastic_net import attribution, regression
 from epf.models.elastic_net.hyperparameters import MAX_ITER, NAME
 from epf.models.elastic_net.scaling import NORMAL_CONSISTENCY
@@ -64,6 +64,7 @@ def _fitted(X, y, parts, explained, numbers, information_set):
             "values": explanation.values.to_numpy(),
             "base": explanation.base.to_numpy(),
             "transformed": explanation.transformed.to_numpy(),
+            "iterations": np.array(regression.iterations(model)),
         },
         gap,
         TRANSFORMED_TOLERANCE,
@@ -75,7 +76,7 @@ def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
-    les matrius de la passada.
+    les matrius de la passada. Torna com s'ha aturat l'ajust, en una línia.
     """
     X, y = built.hourly
     parts = matrix.partition(built, seed)
@@ -88,3 +89,6 @@ def train(family, folder, seed, configuration, explained_days, built):
     )
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)
+    why, most = regression.stopped(fitted.arrays["iterations"])
+    counted = "1 iteració" if most == 1 else f"{most} iteracions"
+    return f"com a molt {counted} en una hora; {STOPPED[why]}"

@@ -50,7 +50,7 @@ def trial(family, drawn, train, validate, seed):
     """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de la validació.
 
     El càstig del seu pas es calcula sobre les files d'entrenament, `train`. Torna el
-    càstig i la barreja, i la puntuació.
+    càstig i la barreja, la puntuació i les iteracions del model de cada hora.
     """
     (X, y), (X_validate, y_validate) = train, validate
     mixing, step = drawn
@@ -59,4 +59,5 @@ def trial(family, drawn, train, validate, seed):
     return (
         {"penalty": penalty, "mixing": mixing},
         mae(regression.predict_rows(model, X_validate), y_validate),
+        {"iterations": regression.iterations(model)},
     )

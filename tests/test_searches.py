@@ -65,7 +65,7 @@ def _searcher(grid, seen):
 
     def trial(family, drawn, train, validate, seed):
         seen.append((train[0].index, validate[0].index))
-        return {"value": drawn}, float(drawn)
+        return {"value": drawn}, float(drawn), {}
 
     return types.SimpleNamespace(
         MATRIX="daily",
@@ -84,8 +84,8 @@ def _study(store, searcher, X, y, parts, seed, trials):
     )
     while len(completed(study)) < trials:
         optuna_trial, drawn = asked(study, searcher, "fake")
-        numbers, score = tried(searcher, "fake", drawn, X, y, parts, seed)
-        told(study, optuna_trial, numbers, score, FINGERPRINTS)
+        numbers, score, stop = tried(searcher, "fake", drawn, X, y, parts, seed)
+        told(study, optuna_trial, numbers, score, stop, FINGERPRINTS)
     return study
 
 
@@ -222,7 +222,7 @@ def test_a_trial_without_a_finite_score_diverges_and_keeps_its_matrices(
         store, "fake", searcher, 0, X.columns, BUILT, FINGERPRINTS["matrices"]
     )
     optuna_trial, drawn = asked(study, searcher, "fake")
-    assert told(study, optuna_trial, {"value": drawn}, score, FINGERPRINTS)
+    assert told(study, optuna_trial, {"value": drawn}, score, {}, FINGERPRINTS)
     assert [one.state.name for one in study.trials] == ["FAIL"]
     with pytest.raises(Refusal, match="sobre unes altres matrius"):
         opened(store, "fake", searcher, 0, X.columns, BUILT, "unes altres")
@@ -302,6 +302,6 @@ def test_a_wave_told_in_any_order_gives_the_same_next_wave(tmp_path):
         )
         wave = [asked(study, searcher, "fake") for _ in range(5)]
         for optuna_trial, drawn in wave[order]:
-            told(study, optuna_trial, {"value": drawn}, drawn, FINGERPRINTS)
+            told(study, optuna_trial, {"value": drawn}, drawn, {}, FINGERPRINTS)
         waves.append([asked(study, searcher, "fake")[1] for _ in range(5)])
     assert waves[0] == waves[1]

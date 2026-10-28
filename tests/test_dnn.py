@@ -44,7 +44,7 @@ def test_the_base_and_contributions_add_up_to_the_prediction():
     # La base i les contribucions de DeepExplainer contra la predicció de la xarxa, a
     # través de la normalització per lots de l'entrada.
     X, y = rows(150)
-    fitted = network.fit_rows(
+    fitted, _ = network.fit_rows(
         (X[:120], y[:120]), (X[120:], y[120:]), TUNED, 0, epochs=5, patience=2
     )
     explained = attribute_rows(fitted, X[:5], background=X[:120])
@@ -96,3 +96,21 @@ def test_a_fit_waits_as_many_weight_updates_at_any_batch(monkeypatch):
     X, y = rows(40)
     network.fit_rows((X[:30], y[:30]), (X[30:], y[30:]), TUNED | {"batch": 64}, 0, 1)
     assert seen == [100]
+
+
+@pytest.mark.parametrize(
+    "changed, why", [("EPOCHS", "ceiling"), ("PATIENCE", "patience")]
+)
+def test_a_fits_stop_follows_from_the_epoch_it_keeps(monkeypatch, changed, why):
+    """Es desa la millor època: les que es fan, i per què, se'n dedueixen."""
+    # Un sostre de 3 èpoques atura abans que la paciència a batch 32; una paciència de
+    # 2, abans que el sostre.
+    monkeypatch.setattr(network, changed, {"EPOCHS": 3, "PATIENCE": 2}[changed])
+    X, y = rows(150)
+    tuned = TUNED | {"batch": 32}
+    fitted, epochs = network.fit_rows(
+        (X[:120], y[:120]), (X[120:], y[120:]), tuned, 0, network.EPOCHS
+    )
+    found, ran = network.stopped(epochs, tuned["batch"])
+    assert found == why
+    assert ran == len(fitted.history.history["val_loss"])

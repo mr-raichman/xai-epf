@@ -209,7 +209,7 @@ def tried(searcher, family, drawn, X, y, parts, seed):
 
     S'ajusta amb les files d'entrenament de `parts` i es puntua sobre les de validació,
     i la matriu no n'hi dona cap altra. Els números són els valors en la forma en què
-    els pren l'ajust.
+    els pren l'ajust. Torna també on s'ha aturat l'ajust, el que en desa el cercador.
     """
     train, validate = X.index.isin(parts.training), X.index.isin(parts.validation)
     return searcher.trial(
@@ -217,14 +217,17 @@ def tried(searcher, family, drawn, X, y, parts, seed):
     )
 
 
-def told(study, optuna_trial, numbers, score, fingerprints):
+def told(study, optuna_trial, numbers, score, stop, fingerprints):
     """Desa al study el resultat d'un trial i el dona per acabat.
 
-    Hi desa els números, la càrrega de la màquina i les empremtes, `fingerprints`, del
-    codi, del dataset, de les matrius i de les biblioteques que el fan. Un trial sense
-    una puntuació finita ha divergit: el dona per fallat, marcat, i diu si ho ha fet.
+    Hi desa els números, on s'ha aturat l'ajust, `stop`, cada valor pel seu nom, la
+    càrrega de la màquina i les empremtes, `fingerprints`, del codi, del dataset, de les
+    matrius i de les biblioteques que el fan. Un trial sense una puntuació finita ha
+    divergit: el dona per fallat, marcat, i diu si ho ha fet.
     """
     optuna_trial.set_user_attr("numbers", plain(numbers))
+    for name, value in stop.items():
+        optuna_trial.set_user_attr(name, plain(value))
     # La càrrega quan el trial torna; Windows no la dona, i hi queda buida.
     optuna_trial.set_user_attr(
         "load", os.getloadavg() if hasattr(os, "getloadavg") else None

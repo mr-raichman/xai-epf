@@ -62,14 +62,15 @@ def fake(tmp_path, monkeypatch):
         raised(family, seed, "fit")
         path = folder / paths.MODEL.format(seed=seed, rank=configuration["rank"])
         np.savez(path, r2=np.float64(0.5), mae=np.float64(1.0))
+        return None if family == "third" else "aturat"
 
     def trial(family, drawn, train, validate, seed):
         order = sum(call[:3] == ("trial", family, seed) for call in state.calls)
         state.calls.append(("trial", family, seed, drawn))
         raised(family, seed, "trial")
         if (family, seed, order) in state.diverging:
-            return {"value": drawn}, math.nan
-        return {"value": drawn}, float(drawn)
+            return {"value": drawn}, math.nan, {}
+        return {"value": drawn}, float(drawn), {}
 
     trainer = types.ModuleType("fake_trainer")
     trainer.FAMILIES = {
@@ -275,6 +276,22 @@ def test_a_seeds_next_wave_is_asked_once_its_last_has_returned_whole(fake, monke
     ] == ["ask", "ask", "trial", "trial"] * 2
 
 
+def test_the_log_holds_a_line_a_seeds_search_and_a_fit_that_stopped(fake):
+    """Un ajust aturat pel sostre no es veia enlloc."""
+    fake.main()
+    log = paths.runs(True, SET) / _name() / paths.WORKERS_LOG
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "first seed 0: cerca acabada amb els seus 4 trials",
+        "first seed 0 fit 0: aturat",
+        "first seed 0 fit 1: aturat",
+        "first seed 1: cerca acabada amb els seus 4 trials",
+        "first seed 1 fit 0: aturat",
+        "first seed 1 fit 1: aturat",
+        "second seed 0 fit 0: aturat",
+        "second seed 1 fit 0: aturat",
+    ]
+
+
 def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     """Una seed amb un trial de menys no es pot planificar, i continuar l'acaba."""
     fake.failing = {("first", 1, "trial"): RuntimeError}
@@ -326,7 +343,7 @@ def test_a_diverged_trial_counts_and_its_seed_ranks_the_others(fake):
     assert found["trials"] == 4 and len(found["ranked"]) == 3
     assert len(_recorded("first")["configurations"]["0"]) == 2
     log = paths.runs(True, SET) / _name() / paths.WORKERS_LOG
-    assert log.read_text(encoding="utf-8") == "first seed 0 trial 1 ha divergit: nan\n"
+    assert "first seed 0 trial 1 ha divergit: nan\n" in log.read_text(encoding="utf-8")
 
 
 def test_a_continued_run_asks_no_trial_in_place_of_a_diverged_one(fake):

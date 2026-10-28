@@ -348,7 +348,8 @@ def _train(
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
     Crida el `train` del mòdul del model, `module`, amb les matrius de l'information
-    set `set_name`. Torna quants segons ha trigat, sense importar-lo. Refusa un codi,
+    set `set_name`. Torna quants segons ha trigat, sense importar-lo, i com s'ha aturat
+    l'ajust, el que torna `train`, `None` d'un que no s'atura. Refusa un codi,
     unes matrius o unes biblioteques que no són els de `fingerprints`, les empremtes amb
     què es va començar o continuar la passada.
     """
@@ -357,8 +358,8 @@ def _train(
     # Un procés l'importa a la seva primera tasca del model, i només en un assaig això
     # passa sovint en un ajust.
     started = time.time()
-    train(family, folder, seed, configuration, explained_days, built)
-    return time.time() - started
+    said = train(family, folder, seed, configuration, explained_days, built)
+    return time.time() - started, said
 
 
 def _ordered(by_seed):
@@ -573,13 +574,17 @@ class Run:
     def returned(self, label, result):
         """Desa el que torna una tasca, un ajust o un trial.
 
-        D'un ajust, els segons i el codi que l'ha fet. Quan amb el trial la cerca de la
-        seed ja és acabada, planifica cada família triada que la llegeix, i en posa els
-        ajustos a la cua.
+        D'un ajust, els segons i el codi que l'ha fet, i com s'ha aturat, al fitxer dels
+        processos. Quan amb el trial la cerca de la seed ja és acabada, planifica cada
+        família triada que la llegeix, i en posa els ajustos a la cua.
         """
         family, seed, kind, rank = label
         if kind == "fit":
-            _timed(self.where / family, seed, rank, result, self.fingerprints["code"])
+            seconds, said = result
+            _timed(self.where / family, seed, rank, seconds, self.fingerprints["code"])
+            if said is not None:
+                with open(self.where / paths.WORKERS_LOG, "a", encoding="utf-8") as log:
+                    log.write(f"{family} seed {seed} fit {rank}: {said}\n")
             return
         if self.searching.returned(label, result) is None:
             return

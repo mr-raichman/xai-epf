@@ -70,3 +70,19 @@ def test_a_trial_and_the_run_hand_the_fit_the_same_seed(monkeypatch):
     with pytest.raises(Stopped):
         train.fitted(X, y, np.array(["x"]), parts, parts.test, 3, POINT, False)
     assert seen == [3, 3]
+
+
+@pytest.mark.parametrize("ceiling, why", [(5, "ceiling"), (None, "patience")])
+def test_a_fits_stop_follows_from_the_trees_it_keeps(monkeypatch, ceiling, why):
+    """Es desa el millor arbre: els que es fan, i per què, se'n dedueixen."""
+    if ceiling is not None:
+        monkeypatch.setattr(train, "MOST_TREES", ceiling)
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(2000, 5))
+    y = X.sum(axis=1) + rng.normal(size=2000)
+    model = fit_rows(
+        X[:1500], y[:1500], POINT, train.MOST_TREES, 0, validation=(X[1500:], y[1500:])
+    )
+    found, grown = train.stopped(model.best_iteration_)
+    assert found == why
+    assert grown == len(model.evals_result_["valid_0"]["l2"])

@@ -44,9 +44,13 @@ def trial(family, drawn, train, validate, seed):
     """Ajusta el punt d'un trial, `drawn`, i el puntua pel MAE de la validació.
 
     S'ajusta amb les files d'entrenament, `train`, i l'early stopping l'atura quan la
-    validació, `validate`, deixa de millorar, com a la passada. Torna el punt i la
-    puntuació.
+    validació, `validate`, deixa de millorar, com a la passada. Torna el punt, la
+    puntuació i els arbres amb què es queda.
     """
     (X, y), (X_validate, y_validate) = train, validate
     model = fit_rows(X, y, drawn, MOST_TREES, seed, validation=validate)
-    return drawn, mae(predict_rows(model, X_validate), y_validate)
+    return (
+        drawn,
+        mae(predict_rows(model, X_validate), y_validate),
+        {"trees": model.best_iteration_},
+    )

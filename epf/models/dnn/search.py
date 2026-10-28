@@ -69,14 +69,14 @@ def trial(family, drawn, train, validate, seed):
 
     S'ajusta amb les files d'entrenament, `train`, amb early stopping sobre tota la
     validació, `validate`. La pèrdua és la de validació de Keras, com la que puntua el
-    codi de l'article, i sense cap càstig és el MAE. Torna els números i la puntuació.
+    codi de l'article, i sense cap càstig és el MAE. Torna els números, la puntuació i
+    l'època amb què es queda.
     """
     X_validate, y_validate = validate
-    fitted = network.fit_rows(train, validate, drawn, seed)
-    return drawn, float(
-        fitted.evaluate(
-            network.inputs(X_validate).to_numpy(),
-            y_validate.to_numpy(dtype=float),
-            verbose=0,
-        )
+    fitted, epochs = network.fit_rows(train, validate, drawn, seed)
+    score = fitted.evaluate(
+        network.inputs(X_validate).to_numpy(),
+        y_validate.to_numpy(dtype=float),
+        verbose=0,
     )
+    return drawn, float(score), {"epochs": epochs}

@@ -5,7 +5,7 @@ import numpy as np
 from epf import paths
 from epf.contract import matrix
 from epf.contract.explanation import PRICE_UNITS, TOLERANCE, group, summed
-from epf.contract.record import Fitted, priced, save_model
+from epf.contract.record import STOPPED, Fitted, priced, save_model
 from epf.models.dnn import attribution, network
 from epf.models.dnn.hyperparameters import FIXED
 
@@ -34,7 +34,7 @@ def _fitted(X, y, parts, explained, seed, numbers, information_set):
     training, validation, test, shown = (
         X.index.isin(days) for days in (*parts, explained)
     )
-    fitted = network.fit_rows(
+    fitted, epochs = network.fit_rows(
         (X[training], y[training]),
         (X[validation], y[validation]),
         numbers,
@@ -64,6 +64,7 @@ def _fitted(X, y, parts, explained, seed, numbers, information_set):
             "unit": PRICE_UNITS,
             "values": explanation.values,
             "base": explanation.base,
+            "epochs": epochs,
         },
         gap,
         TOLERANCE,
@@ -75,7 +76,7 @@ def train(family, folder, seed, configuration, explained_days, built):
     """Ajusta, comprova, puntua i desa una configuració del pla d'una seed.
 
     `explained_days` són els dies de prova que s'expliquen, tots amb `None`, i `built`
-    les matrius de la passada.
+    les matrius de la passada. Torna com s'ha aturat l'ajust, en una línia.
     """
     X, y = built.daily
     parts = matrix.partition(built, seed)
@@ -90,3 +91,6 @@ def train(family, folder, seed, configuration, explained_days, built):
     )
     path = folder / paths.MODEL.format(seed=seed, rank=rank)
     save_model(path, parts, explained, fitted, rank)
+    epochs = int(fitted.arrays["epochs"])
+    why, ran = network.stopped(epochs, configuration["numbers"]["batch"])
+    return f"{ran} èpoques, la millor la {epochs}; {STOPPED[why]}"
