@@ -8,7 +8,9 @@ MATRIX = "daily"
 # Sense graella: l'espai el mostreja TPE.
 GRID = None
 
-# Trials de la cerca a cada seed, demanats en onades: una onada es demana sencera quan
+# Trials de la cerca a cada seed, 100 pel còmput, on Marcjasz et al. (2023) en fan 2048,
+# demanats en onades de 5, la meitat dels 10 que TPE tria a l'atzar abans de fer servir
+# el seu model, perquè aquest s'actualitzi sovint. Una onada es demana sencera quan
 # l'anterior ha tornat sencera, i TPE tria a partir dels trials tornats, de manera que
 # una cerca fa els mateixos trials siguin quants siguin els processos.
 TRIALS = 100
