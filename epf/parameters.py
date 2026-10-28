@@ -40,10 +40,13 @@ SEEDS = tuple(range(20))
 # La seed d'on surt cada tria a l'atzar del projecte, per `seeded`.
 PROJECT_SEED = 0
 
-# Trials de la cerca de cada família a cada seed, i quants dels millors se n'expliquen:
-# Trebbien et al. (2023) en guarden els deu millors i no diuen quants en proven, i
-# cinquanta és el nombre del projecte.
-TRIALS = 50
+# Trials de la cerca de cada família a cada seed: amb `None`, els seus, tota la graella
+# de l'arbre i de l'elastic net i 100 de la xarxa; un nombre, el d'un assaig, en limita
+# tots.
+TRIALS = None
+
+# Les millors configuracions diferents de cada seed que s'expliquen: Trebbien et al.
+# (2023) en guarden les deu millors.
 BEST = 10
 
 

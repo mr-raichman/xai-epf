@@ -3,6 +3,7 @@ import math
 import types
 
 import numpy as np
+import optuna
 import pandas as pd
 import pytest
 
@@ -17,9 +18,13 @@ from epf.contract.searches import (
     record,
     told,
     tried,
+    trials,
 )
 from epf.contract.split import split
 from epf.information import resolved
+from epf.models.dnn import search as dnn
+from epf.models.elastic_net import search as elastic_net
+from epf.models.lightgbm import search as lightgbm
 
 # Un període curt de setmanes senceres, de dimarts a dilluns, amb una setmana suprimida.
 PERIOD = (datetime.date(2019, 1, 1), datetime.date(2019, 7, 29))
@@ -247,3 +252,56 @@ def test_a_seed_fits_the_best_of_its_search_and_the_date_probe_the_best_alone(
 
 def test_a_family_never_searched_fits_once_with_no_numbers():
     assert configurations(None, 0) == [{"rank": 0}]
+
+
+def test_each_family_searches_its_own_trials_unless_a_number_caps_them():
+    """Cinquanta trials de cada família deixaven les graelles a mitges."""
+    searchers = (lightgbm, elastic_net, dnn)
+    assert [trials(one, None) for one in searchers] == [288, 150, 100]
+    assert [trials(one, 2) for one in searchers] == [2, 2, 2]
+
+
+def test_a_space_is_sampled_by_tpe(tmp_path):
+    X, _ = _table()
+    study = opened(
+        tmp_path / "seed_0.db",
+        "fake",
+        _searcher(None, []),
+        0,
+        X.columns,
+        BUILT,
+        FINGERPRINTS["matrices"],
+    )
+    assert isinstance(study.sampler, optuna.samplers.TPESampler)
+
+
+def test_a_seed_keeps_its_best_distinct_configurations_past_a_twin():
+    """Dues configuracions que puntuen igual eren un sol model guardat dues vegades."""
+    found = {
+        "trials": 4,
+        "ranked": [
+            {"numbers": {"value": value}, "score": score, "trial": trial}
+            for trial, (value, score) in enumerate(
+                [(200, 1.0), (900, 1.0), (30, 2.0), (10, 3.0)]
+            )
+        ],
+    }
+    kept = configurations(found, 3)
+    assert [one["numbers"]["value"] for one in kept] == [200, 30, 10]
+    assert [one["rank"] for one in kept] == [0, 1, 2]
+
+
+def test_a_wave_told_in_any_order_gives_the_same_next_wave(tmp_path):
+    """TPE tria a partir dels trials tornats, i no de l'ordre en què han tornat."""
+    X, y = _table()
+    searcher = _searcher(None, [])
+    waves = []
+    for name, order in (("first", slice(None)), ("reversed", slice(None, None, -1))):
+        study = _study(
+            tmp_path / f"{name}.db", searcher, X, y, split(0, PERIOD, DELETED, 1), 0, 10
+        )
+        wave = [asked(study, searcher, "fake") for _ in range(5)]
+        for optuna_trial, drawn in wave[order]:
+            told(study, optuna_trial, {"value": drawn}, drawn, FINGERPRINTS)
+        waves.append([asked(study, searcher, "fake")[1] for _ in range(5)])
+    assert waves[0] == waves[1]

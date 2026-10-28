@@ -249,6 +249,32 @@ def test_the_units_go_family_by_family_a_seeds_fits_right_after_its_search(fake)
     )
 
 
+def test_a_search_with_no_trials_set_searches_its_whole_grid(fake):
+    fake.values["TRIALS"] = None
+    fake.main()
+    for seed in (0, 1):
+        assert sorted(_ranked(seed)) == sorted(GRID)
+
+
+def test_a_seeds_next_wave_is_asked_once_its_last_has_returned_whole(fake, monkeypatch):
+    """Demanada abans, l'onada sortiria de quins trials han tornat primer."""
+    fake.searcher.TRIALS_PER_WAVE = 2
+    monkeypatch.setattr(run, "WORKERS", 3)
+    real = searches.asked
+
+    def asked(study, searcher, family):
+        fake.calls.append(("ask", family, study.study_name, None))
+        return real(study, searcher, family)
+
+    monkeypatch.setattr(searches, "asked", asked)
+    fake.main()
+    assert [
+        kind
+        for kind, family, seed, _ in fake.calls
+        if seed in (0, "first_seed_0") and kind != "fit"
+    ] == ["ask", "ask", "trial", "trial"] * 2
+
+
 def test_a_failed_trial_stops_its_seed_and_a_continuation_replaces_it(fake):
     """Una seed amb un trial de menys no es pot planificar, i continuar l'acaba."""
     fake.failing = {("first", 1, "trial"): RuntimeError}

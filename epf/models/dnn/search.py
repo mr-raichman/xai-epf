@@ -5,8 +5,14 @@ from epf.models.dnn import hyperparameters, network
 # La matriu de la cerca, la diària, com la de la passada.
 MATRIX = "daily"
 
-# Sense graella: l'espai es mostreja a l'atzar.
+# Sense graella: l'espai el mostreja TPE.
 GRID = None
+
+# Trials de la cerca a cada seed, demanats en onades: una onada es demana sencera quan
+# l'anterior ha tornat sencera, i TPE tria a partir dels trials tornats, de manera que
+# una cerca fa els mateixos trials siguin quants siguin els processos.
+TRIALS = 100
+TRIALS_PER_WAVE = 5
 
 # L'espai de `Python/nn.py`, el fitxer de la cerca del codi de Marcjasz et al. (2023),
 # sense els seus selectors de blocs d'entrada, perquè la xarxa llegeix totes les
@@ -24,8 +30,9 @@ LEARNING_RATE = (1e-5, 1e-2)
 # El batch en dies, que aquell codi fixa a 32, cercat: cada seed tria el seu.
 BATCHES = (32, 64, 128, 256)
 
-# Com es cerca, que el study desa i compara amb el d'ara: l'espai, i els números
-# fixos de la xarxa.
+# Com es cerca, que el study desa i compara amb el d'ara: l'espai, el sampler i les
+# onades, que decideixen quines configuracions té un study, i els números fixos de la
+# xarxa.
 FIXED = hyperparameters.FIXED
 SPACE = {
     "layers": LAYERS,
@@ -33,6 +40,8 @@ SPACE = {
     "activations": ACTIVATIONS,
     "learning_rate": LEARNING_RATE,
     "batches": BATCHES,
+    "sampler": "TPE",
+    "trials_per_wave": TRIALS_PER_WAVE,
 }
 
 

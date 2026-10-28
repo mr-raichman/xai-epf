@@ -37,20 +37,22 @@ class Search:
     def __init__(self, smoke, searched, seeds, trials, built, fingerprints, log):
         """Obre el study de cada família de `searched` a cada seed de `seeds`.
 
-        `trials` són els trials de cada seed, `built` i `fingerprints` les matrius i les
-        empremtes de la passada, i `log`, el fitxer dels seus processos, on va cada
-        trial que divergeix. Els studies són els de l'information set de les matrius.
-        Refusa un study fet d'una altra manera abans de desar cap registre, i desa el de
-        cada seed que ja té tots els seus trials.
+        Els trials de cada seed són els de la família, i com a molt `trials`, si no és
+        `None`. `built` i `fingerprints` són les matrius i les empremtes de la passada,
+        i `log`, el fitxer dels seus processos, on va cada trial que divergeix. Els
+        studies són els de l'information set de les matrius. Refusa un study fet d'una
+        altra manera abans de desar cap registre, i desa el de cada seed que ja té tots
+        els seus trials.
         """
         # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        self.smoke, self.trials, self.fingerprints = smoke, trials, fingerprints
+        self.smoke, self.fingerprints = smoke, fingerprints
         self.set_name = built.information.name
         self.log = log
-        self.studies = {}
+        self.trials, self.studies = {}, {}
         for family in searched:
             module = searcher(family)
+            self.trials[family] = searches.trials(module, trials)
             X, _ = getattr(built, module.MATRIX)
             folder = searches.folder(smoke, self.set_name, family)
             folder.mkdir(parents=True, exist_ok=True)
@@ -73,23 +75,35 @@ class Search:
             for key, study in self.studies.items()
         }
         self.pending = {}
+        # Els trials d'una onada demanats a Optuna que encara no s'han donat. No compten
+        # com a pendents: els d'una seed fallada no es donen mai, i la passada no
+        # s'acabaria.
+        self.queued = {key: [] for key in self.studies}
         self.records = {}
         for family, seed in self.studies:
-            if self.done[family, seed] >= trials:
+            if self.done[family, seed] >= self.trials[family]:
                 self._saved(family, seed)
 
     def ask(self, family, seed):
         """Torna la tasca del trial següent d'una família en una seed, o `None`.
 
-        `None` si la seed ja té demanats tots els seus trials.
+        Una família que es cerca en onades, amb `TRIALS_PER_WAVE`, en demana cada una
+        sencera quan l'anterior ha tornat sencera, i en dona els trials d'un en un.
+        `None` si la seed ja té demanats tots els seus trials, o si la seva onada encara
+        en té de pendents.
         """
-        asked = self.done[family, seed] + sum(
-            label[:2] == (family, seed) for label in self.pending
-        )
-        if asked >= self.trials:
-            return None
-        study = self.studies[family, seed]
-        optuna_trial, drawn = searches.asked(study, searcher(family), family)
+        module, queued = searcher(family), self.queued[family, seed]
+        if not queued:
+            out = sum(label[:2] == (family, seed) for label in self.pending)
+            left = self.trials[family] - self.done[family, seed] - out
+            wave = getattr(module, "TRIALS_PER_WAVE", 1)
+            if left <= 0 or (out and wave > 1):
+                return None
+            study = self.studies[family, seed]
+            queued += [
+                searches.asked(study, module, family) for _ in range(min(wave, left))
+            ]
+        optuna_trial, drawn = queued.pop(0)
         label = (family, seed, "trial", optuna_trial.number)
         self.pending[label] = optuna_trial
         return label, _trial, (family, seed, drawn, self.fingerprints, self.set_name)
@@ -118,7 +132,7 @@ class Search:
                     f"{family} seed {seed} trial {number} ha divergit: {score}\n"
                 )
         self.done[family, seed] += 1
-        if self.done[family, seed] == self.trials:
+        if self.done[family, seed] == self.trials[family]:
             return self._saved(family, seed)
         return None
 
@@ -146,7 +160,7 @@ class Search:
 
     def counts(self, family, seed):
         """Torna els trials d'una seed i els que ja té, `(trials, fets)`."""
-        return self.trials, min(self.done[family, seed], self.trials)
+        return self.trials[family], min(self.done[family, seed], self.trials[family])
 
     def _saved(self, family, seed):
         """Desa el registre d'una seed que ja té tots els seus trials, i el torna."""

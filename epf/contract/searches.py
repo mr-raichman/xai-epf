@@ -109,22 +109,34 @@ def made_otherwise(study, columns, built, seed, searcher, matrices):
     return None
 
 
-def _sampler(searcher, family, seed, study):
-    """Torna el sampler d'un study: la graella del cercador, `GRID`, o l'espai.
+def trials(searcher, cap):
+    """Torna els trials de la cerca d'un cercador a cada seed.
 
-    Una graella es barreja amb una seed de la família i de la partició, i el trial `k`
-    en pren el punt `k`: una cerca continuada segueix per on anava, i cap punt no es
-    repeteix. Un espai continu es mostreja amb una seed que compta també els trials que
-    el study ja porta, perquè una cerca continuada no torni a proposar els primers. El
-    nom de la família hi entra perquè dues famílies del mateix espai no proposin les
-    mateixes.
+    Són tots els punts de la seva graella, `GRID`, o, sense, els seus `TRIALS`; i com
+    a molt `cap`, si no és `None`.
+    """
+    if searcher.GRID is None:
+        own = searcher.TRIALS
+    else:
+        own = math.prod(len(values) for values in searcher.GRID.values())
+    return own if cap is None else min(own, cap)
+
+
+def _sampler(searcher, family, seed, study):
+    """Torna el sampler d'un study: la graella del cercador, `GRID`, o TPE a l'espai.
+
+    Una graella dona a cada trial, a l'atzar amb una seed de la família i de la
+    partició, un punt que cap altre trial no ha començat, de manera que cap punt no es
+    repeteix. TPE pren una seed que compta també els trials que el study ja porta,
+    perquè una cerca continuada no torni a proposar els primers. El nom de la família
+    hi entra perquè dues famílies del mateix espai no proposin les mateixes.
     """
     if searcher.GRID is not None:
         return _Grid(
             {name: list(values) for name, values in searcher.GRID.items()},
             seed=seeded("sampler", family, seed),
         )
-    return optuna.samplers.RandomSampler(
+    return optuna.samplers.TPESampler(
         seed=seeded("sampler", family, seed, len(study.trials))
     )
 
@@ -275,12 +287,20 @@ def save(found, smoke, set_name):
 def configurations(found, kept):
     """Torna les configuracions que s'ajusten a una seed, de la millor a la pitjor.
 
-    Cada una porta el seu lloc a la cerca. Són les `kept` millors del registre de la
-    cerca de la seed, `found`, o, amb `kept` zero, una sola sense números, la d'una
-    família que no es cerca.
+    Cada una porta el seu lloc entre les que s'ajusten. Són les `kept` millors
+    diferents del registre de la cerca de la seed, `found`, o, amb `kept` zero, una
+    sola sense números, la d'una família que no es cerca.
     """
     if not kept:
         return [{"rank": 0}]
+    chosen = []
+    for one in found["ranked"]:
+        # Un altre punt que puntua fins a l'últim dígit com un de guardat n'és el mateix
+        # model, com 900 fulles que les files per fulla deixen en 200.
+        if len(chosen) < kept and all(
+            one["score"] != other["score"] for other in chosen
+        ):
+            chosen.append(one)
     return [
         {
             "rank": rank,
@@ -289,5 +309,5 @@ def configurations(found, kept):
             "trial": one["trial"],
             "trials": found["trials"],
         }
-        for rank, one in enumerate(found["ranked"][:kept])
+        for rank, one in enumerate(chosen)
     ]

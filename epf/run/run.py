@@ -105,13 +105,16 @@ def _progress(where, values, readable):
     valors de `parameters.chosen` amb què es va començar: una seed sense pla en té
     tants com en guardarà, i una família que encara no té registre, tots per fer.
     """
-    _, kept, _ = _plans(families.EVERY, values)
+    plans, kept, _ = _plans(families.EVERY, values)
     columns = {}
     for family in readable:
         recorded = families.recorded(where / family) or {}
         absent = families.missing(where / family) if recorded else {}
         # Una família que no es cerca n'ajusta una sola, sense números.
-        planned = min(kept[family], values["TRIALS"]) if kept[family] else 1
+        planned = 1
+        if kept[family]:
+            module = search.searcher(plans[family]["searched_as"])
+            planned = min(kept[family], searches.trials(module, values["TRIALS"]))
         done = fits = 0
         for seed in values["SEEDS"]:
             configured = recorded.get(seed)
@@ -510,8 +513,12 @@ class Run:
         if family in self.chosen:
             configured = recorded[family].get(seed)
             if configured is None:
-                # Abans del pla, les que en guardarà com a molt.
-                found["fit"] = (min(self.kept[family], self.values["TRIALS"]), 0)
+                # Abans del pla, les que en guardarà com a molt; una família que llegeix
+                # una cerca que no es fa no en sap els trials.
+                trials = self.searching.trials.get(
+                    self.plans[family]["searched_as"], self.kept[family]
+                )
+                found["fit"] = (min(self.kept[family], trials), 0)
             else:
                 absent = missing[family].get(seed, [])
                 found["fit"] = (len(configured), len(configured) - len(absent))
