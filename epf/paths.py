@@ -38,7 +38,8 @@ FAMILY_RECORD = "record.json"
 MATRIX = "matrix_{name}.csv"
 
 # El fitxer on cada procés d'una passada escriu la seva sortida, i on van les traces de
-# les seves fallades.
+# les seves fallades i el que en diu el pare: cada trial que divergeix, cada ajust que
+# s'atura i cada cerca acabada.
 WORKERS_LOG = "workers.log"
 
 # Una passada es diu pel seu information set, en minúscules, i el dia i el mes locals

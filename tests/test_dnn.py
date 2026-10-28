@@ -94,7 +94,9 @@ def test_a_fit_waits_as_many_weight_updates_at_any_batch(monkeypatch):
 
     monkeypatch.setattr(keras.callbacks, "EarlyStopping", Recorded)
     X, y = rows(40)
-    network.fit_rows((X[:30], y[:30]), (X[30:], y[30:]), TUNED | {"batch": 64}, 0, 1)
+    network.fit_rows(
+        (X[:30], y[:30]), (X[30:], y[30:]), TUNED | {"batch": 64}, 0, epochs=1
+    )
     assert seen == [100]
 
 
@@ -109,7 +111,7 @@ def test_a_fits_stop_follows_from_the_epoch_it_keeps(monkeypatch, changed, why):
     X, y = rows(150)
     tuned = TUNED | {"batch": 32}
     fitted, epochs = network.fit_rows(
-        (X[:120], y[:120]), (X[120:], y[120:]), tuned, 0, network.EPOCHS
+        (X[:120], y[:120]), (X[120:], y[120:]), tuned, 0, epochs=network.EPOCHS
     )
     found, ran = network.stopped(epochs, tuned["batch"])
     assert found == why

@@ -136,6 +136,8 @@ def _sampler(searcher, family, seed, study):
             {name: list(values) for name, values in searcher.GRID.items()},
             seed=seeded("sampler", family, seed),
         )
+    # L'espai de la xarxa en diu el nom: un altre sampler l'hi ha de canviar, o els seus
+    # studies es continuarien amb el nou.
     return optuna.samplers.TPESampler(
         seed=seeded("sampler", family, seed, len(study.trials))
     )
@@ -145,7 +147,8 @@ class _Grid(optuna.samplers.GridSampler):
     """La graella d'Optuna, que no atura el study quan se n'acaba l'últim punt.
 
     Ho faria amb `study.stop`, que fora d'`optimize` falla, i el pare demana i desa cada
-    trial fora d'`optimize`. Amb més trials que punts, Optuna en torna a fer algun.
+    trial fora d'`optimize`. Un trial fallat compta com a fet: una cerca continuada no
+    en torna a fer el punt, i en fa un altre dues vegades.
     """
 
     def after_trial(self, study, trial, state, values):

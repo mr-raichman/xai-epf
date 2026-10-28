@@ -264,16 +264,18 @@ def test_a_seeds_next_wave_is_asked_once_its_last_has_returned_whole(fake, monke
     real = searches.asked
 
     def asked(study, searcher, family):
-        fake.calls.append(("ask", family, study.study_name, None))
+        seed = int(study.study_name.rsplit("_", 1)[1])
+        fake.calls.append(("ask", family, seed, None))
         return real(study, searcher, family)
 
     monkeypatch.setattr(searches, "asked", asked)
     fake.main()
-    assert [
-        kind
-        for kind, family, seed, _ in fake.calls
-        if seed in (0, "first_seed_0") and kind != "fit"
-    ] == ["ask", "ask", "trial", "trial"] * 2
+    assert [kind for kind, _, seed, _ in fake.calls if seed == 0 and kind != "fit"] == [
+        "ask",
+        "ask",
+        "trial",
+        "trial",
+    ] * 2
 
 
 def test_the_log_holds_a_line_a_seeds_search_and_a_fit_that_stopped(fake):

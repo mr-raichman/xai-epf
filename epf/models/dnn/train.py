@@ -13,8 +13,8 @@ from epf.models.dnn.hyperparameters import FIXED
 NAME = "dnn"
 
 # La família, com la planifica una passada: tots els números fixos que llegeixen els
-# seus trials i els seus ajustos, i les `BEST` millors de cada seed de la seva pròpia
-# cerca.
+# seus trials i els seus ajustos, i les `BEST` millors diferents de cada seed de la seva
+# pròpia cerca.
 FAMILIES = {
     NAME: {
         "fixed": FIXED,

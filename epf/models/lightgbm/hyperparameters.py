@@ -11,8 +11,8 @@ DAY_COUNTER = "day_counter"
 # milloraven.
 MOST_TREES = 50000
 
-# Rondes sense millorar abans d'aturar-lo: les d'aquell codi, que la graella de la cerca
-# acompanya.
+# Rondes sense millorar abans d'aturar un ajust: les d'aquell codi, que la graella de la
+# cerca acompanya.
 PATIENCE = 20
 
 # El que aquell codi fixa a cada punt de la graella: la mostra de files es pren a cada

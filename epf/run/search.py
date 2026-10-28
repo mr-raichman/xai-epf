@@ -17,9 +17,9 @@ def _trial(family, seed, drawn, fingerprints, set_name):
     """Ajusta els valors d'un trial d'una família en una seed, una tasca de `pool`.
 
     Torna els números, la puntuació i on s'ha aturat l'ajust. Refusa un codi, unes
-    matrius o unes biblioteques
-    que no són els de `fingerprints`, les empremtes amb què es va començar o continuar
-    la passada, les matrius les de l'information set `set_name`.
+    matrius o unes biblioteques que no són els de `fingerprints`, les empremtes amb què
+    es va començar o continuar la passada, les matrius les de l'information set
+    `set_name`.
     """
     built = record.built_for(set_name, fingerprints)
     module = searcher(family)
@@ -40,10 +40,10 @@ class Search:
 
         Els trials de cada seed són els de la família, i com a molt `trials`, si no és
         `None`. `built` i `fingerprints` són les matrius i les empremtes de la passada,
-        i `log`, el fitxer dels seus processos, on va cada trial que divergeix. Els
-        studies són els de l'information set de les matrius. Refusa un study fet d'una
-        altra manera abans de desar cap registre, i desa el de cada seed que ja té tots
-        els seus trials.
+        i `log`, el fitxer dels seus processos, on va cada trial que divergeix i cada
+        cerca acabada. Els studies són els de l'information set de les matrius. Refusa
+        un study fet d'una altra manera abans de desar cap registre, i desa el de cada
+        seed que ja té tots els seus trials.
         """
         # Al pare, cada study que crea seria una línia d'Optuna a sobre del bloc.
         optuna.logging.set_verbosity(optuna.logging.WARNING)
