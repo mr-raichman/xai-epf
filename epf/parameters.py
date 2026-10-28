@@ -30,8 +30,9 @@ DEVELOPMENT = (datetime.date(2019, 1, 1), datetime.date(2026, 9, 28))
 # Trebbien et al. (2023).
 SHARES = (48, 32, 20)
 
-# Una partició per seed.
-SEEDS = tuple(range(10))
+# Una partició per seed: el doble de les deu de Trebbien et al. (2023), perquè les seves
+# setmanes de prova cobreixin gairebé tot el període.
+SEEDS = tuple(range(20))
 
 
 ### Ajust i cerca ###
