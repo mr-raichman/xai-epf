@@ -1,6 +1,8 @@
 """L'atribució de la xarxa neuronal, DeepExplainer."""
 
 import collections
+import logging
+import warnings
 
 import numpy as np
 import shap
@@ -15,22 +17,39 @@ from epf.parameters import HOURS_PER_DAY
 Explanation = collections.namedtuple("Explanation", "columns inputs values base")
 
 
+def _not_subsampled(record):
+    """Diu si un registre de shap no és el que diu que retalla el fons a 100 files."""
+    return not record.getMessage().startswith("Background dataset has")
+
+
 def attribute_rows(fitted, X, background):
     """Torna l'atribució de la predicció de cada fila de `X` i hora, amb DeepExplainer.
 
     La base és la predicció mitjana sobre les files de `background`. Com que la xarxa
     no escala el que prediu, l'atribució surt ja en EUR/MWh.
     """
-    # `shap` avisa que retalla el fons a 100 files, però l'avís és de la seva classe
-    # base: DeepExplainer les pren totes. Avisa també, de qualsevol model, que des de
-    # TensorFlow 2.4.0 alguns grafs estàtics poden no anar bé; la suma de cada hora, que
-    # es comprova, en destaparia un.
-    explainer = shap.DeepExplainer(fitted, inputs(background).to_numpy())
     shown = inputs(X)
-    # Keras avisa que l'estructura de les entrades no és l'esperada perquè DeepExplainer
-    # li passa el tensor dins d'una llista; el model el pren igual, i la suma de cada
-    # hora, que es comprova, ho confirma.
-    values = np.asarray(explainer.shap_values(shown.to_numpy(), check_additivity=False))
+    # Tres avisos inofensius: la base i les sumes de l'explicació ja es comproven, i
+    # Keras desembolica la llista que li passa shap.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", "Your TensorFlow version is newer than 2.4.0", UserWarning
+        )
+        warnings.filterwarnings(
+            "ignore",
+            "The structure of `inputs` doesn't match the expected structure",
+            UserWarning,
+        )
+        # El tercer és un registre del logger de shap, i no un avís.
+        log = logging.getLogger("shap")
+        log.addFilter(_not_subsampled)
+        try:
+            explainer = shap.DeepExplainer(fitted, inputs(background).to_numpy())
+        finally:
+            log.removeFilter(_not_subsampled)
+        values = np.asarray(
+            explainer.shap_values(shown.to_numpy(), check_additivity=False)
+        )
     return Explanation(
         list(shown.columns),
         shown.to_numpy(),
