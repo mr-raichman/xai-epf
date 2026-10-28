@@ -10,10 +10,11 @@ from epf.models.elastic_net.train import FAMILIES
 # La matriu de la cerca, la per hora, com la de la passada.
 MATRIX = "hourly"
 
-# Les barreges d'Uniejewski et al. (2016), els càstigs de cada una, i la raó entre el
-# més petit i el més gran, el `LambdaRatio` per defecte de `lasso.m`.
+# Les barreges d'Uniejewski et al. (2016), els càstigs de cada una, 50 en lloc dels seus
+# 34, un pas més fi per poc cost, i la raó entre el més petit i el més gran, el
+# `LambdaRatio` per defecte de `lasso.m`.
 MIXINGS = (0.25, 0.5, 0.75)
-STEPS = 34
+STEPS = 50
 RATIO = 1e-4
 
 # La graella: cada barreja amb cada pas de la seva seqüència.
