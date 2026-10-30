@@ -57,8 +57,9 @@ BEST = 10
 EXPLAINED_DAYS = None
 
 # Files explicades de cada seed sobre les quals es calculen les interaccions de l'arbre,
-# triades a l'atzar amb la seed.
-INTERACTION_ROWS = 1000
+# triades a l'atzar amb la seed: amb 2000, els tres socis més forts de cada sèrie són
+# els de totes les files en el 96.4 % de les mostres o més, en una seed.
+INTERACTION_ROWS = 2000
 
 
 ### Processos ###
