@@ -76,16 +76,19 @@ THREADS = 4
 
 # El que un assaig posa en lloc dels valors de la mesura, i res més, en variants: cada
 # diccionari que es diu `SMOKE`, o `SMOKE_` i un número, el tria l'opció del seu nom,
-# `--smoke` o `--smoke1`.
-SMOKE = {"SEEDS": (0,), "EXPLAINED_DAYS": 50, "TRIALS": 2}
-# Els menys dies explicats amb què l'arbre encara tria les files de les interaccions.
-SMOKE_1 = {
-    "SEEDS": tuple(range(2)),
-    "TRIALS": 1,
-    "BEST": 1,
-    "EXPLAINED_DAYS": INTERACTION_ROWS // HOURS_PER_DAY + 1,
-}
-SMOKE_2 = {"SEEDS": tuple(range(2)), "TRIALS": 10}
+# `--smoke` o `--smoke1`. Les seeds de cada una són de les que fan barats els primers
+# trials de la xarxa neuronal, mentre no en canviïn l'espai ni la seed del sampler, i
+# les de les tres no es repeteixen, perquè una passada amplia qualsevol study d'assaig
+# que troba.
+
+# La més ràpida, per comparar dues passades byte a byte i veure que el codi no falla:
+# dues seeds de dues configuracions, el mínim que fa cada número entre seeds i dins
+# d'una.
+SMOKE = {"SEEDS": (3, 11), "TRIALS": 2, "EXPLAINED_DAYS": 7}
+# Prou per jutjar si una figura val la pena.
+SMOKE_1 = {"SEEDS": (2, 16, 18), "TRIALS": 6, "BEST": 3, "EXPLAINED_DAYS": 30}
+# Prou per veure la direcció i les relacions evidents, sense ser una mesura.
+SMOKE_2 = {"SEEDS": (1, 4, 17), "TRIALS": 20, "BEST": 5}
 
 
 def seeded(label, *parts):
