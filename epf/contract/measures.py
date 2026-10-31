@@ -32,8 +32,8 @@ DEPENDENCE = {
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
 
-# El grup del preu del dia abans, i les seves hores 22 a 24, comptades des de 0: el
-# vespre que Uniejewski et al. (2016) troben més triat que l'hora mateixa.
+# El grup del preu del dia abans, i les seves hores 22 a 24, 21 a 23 comptades des de
+# 0: el vespre que Uniejewski et al. (2016) troben més triat que l'hora mateixa.
 PRICE = information.column(information.PRICE, 1)
 LATE_HOURS = [21, 22, 23]
 

@@ -668,9 +668,9 @@ def main(arguments):
     que no es cerca rep el pla de seguida, i una d'una que es cerca, les millors
     configuracions de la seva cerca quan la té acabada; el pla queda al registre de
     la família i ja no canvia. Dibuixa les figures si cap seed no ha fallat, i si
-    no, n'escriu la taula de puntuacions. Refusa abans d'escriure la passada el que
-    no pot fer; un study refusat deixa a la carpeta de les cerques els que s'han
-    obert abans, nous i sense cap trial, que la passada següent reinicia en
+    no, n'escriu les mètriques principals de la Part I. Refusa abans d'escriure la
+    passada el que no pot fer; un study refusat deixa a la carpeta de les cerques els
+    que s'han obert abans, nous i sense cap trial, que la passada següent reinicia en
     obrir-los. Acaba amb un refús si alguna seed ha fallat, i amb un `RuntimeError`
     si, sense cap fallada, a alguna família li falta el pla d'una seed o un fitxer.
     """

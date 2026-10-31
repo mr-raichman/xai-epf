@@ -697,8 +697,8 @@ def test_a_run_whose_named_families_are_complete_is_not_offered_to_continue(
     assert "Continuar la passada" not in capsys.readouterr().err
 
 
-def test_a_run_with_a_failed_seed_leaves_the_others_scores(fake):
-    """Escrita només en dibuixar, una seed fallada deixava la passada sense la taula."""
+def test_a_run_with_a_failed_seed_leaves_the_others_numbers(fake):
+    """Escrits només en dibuixar, una seed fallada deixava la passada sense números."""
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
