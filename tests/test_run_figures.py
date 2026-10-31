@@ -60,7 +60,7 @@ def test_a_run_is_drawn_without_its_incomplete_family(tmp_path, monkeypatch):
         lambda where, described, colours: drawn.append(described),
     )
     monkeypatch.setattr(ljung_box, "report", lambda where, described, colours: None)
-    monkeypatch.setattr(tables, "scores", lambda where: None)
+    monkeypatch.setattr(tables, "write", lambda where: None)
     _family(tmp_path, "naive_similar_day", saved=(0, 1))
     _family(tmp_path, "naive_previous_day", saved=(0,))
     figures.draw(tmp_path)
@@ -76,7 +76,7 @@ def test_a_folder_of_no_family_is_left_out_of_the_figures(tmp_path, monkeypatch)
         lambda where, described, colours: drawn.append(described),
     )
     monkeypatch.setattr(ljung_box, "report", lambda where, described, colours: None)
-    monkeypatch.setattr(tables, "scores", lambda where: None)
+    monkeypatch.setattr(tables, "write", lambda where: None)
     _family(tmp_path, "ddnn_jsu", saved=(0, 1))
     _family(tmp_path, "naive_similar_day", saved=(0, 1))
     figures.draw(tmp_path)

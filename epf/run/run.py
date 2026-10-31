@@ -707,13 +707,13 @@ def main(arguments):
         run.failed,
     )
     if run.block.failed:
-        tables.scores(where)
+        tables.write(where)
         counted = progress.counted(run.block.failed, families.EVERY)
         log = paths.relative(where / paths.WORKERS_LOG)
         raise Refusal(f"la passada {where.name} no és acabada: {counted}; llegir {log}")
     undone = run.undone()
     if undone:
-        tables.scores(where)
+        tables.write(where)
         # Sense cap seed fallada, només un error del codi hi deixa res per fer, i en
         # mostra el traceback.
         raise RuntimeError(

@@ -1,50 +1,62 @@
 import numpy as np
 
 from epf import paths
-from epf.models.lightgbm.hyperparameters import DAY_COUNTER
-from epf.models.lightgbm.hyperparameters import NAME as TREE
 from epf.run import tables
 
 
-def _saved(where, family, seed, rank, **arrays):
-    """Desa a la passada `where` un model ajustat que només porta `arrays`."""
-    folder = where / family
-    folder.mkdir(exist_ok=True)
-    np.savez(folder / paths.MODEL.format(seed=seed, rank=rank), **arrays)
+def _family(where, family, fits, **fields):
+    """Desa a la passada `where` una família completa, els seus models de `fits`.
 
-
-def _recorded(where, family, **fields):
-    """Desa a la passada `where` el registre d'una família, que només porta `fields`."""
-    paths.write_record(where / family / paths.FAMILY_RECORD, fields)
-
-
-def test_the_scores_follow_the_families_order(tmp_path):
-    # En un altre ordre que el de la taula.
-    _saved(tmp_path, TREE, 1, 0, r2=0.75, mae=9.0)
-    _saved(tmp_path, TREE, 0, 1, r2=0.125, mae=13.0)
-    _saved(tmp_path, TREE, 0, 0, r2=0.25, mae=12.0)
-    _saved(tmp_path, "dnn", 0, 0, r2=0.5, mae=10.0)
-    # Mitjanes del valor absolut 1, 2 i 2: la part del comptador és 2 de 5.
-    _saved(
-        tmp_path,
-        "date_probe",
-        0,
-        0,
-        columns=np.array(["price_lag1_h00", DAY_COUNTER, "hour"]),
-        groups=np.array(["price", "date", "calendar"]),
-        values=np.array([[1.0, -2.0, 3.0], [-1.0, 2.0, -1.0]]),
-        r2=0.5,
-        mae=7.0,
+    Cada model ajustat, per `(seed, configuració)`, porta el seu R² i el seu MAE; el
+    registre, també `fields`.
+    """
+    seeds = sorted({seed for seed, _ in fits})
+    paths.write_record(
+        where / family / paths.FAMILY_RECORD,
+        {
+            "configurations": {
+                str(seed): [{"rank": rank} for one, rank in fits if one == seed]
+                for seed in seeds
+            },
+            "settings": {"SEEDS": seeds},
+            **fields,
+        },
     )
-    for family in (TREE, "dnn"):
-        _recorded(tmp_path, family, ljung_box_tested=True)
-    _recorded(tmp_path, "date_probe", ljung_box_tested=True, counter=DAY_COUNTER)
-    tables.scores(tmp_path)
-    assert (tmp_path / tables.SCORES).read_text(encoding="utf-8").splitlines() == [
-        "family,seed,rank,r2,mae,counter_share",
-        "dnn,0,0,0.5,10.0,",
-        "lightgbm,0,0,0.25,12.0,",
-        "lightgbm,0,1,0.125,13.0,",
-        "lightgbm,1,0,0.75,9.0,",
-        "date_probe,0,0,0.5,7.0,0.4",
+    for (seed, rank), (r2, mae) in fits.items():
+        np.savez(
+            where / family / paths.MODEL.format(seed=seed, rank=rank),
+            r2=np.float64(r2),
+            mae=np.float64(mae),
+        )
+
+
+def test_the_numbers_go_by_measure_and_family_their_keys_integers(tmp_path):
+    """pandas escriu una columna d'enters amb alguna casella buida com a decimals."""
+    # Desades en un altre ordre que el del fitxer.
+    _family(
+        tmp_path,
+        "naive_previous_week",
+        {(1, 0): (0.125, 16.0), (0, 0): (0.0, 20.0)},
+        denominator="main",
+    )
+    _family(tmp_path, "floor", {(0, 0): (0.25, 30.0)})
+    _family(
+        tmp_path,
+        "lightgbm",
+        {(1, 0): (0.75, 9.0), (0, 1): (0.25, 12.0), (0, 0): (0.5, 10.0)},
+    )
+    tables.write(tmp_path)
+    lines = (tmp_path / tables.PART_I_MAIN).read_text(encoding="utf-8").splitlines()
+    assert lines[0] == ",".join(tables.COLUMNS)
+    assert [line for line in lines if line.startswith("r2,")] == [
+        "r2,lightgbm,,0,0,,,,0.5,sense unitats",
+        "r2,lightgbm,,0,1,,,,0.25,sense unitats",
+        "r2,lightgbm,,1,0,,,,0.75,sense unitats",
+        "r2,floor,,0,0,,,,0.25,sense unitats",
+        "r2,naive_previous_week,,0,0,,,,0.0,sense unitats",
+        "r2,naive_previous_week,,1,0,,,,0.125,sense unitats",
     ]
+    assert "rmae,lightgbm,naive_previous_week,1,0,,,,0.5625,sense unitats" in lines
+    assert "mae_mean,naive_previous_week,,,0,,,,18.0,EUR/MWh" in lines
+    # Una sola seed no té desviació.
+    assert "mae_std,floor,,,0,,,,,EUR/MWh" in lines

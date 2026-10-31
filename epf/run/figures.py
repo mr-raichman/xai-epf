@@ -57,8 +57,8 @@ def draw(where):
     """Dibuixa les figures de les famílies completes d'una passada, `where`.
 
     Una família és completa quan cada seed del seu pla té els seus fitxers, i les
-    figures de totes juntes i el test de Ljung-Box són de les completes; `scores.csv`,
-    de cada model ajustat que hi ha. Refusa una passada sense cap família completa.
+    figures de totes juntes i el test de Ljung-Box són de les completes; els números,
+    els que diu `tables.write`. Refusa una passada sense cap família completa.
     """
     colours = figure.family_colours(families.MODELS)
     described = {}
@@ -81,7 +81,7 @@ def draw(where):
         raise Refusal(f"la passada {where.name} no té cap família completa")
     _performance(where, described, colours)
     ljung_box.report(where, described, colours)
-    tables.scores(where)
+    tables.write(where)
 
 
 def main(arguments):

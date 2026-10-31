@@ -566,7 +566,7 @@ def test_a_family_reading_a_search_none_makes_ends_in_an_error(fake, monkeypatch
     with pytest.raises(RuntimeError, match="1 família no és completa, second$"):
         fake.main()
     assert not drawn
-    assert (paths.next_run(True, SET, MINUTE) / tables.SCORES).exists()
+    assert (paths.next_run(True, SET, MINUTE) / tables.PART_I_MAIN).exists()
 
 
 def test_a_fit_that_saves_no_file_is_not_taken_for_done(fake, monkeypatch):
@@ -702,9 +702,9 @@ def test_a_run_with_a_failed_seed_leaves_the_others_scores(fake):
     fake.failing = {("second", 0, "fit"): RuntimeError}
     with pytest.raises(Refusal, match="no és acabada"):
         fake.main()
-    path = paths.next_run(True, SET, MINUTE) / tables.SCORES
-    rows = [row.split(",")[:3] for row in path.read_text(encoding="utf-8").splitlines()]
-    assert rows[1:] == [
+    path = paths.next_run(True, SET, MINUTE) / tables.PART_I_MAIN
+    rows = [row.split(",") for row in path.read_text(encoding="utf-8").splitlines()]
+    assert [[row[1], row[3], row[4]] for row in rows if row[0] == "r2"] == [
         ["first", "0", "0"],
         ["first", "0", "1"],
         ["first", "1", "0"],
