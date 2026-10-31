@@ -30,13 +30,13 @@ MODULES = {
         "model": "lightgbm",
         "train": "epf.models.lightgbm.date_probe",
         "search": None,
-        "figures": "epf.models.lightgbm.figures",
+        "figures": None,
     },
     "floor": {
         "model": "floor",
         "train": "epf.models.floor.train",
         "search": None,
-        "figures": "epf.models.floor.figures",
+        "figures": None,
     },
     "naive_similar_day": {
         "model": "naive",

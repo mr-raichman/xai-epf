@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from epf import Refusal, paths
-from epf.run import figures, ljung_box, tables
+from epf.run import figures, tables
 
 MINUTE = datetime.datetime(2026, 10, 22, 14, 30)
 
@@ -56,15 +56,14 @@ def test_a_run_is_drawn_without_its_incomplete_family(tmp_path, monkeypatch):
     drawn = []
     monkeypatch.setattr(
         figures,
-        "_performance",
-        lambda where, described, colours: drawn.append(described),
+        "_drawn",
+        lambda where, numbers, complete, colours: drawn.append(complete),
     )
-    monkeypatch.setattr(ljung_box, "report", lambda where, described, colours: None)
     monkeypatch.setattr(tables, "write", lambda where: None)
     _family(tmp_path, "naive_similar_day", saved=(0, 1))
     _family(tmp_path, "naive_previous_day", saved=(0,))
     figures.draw(tmp_path)
-    assert [list(described) for described in drawn] == [["naive_similar_day"]]
+    assert drawn == [["naive_similar_day"]]
 
 
 def test_a_folder_of_no_family_is_left_out_of_the_figures(tmp_path, monkeypatch):
@@ -72,15 +71,14 @@ def test_a_folder_of_no_family_is_left_out_of_the_figures(tmp_path, monkeypatch)
     drawn = []
     monkeypatch.setattr(
         figures,
-        "_performance",
-        lambda where, described, colours: drawn.append(described),
+        "_drawn",
+        lambda where, numbers, complete, colours: drawn.append(complete),
     )
-    monkeypatch.setattr(ljung_box, "report", lambda where, described, colours: None)
     monkeypatch.setattr(tables, "write", lambda where: None)
     _family(tmp_path, "ddnn_jsu", saved=(0, 1))
     _family(tmp_path, "naive_similar_day", saved=(0, 1))
     figures.draw(tmp_path)
-    assert [list(described) for described in drawn] == [["naive_similar_day"]]
+    assert drawn == [["naive_similar_day"]]
 
 
 def test_a_run_with_no_complete_family_is_refused(tmp_path):

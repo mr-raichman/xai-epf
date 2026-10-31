@@ -3,15 +3,19 @@
 Són a l'espai transformat, i no en EUR/MWh.
 """
 
-from epf.contract import figure, measures
+import numpy as np
+
+from epf.contract import figure
 
 
-def draw(folder, models, colour):
-    """Dibuixa les figures d'una família a `folder`, dels seus models ajustats.
+def draw(folder, main, secondary, colour):
+    """Dibuixa la dependència d'una família a `folder`, de `colour`, el seu color.
 
-    La importància i la dependència, de `colour`, el color de la família.
+    `main` i `secondary` són els números de la Part II de la passada.
     """
-    figure.importance(folder, models, colour)
-    present = measures.present(models[0])
-    if present:
-        figure.dependence(folder, models, present, colour)
+    found = figure.first_explained(folder)
+    if found is None:
+        return
+    seed, path = found
+    with np.load(path) as model:
+        figure.dependence(folder, seed, model, main, secondary, colour)

@@ -115,11 +115,17 @@ def pairs(model, values, name):
     return x.ravel(), y.ravel()
 
 
-def slope(model, values, name):
-    """Torna el pendent per GW de la contribució del grup `name` contra el seu valor."""
+def line(model, values, name):
+    """Torna el pendent per GW i l'ordenada de la recta de la contribució de `name`."""
     x, y = (np.asarray(one, dtype=np.float64) for one in pairs(model, values, name))
     # En `float64`: amb els `float32` desats, `polyfit` ajusta en `float32`.
-    return float(np.polyfit(x / PER_GW, y, 1)[0])
+    slope, intercept = np.polyfit(x / PER_GW, y, 1)
+    return float(slope), float(intercept)
+
+
+def slope(model, values, name):
+    """Torna el pendent per GW de la contribució del grup `name` contra el seu valor."""
+    return line(model, values, name)[0]
 
 
 def strengths(model):
@@ -396,12 +402,12 @@ def stability(models):
     }
 
 
-def spearman_pairs(models):
+def spearman_pairs(table):
     """Torna la correlació de Spearman de les parts dels grups de cada parell de models.
 
-    `models` són els d'una família amb alguna contribució, com els torna `summarised`.
+    `table` dona les parts de cada model d'una família amb alguna contribució,
+    `(models, grups)`.
     """
-    table = np.array([list(one["shares"].values()) for one in models])
     if len(table) < 2:
         return np.array([])
     found = np.atleast_2d(stats.spearmanr(table, axis=1).statistic)
@@ -500,7 +506,9 @@ def part_ii_secondary(models, stabilities, counters):
                     subject=name,
                 )
         # Caraker et al. (2026b); un sol model no en fa cap parell.
-        pairs = spearman_pairs(list(kept.values()))
+        pairs = spearman_pairs(
+            np.array([list(found["shares"].values()) for found in kept.values()])
+        )
         add("spearman_mean", family, float(np.mean(pairs)) if len(pairs) else math.nan)
         orders = collections.Counter(_order(found["shares"]) for found in kept.values())
         for written, count in orders.most_common():

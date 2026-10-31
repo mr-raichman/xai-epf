@@ -1,77 +1,96 @@
-"""Les figures de l'arbre i de la sonda de datació, del que la passada va desar."""
+"""Les figures de l'arbre, del que la passada va desar."""
 
 import numpy as np
 
 from epf.contract import figure, measures
-from epf.contract.explanation import PRICE_UNITS
 
 # Panells de les interaccions per fila, i l'alçada de cada un entre la seva amplada.
 INTERACTIONS_PER_ROW = 2
 INTERACTIONS_ASPECT = 3 / 4
 
 
-def _interactions(folder, model, present, colour):
-    """Dibuixa les interaccions de cada sèrie al millor model ajustat, `model`.
+def _interactions(folder, seed, model, main, colour):
+    """Dibuixa les interaccions de cada sèrie amb panell d'un model ajustat, `model`.
 
-    És el de la primera seed. Per sèrie de `present`, una figura,
-    `interactions_<sèrie>.svg`: la dependència sencera i l'efecte sense interaccions, de
-    `colour`, el color de la família, i la interacció amb els `measures.PARTNERS` socis
-    més forts, amb el color del valor de cada soci a l'escala contínua.
+    És el de la seed `seed`, a les seves files d'interaccions. Per sèrie, una figura,
+    `interactions_<sèrie>.svg`: la dependència sencera i l'efecte sense interaccions,
+    de `colour`, el color de la família, i la interacció amb cada un dels
+    `measures.PARTNERS` grups més forts amb ella al model, dels números de la Part II,
+    `main`: la suma de les de les columnes del grup, el doble, amb el color del valor
+    del grup a l'hora de la fila.
     """
-    columns = list(model["columns"])
+    family = folder.name
+    groups = np.array([str(group) for group in model["groups"]])
     rows = model["interaction_rows"]
-    inputs, interactions = model["inputs"][rows], model["interactions"]
-    values = model["values"][rows]
-    for name in present:
-        panels, axes = figure.panel_grid(
-            2 + measures.PARTNERS, INTERACTIONS_PER_ROW, INTERACTIONS_ASPECT
-        )
+    values = np.asarray(measures.contributions(model), dtype=np.float64)[rows]
+    inputs = np.asarray(model["inputs"], dtype=np.float64)[rows]
+    interactions = np.asarray(model["interactions"], dtype=np.float64)
+    coloured = {
+        name: value[rows]
+        for name, value in figure.group_values(model, len(model["inputs"])).items()
+    }
+    for name in measures.present(model):
         (j,) = measures.members(model, name)
-        x = inputs[:, j] / measures.PER_GW
-        strength = np.abs(interactions[:, j, :]).mean(axis=0)
-        strength[j] = -np.inf
-        partners = np.argsort(strength)[-measures.PARTNERS :][::-1]
+        strengths = figure.rows(
+            main, "partner_strength", family, seed=seed, rank=0, subject=name
+        )
+        partners = list(
+            strengths.sort_values("value", ascending=False, kind="stable")[
+                "other_subject"
+            ]
+        )[: measures.PARTNERS]
         shown = [
             (values[:, j], None, "sencera"),
             (interactions[:, j, j], None, "sense interaccions"),
-        ]
-        shown += [
+        ] + [
             (
-                2 * interactions[:, j, k],
-                k,
-                f"amb {figure.column_label(columns[k], model['groups'][k])}",
+                2 * interactions[:, j, groups == partner].sum(axis=1),
+                partner,
+                f"amb {figure.GROUP_LABELS[partner]}",
             )
-            for k in partners
+            for partner in partners
         ]
-        for axis, (y, k, title) in zip(axes.flat, shown, strict=False):
-            if k is None:
+        x = inputs[:, j] / measures.PER_GW
+        panels, axes = figure.panel_grid(
+            len(shown), INTERACTIONS_PER_ROW, INTERACTIONS_ASPECT, sharex=True
+        )
+        for axis, (y, partner, title) in zip(axes.flat, shown, strict=False):
+            if partner is None:
                 axis.scatter(x, y, color=colour, **figure.point_style(x.size))
             else:
                 image = axis.scatter(
-                    x, y, c=inputs[:, k], **figure.point_style(x.size, coloured=True)
+                    x,
+                    y,
+                    c=coloured[partner],
+                    **figure.point_style(x.size, coloured=True),
                 )
-                unit = figure.GROUP_UNITS[model["groups"][k]]
                 figure.colorbar(
-                    panels, image, axis, figure.unit_label("valor del soci", unit)
+                    panels,
+                    image,
+                    axis,
+                    figure.unit_label("valor del grup", figure.GROUP_UNITS[partner]),
                 )
             axis.set_title(title)
-            axis.set_xlabel(figure.unit_label(figure.GROUP_LABELS[name], "GW"))
-        panels.supylabel(
-            figure.unit_label("contribució", PRICE_UNITS),
-            fontsize=figure.AXIS_TEXT_SIZE,
+        figure.label_once(
+            panels,
+            axes,
+            figure.unit_label(figure.GROUP_LABELS[name], "GW"),
+            figure.unit_label("contribució", str(model["unit"])),
         )
         figure.save(panels, folder, f"interactions_{name}")
 
 
-def draw(folder, models, colour):
-    """Dibuixa les figures d'una família a `folder`, dels seus models ajustats.
+def draw(folder, main, secondary, colour):
+    """Dibuixa la dependència i les interaccions d'una família a `folder`.
 
-    La importància, la dependència i, si el fitxer en porta, les interaccions, de
-    `colour`, el color de la família.
+    De `colour`, el seu color, i dels números de la Part II de la passada, `main` i
+    `secondary`. Les interaccions, si el model que dibuixa les porta.
     """
-    figure.importance(folder, models, colour)
-    present = measures.present(models[0])
-    if present:
-        figure.dependence(folder, models, present, colour)
-        if "interactions" in models[0].files:
-            _interactions(folder, models[0], present, colour)
+    found = figure.first_explained(folder)
+    if found is None:
+        return
+    seed, path = found
+    with np.load(path) as model:
+        figure.dependence(folder, seed, model, main, secondary, colour)
+        if "interactions" in model:
+            _interactions(folder, seed, model, main, colour)

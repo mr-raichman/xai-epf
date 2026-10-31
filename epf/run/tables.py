@@ -53,7 +53,7 @@ def _scores(where):
     return found
 
 
-def _best(where, complete):
+def best_fits(where, complete):
     """Torna la millor configuració de cada seed de les famílies completes, `complete`.
 
     De cada una, els dies de prova, `days`, i la predicció i el preu de cada un,
@@ -249,7 +249,7 @@ def write(where, main_only=False):
     }
     if main_only:
         return numbers
-    best = _best(where, complete)
+    best = best_fits(where, complete)
     numbers[PART_I_SECONDARY] = _written(
         where / PART_I_SECONDARY,
         metrics.part_i_secondary(best, records) + metrics.part_i_tests(best),

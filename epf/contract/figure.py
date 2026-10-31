@@ -4,6 +4,7 @@ Les dels models explicats es dibuixen dels models ajustats que la passada va des
 """
 
 import collections
+import itertools
 import math
 
 import matplotlib
@@ -12,7 +13,8 @@ import numpy as np
 from epf import information
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
 from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS, HOUR
-from epf.contract.measures import PER_GW, contributions, importances, pairs
+from epf.contract import measures
+from epf.contract.measures import PER_GW
 from epf.contract.record import fitted_files
 from epf.information import KINDS, SERIES
 from epf.parameters import HOUR_COLUMNS
@@ -83,6 +85,10 @@ MARK_COLOUR = rgb(120, 20, 20)
 
 # L'escala dels valors continus, pel seu nom a matplotlib.
 SCALE = "viridis"
+
+# El gris d'on surten els tons d'una llegenda que travessa famílies, com la d'una
+# ponderació, on el color d'una família es llegiria com ella.
+LEGEND_GREY = rgb(91, 91, 91)
 
 # Gruixos i llargades en punts, i opacitats de 0 a 1, que substitueixen la d'un color
 # rgba. Una línia de referència és la que no és cap dada, com un ajust, un zero o un
@@ -328,6 +334,36 @@ def rows_height(count):
     return count * ROW_PITCH + ROW_PANEL_FRAME
 
 
+def label_once(drawing, axes, xlabel=None, ylabel=None):
+    """Posa una sola vegada el títol de cada eix que comparteix una graella.
+
+    Esborra el de cada panell. Un panell sense cap de visible a sota hi conserva les
+    xifres, que un eix compartit deixa només a la fila de baix.
+    """
+    grid = np.atleast_2d(axes)
+    for axis in grid.flat:
+        if xlabel is not None:
+            axis.set_xlabel("")
+        if ylabel is not None:
+            axis.set_ylabel("")
+    if xlabel is not None:
+        drawing.supxlabel(xlabel, fontsize=AXIS_TEXT_SIZE)
+    if ylabel is not None:
+        drawing.supylabel(ylabel, fontsize=AXIS_TEXT_SIZE)
+    for row, column in itertools.product(range(grid.shape[0]), range(grid.shape[1])):
+        below = grid[row + 1 :, column]
+        if grid[row, column].get_visible() and not any(
+            one.get_visible() for one in below
+        ):
+            grid[row, column].tick_params(labelbottom=True)
+
+
+def grey(number):
+    """Torna el gris `number` d'una llegenda, més clar com el to d'una família."""
+    *channels, alpha = to_rgba(LEGEND_GREY)
+    return (*(1 - (1 - np.array(channels)) * (1 - SHADE) ** number), alpha)
+
+
 def panel_grid(count, per_row, aspect, **options):
     """Torna una figura de `count` panells, `per_row` per fila, i la seva graella.
 
@@ -426,84 +462,69 @@ def p_value(value):
     return f"p = {catalan(f'{value:.2g}')}"
 
 
-def column_label(column, group):
-    """Torna com es diu una columna a les figures, del seu grup, `group`, i l'hora.
+### Números i files ###
 
-    `price_lag1_h23`, del grup `price_lag1`, és `preu, D-1, 23 h`.
+
+def rows(frame, measure, family, **keys):
+    """Torna les files d'una mesura i una família dels números d'una passada, `frame`.
+
+    Una clau de `keys` amb un valor hi ha de tenir aquest valor, i una amb `None`, ser
+    buida; `family` també. Una clau que no hi és pot valer qualsevol cosa.
     """
-    if column in CALENDAR_LABELS:
-        return CALENDAR_LABELS[column]
-    hour = column.rsplit("_", 1)[-1]
-    if hour in HOUR_COLUMNS:
-        return f"{GROUP_LABELS[group]}, {int(hour[1:])} h"
-    return GROUP_LABELS[group]
+    found = frame[frame["measure"] == measure]
+    for key, value in {"family": family, **keys}.items():
+        found = found[found[key].isna() if value is None else found[key] == value]
+    return found
 
 
-### Models ajustats ###
+def number(frame, measure, family, **keys):
+    """Torna el valor de l'única fila que `rows` troba, i falla si no n'és una."""
+    return float(rows(frame, measure, family, **keys)["value"].item())
 
 
-def saved(folder):
-    """Torna els models ajustats d'una família, en ordre de seed i de configuració.
+def group_values(model, count):
+    """Torna el valor de cada grup d'un model ajustat a cada una de `count` files.
 
-    El primer és la millor configuració de la primera seed.
+    Un grup d'una columna, la columna; un de 24, la de l'hora de la fila; el
+    calendari, el dia de la setmana, el dilluns 0; cap altre, NaN. La xarxa neuronal
+    desa les entrades per dia, i cada dia hi val per les seves 24 files.
     """
-    return [np.load(path) for path in fitted_files(folder).values()]
-
-
-### Importància ###
-
-
-# Columnes que mostra la importància per columna; la resta compten al seu grup.
-SHOWN = 20
-
-# L'alçada de la importància, amb els noms de les columnes drets a sota, en mm.
-IMPORTANCE_HEIGHT = 70
-
-
-def importance(folder, models, colour):
-    """Dibuixa la importància de les columnes i dels grups, amb cada model ajustat.
-
-    De les columnes, les `SHOWN` que més pesen, de la que més a l'esquerra; dels grups,
-    tots, els de les sèries en l'ordre del seu information set i el calendari al final.
-    La mitjana, en barres de `colour`, el color de la família, i cada model ajustat, en
-    un punt. Un model ajustat sense cap contribució, que no depèn de les entrades, no hi
-    entra, i el títol diu llavors quants models hi entren de quants.
-    """
-    groups = models[0]["groups"]
-    columns = models[0]["columns"]
-    # La seva part seria zero entre zero.
-    kept = [model for model in models if np.any(contributions(model))]
-    found = [importances(contributions(model), groups) for model in kept]
-    for kind in ("columns", "groups"):
-        panels, axis = plt.subplots(figsize=size(IMPORTANCE_HEIGHT))
-        if len(kept) < len(models):
-            axis.set_title(f"models ajustats: {len(kept)} de {len(models)}")
-        if found:
-            if kind == "columns":
-                table = np.array([by_column for by_column, _ in found])
-                order = np.argsort(-table.mean(axis=0), kind="stable")[:SHOWN]
-                names = [column_label(columns[j], groups[j]) for j in order]
-            else:
-                # Les sèries en l'ordre del seu information set, i el calendari i el
-                # comptador de dies després: les matrius els barregen amb les sèries.
-                labels = [name for name in found[0][1] if name not in (CALENDAR, DATE)]
-                labels += [name for name in (CALENDAR, DATE) if name in found[0][1]]
-                table = np.array(
-                    [[by_group[name] for name in labels] for _, by_group in found]
-                )
-                order = np.arange(len(labels))
-                # Un grup sense nom hi falla, com a `column_label`, i no en queda fora
-                # amb la seva part al total.
-                names = [GROUP_LABELS[name] for name in labels]
-            positions = np.arange(len(order))
-            axis.bar(
-                positions, table[:, order].mean(axis=0), color=colour, width=BAR_WIDTH
+    inputs = np.asarray(model["inputs"], dtype=np.float64)
+    if len(inputs) < count:
+        inputs = np.repeat(inputs, count // len(inputs), axis=0)
+    hours = np.arange(count) % len(HOUR_COLUMNS)
+    columns = [str(column) for column in model["columns"]]
+    groups = np.array([str(group) for group in model["groups"]])
+    found = {}
+    for name in dict.fromkeys(groups):
+        members = np.flatnonzero(groups == name)
+        if len(members) == 1:
+            found[name] = inputs[:, members[0]]
+        elif len(members) == len(HOUR_COLUMNS):
+            found[name] = inputs[:, members][np.arange(count), hours]
+        elif name == CALENDAR:
+            days = [j for j in members if columns[j].startswith(DAY_OF_WEEK)]
+            found[name] = (
+                inputs[:, days[0]]
+                if len(days) == 1
+                else inputs[:, days].argmax(axis=1).astype(float)
             )
-            for row in table[:, order]:
-                axis.plot(positions, row, "o", color=TEXT_COLOUR, alpha=POINT_OPACITY)
-            axis.set_xticks(positions, names, rotation=90)
-        panels.supylabel("part de la importància", fontsize=AXIS_TEXT_SIZE)
-        save(panels, folder, "importance" if kind == "columns" else "groups")
+        else:
+            found[name] = np.full(count, np.nan)
+    return found
+
+
+def first_explained(folder):
+    """Torna la seed i el fitxer del primer model d'una família amb contribucions.
+
+    En ordre de seed i de configuració: la millor configuració de la primera seed, si
+    en té alguna. `None` si cap model no en té.
+    """
+    for (seed, _), path in fitted_files(folder).items():
+        with np.load(path) as model:
+            if np.any(model["values"]):
+                return seed, path
+    return None
 
 
 ### Dependència ###
@@ -514,31 +535,46 @@ DEPENDENCE_PER_ROW = 2
 DEPENDENCE_ASPECT = 3.5 / 4.5
 
 
-def dependence(folder, models, present, colour):
-    """Dibuixa la contribució de cada grup de `present` contra el seu valor.
+def dependence(folder, seed, model, main, secondary, colour):
+    """Dibuixa la contribució de cada sèrie amb panell contra el seu valor.
 
-    Els punts, de `colour`, el color de la família, i la recta ajustada són del millor
-    model ajustat de la primera seed, i el títol en dona el pendent i després la mitjana
-    i la dispersió dels pendents de tots, que són el que llegeixen Trebbien et al.
-    (2023). Un panell per grup, `DEPENDENCE_PER_ROW` per fila, a `dependence.svg`.
+    Els punts, de `colour`, el color de la família, i la recta ajustada són del model
+    ajustat `model`, el primer de la família amb alguna contribució, de la seed
+    `seed`, i el títol en dona el pendent i la mitjana i la desviació mostral dels de
+    les seeds, dels números de la Part II, `main` i `secondary`, que són el que
+    llegeixen Trebbien et al. (2023). Un panell per sèrie, `DEPENDENCE_PER_ROW` per
+    fila, a `dependence.svg`.
     """
+    family = folder.name
+    present = measures.present(model)
+    if not present:
+        return
+    values = measures.contributions(model)
     panels, axes = panel_grid(len(present), DEPENDENCE_PER_ROW, DEPENDENCE_ASPECT)
     for axis, name in zip(axes.flat, present, strict=False):
-        slopes = []
-        for count, model in enumerate(models):
-            x, y = pairs(model, contributions(model), name)
-            slope, intercept = np.polyfit(x / PER_GW, y, 1)
-            slopes.append(slope)
-            if count == 0:
-                axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
-                span = np.array([x.min(), x.max()]) / PER_GW
-                axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
+        x, y = measures.pairs(model, values, name)
+        slope, intercept = measures.line(model, values, name)
+        axis.scatter(x / PER_GW, y, color=colour, **point_style(x.size))
+        span = np.array([x.min(), x.max()]) / PER_GW
+        axis.plot(span, slope * span + intercept, **REFERENCE_LINE)
         axis.set_xlabel(unit_label(GROUP_LABELS[name], "GW"))
-        first_slope = catalan(f"{slopes[0]:.2g}")
-        mean = catalan(f"{np.mean(slopes):.2g}")
-        spread = catalan(f"{np.std(slopes):.2g}")
-        axis.set_title(f"pendent {first_slope}\nmitjana {mean} ± {spread}")
+        found = number(
+            secondary,
+            "model_slope",
+            family,
+            seed=seed,
+            rank=int(model["rank"]),
+            subject=name,
+        )
+        mean, spread = (
+            number(main, f"slope_{kind}", family, seed=None, subject=name)
+            for kind in ("mean", "std")
+        )
+        axis.set_title(
+            f"pendent {catalan(f'{found:.2g}')}\n"
+            f"mitjana {catalan(f'{mean:.2g}')} ± {catalan(f'{spread:.2g}')}"
+        )
     panels.supylabel(
-        unit_label("contribució", str(models[0]["unit"])), fontsize=AXIS_TEXT_SIZE
+        unit_label("contribució", str(model["unit"])), fontsize=AXIS_TEXT_SIZE
     )
     save(panels, folder, "dependence")

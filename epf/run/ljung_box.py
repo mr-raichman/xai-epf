@@ -63,8 +63,8 @@ def report(where, numbers, colours):
         for lag in (gap, DAYS_PER_WEEK):
             axis.axvline(lag, **figure.REFERENCE_LINE)
         axis.axhline(0, **figure.REFERENCE_LINE)
-        axis.set_xlabel(figure.unit_label("retard", "dies"))
         axis.set_title(f"{figure.FAMILY_LABELS[family]}\n{figure.p_value(value)}")
-    for axis in axes[:, 0]:
-        axis.set_ylabel("autocorrelació")
+    figure.label_once(
+        panels, axes, figure.unit_label("retard", "dies"), "autocorrelació"
+    )
     figure.save(panels, where, "autocorrelation")
