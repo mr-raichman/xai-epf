@@ -545,6 +545,19 @@ def test_each_fits_seconds_are_kept_as_soon_as_it_returns(fake):
     }
 
 
+def test_each_fit_records_its_start_and_load_beside_its_seconds(fake, monkeypatch):
+    monkeypatch.setattr(record, "machine_load", lambda: (1.0, 2.0, 3.0))
+    fake.main()
+    started = MINUTE.astimezone().isoformat(timespec="seconds")
+    for family in ("first", "second", "third"):
+        found = _recorded(family)
+        for field, value in (("started", started), ("load", [1.0, 2.0, 3.0])):
+            assert found[field] == {
+                seed: {rank: value for rank in ranks}
+                for seed, ranks in found["seconds"].items()
+            }
+
+
 def test_a_family_reading_a_search_none_makes_ends_in_an_error(fake, monkeypatch):
     """Sense pla ni cap seed fallada, la passada en dibuixava les figures i acabava."""
     drawn = []

@@ -357,18 +357,22 @@ def _train(
     """Ajusta una configuració d'una família en una seed, una tasca de `pool`.
 
     Crida el `train` del mòdul del model, `module`, amb les matrius de l'information
-    set `set_name`. Torna quants segons ha trigat, sense importar-lo, i com s'ha aturat
-    l'ajust, el que torna `train`, `None` d'un que no s'atura. Refusa un codi,
+    set `set_name`. Torna quants segons ha trigat, sense importar-lo, com s'ha aturat
+    l'ajust, el que torna `train`, `None` d'un que no s'atura, i quan ha començat, en
+    hora local amb la seva diferència d'UTC. Refusa un codi,
     unes matrius o unes biblioteques que no són els de `fingerprints`, les empremtes amb
     què es va començar o continuar la passada.
     """
     built = record.built_for(set_name, fingerprints)
     train = importlib.import_module(module).train
+    # Amb la diferència d'UTC, perquè l'hora local sola es repeteix quan s'endarrereix
+    # el rellotge a l'octubre.
+    started = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     # Un procés l'importa a la seva primera tasca del model, i només en un assaig això
     # passa sovint en un ajust.
-    started = time.time()
+    clock = time.time()
     said = train(family, folder, seed, configuration, explained_days, built)
-    return time.time() - started, said
+    return time.time() - clock, said, started
 
 
 def _ordered(by_seed):
@@ -385,17 +389,24 @@ def _planned(folder, seed, configurations):
     paths.write_record(path, found)
 
 
-def _timed(folder, seed, rank, seconds, code):
-    """Desa al registre d'una família els segons d'un ajust i el codi que l'ha fet.
+def _timed(folder, seed, rank, seconds, code, started, load):
+    """Desa al registre d'una família el temps, el codi i la càrrega d'un ajust.
 
-    Cada un al costat dels dels altres ajustos, per seed i lloc; `code` és l'empremta
-    del codi.
+    Els segons, el codi, `code`, quan ha començat, `started`, i la càrrega de la
+    màquina quan ha tornat, `load`, cada un al costat dels dels altres ajustos, per
+    seed i lloc.
     """
     path = folder / paths.FAMILY_RECORD
     found = json.loads(path.read_text(encoding="utf-8"))
-    # El registre d'una passada començada abans que es desés el codi de cada ajust.
-    found.setdefault("codes", {})
-    for field, value in (("seconds", round(seconds, 1)), ("codes", code)):
+    # El registre d'una passada començada abans que es desessin.
+    for field in ("codes", "started", "load"):
+        found.setdefault(field, {})
+    for field, value in (
+        ("seconds", round(seconds, 1)),
+        ("codes", code),
+        ("started", started),
+        ("load", load),
+    ):
         ranks = found[field].setdefault(str(seed), {})
         ranks[str(rank)] = value
         found[field][str(seed)] = _ordered(ranks)
@@ -457,6 +468,8 @@ class Run:
                         "configurations": {},
                         "seconds": {},
                         "codes": {},
+                        "started": {},
+                        "load": {},
                         "information": information.recorded(matrices.information),
                         "gap": matrices.information.gap,
                         "deleted": matrices.deleted,
@@ -592,14 +605,23 @@ class Run:
     def returned(self, label, result):
         """Desa el que torna una tasca, un ajust o un trial.
 
-        D'un ajust, els segons i el codi que l'ha fet, i com s'ha aturat, al fitxer dels
-        processos. Quan amb el trial la cerca de la seed ja és acabada, planifica cada
-        família triada que la llegeix, i en posa els ajustos a la cua.
+        D'un ajust, els segons, el codi que l'ha fet, quan ha començat i la càrrega de
+        la màquina quan torna, i com s'ha aturat, al fitxer dels processos. Quan amb el
+        trial la cerca de la seed ja és acabada, planifica cada família triada que la
+        llegeix, i en posa els ajustos a la cua.
         """
         family, seed, kind, rank = label
         if kind == "fit":
-            seconds, said = result
-            _timed(self.where / family, seed, rank, seconds, self.fingerprints["code"])
+            seconds, said, started = result
+            _timed(
+                self.where / family,
+                seed,
+                rank,
+                seconds,
+                self.fingerprints["code"],
+                started,
+                record.machine_load(),
+            )
             if said is not None:
                 with open(self.where / paths.WORKERS_LOG, "a", encoding="utf-8") as log:
                     log.write(f"{family} seed {seed} fit {rank}: {said}\n")

@@ -15,7 +15,6 @@ seves cerques.
 import hashlib
 import json
 import math
-import os
 import sqlite3
 from contextlib import closing
 
@@ -24,6 +23,7 @@ import optuna
 from epf import Refusal, paths
 from epf.paths import plain, write_record
 from epf.contract import matrix
+from epf.contract.record import machine_load
 from epf.information import recorded
 from epf.parameters import DEVELOPMENT, PROJECT_SEED, SHARES, seeded
 
@@ -233,10 +233,8 @@ def told(study, optuna_trial, numbers, score, stop, fingerprints):
     optuna_trial.set_user_attr("numbers", plain(numbers))
     for name, value in stop.items():
         optuna_trial.set_user_attr(name, plain(value))
-    # La càrrega quan el trial torna; Windows no la dona, i hi queda buida.
-    optuna_trial.set_user_attr(
-        "load", os.getloadavg() if hasattr(os, "getloadavg") else None
-    )
+    # La càrrega quan el trial torna.
+    optuna_trial.set_user_attr("load", machine_load())
     for name, value in fingerprints.items():
         optuna_trial.set_user_attr(name, value)
     if math.isfinite(score):

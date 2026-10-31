@@ -3,6 +3,7 @@
 import collections
 import hashlib
 import json
+import os
 
 import numpy as np
 
@@ -104,6 +105,14 @@ def built_for(set_name, started):
     built = matrix.matrices(matrix.series(), information.resolved(set_name))
     refuse_changed(started, built)
     return built
+
+
+def machine_load():
+    """Torna les tres càrregues mitjanes de la màquina, o `None` a Windows.
+
+    Windows no en dona cap.
+    """
+    return os.getloadavg() if hasattr(os, "getloadavg") else None
 
 
 def _days(index):
