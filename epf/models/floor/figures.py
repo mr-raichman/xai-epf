@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from epf.contract import figure
+from epf.contract import figure, measures
 from epf.contract.explanation import PRICE_UNITS
 from epf.contract.figure import plt
 
@@ -22,7 +22,7 @@ def draw(folder, models, colour):
     figura de Trebbien et al. (2023). Una casella sense cap hora queda en blanc.
     """
     first = models[0]
-    load = first["load_training"] / figure.PER_GW
+    load = first["load_training"] / measures.PER_GW
     panels, axis = plt.subplots(figsize=figure.size(HEIGHT))
     image = axis.hist2d(
         load,
@@ -36,7 +36,7 @@ def draw(folder, models, colour):
     for model in models:
         axis.plot(
             span,
-            np.polyval(model["coefficients"], span * figure.PER_GW),
+            np.polyval(model["coefficients"], span * measures.PER_GW),
             color=colour,
         )
     axis.set_xlabel(figure.unit_label("càrrega residual prevista $L$", "GW"))

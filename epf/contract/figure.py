@@ -12,6 +12,7 @@ import numpy as np
 from epf import information
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
 from epf.contract.matrix import DAY_OF_WEEK, DAY_OF_WEEK_COLUMNS, HOUR
+from epf.contract.measures import PER_GW, contributions, importances, pairs
 from epf.contract.record import fitted_files
 from epf.information import KINDS, SERIES
 from epf.parameters import HOUR_COLUMNS
@@ -412,9 +413,6 @@ FAMILY_LABELS = {
 # El valor p més petit que una figura escriu; un de menor s'hi escriu `p < 0,001`.
 SMALLEST_P = 0.001
 
-# MW per GW, perquè els pendents es llegeixen per GW, com fan Trebbien et al. (2023).
-PER_GW = 1000
-
 
 def unit_label(label, unit):
     """Torna el títol d'un eix amb la unitat, `preu (EUR/MWh)`, o sol si no en té."""
@@ -452,17 +450,6 @@ def saved(folder):
     return [np.load(path) for path in fitted_files(folder).values()]
 
 
-def contributions(model):
-    """Torna les contribucions d'un model ajustat, `(files, columnes)`.
-
-    Les de la xarxa neuronal, `(dies, columnes, 24)`, amb una fila per dia i hora.
-    """
-    values = model["values"]
-    if values.ndim == 2:
-        return values
-    return values.transpose(0, 2, 1).reshape(-1, values.shape[1])
-
-
 ### Importància ###
 
 
@@ -471,25 +458,6 @@ SHOWN = 20
 
 # L'alçada de la importància, amb els noms de les columnes drets a sota, en mm.
 IMPORTANCE_HEIGHT = 70
-
-
-def importances(values, groups):
-    """Torna la importància de cada columna i la de cada grup, la seva part del total.
-
-    És la mitjana del valor absolut de les contribucions, en part del total com la
-    donen Pesenti i O'Sullivan (2026), de manera que la d'una columna i la d'un grup es
-    llegeixen igual. La d'un grup suma les contribucions de les seves columnes abans de
-    prendre-la, com Pesenti i O'Sullivan (2025). Es calcula en `float64`.
-    """
-    values = np.asarray(values, dtype=np.float64)
-    by_column = np.abs(values).mean(axis=0)
-    names = list(dict.fromkeys(groups))
-    by_group = np.array(
-        [np.abs(values[:, groups == name].sum(axis=1)).mean() for name in names]
-    )
-    return by_column / by_column.sum(), dict(
-        zip(names, by_group / by_group.sum(), strict=True)
-    )
 
 
 def importance(folder, models, colour):
@@ -541,52 +509,9 @@ def importance(folder, models, colour):
 ### Dependència ###
 
 
-# Els grups que tenen panells de dependència: els de les sèries que l'arbre llegeix a
-# l'hora de la fila, un valor per fila, les previsions com a Trebbien et al. (2023) i
-# el programa igual, en MW o en MWh.
-DEPENDENCE = {
-    name
-    for name, (series, _) in GROUPS.items()
-    if KINDS[SERIES[series].kind].at_the_hour
-}
-
 # Panells per fila de la dependència, i l'alçada de cada un entre la seva amplada.
 DEPENDENCE_PER_ROW = 2
 DEPENDENCE_ASPECT = 3.5 / 4.5
-
-
-def present(model):
-    """Torna els grups de `DEPENDENCE` que porta un model ajustat, en el seu ordre."""
-    return [str(name) for name in dict.fromkeys(model["groups"]) if name in DEPENDENCE]
-
-
-def members(model, name):
-    """Torna les posicions de les columnes del grup `name` en un model ajustat.
-
-    Les troba pel grup que la passada hi va desar: una a la matriu per hora, la de
-    l'hora de la fila, i les 24 de la diària en ordre d'hora.
-    """
-    members = np.flatnonzero(model["groups"] == name)
-    if len(members) == 1:
-        return members
-    hour = {column: number for number, column in enumerate(HOUR_COLUMNS)}
-    return np.array(
-        sorted(members, key=lambda j: hour[str(model["columns"][j]).rsplit("_", 1)[1]])
-    )
-
-
-def pairs(model, values, name):
-    """Torna el valor del grup `name` i la seva contribució a l'hora de cada fila."""
-    inputs = model["inputs"]
-    found = members(model, name)
-    if len(found) == 1:
-        return inputs[:, found[0]], values[:, found[0]]
-    # La xarxa neuronal: a la fila del dia d i l'hora h, la columna de l'hora h.
-    x = inputs[:, found]
-    y = values.reshape(len(inputs), len(HOUR_COLUMNS), -1)[
-        :, np.arange(len(found)), found
-    ]
-    return x.ravel(), y.ravel()
 
 
 def dependence(folder, models, present, colour):

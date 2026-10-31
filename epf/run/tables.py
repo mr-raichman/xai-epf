@@ -9,13 +9,14 @@ import numpy as np
 import pandas as pd
 
 from epf import paths
-from epf.contract import metrics
+from epf.contract import measures, metrics
 from epf.contract.record import fitted_files
 from epf.parameters import HOURS_PER_DAY
 from epf.run import families
 
 PART_I_MAIN = "part_i_main.csv"
 PART_I_SECONDARY = "part_i_secondary.csv"
+PART_II_MAIN = "part_ii_main.csv"
 
 # Les columnes de tots els fitxers, i les que són enters, que amb una casella buida
 # pandas escriuria com a decimals, `3.0`.
@@ -105,9 +106,12 @@ def _ordered(rows):
 
 def _written(path, rows):
     """Escriu les files d'un fitxer de números, sencer o gens, i en torna la taula."""
-    frame = pd.DataFrame(_ordered(rows), columns=COLUMNS)
+    rows = _ordered(rows)
+    frame = pd.DataFrame(rows, columns=COLUMNS)
     for name in INTEGERS:
         frame[name] = frame[name].astype("Int64")
+    # Un recompte, que amb els decimals pandas escriuria com un d'ells, `3.0`.
+    frame["value"] = pd.Series([row["value"] for row in rows], dtype=object)
     paths.write_whole(path, frame.to_csv(index=False, lineterminator="\n"))
     return frame
 
@@ -149,6 +153,20 @@ def write(where, main_only=False):
     aquest ordre, `t_test`, `t_statistic`, `t_left`, `t_rope` i `t_right`, sobre el MAE
     de `family` menys el d'`other_family`, `t_left` per a `family` més precisa.
 
+    `part_ii_main.csv`, les mesures principals de la Part II, de cada família
+    interpretada completa, cada seed la mitjana dels seus models amb alguna
+    contribució, `rank` buida: `share` de cada grup i `slope` per GW de cada sèrie amb
+    panell de dependència, a `subject`, i les seves `share_mean`, `share_std`,
+    `slope_mean` i `slope_std`, `seed` buida; `sign` de cada `slope_mean` i
+    `sign_against`, les seeds que no el mostren; `order_against` de cada parell de
+    grups, `subject` el que la mitjana posa per sobre d'`other_subject`; de la família
+    amb interaccions, `partner_strength` de cada sèrie, `subject`, amb cada grup,
+    `other_subject`, a la millor configuració de cada seed, i `partner_strength_mean` i
+    `partner_seeds`, les seeds on el grup és dels tres més forts, `seed` buida; de la
+    família el registre de la qual en diu `selection`, `selection` de cada columna, a
+    `subject`, a cada hora i, `hour` buida, a totes; i `models_without_contribution` de
+    cada seed.
+
     Torna la taula de cada fitxer pel seu nom. Amb `main_only`, el d'una passada que
     s'atura abans de les figures, només escriu `part_i_main.csv`.
     """
@@ -180,5 +198,18 @@ def write(where, main_only=False):
     numbers[PART_I_SECONDARY] = _written(
         where / PART_I_SECONDARY,
         metrics.part_i_secondary(best, records) + metrics.part_i_tests(best),
+    )
+    models = {}
+    for family in complete:
+        if not records[family].get("interpreted"):
+            continue
+        models[family] = {}
+        for key, path in fitted_files(where / family).items():
+            with np.load(path) as model:
+                models[family][key] = measures.summarised(
+                    model, records[family].get("selection")
+                )
+    numbers[PART_II_MAIN] = _written(
+        where / PART_II_MAIN, measures.part_ii_main(models, records)
     )
     return numbers

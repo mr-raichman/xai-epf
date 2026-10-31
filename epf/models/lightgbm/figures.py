@@ -2,12 +2,8 @@
 
 import numpy as np
 
-from epf.contract import figure
+from epf.contract import figure, measures
 from epf.contract.explanation import PRICE_UNITS
-
-# Socis de cada sèrie a les interaccions, els que més hi interactuen: la regla que fa de
-# les "three selected features" de Trebbien et al. (2023).
-PARTNERS = 3
 
 # Panells de les interaccions per fila, i l'alçada de cada un entre la seva amplada.
 INTERACTIONS_PER_ROW = 2
@@ -19,8 +15,8 @@ def _interactions(folder, model, present, colour):
 
     És el de la primera seed. Per sèrie de `present`, una figura,
     `interactions_<sèrie>.svg`: la dependència sencera i l'efecte sense interaccions, de
-    `colour`, el color de la família, i la interacció amb els `PARTNERS` socis més
-    forts, amb el color del valor de cada soci a l'escala contínua.
+    `colour`, el color de la família, i la interacció amb els `measures.PARTNERS` socis
+    més forts, amb el color del valor de cada soci a l'escala contínua.
     """
     columns = list(model["columns"])
     rows = model["interaction_rows"]
@@ -28,13 +24,13 @@ def _interactions(folder, model, present, colour):
     values = model["values"][rows]
     for name in present:
         panels, axes = figure.panel_grid(
-            2 + PARTNERS, INTERACTIONS_PER_ROW, INTERACTIONS_ASPECT
+            2 + measures.PARTNERS, INTERACTIONS_PER_ROW, INTERACTIONS_ASPECT
         )
-        (j,) = figure.members(model, name)
-        x = inputs[:, j] / figure.PER_GW
+        (j,) = measures.members(model, name)
+        x = inputs[:, j] / measures.PER_GW
         strength = np.abs(interactions[:, j, :]).mean(axis=0)
         strength[j] = -np.inf
-        partners = np.argsort(strength)[-PARTNERS:][::-1]
+        partners = np.argsort(strength)[-measures.PARTNERS :][::-1]
         shown = [
             (values[:, j], None, "sencera"),
             (interactions[:, j, j], None, "sense interaccions"),
@@ -74,7 +70,7 @@ def draw(folder, models, colour):
     `colour`, el color de la família.
     """
     figure.importance(folder, models, colour)
-    present = figure.present(models[0])
+    present = measures.present(models[0])
     if present:
         figure.dependence(folder, models, present, colour)
         if "interactions" in models[0].files:
