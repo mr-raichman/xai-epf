@@ -26,6 +26,8 @@ FAMILIES = {
         "kept": 0,
         "searched_as": NAME,
         "ljung_box_tested": True,
+        "interpreted": False,
+        "benchmark": True,
         "reads": READS,
     }
 }

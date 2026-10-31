@@ -23,9 +23,18 @@ from epf.run import families, figures, pool, progress, search, tables
 READ = ("SEEDS", "TRIALS", "BEST", "EXPLAINED_DAYS")
 
 # El que les taules i les figures de la passada llegeixen d'una família, que el seu
-# registre copia de `FAMILIES`: si se'n fa el test de Ljung-Box dels errors i, de la que
-# en té, la columna del comptador de dies.
-COPIED = ("ljung_box_tested", "counter")
+# registre copia de `FAMILIES`: si se'n fa el test de Ljung-Box dels errors; si
+# s'interpreta a la Part II; si és un banc de comparació; si divideix l'rMAE,
+# `"main"`, o un rMAE secundari, `"secondary"`; si se'n compta la selecció d'Uniejewski
+# et al. (2016); i, de la que en té, la columna del comptador de dies.
+COPIED = (
+    "ljung_box_tested",
+    "interpreted",
+    "benchmark",
+    "denominator",
+    "selection",
+    "counter",
+)
 
 
 def _plans(chosen, values):

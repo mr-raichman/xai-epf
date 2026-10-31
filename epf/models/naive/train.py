@@ -39,8 +39,10 @@ def previous_day(price, days):
     return _copied(price, days, DAY_LAG)
 
 
-# Cada predicció és una família, amb la funció que copia i els dies que copia, que és el
-# que en diu el registre.
+# Cada predicció és una família, amb la funció que copia, els dies que copia, que és el
+# que en diu el registre, i l'rMAE que divideix: el de cada família és sobre la còpia de
+# la setmana anterior, com a Lago et al. (2021), i les altres dues en donen un de
+# secundari.
 FORECASTS = {
     "naive_similar_day": (
         similar_day,
@@ -49,9 +51,10 @@ FORECASTS = {
             "weekdays_from_yesterday": WEEKDAYS_FROM_YESTERDAY,
             "lag_otherwise": WEEK_LAG,
         },
+        "secondary",
     ),
-    "naive_previous_week": (previous_week, {"lag": WEEK_LAG}),
-    "naive_previous_day": (previous_day, {"lag": DAY_LAG}),
+    "naive_previous_week": (previous_week, {"lag": WEEK_LAG}, "main"),
+    "naive_previous_day": (previous_day, {"lag": DAY_LAG}, "secondary"),
 }
 
 # Cada família, com la planifica una passada: els dies que copia, i cap cerca. No se'n
@@ -62,14 +65,17 @@ FAMILIES = {
         "kept": 0,
         "searched_as": name,
         "ljung_box_tested": False,
+        "interpreted": False,
+        "benchmark": True,
+        "denominator": denominator,
     }
-    for name, (_, numbers) in FORECASTS.items()
+    for name, (_, numbers, denominator) in FORECASTS.items()
 }
 
 
 def _fitted(family, price, y, parts):
     """Copia la predicció de la família als dies de prova de la matriu."""
-    forecast, _ = FORECASTS[family]
+    forecast, _, _ = FORECASTS[family]
     # Els dies de prova de la matriu, sobre els quals es puntuen totes les famílies.
     days = y.index[y.index.isin(parts.test)]
     return Fitted(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {})

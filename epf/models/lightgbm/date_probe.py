@@ -26,10 +26,16 @@ from epf.parameters import DEVELOPMENT
 NAME = "date_probe"
 
 # La família, com la planifica una passada: els números de l'arbre, i la millor
-# configuració de cada seed de la cerca de l'arbre; i la columna del seu comptador.
+# configuració de cada seed de la cerca de l'arbre; la columna del seu comptador; i que,
+# a diferència de l'arbre, no s'interpreta.
 FAMILIES = {
     NAME: TREE[hyperparameters.NAME]
-    | {"kept": 1, "searched_as": hyperparameters.NAME, "counter": DAY_COUNTER}
+    | {
+        "kept": 1,
+        "searched_as": hyperparameters.NAME,
+        "counter": DAY_COUNTER,
+        "interpreted": False,
+    }
 }
 
 

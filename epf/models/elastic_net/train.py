@@ -28,6 +28,9 @@ FAMILIES = {
         "kept": "BEST",
         "searched_as": NAME,
         "ljung_box_tested": True,
+        "interpreted": True,
+        "benchmark": False,
+        "selection": True,
     }
 }
 
