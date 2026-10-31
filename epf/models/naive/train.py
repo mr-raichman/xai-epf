@@ -74,11 +74,26 @@ FAMILIES = {
 
 
 def _fitted(family, price, y, parts):
-    """Copia la predicció de la família als dies de prova de la matriu."""
-    forecast, _, _ = FORECASTS[family]
+    """Copia la predicció de la família als dies de prova de la matriu.
+
+    La que divideix l'rMAE, `"main"`, desa també el MAE i el MSE de la seva còpia als
+    dies d'entrenament de la matriu, `training_mae` i `training_mse`, en EUR/MWh i en
+    (EUR/MWh)².
+    """
+    forecast, _, denominator = FORECASTS[family]
+    arrays = {}
+    if denominator == "main":
+        # L'escala del MASE de Hyndman i Koehler (2006) i de l'RMSSE, sobre
+        # l'entrenament.
+        days = y.index[y.index.isin(parts.training)]
+        error = y.loc[days].to_numpy() - forecast(price, days)
+        arrays = {
+            "training_mae": np.mean(np.abs(error)),
+            "training_mse": np.mean(error**2),
+        }
     # Els dies de prova de la matriu, sobre els quals es puntuen totes les famílies.
     days = y.index[y.index.isin(parts.test)]
-    return Fitted(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), {})
+    return Fitted(forecast(price, days).ravel(), y.loc[days].to_numpy().ravel(), arrays)
 
 
 def train(family, folder, seed, configuration, explained_days, built):
