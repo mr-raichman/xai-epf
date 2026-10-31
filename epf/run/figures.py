@@ -53,10 +53,12 @@ DENSITY_BINS = 80
 FAMILY_ASPECT = 0.32
 
 # El beeswarm per grups: l'alçada d'un panell entre la seva amplada, la dispersió dels
-# punts al voltant de la fila d'un grup, i els quantils del valor del grup entre els
-# quals va l'escala de colors.
+# punts al voltant de la fila d'un grup, el diàmetre d'un punt en punts, a ull, entre
+# els de 0.55 i 2 que s'hi van provar, i els quantils del valor del grup entre els quals
+# va l'escala de colors.
 BEESWARM_ASPECT = 0.3
 BEESWARM_JITTER = 0.3
+BEESWARM_DOT = 1.4
 BEESWARM_RANGE = (0.05, 0.95)
 
 # L'alçada de la correlació de Spearman, en mm.
@@ -286,7 +288,7 @@ def _beeswarm(where, interpreted):
                 place + rng.uniform(-BEESWARM_JITTER, BEESWARM_JITTER, len(value)),
                 c=np.clip((value - low) / ((high - low) or 1), 0, 1),
                 cmap=figure.VALUE_SCALE,
-                s=figure.MARKER_SIZE**2,
+                s=BEESWARM_DOT**2,
                 linewidths=0,
                 rasterized=True,
             )
