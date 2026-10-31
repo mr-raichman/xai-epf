@@ -2,10 +2,14 @@ import numpy as np
 import pytest
 
 from epf.contract.measures import (
+    _order,
     contributions,
+    counter_share,
     importances,
     pairs,
     part_ii_main,
+    part_ii_secondary,
+    stability,
     summarised,
 )
 from epf.parameters import HOUR_COLUMNS
@@ -172,3 +176,111 @@ def test_a_partner_counts_where_it_is_among_a_seed_s_three_strongest():
     assert seeds == {"g1": [2], "g2": [2], "g3": [1], "g4": [1]}
     assert _measured(rows, "partner_strength_mean", other_subject="g1") == [2.0]
     assert _measured(rows, "partner_strength", seed=1, other_subject="g4") == [3.0]
+
+
+def test_a_seed_s_stability_by_hand():
+    # Dos models, dues files, un grup: 1 i 3, i 3 i 3. Desviació mostral de cada fila,
+    # √2 i 0, de mitjana √2 / 2; contribució absoluta mitjana (1 + 3 + 3 + 3) / 4.
+    models = [
+        {"rows": np.array([[1.0], [3.0]]), "magnitudes": {"a": 2.0}},
+        {"rows": np.array([[3.0], [3.0]]), "magnitudes": {"a": 3.0}},
+    ]
+    deviation, magnitude = stability(models)["a"]
+    assert deviation == pytest.approx(2**0.5 / 2) and magnitude == 2.5
+    assert np.isnan(stability(models[:1])["a"][0])
+
+
+def test_a_group_order_writes_a_tie_as_one():
+    """L'elastic net deixa dos grups a zero, i cap no va per sobre de l'altre."""
+    assert _order({"a": 0.25, "b": 0.5, "c": 0.25}) == "b > a = c"
+
+
+def test_the_secondary_measures_by_hand():
+    # Tres models, dos a la seed 0. Parts (0.6, 0.3, 0.1), (0.4, 0.5, 0.1) i
+    # (0.7, 0.2, 0.1): rangs (3, 2, 1), (2, 3, 1) i (3, 2, 1), Spearman 0.5, 1 i 0.5,
+    # de mitjana 2 / 3; dos ordres, un de dos models. Entre seeds, de la part de `a`,
+    # 6, 4 i 7 desenes: 24 / 42 de la suma de quadrats. Magnituds de `a` i `b`, 2 i 1,
+    # 1 i 2, 3 i 1: diferències 1, -1 i 2, de mitjana positiva, i un model en contra.
+    fits = {
+        (0, 0): _summary(
+            (0.6, 0.3, 0.1), (1.0, 1.0), magnitudes={"a": 2.0, "b": 1.0, "c": 0.1}
+        ),
+        (0, 1): _summary(
+            (0.4, 0.5, 0.1), (1.0, 1.0), magnitudes={"a": 1.0, "b": 2.0, "c": 0.1}
+        ),
+        (1, 0): _summary(
+            (0.7, 0.2, 0.1), (1.0, 1.0), magnitudes={"a": 3.0, "b": 1.0, "c": 0.1}
+        ),
+        (1, 1): None,
+    }
+    stabilities = {"lightgbm": {0: {name: (0.1, 1.0) for name in "abc"}}}
+    rows = part_ii_secondary({"lightgbm": fits}, stabilities, {})
+    assert _measured(rows, "spearman_mean") == [pytest.approx(2 / 3)]
+    assert _measured(rows, "group_order") == [2, 1]
+    assert _measured(rows, "group_order", subject="b > a > c") == [1]
+    assert _measured(rows, "between_seeds_share", subject="a") == [pytest.approx(4 / 7)]
+    assert _measured(rows, "flip_rate", subject="a", other_subject="b") == [
+        pytest.approx(1 / 3)
+    ]
+    assert _measured(rows, "stability_index", subject="a") == [pytest.approx(0.1)]
+    assert len(_measured(rows, "model_share")) == 9
+    # Els pendents, tots 1, no tenen dispersió.
+    assert np.isnan(_measured(rows, "between_seeds_slope", subject="b")[0])
+
+
+def test_two_families_agreements_by_hand():
+    # Parts (0.5, 0.3, 0.2) i (0.2, 0.3, 0.5): rànquings oposats, -1, cap parell
+    # d'acord, els tres primers els mateixos però només el del mig al seu lloc; pendents
+    # (1, -1) i (1, 1), un signe de dos.
+    magnitudes = {"a": 1.0, "b": 2.0, "c": 3.0}
+    first = {(0, 0): _summary((0.5, 0.3, 0.2), (1.0, -1.0), magnitudes=magnitudes)}
+    second = {(0, 0): _summary((0.2, 0.3, 0.5), (1.0, 1.0), magnitudes=magnitudes)}
+    stabilities = {
+        family: {0: {name: (0.1, 1.0) for name in "abc"}}
+        for family in ("dnn", "lightgbm")
+    }
+    rows = part_ii_secondary({"dnn": first, "lightgbm": second}, stabilities, {})
+    found = {
+        name: _measured(rows, name, family="dnn", other_family="lightgbm", seed=0)
+        for name in (
+            "rank_correlation",
+            "pairwise_rank_agreement",
+            "feature_agreement",
+            "rank_agreement",
+            "sign_agreement",
+        )
+    }
+    assert found == {
+        "rank_correlation": [pytest.approx(-1.0)],
+        "pairwise_rank_agreement": [0.0],
+        "feature_agreement": [1.0],
+        "rank_agreement": [pytest.approx(1 / 3)],
+        "sign_agreement": [0.5],
+    }
+
+
+def test_the_late_evening_and_the_own_hour_by_hand():
+    # Un dia: la columna de l'hora k del preu contribueix k + 100 h a l'hora prevista
+    # h. A la mateixa hora, 101 h; de mitjana a les 21, 22 i 23, 22 + 100 h.
+    hours = np.arange(24)
+    values = hours[None, :] + 100.0 * hours[:, None]
+    model = {
+        "values": values,
+        "inputs": np.zeros((24, 24)),
+        "columns": np.array([f"price_lag1_{hour}" for hour in HOUR_COLUMNS]),
+        "groups": np.array(["price_lag1"] * 24),
+        "unit": np.array("EUR/MWh"),
+    }
+    found = summarised(model)
+    assert found["own_hour"] == pytest.approx(101.0 * hours)
+    assert found["late_evening"] == pytest.approx(22 + 100.0 * hours)
+
+
+def test_the_date_probe_s_counter_share_by_hand():
+    # Mitjanes del valor absolut 1, 2 i 2: la part del comptador és 2 de 5.
+    model = {
+        "values": np.array([[1.0, -2.0, 3.0], [-1.0, 2.0, -1.0]]),
+        "columns": np.array(["price_lag1_h00", "day_counter", "hour"]),
+        "groups": np.array(["price_lag1", "date", "calendar"]),
+    }
+    assert counter_share(model, "day_counter") == pytest.approx(0.4)

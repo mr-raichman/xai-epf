@@ -3,9 +3,12 @@
 Cada seed hi compta una vegada, la mitjana de les seves configuracions, totes igual.
 """
 
+import collections
 import itertools
+import math
 
 import numpy as np
+from scipy import stats
 
 from epf import information
 from epf.contract.explanation import CALENDAR, DATE, UNITLESS
@@ -28,6 +31,14 @@ DEPENDENCE = {
 # Socis de cada sèrie a les interaccions, els que més hi interactuen: la regla que fa de
 # les "three selected features" de Trebbien et al. (2023).
 PARTNERS = 3
+
+# El grup del preu del dia abans, i les seves hores 22 a 24, comptades des de 0: el
+# vespre que Uniejewski et al. (2016) troben més triat que l'hora mateixa.
+PRICE = information.column(information.PRICE, 1)
+LATE_HOURS = [21, 22, 23]
+
+# Els grups primers que comparen dos acords de Krishna et al. (2024).
+TOP = 3
 
 
 def contributions(model):
@@ -141,17 +152,37 @@ def summarised(model, selection=False):
     `slopes`; i la unitat de les contribucions, `unit`. Amb `selection`, les columnes,
     `columns`, i si les contribucions de cada una a cada hora prevista no són totes
     zero, `selected`, `(24, columnes)`. D'un fitxer amb interaccions, `strengths`,
-    `partners`.
+    `partners`. La contribució absoluta mitjana de cada grup, `magnitudes`, i la de cada
+    fila, `rows`, `(files, grups)`. Amb les 24 hores del preu del dia abans, la seva
+    contribució absoluta mitjana a cada hora prevista, a la mateixa hora, `own_hour`, i
+    de mitjana a les de `LATE_HOURS`, `late_evening`.
     """
     values = contributions(model)
     if not np.any(values):
         return None
-    _, shares = importances(values, model["groups"])
+    groups = model["groups"]
+    _, shares = importances(values, groups)
+    names = ordered(shares)
+    every = np.asarray(values, dtype=np.float64)
+    rows = np.stack([every[:, groups == name].sum(axis=1) for name in names], axis=1)
     found = {
-        "shares": {name: float(shares[name]) for name in ordered(shares)},
+        "shares": {name: float(shares[name]) for name in names},
         "slopes": {name: slope(model, values, name) for name in present(model)},
         "unit": str(model["unit"]),
+        "magnitudes": dict(zip(names, np.abs(rows).mean(axis=0).tolist(), strict=True)),
+        "rows": rows,
     }
+    if np.sum(groups == PRICE) == HOURS_PER_DAY:
+        hours = np.arange(len(every)) % HOURS_PER_DAY
+        # A cada hora prevista, de cada hora del preu.
+        heat = np.array(
+            [
+                np.abs(every[hours == hour][:, members(model, PRICE)]).mean(axis=0)
+                for hour in range(HOURS_PER_DAY)
+            ]
+        )
+        found["own_hour"] = np.diag(heat)
+        found["late_evening"] = heat[:, LATE_HOURS].mean(axis=1)
     if selection:
         hours = np.tile(np.arange(HOURS_PER_DAY), len(values) // HOURS_PER_DAY)
         found["columns"] = [str(column) for column in model["columns"]]
@@ -333,4 +364,227 @@ def part_ii_main(models, roles):
                 found is None for (one, _), found in fits.items() if one == seed
             )
             add("models_without_contribution", family, count, seed=seed)
+    return rows
+
+
+def counter_share(model, counter):
+    """Torna la part de la columna `counter` en la importància de les d'un model."""
+    by_column, _ = importances(contributions(model), model["groups"])
+    return float(by_column[list(model["columns"]).index(counter)])
+
+
+def stability(models):
+    """Torna, de cada grup, la desviació entre els models d'una seed i la seva magnitud.
+
+    `models` són els d'una seed amb alguna contribució, com els torna `summarised`, que
+    expliquen les mateixes files. La desviació és la mitjana sobre les files de la
+    desviació estàndard mostral entre els models de la contribució del grup a la fila,
+    NaN amb un sol model, la de l'índex d'estabilitat de Caraker et al. (2026b); la
+    magnitud, la contribució absoluta mitjana de tots.
+    """
+    stacked = np.stack([one["rows"] for one in models])
+    names = list(models[0]["magnitudes"])
+    deviation = (
+        stacked.std(axis=0, ddof=1).mean(axis=0)
+        if len(models) > 1
+        else np.full(len(names), np.nan)
+    )
+    magnitude = np.abs(stacked).mean(axis=(0, 1))
+    return {
+        name: (float(one), float(other))
+        for name, one, other in zip(names, deviation, magnitude, strict=True)
+    }
+
+
+def spearman_pairs(models):
+    """Torna la correlació de Spearman de les parts dels grups de cada parell de models.
+
+    `models` són els d'una família amb alguna contribució, com els torna `summarised`.
+    """
+    table = np.array([list(one["shares"].values()) for one in models])
+    if len(table) < 2:
+        return np.array([])
+    found = np.atleast_2d(stats.spearmanr(table, axis=1).statistic)
+    return found[np.triu_indices_from(found, k=1)]
+
+
+def _order(shares):
+    """Torna l'ordre dels grups per la seva part, `a > b`, i `a = b` si són iguals."""
+    names = sorted(shares, key=lambda name: -shares[name])
+    written = names[0]
+    for before, name in itertools.pairwise(names):
+        written += f" {'=' if shares[before] == shares[name] else '>'} {name}"
+    return written
+
+
+def _between_seeds(values, seeds):
+    """Torna la part de la suma de quadrats d'uns valors que és entre seeds.
+
+    La resta és dins de cada seed, entre les seves configuracions. Uns valors tots
+    iguals tornen NaN.
+    """
+    values, seeds = np.asarray(values, dtype=np.float64), np.asarray(seeds)
+    centre = values.mean()
+    between = sum(
+        (seeds == seed).sum() * (values[seeds == seed].mean() - centre) ** 2
+        for seed in np.unique(seeds)
+    )
+    total = ((values - centre) ** 2).sum()
+    # Uns valors tots iguals, com el pendent d'una sèrie que cap model no llegeix, no
+    # tenen cap dispersió que es pugui partir.
+    return float(between / total) if total else math.nan
+
+
+def _agreements(first, second):
+    """Torna els cinc acords de Krishna et al. (2024) entre dues famílies a una seed.
+
+    Cada una és `(parts, pendents)`, les mitjanes de la seed en el mateix ordre de
+    grups i de sèries: la correlació dels rànquings i l'acord dels parells sobre les
+    parts, el dels `TOP` primers i el dels seus llocs, i el del signe dels pendents.
+    """
+    (shares, slopes), (other_shares, other_slopes) = first, second
+    order = np.argsort(-shares, kind="stable")
+    other_order = np.argsort(-other_shares, kind="stable")
+    pairs = list(itertools.combinations(range(len(shares)), 2))
+    return {
+        "rank_correlation": float(stats.spearmanr(shares, other_shares).statistic),
+        "pairwise_rank_agreement": float(
+            np.mean(
+                [
+                    np.sign(shares[i] - shares[j])
+                    == np.sign(other_shares[i] - other_shares[j])
+                    for i, j in pairs
+                ]
+            )
+        ),
+        "feature_agreement": len(set(order[:TOP]) & set(other_order[:TOP])) / TOP,
+        "rank_agreement": float(np.mean(order[:TOP] == other_order[:TOP])),
+        "sign_agreement": float(np.mean(np.sign(slopes) == np.sign(other_slopes))),
+    }
+
+
+def part_ii_secondary(models, stabilities, counters):
+    """Torna les files de les mesures secundàries de la Part II.
+
+    `models` és com a `part_ii_main`, sense les files de cada model; `stabilities`
+    dona, per família i seed, el que en torna `stability`; i `counters`, per família i
+    `(seed, configuració)`, la part del comptador de dies de cada model ajustat de la
+    família que en té. Un model sense cap contribució no hi entra.
+    """
+    rows = []
+
+    def add(measure, family, value, unit=UNITLESS, **keys):
+        rows.append(
+            {"measure": measure, "family": family, **keys, "value": value, "unit": unit}
+        )
+
+    means = {}
+    for family, fits in models.items():
+        kept = {key: found for key, found in fits.items() if found}
+        if not kept:
+            continue
+        first = next(iter(kept.values()))
+        unit = first["unit"]
+        for (seed, rank), found in kept.items():
+            for name, value in found["shares"].items():
+                add("model_share", family, value, seed=seed, rank=rank, subject=name)
+        for (seed, rank), found in kept.items():
+            for name, value in found["slopes"].items():
+                add(
+                    "model_slope",
+                    family,
+                    value,
+                    f"{unit} per GW",
+                    seed=seed,
+                    rank=rank,
+                    subject=name,
+                )
+        # Caraker et al. (2026b); un sol model no en fa cap parell.
+        pairs = spearman_pairs(list(kept.values()))
+        add("spearman_mean", family, float(np.mean(pairs)) if len(pairs) else math.nan)
+        orders = collections.Counter(_order(found["shares"]) for found in kept.values())
+        for written, count in orders.most_common():
+            add("group_order", family, count, subject=written)
+        by_seed = stabilities[family]
+        for name in first["shares"]:
+            deviations = [found[name][0] for found in by_seed.values()]
+            consensus = float(np.mean([found[name][1] for found in by_seed.values()]))
+            present_deviations = [one for one in deviations if not np.isnan(one)]
+            index = (
+                float(np.mean(present_deviations)) / consensus
+                if present_deviations
+                else math.nan
+            )
+            add("stability_index", family, index, subject=name)
+            add("consensus_importance", family, consensus, unit, subject=name)
+        # Caraker et al. (2026a): el signe de la diferència de magnitud de cada model,
+        # contra el de la mitjana.
+        table = np.array(
+            [list(found["magnitudes"].values()) for found in kept.values()]
+        )
+        gaps = table[:, :, None] - table[:, None, :]
+        flips = (np.sign(gaps) != np.sign(gaps.mean(axis=0))).mean(axis=0)
+        names = list(first["magnitudes"])
+        for i, j in itertools.combinations(range(len(names)), 2):
+            add(
+                "flip_rate",
+                family,
+                float(flips[i, j]),
+                subject=names[i],
+                other_subject=names[j],
+            )
+        seeds = [seed for seed, _ in kept]
+        for kind, measure in (
+            ("shares", "between_seeds_share"),
+            ("slopes", "between_seeds_slope"),
+        ):
+            for name in first[kind]:
+                values = [found[kind][name] for found in kept.values()]
+                add(measure, family, _between_seeds(values, seeds), subject=name)
+        means[family] = {
+            seed: {
+                kind: np.mean(
+                    [
+                        list(found[kind].values())
+                        for (one, _), found in kept.items()
+                        if one == seed
+                    ],
+                    axis=0,
+                )
+                for kind in ("shares", "slopes")
+            }
+            for seed in dict.fromkeys(seeds)
+        }
+        if "own_hour" in first:
+            by_hour = {
+                kind: {
+                    seed: np.mean(
+                        [
+                            found[kind]
+                            for (one, _), found in kept.items()
+                            if one == seed
+                        ],
+                        axis=0,
+                    )
+                    for seed in dict.fromkeys(seeds)
+                }
+                for kind in ("own_hour", "late_evening")
+            }
+            for kind, found in by_hour.items():
+                for seed, values in found.items():
+                    for hour, value in enumerate(values):
+                        add(kind, family, float(value), unit, seed=seed, hour=hour)
+                for hour, value in enumerate(np.mean(list(found.values()), axis=0)):
+                    add(kind, family, float(value), unit, hour=hour)
+    for family, other in itertools.combinations(means, 2):
+        for seed in means[family].keys() & means[other].keys():
+            found = _agreements(
+                (means[family][seed]["shares"], means[family][seed]["slopes"]),
+                (means[other][seed]["shares"], means[other][seed]["slopes"]),
+            )
+            for name, value in found.items():
+                add(name, family, value, other_family=other, seed=seed)
+    for family, shares in counters.items():
+        for (seed, rank), value in shares.items():
+            add("counter_share", family, value, seed=seed, rank=rank)
     return rows

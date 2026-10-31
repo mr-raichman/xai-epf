@@ -17,6 +17,7 @@ from epf.run import families
 PART_I_MAIN = "part_i_main.csv"
 PART_I_SECONDARY = "part_i_secondary.csv"
 PART_II_MAIN = "part_ii_main.csv"
+PART_II_SECONDARY = "part_ii_secondary.csv"
 
 # Les columnes de tots els fitxers, i les que són enters, que amb una casella buida
 # pandas escriuria com a decimals, `3.0`.
@@ -84,6 +85,48 @@ def _best(where, complete):
                     if name in model.files
                 }
     return found
+
+
+def _explained(where, complete, records):
+    """Torna el que les mesures de la Part II llegeixen dels fitxers de les famílies.
+
+    De cada família completa interpretada, el que `measures.summarised` torna de cada
+    model ajustat, sense les files, i el que `measures.stability` torna de cada seed; i
+    de la que té comptador de dies, la part del comptador de cada model. Llegeix un
+    fitxer i després l'altre, i les files d'una seed no hi són mentre es llegeix la
+    següent.
+    """
+    models, stabilities, counters = {}, {}, {}
+    for family in complete:
+        found = records[family]
+        if found.get("counter") is not None:
+            counters[family] = {}
+            for key, path in fitted_files(where / family).items():
+                with np.load(path) as model:
+                    counters[family][key] = measures.counter_share(
+                        model, found["counter"]
+                    )
+        if not found.get("interpreted"):
+            continue
+        models[family], stabilities[family] = {}, {}
+        files = fitted_files(where / family)
+        for seed in dict.fromkeys(seed for seed, _ in files):
+            for (one, rank), path in files.items():
+                if one == seed:
+                    with np.load(path) as model:
+                        models[family][seed, rank] = measures.summarised(
+                            model, found.get("selection")
+                        )
+            kept = [
+                summary
+                for (one, _), summary in models[family].items()
+                if one == seed and summary
+            ]
+            if kept:
+                stabilities[family][seed] = measures.stability(kept)
+            for summary in kept:
+                del summary["rows"]
+    return models, stabilities, counters
 
 
 def _ordered(rows):
@@ -167,6 +210,18 @@ def write(where, main_only=False):
     `subject`, a cada hora i, `hour` buida, a totes; i `models_without_contribution` de
     cada seed.
 
+    `part_ii_secondary.csv`, les secundàries, dels models amb alguna contribució:
+    `model_share` i `model_slope` de cada model ajustat; de cada família,
+    `spearman_mean`, la mitjana de la correlació de Spearman de les parts de cada parell
+    de models; `group_order`, cada ordre dels grups per la seva part, a `subject`, i
+    quants models el tenen; `stability_index` i `consensus_importance` de cada grup;
+    `flip_rate` de cada parell de grups; `between_seeds_share` i `between_seeds_slope`;
+    a cada seed i parell de famílies, `rank_correlation`, `pairwise_rank_agreement`,
+    `feature_agreement`, `rank_agreement` i `sign_agreement`; amb el preu del dia
+    abans, `own_hour` i `late_evening` a cada hora prevista, de cada seed i, `seed`
+    buida, sobre totes; i `counter_share` de cada model de la família que té comptador
+    de dies.
+
     Torna la taula de cada fitxer pel seu nom. Amb `main_only`, el d'una passada que
     s'atura abans de les figures, només escriu `part_i_main.csv`.
     """
@@ -199,17 +254,12 @@ def write(where, main_only=False):
         where / PART_I_SECONDARY,
         metrics.part_i_secondary(best, records) + metrics.part_i_tests(best),
     )
-    models = {}
-    for family in complete:
-        if not records[family].get("interpreted"):
-            continue
-        models[family] = {}
-        for key, path in fitted_files(where / family).items():
-            with np.load(path) as model:
-                models[family][key] = measures.summarised(
-                    model, records[family].get("selection")
-                )
+    models, stabilities, counters = _explained(where, complete, records)
     numbers[PART_II_MAIN] = _written(
         where / PART_II_MAIN, measures.part_ii_main(models, records)
+    )
+    numbers[PART_II_SECONDARY] = _written(
+        where / PART_II_SECONDARY,
+        measures.part_ii_secondary(models, stabilities, counters),
     )
     return numbers
