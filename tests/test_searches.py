@@ -13,9 +13,11 @@ from epf.contract.searches import (
     asked,
     completed,
     configurations,
+    copied,
     folder,
     opened,
     record,
+    stored,
     told,
     tried,
     trials,
@@ -305,3 +307,21 @@ def test_a_wave_told_in_any_order_gives_the_same_next_wave(tmp_path):
             told(study, optuna_trial, {"value": drawn}, drawn, {}, FINGERPRINTS)
         waves.append([asked(study, searcher, "fake")[1] for _ in range(5)])
     assert waves[0] == waves[1]
+
+
+def test_a_copy_holds_every_trial_and_is_not_taken_again(tmp_path):
+    """El pla de la sonda de datació ve després del de l'arbre, a la mateixa seed."""
+    X, y = _table()
+    parts = split(0, PERIOD, DELETED, 1)
+    searcher = _searcher({"value": tuple(range(8))}, [])
+    store, path = tmp_path / "study.db", tmp_path / "run" / "study.db"
+    _study(store, searcher, X, y, parts, 0, 3)
+    copied(store, path)
+    _study(store, searcher, X, y, parts, 0, 5)
+    copied(store, path)
+    found = [
+        [(one.number, one.state, one.params, one.value) for one in study.trials]
+        for study in (stored(store, "fake", 0), stored(path, "fake", 0))
+    ]
+    assert len(found[1]) == 3 and found[1] == found[0][:3]
+    assert not paths.partial(path).exists()

@@ -217,6 +217,24 @@ def _ranked(seed):
     return [one["numbers"]["value"] for one in found["ranked"]]
 
 
+def test_each_searched_seed_s_study_is_copied_into_its_searcher_s_folder(fake):
+    fake.main()
+    where = paths.next_run(True, SET, MINUTE)
+    for seed in (0, 1):
+        name = searches.STUDY.format(seed=seed)
+        found = [
+            [(one.number, one.state, one.params, one.value) for one in study.trials]
+            for study in (
+                searches.stored(
+                    searches.folder("SMOKE", SET, "first") / name, "first", seed
+                ),
+                searches.stored(where / "first" / name, "first", seed),
+            )
+        ]
+        assert len(found[1]) == 4 and found[1] == found[0]
+    assert not list((where / "second").glob("*.db"))
+
+
 def test_each_seed_fits_the_best_of_its_own_search(fake):
     """Una seed que ajustés el millor d'una altra en descriuria una altra cerca."""
     fake.main()

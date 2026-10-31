@@ -55,11 +55,12 @@ class Search:
             module = searcher(family)
             self.trials[family] = searches.trials(module, trials)
             X, _ = getattr(built, module.MATRIX)
-            folder = searches.folder(smoke, self.set_name, family)
-            folder.mkdir(parents=True, exist_ok=True)
+            searches.folder(smoke, self.set_name, family).mkdir(
+                parents=True, exist_ok=True
+            )
             for seed in seeds:
                 self.studies[family, seed] = searches.opened(
-                    folder / searches.STUDY.format(seed=seed),
+                    self.store(family, seed),
                     family,
                     module,
                     seed,
@@ -108,6 +109,11 @@ class Search:
         label = (family, seed, "trial", optuna_trial.number)
         self.pending[label] = optuna_trial
         return label, _trial, (family, seed, drawn, self.fingerprints, self.set_name)
+
+    def store(self, family, seed):
+        """Torna el fitxer del study d'una família en una seed."""
+        folder = searches.folder(self.smoke, self.set_name, family)
+        return folder / searches.STUDY.format(seed=seed)
 
     def in_flight(self):
         """Diu si algun trial demanat encara no ha tornat."""

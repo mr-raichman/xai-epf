@@ -500,13 +500,22 @@ class Run:
         """Fa, desa i torna el pla d'una seed d'una família, o `None` si no pot.
 
         No pot mentre la cerca de la seed que la família llegeix no és acabada, ni si en
-        acabar no té cap trial que puntuï.
+        acabar no té cap trial que puntuï. D'una família que es cerca, abans copia el
+        study de la seed a la passada, a la carpeta de la família que el va fer, si
+        encara no hi és.
         """
         made = None
         if self.kept[family]:
-            made = self.searching.found(self.plans[family]["searched_as"], seed)
+            searched_as = self.plans[family]["searched_as"]
+            made = self.searching.found(searched_as, seed)
             if made is None or not made["ranked"]:
                 return None
+            # Abans del pla: una passada continuada no torna a fer el d'una seed, i
+            # una aturada entre tots dos la deixaria sense còpia.
+            searches.copied(
+                self.searching.store(searched_as, seed),
+                self.where / searched_as / searches.STUDY.format(seed=seed),
+            )
         configured = configurations(made, self.kept[family])
         _planned(self.where / family, seed, configured)
         return configured

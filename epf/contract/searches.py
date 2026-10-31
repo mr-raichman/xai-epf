@@ -16,6 +16,8 @@ import hashlib
 import json
 import math
 import os
+import sqlite3
+from contextlib import closing
 
 import optuna
 
@@ -288,6 +290,27 @@ def save(found, smoke, set_name):
         folder(smoke, set_name, found["family"]) / RECORD.format(seed=found["seed"]),
         found,
     )
+
+
+def copied(store, path):
+    """Copia sencer el study de `store` a `path`, si encara no hi és.
+
+    La còpia la fa SQLite, que llegeix el study com qualsevol connexió seva, sencer o
+    gens; i s'escriu a `<nom>.part` abans de portar el seu nom.
+    """
+    if path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = paths.partial(path)
+    partial.unlink(missing_ok=True)
+    # No els bytes del fitxer, que copiats a mig escriure o amb el diari que els desfà
+    # al costat s'obririen sense cap error amb trials a mitges.
+    with (
+        closing(sqlite3.connect(store)) as source,
+        closing(sqlite3.connect(partial)) as target,
+    ):
+        source.backup(target)
+    partial.replace(path)
 
 
 def configurations(found, kept):
