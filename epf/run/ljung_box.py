@@ -35,7 +35,8 @@ LJUNG_BOX = "ljung_box.csv"
 def daily_errors(models):
     """Torna l'error mitjà de cada dia, del primer al darrer dia de prova.
 
-    `models` són els models ajustats d'una família, en ordre de seed. Cada dia pren
+    L'error és el preu menys la predicció. `models` són els models ajustats d'una
+    família, en ordre de seed. Cada dia pren
     l'error del millor de la primera seed que el prova, i un dia que cap no prova val
     `NaN`. Falla si les files d'un fitxer no són les dels dies de prova que diu.
     """
@@ -44,7 +45,7 @@ def daily_errors(models):
         if int(model["rank"]):
             continue
         days = model["days_test"]
-        error = np.asarray(model["predicted"]) - np.asarray(model["actual"])
+        error = np.asarray(model["actual"]) - np.asarray(model["predicted"])
         if error.size != len(days) * len(HOUR_COLUMNS):
             raise ValueError(
                 f"{error.size} errors per a {len(days)} dies de prova: les "

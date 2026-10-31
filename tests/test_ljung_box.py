@@ -48,4 +48,4 @@ def test_each_day_comes_from_the_first_seed_that_tests_it_and_its_best_model():
     other = _model(["2020-01-01", "2020-01-02"], 9.0, rank=1)
     second = _model(["2020-01-02", "2020-01-04"], 2.0)
     series = daily_errors([first, other, second])
-    assert np.array_equal(series, [1.0, 1.0, np.nan, 2.0], equal_nan=True)
+    assert np.array_equal(series, [-1.0, -1.0, np.nan, -2.0], equal_nan=True)
