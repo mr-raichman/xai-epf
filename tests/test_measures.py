@@ -284,3 +284,21 @@ def test_the_date_probe_s_counter_share_by_hand():
         "groups": np.array(["price_lag1", "date", "calendar"]),
     }
     assert counter_share(model, "day_counter") == pytest.approx(0.4)
+
+
+def test_a_group_no_model_reads_has_no_stability_index():
+    """Un grup que l'elastic net deixa a zero a tot arreu no té cap importància."""
+    fits = {
+        (0, 0): _summary(
+            (0.6, 0.4, 0.0), (1.0, 0.0), magnitudes={"a": 2.0, "b": 1.0, "c": 0.0}
+        ),
+        (0, 1): _summary(
+            (0.5, 0.5, 0.0), (2.0, 0.0), magnitudes={"a": 1.0, "b": 1.0, "c": 0.0}
+        ),
+    }
+    stabilities = {
+        "elastic_net": {0: {"a": (0.1, 1.5), "b": (0.0, 1.0), "c": (0.0, 0.0)}}
+    }
+    rows = part_ii_secondary({"elastic_net": fits}, stabilities, {})
+    assert np.isnan(_measured(rows, "stability_index", subject="c")[0])
+    assert _measured(rows, "stability_index", subject="a") == [pytest.approx(0.1 / 1.5)]

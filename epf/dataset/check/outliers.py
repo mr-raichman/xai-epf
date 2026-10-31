@@ -167,7 +167,8 @@ def draw(name, title, frame, by_hours, by_days):
     )
     top.set_xlim(0, HOURS_PER_DAY - 1)
     top.set_ylim(0, np.nanmax(by_hours) * AXIS_TOP)
-    top.set_xticks(hours)
+    # Les hores d'1 a 24, com les numera l'OMIE.
+    top.set_xticks(hours, [str(hour + 1) for hour in hours])
     top.set_xlabel(figure.CALENDAR_LABELS[HOUR])
     _style(
         top,

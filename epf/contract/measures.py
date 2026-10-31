@@ -475,7 +475,10 @@ def part_ii_secondary(models, stabilities, counters):
     `models` és com a `part_ii_main`, sense les files de cada model; `stabilities`
     dona, per família i seed, el que en torna `stability`; i `counters`, per família i
     `(seed, configuració)`, la part del comptador de dies de cada model ajustat de la
-    família que en té. Un model sense cap contribució no hi entra.
+    família que en té. Un model sense cap contribució no hi entra. L'índex d'estabilitat
+    fa la mitjana de les seeds amb dos models o més, i no en té un grup que cap model no
+    llegeix; dos grups empatats en un model hi compten com un canvi d'ordre al ritme de
+    canvis.
     """
     rows = []
 
@@ -518,9 +521,11 @@ def part_ii_secondary(models, stabilities, counters):
             deviations = [found[name][0] for found in by_seed.values()]
             consensus = float(np.mean([found[name][1] for found in by_seed.values()]))
             present_deviations = [one for one in deviations if not np.isnan(one)]
+            # Un grup que cap model no llegeix, com un que l'elastic net deixa a zero a
+            # tot arreu, no té cap importància per la qual dividir.
             index = (
                 float(np.mean(present_deviations)) / consensus
-                if present_deviations
+                if present_deviations and consensus
                 else math.nan
             )
             add("stability_index", family, index, subject=name)
