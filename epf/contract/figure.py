@@ -63,14 +63,15 @@ DPI = 300
 TEXT_COLOUR = rgb(0, 0, 0)
 BACKGROUND = rgb(255, 255, 255)
 
-# El color dels bancs de comparació, el sòl i les còpies.
-BENCHMARK_COLOUR = rgb(106, 66, 140)
+# El color dels bancs de comparació, el sòl i les còpies: un gris, prou fosc perquè els
+# tons de les còpies encara es vegin.
+BENCHMARK_COLOUR = rgb(64, 64, 64)
 
 # El color de cada model. Les seves famílies en prenen tons, en l'ordre en què el model
 # les fa, cada una `SHADE` més a prop del blanc que l'anterior; les d'un model del color
 # d'un altre segueixen els tons de les de l'altre.
 MODEL_COLOURS = {
-    "dnn": rgb(12, 115, 208),
+    "dnn": rgb(106, 66, 140),
     "elastic_net": rgb(66, 131, 95),
     "lightgbm": rgb(171, 97, 37),
     "floor": BENCHMARK_COLOUR,
@@ -78,13 +79,19 @@ MODEL_COLOURS = {
 }
 SHADE = 0.32
 
-# El color de tot el que no és d'una família, com les sèries del dataset, i el que hi
-# marca uns punts triats, més fosc perquè se'n distingeixin també per la claredat.
-OTHER_COLOUR = rgb(163, 86, 130)
+# El color de tot el que no és d'una família, com les sèries del dataset, el blau de la
+# UPC del llibre d'estil dels seus webs, i el que hi marca uns punts triats, més fosc
+# perquè se'n distingeixin també per la claredat.
+OTHER_COLOUR = rgb(0, 123, 192)
 MARK_COLOUR = rgb(120, 20, 20)
 
-# L'escala dels valors continus, pel seu nom a matplotlib.
-SCALE = "viridis"
+# L'escala d'un recompte, de pocs a molts: magma, perceptualment uniforme (Crameri,
+# Shephard i Heron, 2020), del seu 0.85, clar, al seu negre, perquè un recompte petit
+# es vegi sobre el blanc. La pren `image.cmap` pel seu nom.
+SCALE = LinearSegmentedColormap.from_list(
+    "count", matplotlib.colormaps["magma"](np.linspace(0.85, 0, 256))
+)
+matplotlib.colormaps.register(SCALE)
 
 # L'escala del valor d'una sèrie als punts que pinta, de baix a dalt: la vermella i
 # blava del beeswarm de SHAP (Lundberg i Lee, 2017), presa a cinc punts, perquè les
@@ -196,7 +203,7 @@ STYLE = {
     "mathtext.fallback": "stix",
     # Cada xifra sencera, sense un desplaçament comú a l'extrem de l'eix.
     "axes.formatter.useoffset": False,
-    "image.cmap": SCALE,
+    "image.cmap": SCALE.name,
     "lines.linewidth": LINE_WIDTH,
     "lines.markersize": MARKER_SIZE,
     "axes.grid": GRID_SHOWN,
