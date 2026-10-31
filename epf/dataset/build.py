@@ -240,4 +240,5 @@ def main():
     for name, frame in found.items():
         (paths.DATA_FIGURES / name).mkdir(parents=True, exist_ok=True)
         figures.draw(name, frame)
+        figures.histograms(name, frame)
         outliers.draw(name, figures.title(name), frame, *outliers.report(name, frame))
