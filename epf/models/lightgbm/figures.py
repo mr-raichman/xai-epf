@@ -62,6 +62,7 @@ def _interactions(folder, seed, model, main, colour):
                     x,
                     y,
                     c=coloured[partner],
+                    cmap=figure.VALUE_SCALE,
                     **figure.point_style(x.size, coloured=True),
                 )
                 figure.colorbar(

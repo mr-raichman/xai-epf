@@ -23,7 +23,7 @@ from epf.parameters import HOUR_COLUMNS
 # el té triat.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import to_rgba  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap, to_rgba  # noqa: E402
 from matplotlib.ticker import ScalarFormatter  # noqa: E402
 
 
@@ -85,6 +85,20 @@ MARK_COLOUR = rgb(120, 20, 20)
 
 # L'escala dels valors continus, pel seu nom a matplotlib.
 SCALE = "viridis"
+
+# L'escala del valor d'una sèrie als punts que pinta, de baix a dalt: la vermella i
+# blava del beeswarm de SHAP (Lundberg i Lee, 2017), presa a cinc punts, perquè les
+# figures no importen shap.
+VALUE_SCALE = LinearSegmentedColormap.from_list(
+    "value",
+    [
+        rgb(0, 139, 251),
+        rgb(75, 99, 227),
+        rgb(156, 35, 173),
+        rgb(224, 0, 133),
+        rgb(255, 0, 81),
+    ],
+)
 
 # El gris d'on surten els tons d'una llegenda que travessa famílies, com la d'una
 # ponderació, on el color d'una família es llegiria com ella.
