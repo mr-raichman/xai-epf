@@ -36,7 +36,7 @@ FAMILIES = {
 def _fitted(X, y, parts):
     """Ajusta el cúbic amb les files d'entrenament i en prediu les de prova.
 
-    Torna també els coeficients i les files d'entrenament, que dibuixa la figura.
+    Torna també els coeficients i les files d'entrenament, per dibuixar-ne el cúbic.
     """
     training, test = X.index.isin(parts.training), X.index.isin(parts.test)
     demand, wind, solar = READS
