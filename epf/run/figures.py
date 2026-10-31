@@ -79,9 +79,9 @@ def draw(where):
             importlib.import_module(module).draw(folder, models, colours[folder.name])
     if not described:
         raise Refusal(f"la passada {where.name} no té cap família completa")
+    numbers = tables.write(where)
     _performance(where, described, colours)
-    ljung_box.report(where, described, colours)
-    tables.write(where)
+    ljung_box.report(where, numbers, colours)
 
 
 def main(arguments):

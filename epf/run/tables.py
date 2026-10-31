@@ -11,9 +11,11 @@ import pandas as pd
 from epf import paths
 from epf.contract import metrics
 from epf.contract.record import fitted_files
+from epf.parameters import HOURS_PER_DAY
 from epf.run import families
 
 PART_I_MAIN = "part_i_main.csv"
+PART_I_SECONDARY = "part_i_secondary.csv"
 
 # Les columnes de tots els fitxers, i les que són enters, que amb una casella buida
 # pandas escriuria com a decimals, `3.0`.
@@ -49,6 +51,38 @@ def _scores(where):
     return found
 
 
+def _best(where, complete):
+    """Torna la millor configuració de cada seed de les famílies completes, `complete`.
+
+    De cada una, els dies de prova, `days`, i la predicció i el preu de cada un,
+    `predicted` i `actual`, `(dies, 24)`, i el que el fitxer porti de `training_mae` i
+    `training_mse`. Falla si les files d'un fitxer no són les dels dies que diu.
+    """
+    found = {}
+    for family in complete:
+        found[family] = {}
+        for (seed, rank), path in fitted_files(where / family).items():
+            if rank:
+                continue
+            with np.load(path) as model:
+                days = model["days_test"]
+                if model["predicted"].size != len(days) * HOURS_PER_DAY:
+                    raise ValueError(
+                        f"{paths.relative(path)}: {model['predicted'].size} files per "
+                        f"a {len(days)} dies de prova"
+                    )
+                found[family][seed] = {
+                    "days": days,
+                    "predicted": model["predicted"].reshape(len(days), -1),
+                    "actual": model["actual"].reshape(len(days), -1),
+                } | {
+                    name: model[name].item()
+                    for name in ("training_mae", "training_mse")
+                    if name in model.files
+                }
+    return found
+
+
 def _ordered(rows):
     """Torna les files per mesura, en l'ordre en què surten, família, seed, lloc i hora.
 
@@ -68,15 +102,16 @@ def _ordered(rows):
 
 
 def _written(path, rows):
-    """Escriu les files d'un fitxer de números, sencer o gens."""
+    """Escriu les files d'un fitxer de números, sencer o gens, i en torna la taula."""
     frame = pd.DataFrame(_ordered(rows), columns=COLUMNS)
     for name in INTEGERS:
         frame[name] = frame[name].astype("Int64")
     paths.write_whole(path, frame.to_csv(index=False, lineterminator="\n"))
+    return frame
 
 
-def write(where):
-    """Escriu els números de la passada `where` als seus fitxers.
+def write(where, main_only=False):
+    """Escriu els números de la passada `where` als seus fitxers, i els torna.
 
     Cada fitxer té una fila per número, amb les columnes de `COLUMNS`: la mesura; la
     família i, d'una mesura entre dues, l'altra; la seed i la configuració del model,
@@ -95,6 +130,21 @@ def write(where):
     `"main"` el `denominator`, `other_family`; i, de cada família completa, `r2_mean`,
     `r2_std`, `mae_mean`, `mae_std`, `rmae_mean` i `rmae_std`, sobre la millor
     configuració de cada seed, `seed` buida.
+
+    `part_i_secondary.csv`, les secundàries, de la millor configuració de cada seed de
+    cada família completa: `rmse`, `mse`, `mdae`, `mean_error`, `wape`, `corr`, `wmae`,
+    `cov_e`, `corr_f`, `mhd` i `mpd`; `rmae` sobre cada còpia que en dona un de
+    secundari; `deviation_from_best`, i `deviation_from_best_mean`, `seed` buida;
+    `mae` i `r2` de cada hora; sobre la còpia principal, `mase` i `rmsse`, i `rmae` de
+    cada hora, `rmae_year` de cada any i `rmae_decile` de cada decil del preu, de l'1 al
+    10, a `subject`, també sobre les seeds, `seed` buida; `price_decile_top`, el límit
+    de dalt de cada decil, `family` buida; i, de cada família amb el test de
+    Ljung-Box, `ljung_box_q`, `ljung_box_p` i `ljung_box_days` de la sèrie cosida de
+    totes les seeds, `seed` buida, i de cada seed, i `autocorrelation` de la cosida a
+    cada retard, a `subject`.
+
+    Torna la taula de cada fitxer pel seu nom. Amb `main_only`, el d'una passada que
+    s'atura abans de les figures, només escriu `part_i_main.csv`.
     """
     scores = _scores(where)
     complete = [family for family in scores if families.complete(where / family)]
@@ -113,4 +163,15 @@ def write(where):
         ),
         None,
     )
-    _written(where / PART_I_MAIN, metrics.part_i_main(scores, denominator, complete))
+    numbers = {
+        PART_I_MAIN: _written(
+            where / PART_I_MAIN, metrics.part_i_main(scores, denominator, complete)
+        )
+    }
+    if main_only:
+        return numbers
+    numbers[PART_I_SECONDARY] = _written(
+        where / PART_I_SECONDARY,
+        metrics.part_i_secondary(_best(where, complete), records),
+    )
+    return numbers

@@ -45,7 +45,7 @@ def test_the_numbers_go_by_measure_and_family_their_keys_integers(tmp_path):
         "lightgbm",
         {(1, 0): (0.75, 9.0), (0, 1): (0.25, 12.0), (0, 0): (0.5, 10.0)},
     )
-    tables.write(tmp_path)
+    tables.write(tmp_path, main_only=True)
     lines = (tmp_path / tables.PART_I_MAIN).read_text(encoding="utf-8").splitlines()
     assert lines[0] == ",".join(tables.COLUMNS)
     assert [line for line in lines if line.startswith("r2,")] == [

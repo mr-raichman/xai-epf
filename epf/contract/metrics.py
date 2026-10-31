@@ -3,12 +3,51 @@
 import math
 
 import numpy as np
+from scipy import stats
 
 from epf import Refusal
 from epf.contract.explanation import PRICE_UNITS, UNITLESS
+from epf.parameters import DAYS_PER_WEEK, DEVELOPMENT, HOURS_PER_DAY
 
-# Les unitats de cada mètrica principal.
-MAIN_UNITS = {"r2": UNITLESS, "mae": PRICE_UNITS, "rmae": UNITLESS}
+# Les mètriques principals de la Part I.
+MAIN = ("r2", "mae", "rmae")
+
+# Les unitats de cada mètrica, i de cada número que se'n fa.
+UNITS = {
+    "r2": UNITLESS,
+    "mae": PRICE_UNITS,
+    "rmae": UNITLESS,
+    "rmse": PRICE_UNITS,
+    "mse": "(EUR/MWh)²",
+    "mdae": PRICE_UNITS,
+    "mean_error": PRICE_UNITS,
+    "wape": UNITLESS,
+    "corr": UNITLESS,
+    "mase": UNITLESS,
+    "rmsse": UNITLESS,
+    "wmae": UNITLESS,
+    "deviation_from_best": UNITLESS,
+    "deviation_from_best_mean": UNITLESS,
+    # El logaritme del determinant d'una matriu de 24 per 24 en (EUR/MWh)².
+    "cov_e": "log (EUR/MWh)⁴⁸",
+    "corr_f": UNITLESS,
+    "mhd": "hores",
+    "mpd": PRICE_UNITS,
+    "rmae_year": UNITLESS,
+    "rmae_decile": UNITLESS,
+    "price_decile_top": PRICE_UNITS,
+    "ljung_box_q": UNITLESS,
+    "ljung_box_p": UNITLESS,
+    "ljung_box_days": "dies",
+    "autocorrelation": UNITLESS,
+}
+
+# Retards del test de Ljung-Box, dues vegades el període setmanal, com aconsellen
+# Hyndman i Athanasopoulos (2021) per a una sèrie estacional.
+LAGS = 2 * DAYS_PER_WEEK
+
+# Els límits de les deu parts del preu.
+DECILES = np.linspace(0, 1, 11)
 
 
 def _fail_on_absent(actual):
@@ -78,7 +117,7 @@ def part_i_main(scores, denominator, complete):
     seed no es resumeix. Cada fila és un diccionari amb les claus que s'hi apliquen.
     """
     base = scores.get(denominator, {})
-    found = {name: {} for name in MAIN_UNITS}
+    found = {name: {} for name in MAIN}
     for family, fits in scores.items():
         for name in found:
             found[name][family] = {}
@@ -98,7 +137,7 @@ def part_i_main(scores, denominator, complete):
                     "seed": seed,
                     "rank": rank,
                     "value": value,
-                    "unit": MAIN_UNITS[name],
+                    "unit": UNITS[name],
                 }
                 for (seed, rank), value in values.items()
             ]
@@ -121,7 +160,306 @@ def part_i_main(scores, denominator, complete):
                         **({"other_family": denominator} if name == "rmae" else {}),
                         "rank": 0,
                         "value": value,
-                        "unit": MAIN_UNITS[name],
+                        "unit": UNITS[name],
                     }
                 )
+    return rows
+
+
+def daily_errors(seeds):
+    """Torna l'error mitjà de cada dia, del primer al darrer dia de prova.
+
+    `seeds` dona, en ordre de seed, els dies de prova i els errors `(dies, 24)` de la
+    millor configuració d'una família. Cada dia pren l'error de la primera seed que el
+    prova, i un dia que cap no prova val `NaN`.
+    """
+    found = {}
+    for days, errors in seeds:
+        for day, mean in zip(days, errors.mean(axis=1), strict=True):
+            found.setdefault(day, mean)
+    span = np.arange(min(found), max(found) + np.timedelta64(1, "D"))
+    return np.array([found.get(day, np.nan) for day in span])
+
+
+def ljung_box(series, lags=LAGS):
+    """Torna la Q de Ljung-Box, el seu valor p i les autocorrelacions d'una sèrie.
+
+    Com `Box.test` de R, amb els dies buits passats a `acf`; sense cap dia buit és
+    l'estimador de sempre. El valor p és el d'una khi quadrat de `lags` graus, sense
+    restar-ne cap, perquè els errors són de fora de la mostra.
+    """
+    x = np.asarray(series, dtype=float) - np.nanmean(series)
+    present = int((~np.isnan(x)).sum())
+    covariances = []
+    for lag in range(lags + 1):
+        products = x[lag:] * x[: len(x) - lag]
+        pairs = ~np.isnan(products)
+        # Entre els parells més el retard, com `acf` de R, que sense cap dia buit és la
+        # llargada de la sèrie.
+        covariances.append(products[pairs].sum() / (pairs.sum() + lag))
+    correlations = np.clip(np.array(covariances[1:]) / covariances[0], -1, 1)
+    statistic = (
+        present
+        * (present + 2)
+        * np.sum(correlations**2 / (present - np.arange(1, lags + 1)))
+    )
+    return statistic, stats.chi2.sf(statistic, lags), correlations
+
+
+def _spearman_by_day(actual, predicted):
+    """Torna la correlació de Spearman de cada dia entre el preu i la predicció.
+
+    Amb els rangs mitjans dels empats, com `scipy.stats.spearmanr`.
+    """
+    ranks = [stats.rankdata(values, axis=1) for values in (actual, predicted)]
+    ranks = [one - one.mean(axis=1, keepdims=True) for one in ranks]
+    return (ranks[0] * ranks[1]).sum(axis=1) / np.sqrt(
+        (ranks[0] ** 2).sum(axis=1) * (ranks[1] ** 2).sum(axis=1)
+    )
+
+
+def _extremes(actual, predicted):
+    """Torna, per dia, la distància en hores i en preu dels extrems previstos als reals.
+
+    Per al mínim i el màxim, sumats: les hores, de la del previst a la més propera de
+    les del real, que pot ser a més d'una hora; i el preu, el real a l'hora del previst
+    menys el real a la seva, en valor absolut. Un previst empatat pren la primera hora.
+    """
+    hours = np.arange(actual.shape[1])
+    rows = np.arange(len(actual))
+    distance = price = 0
+    for real, forecast in (
+        (actual.min(axis=1), predicted.argmin(axis=1)),
+        (actual.max(axis=1), predicted.argmax(axis=1)),
+    ):
+        tied = actual == real[:, None]
+        distance = distance + np.where(
+            tied, np.abs(hours - forecast[:, None]), np.inf
+        ).min(axis=1)
+        price = price + np.abs(real - actual[rows, forecast])
+    return distance, price
+
+
+def one_seed(days, actual, predicted):
+    """Torna les mètriques secundàries d'una família en una seed, fetes d'ella sola.
+
+    `days` són els dies de prova, i `actual` i `predicted` el preu i la predicció de
+    cada un, `(dies, 24)`. L'error és el preu menys la predicció. El WMAE fa la mitjana
+    de les setmanes de dimarts a dilluns des de `DEVELOPMENT[0]`. El Cov-e val NaN si la
+    matriu dels errors no té determinant positiu.
+    """
+    error = actual - predicted
+    absolute = np.abs(error)
+    weeks = (days - np.datetime64(DEVELOPMENT[0], "D")).astype(int) // DAYS_PER_WEEK
+    sign, logdet = np.linalg.slogdet(error.T @ error / len(error))
+    distance, price = _extremes(actual, predicted)
+    return {
+        "rmse": float(np.sqrt(np.mean(error**2))),
+        "mse": float(np.mean(error**2)),
+        "mdae": float(np.median(absolute)),
+        "mean_error": float(np.mean(error)),
+        "wape": float(absolute.sum() / np.abs(actual).sum()),
+        # Hewamalage, Ackermann i Bergmeir (2022).
+        "corr": float(np.corrcoef(actual.ravel(), predicted.ravel())[0, 1]),
+        # Uniejewski et al. (2016).
+        "wmae": float(
+            np.mean(
+                [
+                    absolute[weeks == week].mean() / actual[weeks == week].mean()
+                    for week in np.unique(weeks)
+                ]
+            )
+        ),
+        # Les quatre de Maciejowska, Lipiecki i Uniejewski (2026).
+        "cov_e": float(logdet) if sign > 0 else math.nan,
+        "corr_f": float(np.mean(_spearman_by_day(actual, predicted))),
+        "mhd": float(np.mean(distance)),
+        "mpd": float(np.mean(price)),
+    }
+
+
+def _r2(actual, predicted):
+    """Torna l'R² de les files, sobre la seva pròpia mitjana."""
+    spread = np.sum((actual - np.mean(actual)) ** 2)
+    return float(1 - np.sum((actual - predicted) ** 2) / spread)
+
+
+def _mae(fit):
+    """Torna el MAE de la millor configuració d'una seed, de `part_i_secondary`."""
+    return float(np.abs(fit["actual"] - fit["predicted"]).mean())
+
+
+def _years(days):
+    """Torna l'any de cada dia."""
+    return days.astype("datetime64[Y]").astype(int) + 1970
+
+
+def _binned(error, base, bins, keys):
+    """Torna l'rMAE de cada clau de `keys`: el MAE de les files de `bins` iguals.
+
+    `error` i `base` són els errors de la família i de la còpia a les mateixes files.
+    Una clau sense cap fila val NaN.
+    """
+    return {
+        key: float(np.abs(error[bins == key]).mean() / np.abs(base[bins == key]).mean())
+        if np.any(bins == key)
+        else math.nan
+        for key in keys
+    }
+
+
+def deciles(best):
+    """Torna els límits de les deu parts del preu dels dies de prova de totes les seeds.
+
+    `best` és com a `part_i_secondary`; cada dia i hora hi compta una vegada.
+    """
+    days, prices = [], []
+    for fits in best.values():
+        for fit in fits.values():
+            days.append(fit["days"])
+            prices.append(fit["actual"])
+    _, first = np.unique(np.concatenate(days), return_index=True)
+    return np.quantile(np.concatenate(prices)[first], DECILES)
+
+
+def part_i_secondary(best, roles):
+    """Torna les files de les mètriques secundàries de la Part I.
+
+    `best` dona, per família, en l'ordre de les famílies, i per seed, la millor
+    configuració: els dies de prova, `days`, el preu i la predicció de cada un,
+    `actual` i `predicted`, `(dies, 24)`, i de la que en té, el MAE i el MSE de la
+    còpia a l'entrenament, `training_mae` i `training_mse`. `roles` és el registre de
+    cada família. L'rMAE per hora, per any i per decil del preu té, a més de cada seed,
+    la mitjana de les seeds que tenen files a la casella, i una casella sense cap fila
+    val NaN. Cada fila és un diccionari amb les claus que s'hi apliquen. Falla si una
+    família i la còpia que la divideix no tenen els mateixos dies de prova a una seed.
+    """
+    main = next(
+        (family for family in best if roles[family].get("denominator") == "main"), None
+    )
+    secondary = [
+        family for family in best if roles[family].get("denominator") == "secondary"
+    ]
+    pool = [
+        family
+        for family in best
+        if roles[family].get("interpreted") or roles[family].get("benchmark")
+    ]
+    edges = deciles(best)
+    rows = []
+
+    def add(measure, family, value, **keys):
+        rows.append(
+            {"measure": measure, "family": family, **keys, "value": value}
+            | {"unit": UNITS[measure]}
+        )
+
+    for family, fits in best.items():
+        years = sorted(
+            {int(year) for fit in fits.values() for year in _years(fit["days"])}
+        )
+        # Cada tall de l'rMAE: la clau on va la casella i les caselles.
+        cuts = {
+            "rmae": ("hour", range(HOURS_PER_DAY)),
+            "rmae_year": ("subject", years),
+            "rmae_decile": ("subject", range(1, len(DECILES))),
+        }
+        found = {measure: [] for measure in cuts}
+        deviations = []
+        for seed, fit in fits.items():
+            seeded = {"seed": seed, "rank": 0}
+            error = fit["actual"] - fit["predicted"]
+            for name, value in one_seed(
+                fit["days"], fit["actual"], fit["predicted"]
+            ).items():
+                add(name, family, value, **seeded)
+            for other in secondary:
+                if seed in best[other]:
+                    ratio = _mae(fit) / _mae(best[other][seed])
+                    add("rmae", family, ratio, other_family=other, **seeded)
+            present = [other for other in pool if seed in best[other]]
+            if present:
+                # Ziel i Weron (2018).
+                deviations.append(
+                    _mae(fit) / min(_mae(best[other][seed]) for other in present) - 1
+                )
+                add("deviation_from_best", family, deviations[-1], **seeded)
+            for hour in range(HOURS_PER_DAY):
+                hourly = fit["actual"][:, hour], fit["predicted"][:, hour]
+                add(
+                    "mae",
+                    family,
+                    float(np.abs(error[:, hour]).mean()),
+                    hour=hour,
+                    **seeded,
+                )
+                add("r2", family, _r2(*hourly), hour=hour, **seeded)
+            if main is None or seed not in best[main]:
+                continue
+            copy = best[main][seed]
+            if not np.array_equal(fit["days"], copy["days"]):
+                raise ValueError(
+                    f"{family} i {main} no tenen els mateixos dies de prova a la "
+                    f"seed {seed}"
+                )
+            # Hyndman i Koehler (2006), i l'RMSSE de Hyndman i Athanasopoulos (2021).
+            scaled = {
+                "mase": _mae(fit) / copy["training_mae"],
+                "rmsse": float(np.sqrt(np.mean(error**2) / copy["training_mse"])),
+            }
+            for name, value in scaled.items():
+                add(name, family, value, other_family=main, **seeded)
+            bins = {
+                "rmae": np.broadcast_to(np.arange(HOURS_PER_DAY), error.shape),
+                "rmae_year": np.broadcast_to(_years(fit["days"])[:, None], error.shape),
+                "rmae_decile": np.clip(
+                    np.searchsorted(edges, fit["actual"], side="right"),
+                    1,
+                    len(DECILES) - 1,
+                ),
+            }
+            base = copy["actual"] - copy["predicted"]
+            for measure, (key, keys) in cuts.items():
+                found[measure].append(_binned(error, base, bins[measure], keys))
+                for one, value in found[measure][-1].items():
+                    shown = {key: one if key == "hour" else str(one)}
+                    add(measure, family, value, other_family=main, **seeded, **shown)
+        if deviations:
+            add("deviation_from_best_mean", family, float(np.mean(deviations)), rank=0)
+        for measure, (key, keys) in cuts.items():
+            for one in keys if found[measure] else ():
+                values = [
+                    by_seed[one]
+                    for by_seed in found[measure]
+                    if not math.isnan(by_seed[one])
+                ]
+                mean = float(np.mean(values)) if values else math.nan
+                shown = {key: one if key == "hour" else str(one)}
+                add(measure, family, mean, other_family=main, rank=0, **shown)
+        if roles[family].get("ljung_box_tested"):
+            errors = {
+                seed: (fit["days"], fit["actual"] - fit["predicted"])
+                for seed, fit in fits.items()
+            }
+            # La sèrie cosida de totes les seeds, i la de cada una.
+            series = {None: daily_errors(errors.values())} | {
+                seed: daily_errors([one]) for seed, one in errors.items()
+            }
+            for seed, one in series.items():
+                statistic, value, correlations = ljung_box(one)
+                keys = {"rank": 0} | ({} if seed is None else {"seed": seed})
+                add("ljung_box_q", family, float(statistic), **keys)
+                add("ljung_box_p", family, float(value), **keys)
+                add("ljung_box_days", family, int((~np.isnan(one)).sum()), **keys)
+                if seed is None:
+                    for lag, correlation in enumerate(correlations, start=1):
+                        add(
+                            "autocorrelation",
+                            family,
+                            float(correlation),
+                            subject=str(lag),
+                            **keys,
+                        )
+    for decile, top in enumerate(edges[1:], start=1):
+        add("price_decile_top", None, float(top), subject=str(decile))
     return rows

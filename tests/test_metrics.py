@@ -2,9 +2,20 @@ import warnings
 
 import numpy as np
 import pytest
+from scipy import stats
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
 from epf import Refusal
-from epf.contract.metrics import part_i_main, scored
+from epf.contract.metrics import (
+    LAGS,
+    _extremes,
+    daily_errors,
+    ljung_box,
+    one_seed,
+    part_i_main,
+    part_i_secondary,
+    scored,
+)
 
 
 def test_a_score_refuses_a_prediction_that_is_not_a_number_and_fails_a_missing_price():
@@ -75,3 +86,162 @@ def test_one_seed_s_spread_is_a_blank_value_with_no_warning():
         rows = part_i_main(scores, None, ["floor"])
     assert np.isnan(_values(rows, "mae_std")[("floor", None, 0)])
     assert not _values(rows, "rmae")
+
+
+def test_without_gaps_the_statistic_is_the_usual_ljung_box():
+    """Un estadístic mal calculat donaria un valor p plausible."""
+    # Una AR(1) de coeficient 0.3: una implementació que no és la del projecte ha de
+    # donar el mateix estadístic i el mateix valor p.
+    rng = np.random.default_rng(0)
+    series = np.zeros(500)
+    for t in range(1, len(series)):
+        series[t] = 0.3 * series[t - 1] + rng.normal()
+    statistic, value, _ = ljung_box(series)
+    expected = acorr_ljungbox(series, lags=[LAGS])
+    assert statistic == pytest.approx(expected["lb_stat"].iloc[0])
+    assert value == pytest.approx(expected["lb_pvalue"].iloc[0])
+
+
+def test_a_missing_day_is_left_out_of_its_pairs_as_r_does():
+    # Feta a mà amb l'`acf0` de R: la mitjana dels presents és 3, la covariància a 0 és
+    # 10/4, la del retard 1 són dos parells que sumen 4 dividits per 2 + 1, r = 8/15, i
+    # amb n = 4, Q = 4 · 6 · r^2 / 3.
+    statistic, _, correlations = ljung_box(
+        np.array([1.0, 2.0, np.nan, 4.0, 5.0]), lags=1
+    )
+    assert correlations[0] == pytest.approx(8 / 15)
+    assert statistic == pytest.approx(4 * 6 * (8 / 15) ** 2 / 3)
+
+
+def test_each_day_comes_from_the_first_seed_that_tests_it():
+    """Un dia d'una altra seed donaria un valor p plausible sobre una altra sèrie."""
+    first = (np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[D]"), 1.0)
+    second = (np.array(["2020-01-02", "2020-01-04"], dtype="datetime64[D]"), 2.0)
+    series = daily_errors(
+        [(days, np.full((len(days), 24), error)) for days, error in (first, second)]
+    )
+    assert np.array_equal(series, [1.0, 1.0, np.nan, 2.0], equal_nan=True)
+
+
+def _day(mean):
+    """Torna els 24 preus d'un dia de mitjana `mean`, que pugen 0.1 cada hora."""
+    return mean + (np.arange(24) - 11.5) * 0.1
+
+
+def test_the_errors_metrics_by_hand():
+    # Dues setmanes de dimarts a dilluns: la primera a 10 de mitjana i errors d'1, la
+    # segona a 20 i errors de -4. WMAE (1 / 10 + 4 / 20) / 2 = 0.15; WAPE 5 / 30; error
+    # mitjà -1.5; MdAE 2.5, a mig camí d'1 i de 4; MSE (1 + 16) / 2 = 8.5.
+    days = np.arange("2019-01-01", "2019-01-15", dtype="datetime64[D]")
+    actual = np.array([_day(10 if day < 7 else 20) for day in range(14)])
+    predicted = actual - np.where(np.arange(14) < 7, 1.0, -4.0)[:, None]
+    found = one_seed(days, actual, predicted)
+    assert found["wmae"] == pytest.approx(0.15)
+    assert found["wape"] == pytest.approx(5 / 30)
+    assert found["mean_error"] == pytest.approx(-1.5)
+    assert found["mdae"] == pytest.approx(2.5)
+    assert found["mse"] == pytest.approx(8.5)
+    assert found["rmse"] == pytest.approx(8.5**0.5)
+
+
+def test_the_correlations_and_cov_e_match_other_implementations():
+    # Preus arrodonits, que empaten com els de les hores a zero.
+    rng = np.random.default_rng(0)
+    actual = np.round(rng.normal(50, 20, (30, 24)), -1)
+    predicted = np.round(actual + rng.normal(0, 8, (30, 24)), -1)
+    days = np.arange("2019-01-01", "2019-01-31", dtype="datetime64[D]")
+    found = one_seed(days, actual, predicted)
+    error = actual - predicted
+    assert found["corr"] == pytest.approx(
+        stats.pearsonr(actual.ravel(), predicted.ravel()).statistic
+    )
+    assert found["corr_f"] == pytest.approx(
+        np.mean([stats.spearmanr(a, f).statistic for a, f in zip(actual, predicted)])
+    )
+    eigenvalues = np.linalg.eigvalsh(error.T @ error / len(error))
+    assert found["cov_e"] == pytest.approx(np.sum(np.log(eigenvalues)))
+
+
+def test_a_forecast_on_any_of_the_tied_true_hours_hits_the_extreme():
+    # Dos dies a 50, a zero de les 10 a les 15 i a 100 a les 20. El primer previst té
+    # el mínim a les 14, una de les zero, i el màxim a les 19: 0 + 1 hores, 0 + 50
+    # EUR/MWh. El segon empata el mínim a les 3 i a les 12, i pren les 3, a 7 hores de
+    # les 10 i a 50 EUR/MWh, i encerta el màxim. MHD (1 + 7) / 2 = 4, MPD 50.
+    actual = np.full((2, 24), 50.0)
+    actual[:, 10:16] = 0.0
+    actual[:, 20] = 100.0
+    predicted = np.full((2, 24), 40.0)
+    predicted[0, 14], predicted[0, 19] = 1.0, 90.0
+    predicted[1, [3, 12]], predicted[1, 20] = 2.0, 95.0
+    distance, price = _extremes(actual, predicted)
+    assert np.array_equal(distance, [1, 7]) and np.array_equal(price, [50, 50])
+
+
+def _fit(days, errors, **arrays):
+    """Torna la millor configuració d'una seed: dies de mitjana 10, 20, ... i errors."""
+    days = np.array(days, dtype="datetime64[D]")
+    actual = np.array([_day(10 * (number + 1)) for number in range(len(days))])
+    return {"days": days, "actual": actual, "predicted": actual - errors, **arrays}
+
+
+def _secondary(rows, measure, family=None, **keys):
+    """Torna el valor de les files d'una mesura i una família que tenen les claus."""
+    return [
+        row["value"]
+        for row in rows
+        if row["measure"] == measure
+        and row["family"] == family
+        and all(row.get(key) == value for key, value in keys.items())
+    ]
+
+
+def test_the_secondary_metrics_against_the_copies_by_hand():
+    """La sonda de datació no entra entre les millors, i pot quedar-ne per sota."""
+    # Seed 0 al 2019 i seed 1 al 2020, dos dies cada una. Errors constants: l'arbre 1
+    # i 3, la sonda 0.5, la còpia de la setmana -2, la del dia 4. rMAE sobre la del dia
+    # 1 / 4; MASE 1 / 4 i RMSSE √(1 / 25), sobre l'entrenament de la còpia; la
+    # desviació de la millor, entre l'arbre i les còpies, 0 per a l'arbre i -0.5 per a
+    # la sonda. Per any, l'arbre fa 1 / 2 el 2019 i 3 / 2 el 2020, cada any d'una seed.
+    # A cada hora, els dos dies valen a i a + 10: l'R² sobre la mitjana de l'hora és
+    # 1 - 2 / 50 a la seed 0, i amb la de la seed sencera seria un altre.
+    first, second = ["2019-01-01", "2019-01-02"], ["2020-01-07", "2020-01-08"]
+    best = {
+        "lightgbm": {0: _fit(first, 1.0), 1: _fit(second, 3.0)},
+        "date_probe": {0: _fit(first, 0.5), 1: _fit(second, 0.5)},
+        "naive_previous_week": {
+            seed: _fit(days, -2.0, training_mae=4.0, training_mse=25.0)
+            for seed, days in ((0, first), (1, second))
+        },
+        "naive_previous_day": {0: _fit(first, 4.0), 1: _fit(second, 4.0)},
+    }
+    roles = {
+        "lightgbm": {"interpreted": True},
+        "date_probe": {},
+        "naive_previous_week": {"benchmark": True, "denominator": "main"},
+        "naive_previous_day": {"benchmark": True, "denominator": "secondary"},
+    }
+    rows = part_i_secondary(best, roles)
+    assert _secondary(
+        rows, "rmae", "lightgbm", seed=0, other_family="naive_previous_day"
+    ) == [0.25]
+    assert _secondary(rows, "mase", "lightgbm", seed=0) == [0.25]
+    assert _secondary(rows, "rmsse", "lightgbm", seed=0) == [pytest.approx(0.2)]
+    assert _secondary(rows, "deviation_from_best", "lightgbm", seed=0) == [0.0]
+    assert _secondary(rows, "deviation_from_best", "date_probe", seed=0) == [-0.5]
+    assert _secondary(rows, "r2", "lightgbm", seed=0, hour=5) == [pytest.approx(0.96)]
+    assert _secondary(rows, "rmae_year", "lightgbm", seed=0, subject="2019") == [0.5]
+    assert np.isnan(
+        _secondary(rows, "rmae_year", "lightgbm", seed=0, subject="2020")[0]
+    )
+    means = [
+        row["value"]
+        for row in rows
+        if row["measure"] == "rmae_year"
+        and row["family"] == "lightgbm"
+        and row.get("seed") is None
+    ]
+    assert means == [0.5, 1.5]
+    prices = np.concatenate([fit["actual"] for fit in best["lightgbm"].values()])
+    assert _secondary(rows, "price_decile_top") == list(
+        np.quantile(prices, np.linspace(0, 1, 11))[1:]
+    )
