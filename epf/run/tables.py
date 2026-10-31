@@ -73,6 +73,8 @@ def _best(where, complete):
                     )
                 found[family][seed] = {
                     "days": days,
+                    "days_training": model["days_training"],
+                    "days_validation": model["days_validation"],
                     "predicted": model["predicted"].reshape(len(days), -1),
                     "actual": model["actual"].reshape(len(days), -1),
                 } | {
@@ -138,10 +140,14 @@ def write(where, main_only=False):
     `mae` i `r2` de cada hora; sobre la còpia principal, `mase` i `rmsse`, i `rmae` de
     cada hora, `rmae_year` de cada any i `rmae_decile` de cada decil del preu, de l'1 al
     10, a `subject`, també sobre les seeds, `seed` buida; `price_decile_top`, el límit
-    de dalt de cada decil, `family` buida; i, de cada família amb el test de
-    Ljung-Box, `ljung_box_q`, `ljung_box_p` i `ljung_box_days` de la sèrie cosida de
-    totes les seeds, `seed` buida, i de cada seed, i `autocorrelation` de la cosida a
-    cada retard, a `subject`.
+    de dalt de cada decil, `family` buida; de cada família amb el test de Ljung-Box,
+    `ljung_box_q`, `ljung_box_p` i `ljung_box_days` de la sèrie cosida de totes les
+    seeds, `seed` buida, i de cada seed, i `autocorrelation` de la cosida a cada retard,
+    a `subject`; a cada seed i parell ordenat, `dm_day` i `dm_hour`, el valor p que
+    `other_family` és més precisa que `family`; a cada seed i parell en l'ordre de les
+    famílies, `error_correlation`; i, sobre les seeds, `seed` buida, de cada parell en
+    aquest ordre, `t_test`, `t_statistic`, `t_left`, `t_rope` i `t_right`, sobre el MAE
+    de `family` menys el d'`other_family`, `t_left` per a `family` més precisa.
 
     Torna la taula de cada fitxer pel seu nom. Amb `main_only`, el d'una passada que
     s'atura abans de les figures, només escriu `part_i_main.csv`.
@@ -170,8 +176,9 @@ def write(where, main_only=False):
     }
     if main_only:
         return numbers
+    best = _best(where, complete)
     numbers[PART_I_SECONDARY] = _written(
         where / PART_I_SECONDARY,
-        metrics.part_i_secondary(_best(where, complete), records),
+        metrics.part_i_secondary(best, records) + metrics.part_i_tests(best),
     )
     return numbers

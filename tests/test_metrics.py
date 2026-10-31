@@ -9,11 +9,14 @@ from epf import Refusal
 from epf.contract.metrics import (
     LAGS,
     _extremes,
+    corrected_t_test,
     daily_errors,
+    diebold_mariano,
     ljung_box,
     one_seed,
     part_i_main,
     part_i_secondary,
+    part_i_tests,
     scored,
 )
 
@@ -245,3 +248,63 @@ def test_the_secondary_metrics_against_the_copies_by_hand():
     assert _secondary(rows, "price_decile_top") == list(
         np.quantile(prices, np.linspace(0, 1, 11))[1:]
     )
+
+
+def test_the_dm_tests_by_hand():
+    # Errors de la primera 2, 4 i 6 a totes les hores, i de la segona 1: diferències
+    # 1, 3 i 5, mitjana 3, variància sense corregir 8 / 3, i l'estadístic
+    # 3 / √(8 / 3 / 3) = 9 / (2√2), al dia i a cada hora.
+    first = np.repeat([[2.0], [-4.0], [6.0]], 24, axis=1)
+    second = np.ones((3, 24))
+    day, hours = diebold_mariano(first, second)
+    expected = 1 - stats.norm.cdf(9 / (2 * 2**0.5))
+    assert day == pytest.approx(expected) and hours == pytest.approx([expected] * 24)
+    assert diebold_mariano(second, first)[0] == pytest.approx(1 - expected)
+
+
+def test_the_corrected_t_test_by_hand():
+    # Quatre seeds, diferències 1, 2, 3 i 6: mitjana 3, variància mostral 14 / 3, i la
+    # proporció de setmanes de la partició, 80 de prova sobre 193 + 129.
+    ratio = 80 / 322
+    scale = ((1 / 4 + ratio) * 14 / 3) ** 0.5
+    found = corrected_t_test(np.array([1.0, 2.0, 3.0, 6.0]), ratio, 0.5)
+    assert found["t_statistic"] == pytest.approx(3 / scale)
+    assert found["t_test"] == pytest.approx(2 * stats.t.sf(3 / scale, 3))
+    assert found["t_left"] == pytest.approx(stats.t.cdf(-0.5, 3, loc=3, scale=scale))
+    assert found["t_right"] == pytest.approx(stats.t.sf(0.5, 3, loc=3, scale=scale))
+    assert sum(
+        found[name] for name in ("t_left", "t_rope", "t_right")
+    ) == pytest.approx(1)
+    assert all(
+        np.isnan(value) for value in corrected_t_test(np.ones(4), ratio, 0.5).values()
+    )
+
+
+def _parted(days, errors, weeks):
+    """Torna una seed de `part_i_tests`: dies, errors, i setmanes de cada part."""
+    start = np.datetime64("2019-01-01")
+    return _fit(days, errors) | {
+        "days_training": start + 7 * np.arange(weeks[0]),
+        "days_validation": start + 7 * np.arange(weeks[0], weeks[0] + weeks[1]),
+    }
+
+
+def test_each_pair_is_tested_both_ways_by_dm_once_by_the_t_test():
+    first, second = ["2019-01-01", "2019-01-02"], ["2020-01-07", "2020-01-08"]
+    best = {
+        name: {0: _parted(first, error, (2, 1)), 1: _parted(second, error + 1, (2, 1))}
+        for name, error in (
+            ("lightgbm", np.array([[1.0], [1.5]])),
+            ("naive_previous_week", np.array([[2.0], [3.0]])),
+        )
+    }
+    rows = part_i_tests(best)
+    assert len(_secondary(rows, "dm_day", "lightgbm", seed=0)) == 1
+    assert len(_secondary(rows, "dm_day", "naive_previous_week", seed=0)) == 1
+    assert len(_secondary(rows, "dm_hour", "lightgbm", seed=1)) == 24
+    assert len(_secondary(rows, "error_correlation", "lightgbm")) == 2
+    assert not _secondary(rows, "error_correlation", "naive_previous_week")
+    assert [row.get("seed") for row in rows if row["measure"] == "t_test"] == [None]
+    best["lightgbm"][1]["days_validation"] = best["lightgbm"][1]["days_validation"][:0]
+    with pytest.raises(ValueError, match="proporcions de setmanes"):
+        part_i_tests(best)

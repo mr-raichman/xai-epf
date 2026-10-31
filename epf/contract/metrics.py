@@ -40,6 +40,14 @@ UNITS = {
     "ljung_box_p": UNITLESS,
     "ljung_box_days": "dies",
     "autocorrelation": UNITLESS,
+    "dm_day": UNITLESS,
+    "dm_hour": UNITLESS,
+    "error_correlation": UNITLESS,
+    "t_test": UNITLESS,
+    "t_statistic": UNITLESS,
+    "t_left": UNITLESS,
+    "t_rope": UNITLESS,
+    "t_right": UNITLESS,
 }
 
 # Retards del test de Ljung-Box, dues vegades el període setmanal, com aconsellen
@@ -48,6 +56,10 @@ LAGS = 2 * DAYS_PER_WEEK
 
 # Els límits de les deu parts del preu.
 DECILES = np.linspace(0, 1, 11)
+
+# La meitat de la regió d'equivalència de la t bayesiana, en part del MAE mitjà del
+# parell sobre les seeds: l'1 % que Benavoli et al. (2017) prenen en l'exactitud.
+ROPE = 0.01
 
 
 def _fail_on_absent(actual):
@@ -462,4 +474,125 @@ def part_i_secondary(best, roles):
                         )
     for decile, top in enumerate(edges[1:], start=1):
         add("price_decile_top", None, float(top), subject=str(decile))
+    return rows
+
+
+def diebold_mariano(first, second):
+    """Torna el valor p de Diebold-Mariano que `second` és més precís que `first`.
+
+    `first` i `second` són els errors de les dues prediccions, `(dies, 24)`. Com el
+    `DM` de Lago et al. (2021): la pèrdua absoluta, la variància de les diferències
+    sense corregir i una sola cua. Torna el del test multivariant, sobre la mitjana de
+    cada dia, i els de l'univariant a cada hora.
+    """
+    differences = np.abs(first) - np.abs(second)
+
+    def tested(found):
+        statistic = found.mean(axis=0) / np.sqrt(found.var(axis=0) / len(found))
+        return 1 - stats.norm.cdf(statistic)
+
+    return float(tested(differences.mean(axis=1))), tested(differences)
+
+
+def corrected_t_test(differences, ratio, rope):
+    """Torna la t corregida d'unes diferències de MAE, i la seva forma bayesiana.
+
+    `differences` són les de cada seed, `ratio` les setmanes de prova sobre les
+    d'entrenament i de validació, i `rope` la meitat de la regió d'equivalència. La
+    variància és la mostral per 1/n més `ratio` (Nadeau i Bengio, 2003), i la posterior,
+    una t de n - 1 graus centrada en la mitjana amb aquesta escala (Benavoli et al.,
+    2017). Torna l'estadístic, el valor p de dues cues i la probabilitat de la posterior
+    per sota de -`rope`, entre -`rope` i `rope` i per sobre de `rope`; unes diferències
+    totes iguals no tenen dispersió, i ho tornen tot NaN.
+    """
+    n = len(differences)
+    scale = math.sqrt((1 / n + ratio) * np.var(differences, ddof=1))
+    if scale == 0:
+        return dict.fromkeys(
+            ("t_test", "t_statistic", "t_left", "t_rope", "t_right"), math.nan
+        )
+    mean = float(np.mean(differences))
+    statistic = mean / scale
+    posterior = stats.t(n - 1, loc=mean, scale=scale)
+    return {
+        "t_test": float(2 * stats.t.sf(abs(statistic), n - 1)),
+        "t_statistic": statistic,
+        "t_left": float(posterior.cdf(-rope)),
+        "t_rope": float(posterior.cdf(rope) - posterior.cdf(-rope)),
+        "t_right": float(posterior.sf(rope)),
+    }
+
+
+def _weeks(days):
+    """Torna quantes setmanes toquen uns dies, les que reparteix la partició."""
+    start = np.datetime64(DEVELOPMENT[0], "D")
+    return len(np.unique((days - start).astype(int) // DAYS_PER_WEEK))
+
+
+def part_i_tests(best):
+    """Torna les files dels tests entre famílies, mètriques secundàries de la Part I.
+
+    `best` és com a `part_i_secondary`, cada seed també amb els dies d'entrenament i de
+    validació, `days_training` i `days_validation`. A cada seed i parell ordenat, els
+    valors p de Diebold-Mariano que la segona família és més precisa que la primera,
+    del dia i de cada hora; a cada seed i parell, una vegada en l'ordre de les
+    famílies, la correlació de Pearson dels seus errors mitjans de cada dia; i, amb més
+    d'una seed, la t corregida de cada parell sobre el MAE de la primera menys el de la
+    segona, amb la regió d'equivalència de `ROPE`. Falla si les seeds no tenen les
+    mateixes setmanes a cada part.
+    """
+    rows = []
+
+    def add(measure, family, other, value, **keys):
+        rows.append(
+            {"measure": measure, "family": family, "other_family": other}
+            | keys
+            | {"rank": 0, "value": value, "unit": UNITS[measure]}
+        )
+
+    errors = {
+        family: {seed: fit["actual"] - fit["predicted"] for seed, fit in fits.items()}
+        for family, fits in best.items()
+    }
+    for family, fits in errors.items():
+        for other, others in errors.items():
+            if other == family:
+                continue
+            for seed in fits.keys() & others.keys():
+                day, hours = diebold_mariano(fits[seed], others[seed])
+                add("dm_day", family, other, day, seed=seed)
+                for hour, value in enumerate(hours):
+                    add("dm_hour", family, other, float(value), seed=seed, hour=hour)
+    pairs = [
+        (family, other)
+        for number, family in enumerate(errors)
+        for other in list(errors)[number + 1 :]
+    ]
+    for family, other in pairs:
+        for seed in errors[family].keys() & errors[other].keys():
+            daily = [errors[name][seed].mean(axis=1) for name in (family, other)]
+            correlation = float(np.corrcoef(*daily)[0, 1])
+            add("error_correlation", family, other, correlation, seed=seed)
+    ratios = {
+        _weeks(fit["days"])
+        / (_weeks(fit["days_training"]) + _weeks(fit["days_validation"]))
+        for fits in best.values()
+        for fit in fits.values()
+    }
+    if len(ratios) > 1:
+        raise ValueError(f"les seeds tenen {len(ratios)} proporcions de setmanes")
+    (ratio,) = ratios
+    for family, other in pairs:
+        seeds = sorted(errors[family].keys() & errors[other].keys())
+        if len(seeds) < 2:
+            continue
+        maes = np.array(
+            [
+                [np.abs(errors[name][seed]).mean() for seed in seeds]
+                for name in (family, other)
+            ]
+        )
+        found = corrected_t_test(maes[0] - maes[1], ratio, ROPE * maes.mean())
+        for name, value in found.items():
+            add(name, family, other, value)
     return rows
