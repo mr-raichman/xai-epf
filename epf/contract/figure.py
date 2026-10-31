@@ -42,10 +42,10 @@ FONT = "Times New Roman"
 FALLBACK_FONT = "Liberation Serif"
 
 # Mides del text, en punts, des de la del peu de figura de la memòria: el títol d'una
-# figura o d'un panell, un punt per sota, i tot el text dels eixos, dos.
+# figura o d'un panell, un punt per sota, i tot el text dels eixos, tres.
 CAPTION_SIZE = 12
 PANEL_HEADING_SIZE = CAPTION_SIZE - 1
-AXIS_TEXT_SIZE = CAPTION_SIZE - 2
+AXIS_TEXT_SIZE = CAPTION_SIZE - 3
 
 # `PANEL_HEADING_PLACE`, "left", "center" o "right".
 PANEL_HEADING_PLACE = "center"
